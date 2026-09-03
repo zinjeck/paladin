@@ -95,7 +95,7 @@ namespace Paladin
             !window_ ||
             !renderer_ ||
             !simulationClock_ ||
-            !simulation_
+            !simulation_ ||
             !camera_ ||
             !worldGridRenderer_ ||
             !tileRenderMetrics_
