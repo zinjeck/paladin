@@ -19,7 +19,9 @@ FetchContent_MakeAvailable(SDL3)
 add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
+    src/core/SimulationClock.cpp
     src/platform/Window.cpp
+    src/rendering/Renderer.cpp
 )
 
 target_include_directories(Paladin PRIVATE

@@ -20,6 +20,8 @@ namespace Paladin
 
         bool isValid() const noexcept;
 
+        SDL_Window* nativeHandle() const noexcept;
+
     private:
         SDL_Window* window_ = nullptr;
     };

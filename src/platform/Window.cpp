@@ -38,4 +38,9 @@ namespace Paladin
     {
         return window_ != nullptr;
     }
+
+    SDL_Window* Window::nativeHandle() const noexcept
+    {
+        return window_;
+    }
 }
