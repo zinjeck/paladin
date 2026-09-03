@@ -8,6 +8,7 @@
 #include "world/Settlement.h"
 #include "world/WorldPosition.h"
 #include "world/WorldTime.h"
+#include "world/WorldGrid.h"
 
 #include <cstddef>
 
@@ -28,6 +29,12 @@ namespace Paladin
         // ====================================================
         // Entity creation
         // ====================================================
+
+        [[nodiscard]]
+        WorldGrid& grid() noexcept;
+        
+        [[nodiscard]]
+        const WorldGrid& grid() const noexcept;
 
         [[nodiscard]]
         SettlementId createSettlement(
