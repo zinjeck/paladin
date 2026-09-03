@@ -52,6 +52,7 @@ add_executable(PaladinTests
     tests/WorldTests.cpp
 
     src/world/World.cpp
+    src/world/WorldTime.cpp
 )
 
 target_include_directories(PaladinTests PRIVATE
