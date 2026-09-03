@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Paladin/out/build/x64-Debug/_deps/sdl3-subbuild/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
