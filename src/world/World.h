@@ -6,6 +6,7 @@
 #include "world/Army.h"
 #include "world/Polity.h"
 #include "world/Settlement.h"
+#include "world/WorldPosition.h"
 
 #include <cstddef>
 
@@ -23,23 +24,27 @@ namespace Paladin
         void tick(double deltaSeconds);
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // Entity creation
-        // ----------------------------------------------------
+        // ====================================================
 
         [[nodiscard]]
-        SettlementId createSettlement();
+        SettlementId createSettlement(
+            WorldPosition position = {}
+        );
 
         [[nodiscard]]
         PolityId createPolity();
 
         [[nodiscard]]
-        ArmyId createArmy();
+        ArmyId createArmy(
+            WorldPosition position = {}
+        );
 
 
-        // ----------------------------------------------------
+        // ====================================================
         // Entity lookup
-        // ----------------------------------------------------
+        // ====================================================
 
         [[nodiscard]]
         Settlement* settlement(
@@ -74,9 +79,47 @@ namespace Paladin
         ) const noexcept;
 
 
-        // ----------------------------------------------------
+        // ====================================================
+        // Settlement relationships
+        // ====================================================
+
+        bool assignSettlementToPolity(
+            SettlementId settlementId,
+            PolityId polityId
+        ) noexcept;
+
+        bool makeSettlementIndependent(
+            SettlementId settlementId
+        ) noexcept;
+
+        bool setSettlementPosition(
+            SettlementId settlementId,
+            WorldPosition position
+        ) noexcept;
+
+
+        // ====================================================
+        // Army relationships
+        // ====================================================
+
+        bool assignArmyToPolity(
+            ArmyId armyId,
+            PolityId polityId
+        ) noexcept;
+
+        bool makeArmyIndependent(
+            ArmyId armyId
+        ) noexcept;
+
+        bool setArmyPosition(
+            ArmyId armyId,
+            WorldPosition position
+        ) noexcept;
+
+
+        // ====================================================
         // Counts
-        // ----------------------------------------------------
+        // ====================================================
 
         [[nodiscard]]
         std::size_t settlementCount() const noexcept;
