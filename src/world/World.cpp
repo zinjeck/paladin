@@ -2,7 +2,10 @@
 
 namespace Paladin
 {
-    World::World() = default;
+    World::World()
+        : grid_(256, 256)
+    {
+    }
 
     World::~World() = default;
 
