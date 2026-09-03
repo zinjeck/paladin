@@ -4,7 +4,11 @@
 #include "platform/Window.h"
 #include "rendering/Renderer.h"
 #include "simulation/Simulation.h"
+#include "rendering/Camera2D.h"
+#include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldGridRenderer.h"
 
+#include "world/World.h"
 #include <SDL3/SDL.h>
 
 #include <memory>
@@ -53,10 +57,26 @@ namespace Paladin
 
         simulation_ =
             std::make_unique<Simulation>();
+
+        camera_ =
+            std::make_unique<Camera2D>(
+                128.0,
+                128.0
+            );
+        
+        worldGridRenderer_ =
+            std::make_unique<WorldGridRenderer>();
+        
+        tileRenderMetrics_ =
+            std::make_unique<TileRenderMetrics>();
     }
 
     Application::~Application()
     {
+        tileRenderMetrics_.reset();
+        worldGridRenderer_.reset();
+        camera_.reset();
+
         simulation_.reset();
         simulationClock_.reset();
         renderer_.reset();
@@ -76,6 +96,9 @@ namespace Paladin
             !renderer_ ||
             !simulationClock_ ||
             !simulation_
+            !camera_ ||
+            !worldGridRenderer_ ||
+            !tileRenderMetrics_
         )
         {
             return 1;
@@ -108,9 +131,12 @@ namespace Paladin
 
             renderer_->beginFrame();
 
-            // The renderer will eventually read simulation state here.
-            //
-            // It must not own or mutate authoritative world state.
+            worldGridRenderer_->render(
+                *renderer_,
+                simulation_->world().grid(),
+                *camera_,
+                *tileRenderMetrics_
+            )
 
             renderer_->endFrame();
         }
