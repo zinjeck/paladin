@@ -9,23 +9,21 @@ namespace Paladin
 
     void World::tick(double deltaSeconds)
     {
-        // Future strategic world simulation.
-        //
-        // Eventually:
-        //
-        // - settlement simulation
-        // - polity AI
-        // - diplomacy
-        // - strategic army movement
-        // - trade
-        // - warfare
-        // - world-scale economy
-        //
-        // Rendering remains completely separate.
-
-        (void)deltaSeconds;
+        time_.advance(deltaSeconds);
+    
+        // Future strategic systems will update here.
     }
 
+    WorldTime& World::time() noexcept
+    {
+        return time_;
+    }
+    
+    
+    const WorldTime& World::time() const noexcept
+    {
+        return time_;
+    }
 
     // ========================================================
     // Creation
