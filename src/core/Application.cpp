@@ -136,7 +136,7 @@ namespace Paladin
                 simulation_->world().grid(),
                 *camera_,
                 *tileRenderMetrics_
-            )
+            );
 
             renderer_->endFrame();
         }
