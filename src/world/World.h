@@ -146,6 +146,7 @@ namespace Paladin
 
     private:
         WorldTime time_;
+        WorldGrid grid_;
     
         EntityRegistry<
             Settlement,
