@@ -38,3 +38,27 @@ add_custom_command(
         $<TARGET_FILE:SDL3::SDL3>
         $<TARGET_FILE_DIR:Paladin>
 )
+
+# ============================================================
+# Tests
+# ============================================================
+
+enable_testing()
+
+add_executable(PaladinTests
+    tests/TestMain.cpp
+    tests/CoreTests.cpp
+    tests/WorldTests.cpp
+
+    src/world/World.cpp
+)
+
+target_include_directories(PaladinTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+)
+
+add_test(
+    NAME PaladinTests
+    COMMAND PaladinTests
+)
