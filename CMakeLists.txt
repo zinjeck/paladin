@@ -26,6 +26,7 @@ add_executable(Paladin
     src/world/World.cpp
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
+    src/rendering/WorldGridRenderer.cpp
 )
 
 target_include_directories(Paladin PRIVATE

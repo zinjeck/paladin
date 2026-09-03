@@ -47,4 +47,63 @@ namespace Paladin
     {
         SDL_RenderPresent(renderer_);
     }
+
+    void Renderer::fillRectangle(
+        float x,
+        float y,
+        float width,
+        float height,
+        RenderColor color
+    )
+    {
+        SDL_SetRenderDrawColor(
+            renderer_,
+            color.red,
+            color.green,
+            color.blue,
+            color.alpha
+        );
+    
+        const SDL_FRect rectangle{
+            x,
+            y,
+            width,
+            height
+        };
+    
+        SDL_RenderFillRect(
+            renderer_,
+            &rectangle
+        );
+    }
+    
+    
+    int Renderer::outputWidth() const noexcept
+    {
+        int width = 0;
+        int height = 0;
+    
+        SDL_GetRenderOutputSize(
+            renderer_,
+            &width,
+            &height
+        );
+    
+        return width;
+    }
+    
+    
+    int Renderer::outputHeight() const noexcept
+    {
+        int width = 0;
+        int height = 0;
+    
+        SDL_GetRenderOutputSize(
+            renderer_,
+            &width,
+            &height
+        );
+    
+        return height;
+    }
 }
