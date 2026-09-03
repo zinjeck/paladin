@@ -7,6 +7,7 @@ namespace Paladin
     class Window;
     class Renderer;
     class SimulationClock;
+    class Simulation;
 
     class Application
     {
@@ -20,12 +21,11 @@ namespace Paladin
         int run();
 
     private:
-        void simulationTick(double deltaSeconds);
-
         bool sdlInitialized_ = false;
 
         std::unique_ptr<Window> window_;
         std::unique_ptr<Renderer> renderer_;
         std::unique_ptr<SimulationClock> simulationClock_;
+        std::unique_ptr<Simulation> simulation_;
     };
 }
