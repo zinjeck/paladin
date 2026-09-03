@@ -28,6 +28,17 @@ namespace Paladin
         return time_;
     }
 
+    WorldGrid& World::grid() noexcept
+    {
+        return grid_;
+    }
+    
+    
+    const WorldGrid& World::grid() const noexcept
+    {
+        return grid_;
+    }
+
     // ========================================================
     // Creation
     // ========================================================
