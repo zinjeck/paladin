@@ -7,6 +7,7 @@
 #include "world/Polity.h"
 #include "world/Settlement.h"
 #include "world/WorldPosition.h"
+#include "world/WorldTime.h"
 
 #include <cstddef>
 
@@ -78,6 +79,12 @@ namespace Paladin
             ArmyId id
         ) const noexcept;
 
+        [[nodiscard]]
+        WorldTime& time() noexcept;
+        
+        [[nodiscard]]
+        const WorldTime& time() const noexcept;
+
 
         // ====================================================
         // Settlement relationships
@@ -132,6 +139,8 @@ namespace Paladin
 
 
     private:
+        WorldTime time_;
+    
         EntityRegistry<
             Settlement,
             SettlementId
