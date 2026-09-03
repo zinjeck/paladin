@@ -2,7 +2,10 @@
 
 namespace Paladin
 {
-    World::World() = default;
+    World::World()
+        : grid_(256, 256)
+    {
+    }
 
     World::~World() = default;
 
@@ -23,6 +26,17 @@ namespace Paladin
     const WorldTime& World::time() const noexcept
     {
         return time_;
+    }
+
+    WorldGrid& World::grid() noexcept
+    {
+        return grid_;
+    }
+    
+    
+    const WorldGrid& World::grid() const noexcept
+    {
+        return grid_;
     }
 
     // ========================================================

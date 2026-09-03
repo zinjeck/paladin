@@ -8,6 +8,7 @@
 #include "world/Settlement.h"
 #include "world/WorldPosition.h"
 #include "world/WorldTime.h"
+#include "world/WorldGrid.h"
 
 #include <cstddef>
 
@@ -85,6 +86,11 @@ namespace Paladin
         [[nodiscard]]
         const WorldTime& time() const noexcept;
 
+        [[nodiscard]]
+        WorldGrid& grid() noexcept;
+        
+        [[nodiscard]]
+        const WorldGrid& grid() const noexcept;
 
         // ====================================================
         // Settlement relationships
@@ -140,6 +146,7 @@ namespace Paladin
 
     private:
         WorldTime time_;
+        WorldGrid grid_;
     
         EntityRegistry<
             Settlement,
