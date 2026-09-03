@@ -1,8 +1,0 @@
-C:/Paladin/out/build/x64-Debug/CMakeFiles/Paladin.dir
-C:/Paladin/out/build/x64-Debug/CMakeFiles/edit_cache.dir
-C:/Paladin/out/build/x64-Debug/CMakeFiles/rebuild_cache.dir
-C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/CMakeFiles/SDL3-shared.dir
-C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/CMakeFiles/SDL3_test.dir
-C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/CMakeFiles/SDL_uclibc.dir
-C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/CMakeFiles/edit_cache.dir
-C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/CMakeFiles/rebuild_cache.dir
