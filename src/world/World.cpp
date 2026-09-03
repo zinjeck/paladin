@@ -1,10 +1,53 @@
 #include "world/World.h"
+#include "world/TerrainType.h"
 
 namespace Paladin
 {
     World::World()
         : grid_(256, 256)
     {
+        // Temporary bootstrap terrain.
+        //
+        // This is NOT world generation.
+        // It only exists so we can prove rendering works.
+    
+        for (std::int32_t y = 64; y < 192; ++y)
+        {
+            for (std::int32_t x = 64; x < 192; ++x)
+            {
+                WorldTile* tile =
+                    grid_.tile(
+                        WorldTilePosition{
+                            x,
+                            y
+                        }
+                    );
+    
+                if (tile)
+                {
+                    tile->terrain =
+                        TerrainType::Land;
+                }
+            }
+        }
+    
+    
+        for (std::int32_t y = 80; y < 176; ++y)
+        {
+            WorldTile* tile =
+                grid_.tile(
+                    WorldTilePosition{
+                        128,
+                        y
+                    }
+                );
+    
+            if (tile)
+            {
+                tile->terrain =
+                    TerrainType::Mountain;
+            }
+        }
     }
 
     World::~World() = default;
