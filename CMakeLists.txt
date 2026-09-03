@@ -24,7 +24,7 @@ add_executable(Paladin
     src/rendering/Renderer.cpp
     src/simulation/Simulation.cpp
     src/world/World.cpp
-		src/world/WorldTime.cpp
+	src/world/WorldTime.cpp
 )
 
 target_include_directories(Paladin PRIVATE
