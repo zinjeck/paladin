@@ -31,12 +31,6 @@ namespace Paladin
         // ====================================================
 
         [[nodiscard]]
-        WorldGrid& grid() noexcept;
-        
-        [[nodiscard]]
-        const WorldGrid& grid() const noexcept;
-
-        [[nodiscard]]
         SettlementId createSettlement(
             WorldPosition position = {}
         );
@@ -92,6 +86,11 @@ namespace Paladin
         [[nodiscard]]
         const WorldTime& time() const noexcept;
 
+        [[nodiscard]]
+        WorldGrid& grid() noexcept;
+        
+        [[nodiscard]]
+        const WorldGrid& grid() const noexcept;
 
         // ====================================================
         // Settlement relationships
