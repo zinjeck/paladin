@@ -9,27 +9,33 @@ namespace Paladin
 
     void World::tick(double deltaSeconds)
     {
-        // Future strategic simulation.
+        // Future strategic world simulation.
         //
-        // This layer will eventually coordinate things such as:
+        // Eventually:
         //
-        // - settlement progression
+        // - settlement simulation
         // - polity AI
         // - diplomacy
         // - strategic army movement
-        // - warfare
         // - trade
-        // - world-scale economic systems
+        // - warfare
+        // - world-scale economy
         //
-        // None of those systems will require rendering.
+        // Rendering remains completely separate.
 
         (void)deltaSeconds;
     }
 
 
-    SettlementId World::createSettlement()
+    // ========================================================
+    // Creation
+    // ========================================================
+
+    SettlementId World::createSettlement(
+        WorldPosition position
+    )
     {
-        return settlements_.create();
+        return settlements_.create(position);
     }
 
 
@@ -39,11 +45,17 @@ namespace Paladin
     }
 
 
-    ArmyId World::createArmy()
+    ArmyId World::createArmy(
+        WorldPosition position
+    )
     {
-        return armies_.create();
+        return armies_.create(position);
     }
 
+
+    // ========================================================
+    // Lookup
+    // ========================================================
 
     Settlement* World::settlement(
         SettlementId id
@@ -92,6 +104,140 @@ namespace Paladin
         return armies_.find(id);
     }
 
+
+    // ========================================================
+    // Settlement relationships
+    // ========================================================
+
+    bool World::assignSettlementToPolity(
+        SettlementId settlementId,
+        PolityId polityId
+    ) noexcept
+    {
+        Settlement* targetSettlement =
+            settlements_.find(settlementId);
+
+        const Polity* targetPolity =
+            polities_.find(polityId);
+
+        if (!targetSettlement || !targetPolity)
+        {
+            return false;
+        }
+
+        targetSettlement->setOwnerPolity(polityId);
+
+        return true;
+    }
+
+
+    bool World::makeSettlementIndependent(
+        SettlementId settlementId
+    ) noexcept
+    {
+        Settlement* targetSettlement =
+            settlements_.find(settlementId);
+
+        if (!targetSettlement)
+        {
+            return false;
+        }
+
+        targetSettlement->setOwnerPolity(
+            PolityId{}
+        );
+
+        return true;
+    }
+
+
+    bool World::setSettlementPosition(
+        SettlementId settlementId,
+        WorldPosition position
+    ) noexcept
+    {
+        Settlement* targetSettlement =
+            settlements_.find(settlementId);
+
+        if (!targetSettlement)
+        {
+            return false;
+        }
+
+        targetSettlement->setPosition(position);
+
+        return true;
+    }
+
+
+    // ========================================================
+    // Army relationships
+    // ========================================================
+
+    bool World::assignArmyToPolity(
+        ArmyId armyId,
+        PolityId polityId
+    ) noexcept
+    {
+        Army* targetArmy =
+            armies_.find(armyId);
+
+        const Polity* targetPolity =
+            polities_.find(polityId);
+
+        if (!targetArmy || !targetPolity)
+        {
+            return false;
+        }
+
+        targetArmy->setOwnerPolity(polityId);
+
+        return true;
+    }
+
+
+    bool World::makeArmyIndependent(
+        ArmyId armyId
+    ) noexcept
+    {
+        Army* targetArmy =
+            armies_.find(armyId);
+
+        if (!targetArmy)
+        {
+            return false;
+        }
+
+        targetArmy->setOwnerPolity(
+            PolityId{}
+        );
+
+        return true;
+    }
+
+
+    bool World::setArmyPosition(
+        ArmyId armyId,
+        WorldPosition position
+    ) noexcept
+    {
+        Army* targetArmy =
+            armies_.find(armyId);
+
+        if (!targetArmy)
+        {
+            return false;
+        }
+
+        targetArmy->setPosition(position);
+
+        return true;
+    }
+
+
+    // ========================================================
+    // Counts
+    // ========================================================
 
     std::size_t World::settlementCount() const noexcept
     {
