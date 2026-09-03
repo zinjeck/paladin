@@ -1,1 +1,257 @@
+# ============================================================
+# PALADIN
+# .gitignore
+#
+# Philosophy:
+# Track source, configuration, assets, documentation, and tests.
+# Ignore only generated build products, IDE state, caches,
+# temporary files, and machine-specific output.
+# ============================================================
+
+
+# ============================================================
+# VISUAL STUDIO LOCAL / MACHINE STATE
+# ============================================================
+
 .vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+
+# ============================================================
+# BUILD DIRECTORIES
+# ============================================================
+
+out/
+build/
+build-*/
+cmake-build-*/
+
+
+# ============================================================
+# GENERATED CMAKE / NINJA FILES
+#
+# CMake source files themselves are NOT ignored.
+# ============================================================
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+compile_commands.json
+
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+Makefile
+
+
+# ============================================================
+# MACHINE-SPECIFIC CMAKE SETTINGS
+#
+# CMakePresets.json should be tracked.
+# CMakeUserPresets.json is normally local-machine specific.
+# ============================================================
+
+CMakeUserPresets.json
+
+
+# ============================================================
+# COMPILED / GENERATED C AND C++ OUTPUT
+# ============================================================
+
+*.obj
+*.o
+*.lo
+
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+
+*.exe
+*.dll
+*.lib
+*.exp
+
+
+# ============================================================
+# DEBUG / CRASH / PROFILING OUTPUT
+# ============================================================
+
+*.dmp
+*.mdmp
+*.trace
+*.etl
+*.vsp
+*.vspx
+*.diagsession
+
+
+# ============================================================
+# LOGS
+# ============================================================
+
+*.log
+
+
+# ============================================================
+# TEST / COVERAGE OUTPUT
+# ============================================================
+
+Testing/
+test-results/
+coverage/
+coverage-*/
+
+
+# ============================================================
+# CACHE DIRECTORIES
+# ============================================================
+
+.cache/
+
+
+# ============================================================
+# TEMPORARY / BACKUP FILES
+# ============================================================
+
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+
+*~
+~$*
+
+
+# ============================================================
+# WINDOWS FILESYSTEM JUNK
+# ============================================================
+
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+$RECYCLE.BIN/
+
+
+# ============================================================
+# OTHER IDE / EDITOR LOCAL STATE
+# ============================================================
+
+.idea/
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+
+# ============================================================
+# SOURCE CODE SAFEGUARDS
+#
+# These extensions are explicitly NOT ignored.
+#
+# C
+# ============================================================
+
+!*.c
+!*.h
+
+
+# ============================================================
+# C++
+# ============================================================
+
+!*.cc
+!*.cpp
+!*.cxx
+!*.c++
+!*.hh
+!*.hpp
+!*.hxx
+!*.h++
+!*.inl
+!*.ipp
+!*.tpp
+
+
+# ============================================================
+# ASSEMBLY
+#
+# .asm = common MASM/NASM
+# .s   = common assembler source
+# .S   = assembler source with C preprocessor
+# .inc = common assembly include file
+# ============================================================
+
+!*.asm
+!*.s
+!*.S
+!*.inc
+
+
+# ============================================================
+# CMAKE SOURCE
+# ============================================================
+
+!CMakeLists.txt
+!*.cmake
+!CMakePresets.json
+
+
+# ============================================================
+# PALADIN SOURCE DIRECTORIES
+#
+# These should remain tracked.
+# ============================================================
+
+!src/
+!src/**
+
+!include/
+!include/**
+
+!cmake/
+!cmake/**
+
+!tests/
+!tests/**
+
+!assets/
+!assets/**
+
+!config/
+!config/**
+
+!docs/
+!docs/**
+
+
+# ============================================================
+# IMPORTANT
+#
+# Never add blanket rules such as:
+#
+# *.c
+# *.cpp
+# *.h
+# *.hpp
+# *.asm
+# *.s
+# *.cmake
+# src/
+# include/
+# cmake/
+#
+# Those contain Paladin's actual source code.
+# ============================================================

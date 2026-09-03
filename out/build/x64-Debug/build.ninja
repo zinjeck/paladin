@@ -52,9 +52,29 @@ build cmake_object_order_depends_target_Paladin: phony || cmake_object_order_dep
 build CMakeFiles\Paladin.dir\src\main.cpp.obj: CXX_COMPILER__Paladin_unscanned_Debug C$:\Paladin\src\main.cpp || cmake_object_order_depends_target_Paladin
   CONFIG = Debug
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++latest -MDd
-  INCLUDES = -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include
+  INCLUDES = -IC:\Paladin\src -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include
   OBJECT_DIR = CMakeFiles\Paladin.dir
   OBJECT_FILE_DIR = CMakeFiles\Paladin.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\Paladin.dir\
+  TARGET_PDB = Paladin.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\Paladin.dir
+
+build CMakeFiles\Paladin.dir\src\core\Application.cpp.obj: CXX_COMPILER__Paladin_unscanned_Debug C$:\Paladin\src\core\Application.cpp || cmake_object_order_depends_target_Paladin
+  CONFIG = Debug
+  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++latest -MDd
+  INCLUDES = -IC:\Paladin\src -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include
+  OBJECT_DIR = CMakeFiles\Paladin.dir
+  OBJECT_FILE_DIR = CMakeFiles\Paladin.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\Paladin.dir\
+  TARGET_PDB = Paladin.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\Paladin.dir
+
+build CMakeFiles\Paladin.dir\src\platform\Window.cpp.obj: CXX_COMPILER__Paladin_unscanned_Debug C$:\Paladin\src\platform\Window.cpp || cmake_object_order_depends_target_Paladin
+  CONFIG = Debug
+  FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++latest -MDd
+  INCLUDES = -IC:\Paladin\src -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include
+  OBJECT_DIR = CMakeFiles\Paladin.dir
+  OBJECT_FILE_DIR = CMakeFiles\Paladin.dir\src\platform
   TARGET_COMPILE_PDB = CMakeFiles\Paladin.dir\
   TARGET_PDB = Paladin.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\Paladin.dir
@@ -67,7 +87,7 @@ build CMakeFiles\Paladin.dir\src\main.cpp.obj: CXX_COMPILER__Paladin_unscanned_D
 #############################################
 # Link the executable Paladin.exe
 
-build Paladin.exe: CXX_EXECUTABLE_LINKER__Paladin_Debug CMakeFiles\Paladin.dir\src\main.cpp.obj | _deps\sdl3-build\SDL3.lib _deps\sdl3-src\src\dynapi\SDL_dynapi.sym || _deps\sdl3-build\SDL3.dll
+build Paladin.exe: CXX_EXECUTABLE_LINKER__Paladin_Debug CMakeFiles\Paladin.dir\src\main.cpp.obj CMakeFiles\Paladin.dir\src\core\Application.cpp.obj CMakeFiles\Paladin.dir\src\platform\Window.cpp.obj | _deps\sdl3-build\SDL3.lib _deps\sdl3-src\src\dynapi\SDL_dynapi.sym || _deps\sdl3-build\SDL3.dll
   CONFIG = Debug
   FLAGS = /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -MDd
   LINK_FLAGS = /machine:x64 /debug /INCREMENTAL /subsystem:console

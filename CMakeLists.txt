@@ -18,6 +18,12 @@ FetchContent_MakeAvailable(SDL3)
 
 add_executable(Paladin
     src/main.cpp
+    src/core/Application.cpp
+    src/platform/Window.cpp
+)
+
+target_include_directories(Paladin PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(Paladin PRIVATE SDL3::SDL3)
