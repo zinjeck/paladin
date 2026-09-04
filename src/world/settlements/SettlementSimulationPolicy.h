@@ -6,8 +6,17 @@
 
 namespace Paladin
 {
+    enum class SettlementSimulationResolution
+    {
+        DetailedLocal,
+        InactiveLocalAggregate,
+        StrategicAggregate
+    };
+
     struct SettlementSimulationPolicy
     {
+        SettlementSimulationResolution resolution =
+            SettlementSimulationResolution::StrategicAggregate;
         std::uint64_t minimumStepMinutes = 1;
 
         [[nodiscard]]

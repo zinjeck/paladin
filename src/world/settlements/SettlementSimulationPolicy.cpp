@@ -28,7 +28,13 @@ namespace Paladin
         return
             detailed.isValid() &&
             inactive.isValid() &&
-            strategic.isValid();
+            strategic.isValid() &&
+            detailed.resolution ==
+                SettlementSimulationResolution::DetailedLocal &&
+            inactive.resolution ==
+                SettlementSimulationResolution::InactiveLocalAggregate &&
+            strategic.resolution ==
+                SettlementSimulationResolution::StrategicAggregate;
     }
 
 
@@ -39,9 +45,18 @@ namespace Paladin
         constexpr std::uint64_t minutesPerDay = 24 * minutesPerHour;
 
         return {
-            {1},
-            {minutesPerHour},
-            {30 * minutesPerDay}
+            {
+                SettlementSimulationResolution::DetailedLocal,
+                1
+            },
+            {
+                SettlementSimulationResolution::InactiveLocalAggregate,
+                minutesPerHour
+            },
+            {
+                SettlementSimulationResolution::StrategicAggregate,
+                30 * minutesPerDay
+            }
         };
     }
 }

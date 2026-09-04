@@ -10,4 +10,20 @@ namespace Paladin
         Inactive,
         Strategic
     };
+
+    [[nodiscard]]
+    constexpr bool isSettlementSimulationTier(
+        SettlementSimulationTier tier
+    ) noexcept
+    {
+        switch (tier)
+        {
+            case SettlementSimulationTier::Detailed:
+            case SettlementSimulationTier::Inactive:
+            case SettlementSimulationTier::Strategic:
+                return true;
+        }
+
+        return false;
+    }
 }

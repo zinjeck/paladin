@@ -4,6 +4,7 @@
 
 #include "world/World.h"
 #include "world/generation/WorldGenerationSeed.h"
+#include "world/settlements/SettlementMap.h"
 
 #include <cmath>
 #include <limits>
@@ -170,7 +171,7 @@ namespace Paladin
 
     bool Simulation::setDetailedSimulationSettlement(
         SettlementId settlementId
-    ) noexcept
+    )
     {
         const Settlement* settlement =
             world_->settlement(settlementId);
@@ -183,16 +184,107 @@ namespace Paladin
             return false;
         }
 
+        const SettlementId previousSettlementId =
+            detailedSimulationSettlementId_;
+
         detailedSimulationSettlementId_ = settlementId;
-        synchronizeSettlementSimulationTiers();
+
+        if (synchronizeSettlementSimulationTiers())
+        {
+            return true;
+        }
+
+        detailedSimulationSettlementId_ = previousSettlementId;
+        static_cast<void>(synchronizeSettlementSimulationTiers());
+        return false;
+    }
+
+
+    bool Simulation::clearDetailedSimulationSettlement()
+    {
+        const SettlementId previousSettlementId =
+            detailedSimulationSettlementId_;
+
+        detailedSimulationSettlementId_ = {};
+
+        if (synchronizeSettlementSimulationTiers())
+        {
+            return true;
+        }
+
+        detailedSimulationSettlementId_ = previousSettlementId;
+        static_cast<void>(synchronizeSettlementSimulationTiers());
+        return false;
+    }
+
+
+    bool Simulation::prepareSettlementMap(
+        SettlementId settlementId,
+        const SettlementMapGenerationSettings& settings
+    )
+    {
+        Settlement* settlement = world_->settlement(settlementId);
+
+        if (
+            !settlement ||
+            settlement->ownerPolityId() != playerPolityId_ ||
+            !settlement->simulationState().isInitialized()
+        )
+        {
+            return false;
+        }
+
+        SettlementSimulationState& state =
+            settlement->simulationState();
+
+        const TerritoryFoundationPolicy& territoryPolicy =
+            world_->territoryFoundationPolicy();
+
+        const SettlementMap* existingMap = state.localMap();
+
+        if (
+            existingMap &&
+            existingMap->sourceRegionCenter() == settlement->position() &&
+            existingMap->sourceRegionWidth() ==
+                territoryPolicy.settlementRegionWidth &&
+            existingMap->sourceRegionHeight() ==
+                territoryPolicy.settlementRegionHeight &&
+            existingMap->localTilesPerWorldTile() ==
+                settings.localTilesPerWorldTile
+        )
+        {
+            return true;
+        }
+
+        std::unique_ptr<SettlementMap> generatedMap =
+            settlementMapGenerator_.generate(
+                world_->grid(),
+                settlement->position(),
+                territoryPolicy.settlementRegionWidth,
+                territoryPolicy.settlementRegionHeight,
+                world_->generationSeed(),
+                settings
+            );
+
+        if (!generatedMap)
+        {
+            return false;
+        }
+
+        state.setLocalMap(std::move(generatedMap));
         return true;
     }
 
 
-    void Simulation::clearDetailedSimulationSettlement() noexcept
+    const SettlementMap* Simulation::settlementMap(
+        SettlementId settlementId
+    ) const noexcept
     {
-        detailedSimulationSettlementId_ = {};
-        synchronizeSettlementSimulationTiers();
+        const Settlement* settlement = world_->settlement(settlementId);
+
+        return settlement
+            ? settlement->simulationState().localMap()
+            : nullptr;
     }
 
 
@@ -214,9 +306,6 @@ namespace Paladin
                 setPresentedSettlement(settlementId)
             );
 
-            static_cast<void>(
-                setDetailedSimulationSettlement(settlementId)
-            );
         }
 
         return settlementId;
@@ -246,14 +335,39 @@ namespace Paladin
 
     bool Simulation::movePlayerCapital(WorldPosition position)
     {
-        return world_->relocateSoleCapital(playerPolityId_, position);
+        const Polity* polity = world_->polity(playerPolityId_);
+
+        if (!polity)
+        {
+            return false;
+        }
+
+        Settlement* capital = world_->settlement(
+            polity->capitalSettlementId()
+        );
+
+        if (
+            !capital ||
+            !world_->relocateSoleCapital(playerPolityId_, position)
+        )
+        {
+            return false;
+        }
+
+        capital->simulationState().clearLocalMap();
+        return true;
     }
 
 
-    void Simulation::synchronizeSettlementSimulationTiers() noexcept
+    bool Simulation::synchronizeSettlementSimulationTiers()
     {
         for (Settlement& settlement : world_->settlements())
         {
+            if (!settlement.simulationState().isInitialized())
+            {
+                continue;
+            }
+
             SettlementSimulationTier tier =
                 SettlementSimulationTier::Strategic;
 
@@ -271,8 +385,19 @@ namespace Paladin
                 tier = SettlementSimulationTier::Inactive;
             }
 
-            settlement.simulationState().setSimulationTier(tier);
+            if (
+                !worldSimulationPipeline_->transitionSettlementTier(
+                    *world_,
+                    settlement.id(),
+                    tier
+                )
+            )
+            {
+                return false;
+            }
         }
+
+        return true;
     }
 
 

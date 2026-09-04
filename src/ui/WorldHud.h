@@ -14,6 +14,7 @@ namespace Paladin
         MoveCapital,
         RenameCapital,
         EditPolity,
+        Play,
         Back
     };
 
@@ -53,6 +54,7 @@ namespace Paladin
         UiButton moveCapitalButton_;
         UiButton renameCapitalButton_;
         UiButton editPolityButton_;
+        UiButton playButton_;
         UiButton backButton_;
         bool capitalEstablished_ = false;
     };

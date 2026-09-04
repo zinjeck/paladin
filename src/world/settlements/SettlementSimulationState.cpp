@@ -10,7 +10,10 @@ namespace Paladin
         const SettlementFoundationProfile& profile
     )
     {
-        if (initialized_)
+        if (
+            initialized_ ||
+            !isSettlementSimulationTier(profile.initialSimulationTier)
+        )
         {
             return false;
         }
@@ -158,8 +161,58 @@ namespace Paladin
             population_.version(),
             stockpile_.version(),
             economy_.version(),
-            schedulingVersion_
+            schedulingVersion_,
+            localMapVersion_
         };
+    }
+
+
+    SettlementStateChanges SettlementSimulationState::changesSince(
+        const SettlementStateVersions& previousVersions
+    ) const noexcept
+    {
+        const SettlementStateVersions current = versions();
+        SettlementStateDomain domains = SettlementStateDomain::None;
+
+        if (current.population != previousVersions.population)
+        {
+            domains = domains | SettlementStateDomain::Population;
+        }
+
+        if (current.resources != previousVersions.resources)
+        {
+            domains = domains | SettlementStateDomain::Resources;
+        }
+
+        if (current.economy != previousVersions.economy)
+        {
+            domains = domains | SettlementStateDomain::Economy;
+        }
+
+        if (current.scheduling != previousVersions.scheduling)
+        {
+            domains = domains | SettlementStateDomain::Scheduling;
+        }
+
+        if (current.localMap != previousVersions.localMap)
+        {
+            domains = domains | SettlementStateDomain::LocalMap;
+        }
+
+        return {domains, current};
+    }
+
+
+    bool SettlementSimulationState::hasLocalMap() const noexcept
+    {
+        return localMap_ != nullptr;
+    }
+
+
+    const SettlementMap*
+    SettlementSimulationState::localMap() const noexcept
+    {
+        return localMap_.get();
     }
 
 
@@ -210,5 +263,61 @@ namespace Paladin
         ++completedSimulationSteps_;
         ++schedulingVersion_;
         return dueMinutes;
+    }
+
+
+    std::uint64_t
+    SettlementSimulationState::takeAllPendingSimulationMinutes() noexcept
+    {
+        const std::uint64_t dueMinutes = pendingSimulationMinutes_;
+
+        if (dueMinutes == 0)
+        {
+            return 0;
+        }
+
+        pendingSimulationMinutes_ = 0;
+
+        constexpr std::uint64_t maximumMinutes =
+            std::numeric_limits<std::uint64_t>::max();
+
+        if (dueMinutes > maximumMinutes - totalSimulatedMinutes_)
+        {
+            totalSimulatedMinutes_ = maximumMinutes;
+        }
+        else
+        {
+            totalSimulatedMinutes_ += dueMinutes;
+        }
+
+        ++completedSimulationSteps_;
+        ++schedulingVersion_;
+        return dueMinutes;
+    }
+
+
+    void SettlementSimulationState::setLocalMap(
+        std::unique_ptr<SettlementMap> localMap
+    ) noexcept
+    {
+        if (!localMap)
+        {
+            return;
+        }
+
+        localMap_ = std::move(localMap);
+        ++localMapVersion_;
+    }
+
+
+    void SettlementSimulationState::clearLocalMap() noexcept
+    {
+        if (!localMap_)
+        {
+            return;
+        }
+
+        localMap_.reset();
+        ++localMapVersion_;
     }
 }

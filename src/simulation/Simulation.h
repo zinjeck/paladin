@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
 #include "world/WorldPosition.h"
+#include "world/generation/SettlementMapGenerator.h"
 
 #include <cstdint>
 #include <memory>
@@ -11,6 +12,7 @@ namespace Paladin
 {
     class World;
     class WorldSimulationPipeline;
+    class SettlementMap;
     struct WorldGenerationSettings;
 
     enum class SimulationSpeed
@@ -72,9 +74,22 @@ namespace Paladin
         [[nodiscard]]
         bool setDetailedSimulationSettlement(
             SettlementId settlementId
-        ) noexcept;
+        );
 
-        void clearDetailedSimulationSettlement() noexcept;
+        [[nodiscard]]
+        bool clearDetailedSimulationSettlement();
+
+        [[nodiscard]]
+        bool prepareSettlementMap(
+            SettlementId settlementId,
+            const SettlementMapGenerationSettings& settings =
+                defaultSettlementMapGenerationSettings()
+        );
+
+        [[nodiscard]]
+        const SettlementMap* settlementMap(
+            SettlementId settlementId
+        ) const noexcept;
 
         [[nodiscard]]
         SettlementId foundPlayerCapital(
@@ -95,7 +110,8 @@ namespace Paladin
         [[nodiscard]]
         double speedMultiplier() const noexcept;
 
-        void synchronizeSettlementSimulationTiers() noexcept;
+        [[nodiscard]]
+        bool synchronizeSettlementSimulationTiers();
 
         std::unique_ptr<World> world_;
         std::unique_ptr<WorldSimulationPipeline>
@@ -110,5 +126,6 @@ namespace Paladin
 
         std::uint64_t tickCount_ = 0;
         double pendingGameMinutes_ = 0.0;
+        SettlementMapGenerator settlementMapGenerator_;
     };
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "world/settlements/SettlementSimulationPolicy.h"
 #include "world/settlements/SettlementSimulationTier.h"
 
 #include <cstdint>
@@ -15,6 +16,8 @@ namespace Paladin
         SettlementId settlementId;
         SettlementSimulationTier simulationTier =
             SettlementSimulationTier::Inactive;
+        SettlementSimulationResolution simulationResolution =
+            SettlementSimulationResolution::InactiveLocalAggregate;
         std::uint64_t gameMinutes = 0;
     };
 

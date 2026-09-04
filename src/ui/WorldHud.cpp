@@ -9,8 +9,10 @@ namespace Paladin
           moveCapitalButton_("Move Capital"),
           renameCapitalButton_("Rename Capital"),
           editPolityButton_("Edit Polity"),
+          playButton_("Play"),
           backButton_("Back")
     {
+        playButton_.setEnabled(false);
     }
 
     void WorldHud::layout(
@@ -56,6 +58,13 @@ namespace Paladin
             140.0F,
             height
         });
+
+        playButton_.setBounds({
+            static_cast<float>(viewportWidth) - 140.0F - 16.0F,
+            static_cast<float>(viewportHeight) - height - 16.0F,
+            140.0F,
+            height
+        });
     }
 
     void WorldHud::pointerMoved(float x, float y) noexcept
@@ -64,12 +73,14 @@ namespace Paladin
         moveCapitalButton_.pointerMoved(x, y);
         renameCapitalButton_.pointerMoved(x, y);
         editPolityButton_.pointerMoved(x, y);
+        playButton_.pointerMoved(x, y);
         backButton_.pointerMoved(x, y);
     }
 
     void WorldHud::setCapitalEstablished(bool established) noexcept
     {
         capitalEstablished_ = established;
+        playButton_.setEnabled(established);
     }
 
     bool WorldHud::pointerPressed(float x, float y) noexcept
@@ -91,8 +102,11 @@ namespace Paladin
         const bool backCaptured =
             backButton_.pointerPressed(x, y);
 
+        const bool playCaptured =
+            playButton_.pointerPressed(x, y);
+
         return
-            actionCaptured || backCaptured;
+            actionCaptured || playCaptured || backCaptured;
     }
 
     bool WorldHud::containsInteractivePoint(
@@ -102,6 +116,7 @@ namespace Paladin
     {
         return
             backButton_.containsPoint(x, y) ||
+            playButton_.containsPoint(x, y) ||
             (
                 !capitalEstablished_ &&
                 selectRegionButton_.containsPoint(x, y)
@@ -136,6 +151,9 @@ namespace Paladin
         const bool backClicked =
             backButton_.pointerReleased(x, y);
 
+        const bool playClicked =
+            playButton_.pointerReleased(x, y);
+
         if (!capitalEstablished_ && selectRegionClicked)
         {
             return WorldHudAction::SelectRegion;
@@ -155,6 +173,11 @@ namespace Paladin
         if (capitalEstablished_ && editClicked)
         {
             return WorldHudAction::EditPolity;
+        }
+
+        if (capitalEstablished_ && playClicked)
+        {
+            return WorldHudAction::Play;
         }
 
         if (backClicked)
@@ -182,6 +205,12 @@ namespace Paladin
             moveCapitalButton_.render(renderer, uiRenderer);
             renameCapitalButton_.render(renderer, uiRenderer);
             editPolityButton_.render(renderer, uiRenderer);
+        }
+
+        // Before founding, Play remains fully transparent as well as disabled.
+        if (capitalEstablished_)
+        {
+            playButton_.render(renderer, uiRenderer);
         }
 
         backButton_.render(renderer, uiRenderer);

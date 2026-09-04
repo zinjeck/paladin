@@ -8,10 +8,13 @@
 #include "world/WorldTile.h"
 #include "world/generation/WorldGenerationSettings.h"
 #include "world/generation/WorldGenerationSeed.h"
+#include "world/generation/SettlementMapGenerator.h"
+#include "world/settlements/SettlementMap.h"
 
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <type_traits>
 
 namespace
@@ -203,6 +206,86 @@ namespace
         PALADIN_CHECK(mountainTileCount > 0);
         PALADIN_CHECK(waterTileCount > 0);
     }
+
+    void testSettlementMapTranslatesSelectedRegion()
+    {
+        Paladin::WorldGrid sourceGrid(9, 9);
+
+        for (std::int32_t y = 0; y < sourceGrid.height(); ++y)
+        {
+            for (std::int32_t x = 0; x < sourceGrid.width(); ++x)
+            {
+                Paladin::WorldTile* tile = sourceGrid.tile({x, y});
+
+                tile->terrain = x < 4
+                    ? Paladin::TerrainType::Water
+                    : Paladin::TerrainType::Land;
+
+                tile->biome = x < 4
+                    ? Paladin::BiomeType::Ocean
+                    : Paladin::BiomeType::Forest;
+
+                tile->elevation = Paladin::Elevation(
+                    x < 4 ? 0.2F : 0.7F
+                );
+
+                tile->temperature = Paladin::Temperature(0.6F);
+                tile->rainfall = Paladin::Rainfall(0.7F);
+            }
+        }
+
+        Paladin::SettlementMapGenerationSettings settings;
+        settings.localTilesPerWorldTile = 4;
+
+        const Paladin::SettlementMapGenerator generator;
+        const Paladin::WorldPosition selectedCenter{4, 4};
+
+        const std::unique_ptr<Paladin::SettlementMap> first =
+            generator.generate(
+                sourceGrid,
+                selectedCenter,
+                9,
+                9,
+                0xABCD'1234ULL,
+                settings
+            );
+
+        const std::unique_ptr<Paladin::SettlementMap> second =
+            generator.generate(
+                sourceGrid,
+                selectedCenter,
+                9,
+                9,
+                0xABCD'1234ULL,
+                settings
+            );
+
+        PALADIN_CHECK(first != nullptr);
+        PALADIN_CHECK(second != nullptr);
+        PALADIN_CHECK(first->grid().width() == 36);
+        PALADIN_CHECK(first->grid().height() == 36);
+        PALADIN_CHECK(first->sourceRegionCenter() == selectedCenter);
+        PALADIN_CHECK(first->sourceRegionWidth() == 9);
+        PALADIN_CHECK(first->sourceRegionHeight() == 9);
+        PALADIN_CHECK(first->localTilesPerWorldTile() == 4);
+        PALADIN_CHECK(worldHash(first->grid()) == worldHash(second->grid()));
+
+        PALADIN_CHECK(
+            first->grid().tile({1, 18})->terrain
+            == Paladin::TerrainType::Water
+        );
+
+        PALADIN_CHECK(
+            first->grid().tile({34, 18})->terrain
+            == Paladin::TerrainType::Land
+        );
+
+        const auto defaults =
+            Paladin::defaultSettlementMapGenerationSettings();
+
+        PALADIN_CHECK(defaults.localTilesPerWorldTile == 64);
+        PALADIN_CHECK(9 * defaults.localTilesPerWorldTile == 576);
+    }
 }
 
 void runWorldGenerationTests()
@@ -223,4 +306,5 @@ void runWorldGenerationTests()
 
     testDeterministicWorldGeneration();
     testGeneratedWorldInvariants();
+    testSettlementMapTranslatesSelectedRegion();
 }

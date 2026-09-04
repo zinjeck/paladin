@@ -5,6 +5,7 @@
 #include "world/Settlement.h"
 #include "world/World.h"
 
+#include <array>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -19,7 +20,7 @@ namespace Paladin
         if (!policies_.isValid())
         {
             throw std::invalid_argument(
-                "Settlement simulation policies must use positive cadences."
+                "Settlement simulation policies must use valid resolutions and positive cadences."
             );
         }
 
@@ -72,10 +73,13 @@ namespace Paladin
             const SettlementSimulationTier tier =
                 state.simulationTier();
 
+            const SettlementSimulationPolicy& policy =
+                policies_.forTier(tier);
+
             const std::uint64_t dueMinutes =
                 state.takeDueSimulationMinutes(
                     gameMinutes,
-                    policies_.forTier(tier)
+                    policy
                 );
 
             if (dueMinutes == 0)
@@ -87,14 +91,84 @@ namespace Paladin
                 {
                     settlement.id(),
                     tier,
+                    policy.resolution,
                     dueMinutes
                 }
             );
         }
 
+        runSystems(world, gameMinutes, settlementSteps_);
+    }
+
+
+    bool WorldSimulationPipeline::transitionSettlementTier(
+        World& world,
+        SettlementId settlementId,
+        SettlementSimulationTier targetTier
+    )
+    {
+        if (!isSettlementSimulationTier(targetTier))
+        {
+            return false;
+        }
+
+        Settlement* settlement = world.settlement(settlementId);
+
+        if (!settlement)
+        {
+            return false;
+        }
+
+        SettlementSimulationState& state =
+            settlement->simulationState();
+
+        if (!state.isInitialized())
+        {
+            return false;
+        }
+
+        const SettlementSimulationTier previousTier =
+            state.simulationTier();
+
+        if (previousTier == targetTier)
+        {
+            return true;
+        }
+
+        const std::uint64_t retainedMinutes =
+            state.takeAllPendingSimulationMinutes();
+
+        if (retainedMinutes > 0)
+        {
+            const SettlementSimulationPolicy& previousPolicy =
+                policies_.forTier(previousTier);
+
+            const std::array<SettlementSimulationStep, 1> transitionStep{
+                SettlementSimulationStep{
+                    settlementId,
+                    previousTier,
+                    previousPolicy.resolution,
+                    retainedMinutes
+                }
+            };
+
+            runSystems(world, retainedMinutes, transitionStep);
+        }
+
+        state.setSimulationTier(targetTier);
+        return true;
+    }
+
+
+    void WorldSimulationPipeline::runSystems(
+        World& world,
+        std::uint64_t gameMinutes,
+        std::span<const SettlementSimulationStep> settlementSteps
+    )
+    {
         const WorldSimulationStep step{
             gameMinutes,
-            settlementSteps_
+            settlementSteps
         };
 
         for (const std::unique_ptr<WorldSimulationSystem>& system

@@ -39,6 +39,16 @@ namespace Paladin
             std::uint64_t gameMinutes
         );
 
+        // Commits all time retained under the previous policy before changing
+        // resolution. A city view can therefore never reinterpret inactive
+        // or strategic time as detailed simulation.
+        [[nodiscard]]
+        bool transitionSettlementTier(
+            World& world,
+            SettlementId settlementId,
+            SettlementSimulationTier targetTier
+        );
+
         [[nodiscard]]
         std::size_t systemCount() const noexcept;
 
@@ -46,6 +56,12 @@ namespace Paladin
         const SettlementSimulationPolicies& policies() const noexcept;
 
     private:
+        void runSystems(
+            World& world,
+            std::uint64_t gameMinutes,
+            std::span<const SettlementSimulationStep> settlementSteps
+        );
+
         // Registration order is execution order. This makes cross-system
         // dependencies explicit and deterministic.
         std::vector<std::unique_ptr<WorldSimulationSystem>> systems_;

@@ -4,16 +4,19 @@
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityRenderer.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/GrayUiRenderer.h"
+#include "ui/CityHud.h"
 #include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/WorldHud.h"
 #include "world/World.h"
+#include "world/settlements/SettlementMap.h"
 
 #include <SDL3/SDL.h>
 
@@ -75,6 +78,9 @@ namespace Paladin
         worldHud_ =
             std::make_unique<WorldHud>();
 
+        cityHud_ =
+            std::make_unique<CityHud>();
+
         foundingPanel_ =
             std::make_unique<FoundingPanel>();
     }
@@ -87,12 +93,15 @@ namespace Paladin
         }
 
         tileRenderMetrics_.reset();
+        cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
         camera_.reset();
+        savedWorldCamera_.reset();
         simulation_.reset();
 
         worldHud_.reset();
+        cityHud_.reset();
         foundingPanel_.reset();
         mainMenu_.reset();
         grayUiRenderer_.reset();
@@ -116,6 +125,7 @@ namespace Paladin
             !grayUiRenderer_ ||
             !mainMenu_ ||
             !worldHud_ ||
+            !cityHud_ ||
             !foundingPanel_
         )
         {
@@ -135,7 +145,7 @@ namespace Paladin
                     renderer_->outputHeight()
                 );
             }
-            else
+            else if (screen_ == Screen::World)
             {
                 worldHud_->layout(
                     renderer_->outputWidth(),
@@ -152,6 +162,13 @@ namespace Paladin
                 );
 
                 foundingPanel_->layout(
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+            }
+            else
+            {
+                cityHud_->layout(
                     renderer_->outputWidth(),
                     renderer_->outputHeight()
                 );
@@ -209,6 +226,107 @@ namespace Paladin
                         }
 
                         // Tutorial intentionally has no action yet.
+                    }
+
+                    continue;
+                }
+
+                if (screen_ == Screen::City)
+                {
+                    if (event.type == SDL_EVENT_MOUSE_MOTION)
+                    {
+                        cityHud_->pointerMoved(
+                            event.motion.x,
+                            event.motion.y
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_KEY_DOWN &&
+                        event.key.scancode == SDL_SCANCODE_ESCAPE
+                    )
+                    {
+                        returnToWorldFromCity();
+                        continue;
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_KEY_DOWN &&
+                        !event.key.repeat &&
+                        (
+                            event.key.scancode == SDL_SCANCODE_EQUALS ||
+                            event.key.scancode == SDL_SCANCODE_KP_PLUS ||
+                            event.key.scancode == SDL_SCANCODE_MINUS ||
+                            event.key.scancode == SDL_SCANCODE_KP_MINUS
+                        )
+                    )
+                    {
+                        float mouseX = 0.0F;
+                        float mouseY = 0.0F;
+                        SDL_GetMouseState(&mouseX, &mouseY);
+
+                        const bool zoomingIn =
+                            event.key.scancode == SDL_SCANCODE_EQUALS ||
+                            event.key.scancode == SDL_SCANCODE_KP_PLUS;
+
+                        applyCameraZoom(
+                            zoomingIn ? 1.15 : 0.85,
+                            static_cast<double>(mouseX),
+                            static_cast<double>(mouseY)
+                        );
+                    }
+
+                    if (event.type == SDL_EVENT_MOUSE_WHEEL)
+                    {
+                        double wheelDelta =
+                            static_cast<double>(event.wheel.y);
+
+                        if (
+                            event.wheel.direction ==
+                            SDL_MOUSEWHEEL_FLIPPED
+                        )
+                        {
+                            wheelDelta = -wheelDelta;
+                        }
+
+                        const double multiplier = wheelDelta > 0.0
+                            ? std::pow(1.15, wheelDelta)
+                            : std::pow(0.85, -wheelDelta);
+
+                        applyCameraZoom(
+                            multiplier,
+                            static_cast<double>(event.wheel.mouse_x),
+                            static_cast<double>(event.wheel.mouse_y)
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        static_cast<void>(
+                            cityHud_->pointerPressed(
+                                event.button.x,
+                                event.button.y
+                            )
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        if (
+                            cityHud_->pointerReleased(
+                                event.button.x,
+                                event.button.y
+                            ) == CityHudAction::Back
+                        )
+                        {
+                            returnToWorldFromCity();
+                        }
                     }
 
                     continue;
@@ -519,6 +637,10 @@ namespace Paladin
                             SDL_StartTextInput(window_->nativeHandle());
                         }
                     }
+                    else if (action == WorldHudAction::Play)
+                    {
+                        enterPlayerCapitalCity();
+                    }
                     else if (action == WorldHudAction::Back)
                     {
                         endWorldSession();
@@ -543,6 +665,68 @@ namespace Paladin
                     *renderer_,
                     *grayUiRenderer_
                 );
+                renderer_->endFrame();
+                continue;
+            }
+
+            if (screen_ == Screen::City)
+            {
+                updateCameraMovement(
+                    simulationClock_->frameDeltaSeconds()
+                );
+
+                updateCameraZoom(
+                    simulationClock_->frameDeltaSeconds()
+                );
+
+                while (simulationClock_->shouldTick())
+                {
+                    simulation_->tick(
+                        simulationClock_->fixedDeltaSeconds()
+                    );
+
+                    simulationClock_->consumeTick();
+                }
+
+                renderer_->beginFrame();
+
+                const SettlementMap* settlementMap =
+                    simulation_->settlementMap(
+                        activeCitySettlementId_
+                    );
+
+                if (settlementMap)
+                {
+                    cityRenderer_->render(
+                        *renderer_,
+                        *settlementMap,
+                        *camera_,
+                        *tileRenderMetrics_
+                    );
+                }
+
+                const Settlement* citySettlement =
+                    simulation_->world().settlement(
+                        activeCitySettlementId_
+                    );
+
+                const WorldTime& worldTime =
+                    simulation_->world().time();
+
+                cityHud_->setCityInformation(
+                    citySettlement
+                        ? std::string(citySettlement->name())
+                        : std::string(),
+                    worldTime.day(),
+                    worldTime.hour(),
+                    worldTime.minute()
+                );
+
+                cityHud_->render(
+                    *renderer_,
+                    *grayUiRenderer_
+                );
+
                 renderer_->endFrame();
                 continue;
             }
@@ -770,11 +954,18 @@ namespace Paladin
         worldRenderer_ =
             std::make_unique<WorldRenderer>();
 
+        cityRenderer_ =
+            std::make_unique<CityRenderer>();
+
         tileRenderMetrics_ =
             std::make_unique<TileRenderMetrics>();
 
+        tileRenderMetrics_->tilePixels = 4.0;
+
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
+        savedWorldCamera_.reset();
+        activeCitySettlementId_ = {};
         simulationClock_->reset();
         screen_ = Screen::World;
     }
@@ -785,13 +976,16 @@ namespace Paladin
         SDL_StopTextInput(window_->nativeHandle());
 
         tileRenderMetrics_.reset();
+        cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
         camera_.reset();
+        savedWorldCamera_.reset();
         simulation_.reset();
 
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
+        activeCitySettlementId_ = {};
         simulationClock_->reset();
         screen_ = Screen::MainMenu;
 
@@ -799,6 +993,103 @@ namespace Paladin
             renderer_->outputWidth(),
             renderer_->outputHeight()
         );
+    }
+
+    void Application::enterPlayerCapitalCity()
+    {
+        if (
+            screen_ != Screen::World ||
+            !simulation_ ||
+            !camera_ ||
+            !tileRenderMetrics_
+        )
+        {
+            return;
+        }
+
+        const Polity* polity = simulation_->world().polity(
+            simulation_->playerPolityId()
+        );
+
+        if (!polity || !polity->capitalSettlementId().isValid())
+        {
+            return;
+        }
+
+        const SettlementId capitalId =
+            polity->capitalSettlementId();
+
+        if (
+            !simulation_->prepareSettlementMap(capitalId) ||
+            !simulation_->setPresentedSettlement(capitalId) ||
+            !simulation_->setDetailedSimulationSettlement(capitalId)
+        )
+        {
+            return;
+        }
+
+        const SettlementMap* settlementMap =
+            simulation_->settlementMap(capitalId);
+
+        if (!settlementMap)
+        {
+            static_cast<void>(
+                simulation_->clearDetailedSimulationSettlement()
+            );
+            return;
+        }
+
+        savedWorldCamera_ =
+            std::make_unique<Camera2D>(*camera_);
+
+        camera_ = std::make_unique<Camera2D>(
+            static_cast<double>(settlementMap->grid().width()) * 0.5,
+            static_cast<double>(settlementMap->grid().height()) * 0.5
+        );
+
+        tileRenderMetrics_->tilePixels = 2.0;
+        cityRenderer_ = std::make_unique<CityRenderer>();
+        activeCitySettlementId_ = capitalId;
+        edgeScrollDwellSeconds_ = 0.0;
+        settlementPlacementController_->cancelSelection();
+        movingCapital_ = false;
+        screen_ = Screen::City;
+        clampCameraToWorld();
+    }
+
+    void Application::returnToWorldFromCity()
+    {
+        if (screen_ != Screen::City || !simulation_)
+        {
+            return;
+        }
+
+        if (!simulation_->clearDetailedSimulationSettlement())
+        {
+            return;
+        }
+
+        if (savedWorldCamera_)
+        {
+            camera_ = std::move(savedWorldCamera_);
+        }
+        else
+        {
+            camera_ = std::make_unique<Camera2D>(
+                static_cast<double>(
+                    simulation_->world().grid().width()
+                ) * 0.5,
+                static_cast<double>(
+                    simulation_->world().grid().height()
+                ) * 0.5
+            );
+        }
+
+        tileRenderMetrics_->tilePixels = 4.0;
+        activeCitySettlementId_ = {};
+        edgeScrollDwellSeconds_ = 0.0;
+        screen_ = Screen::World;
+        clampCameraToWorld();
     }
 
     void Application::cancelFoundingFlow()
@@ -938,7 +1229,7 @@ namespace Paladin
                 mouseY >= 0.0F &&
                 mouseX < viewportWidth &&
                 mouseY < viewportHeight &&
-                !worldHud_->containsInteractivePoint(
+                !activeHudContainsPoint(
                     mouseX,
                     mouseY
                 );
@@ -1237,13 +1528,16 @@ namespace Paladin
             return;
         }
 
-        const double worldWidth = static_cast<double>(
-            simulation_->world().grid().width()
-        );
+        const WorldGrid* grid = activeGrid();
 
-        const double worldHeight = static_cast<double>(
-            simulation_->world().grid().height()
-        );
+        if (!grid)
+        {
+            return;
+        }
+
+        const double worldWidth = static_cast<double>(grid->width());
+
+        const double worldHeight = static_cast<double>(grid->height());
 
         const double halfVisibleWidth =
             static_cast<double>(renderer_->outputWidth())
@@ -1283,5 +1577,38 @@ namespace Paladin
                 halfVisibleHeight
             )
         );
+    }
+
+    const WorldGrid* Application::activeGrid() const noexcept
+    {
+        if (!simulation_)
+        {
+            return nullptr;
+        }
+
+        if (screen_ == Screen::City)
+        {
+            const SettlementMap* settlementMap =
+                simulation_->settlementMap(
+                    activeCitySettlementId_
+                );
+
+            return settlementMap ? &settlementMap->grid() : nullptr;
+        }
+
+        return &simulation_->world().grid();
+    }
+
+    bool Application::activeHudContainsPoint(
+        float x,
+        float y
+    ) const noexcept
+    {
+        if (screen_ == Screen::City)
+        {
+            return cityHud_->containsInteractivePoint(x, y);
+        }
+
+        return worldHud_->containsInteractivePoint(x, y);
     }
 }

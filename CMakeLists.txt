@@ -24,6 +24,7 @@ add_executable(Paladin
     src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
+    src/rendering/CityRenderer.cpp
     src/rendering/Texture.cpp
     src/rendering/SpriteRenderer.cpp
     src/rendering/OverlayRenderer.cpp
@@ -39,6 +40,7 @@ add_executable(Paladin
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
+    src/world/generation/SettlementMapGenerator.cpp
     src/world/generation/LandmassGenerationTemplate.cpp
     src/world/generation/LandmassGenerator.cpp
     src/world/generation/ClimateGenerator.cpp
@@ -46,6 +48,7 @@ add_executable(Paladin
     src/world/generation/WorldGenerator.cpp
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementMap.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp
@@ -56,6 +59,7 @@ add_executable(Paladin
     src/world/territory/TerritoryMap.cpp
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
+    src/ui/CityHud.cpp
     src/ui/GrayUiRenderer.cpp
     src/ui/FoundingPanel.cpp
     src/ui/UiButton.cpp
@@ -93,6 +97,7 @@ add_executable(PaladinTests
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
+    src/world/generation/SettlementMapGenerator.cpp
     src/world/generation/LandmassGenerationTemplate.cpp
     src/world/generation/LandmassGenerator.cpp
     src/world/generation/ClimateGenerator.cpp
@@ -100,6 +105,7 @@ add_executable(PaladinTests
     src/world/generation/WorldGenerator.cpp
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementMap.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp

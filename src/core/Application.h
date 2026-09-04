@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/StrongId.h"
 #include "interaction/CameraNavigationPolicy.h"
 
 #include <memory>
@@ -7,6 +8,8 @@
 namespace Paladin
 {
     class Camera2D;
+    class CityHud;
+    class CityRenderer;
     class GrayUiRenderer;
     class FoundingPanel;
     class MainMenu;
@@ -17,6 +20,7 @@ namespace Paladin
     class Window;
     class WorldHud;
     class WorldRenderer;
+    class WorldGrid;
 
     struct TileRenderMetrics;
 
@@ -35,11 +39,14 @@ namespace Paladin
         enum class Screen
         {
             MainMenu,
-            World
+            World,
+            City
         };
 
         void startWorldSession();
         void endWorldSession();
+        void enterPlayerCapitalCity();
+        void returnToWorldFromCity();
 
         void cancelFoundingFlow();
         void confirmFoundingFlow();
@@ -47,6 +54,12 @@ namespace Paladin
         void updateCameraMovement(double frameDeltaSeconds);
         void updateCameraZoom(double frameDeltaSeconds);
         void clampCameraToWorld() noexcept;
+
+        [[nodiscard]]
+        const WorldGrid* activeGrid() const noexcept;
+
+        [[nodiscard]]
+        bool activeHudContainsPoint(float x, float y) const noexcept;
 
         void updateSettlementPlacementHover(
             double screenX,
@@ -69,6 +82,7 @@ namespace Paladin
         std::unique_ptr<GrayUiRenderer> grayUiRenderer_;
         std::unique_ptr<MainMenu> mainMenu_;
         std::unique_ptr<WorldHud> worldHud_;
+        std::unique_ptr<CityHud> cityHud_;
         std::unique_ptr<FoundingPanel> foundingPanel_;
 
         std::unique_ptr<Simulation> simulation_;
@@ -76,6 +90,7 @@ namespace Paladin
         std::unique_ptr<SettlementPlacementController>
             settlementPlacementController_;
         std::unique_ptr<WorldRenderer> worldRenderer_;
+        std::unique_ptr<CityRenderer> cityRenderer_;
         std::unique_ptr<TileRenderMetrics>
             tileRenderMetrics_;
 
@@ -83,5 +98,7 @@ namespace Paladin
             defaultCameraNavigationPolicy();
         double edgeScrollDwellSeconds_ = 0.0;
         bool movingCapital_ = false;
+        std::unique_ptr<Camera2D> savedWorldCamera_;
+        SettlementId activeCitySettlementId_;
     };
 }

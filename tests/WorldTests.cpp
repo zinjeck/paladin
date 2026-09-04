@@ -350,13 +350,16 @@ void runWorldTests()
             .population().residents() == 100
     );
 
-    simulatedPlayerCapital->simulationState().setSimulationTier(
-        Paladin::SettlementSimulationTier::Detailed
-    );
-
     Paladin::WorldSimulationPipeline simulationPipeline;
 
     PALADIN_CHECK(simulationPipeline.systemCount() == 2);
+    PALADIN_CHECK(
+        simulationPipeline.transitionSettlementTier(
+            world,
+            capitalId,
+            Paladin::SettlementSimulationTier::Detailed
+        )
+    );
     PALADIN_CHECK(
         simulationPipeline.policies().detailed.minimumStepMinutes == 1
     );
@@ -425,14 +428,42 @@ void runWorldTests()
             .versions().resources == inactiveOpeningVersions.resources
     );
 
-    simulationPipeline.tick(
-        world,
-        30
+    const Paladin::SettlementStateChanges playerChanges =
+        simulatedPlayerCapital->simulationState().changesSince(
+            playerOpeningVersions
+        );
+
+    PALADIN_CHECK(
+        playerChanges.has(Paladin::SettlementStateDomain::Resources)
     );
 
     PALADIN_CHECK(
-        simulatedInactiveSettlement->simulationState()
-            .stockpile().amount("food") > inactiveOpeningFood
+        playerChanges.has(Paladin::SettlementStateDomain::Economy)
+    );
+
+    const Paladin::SettlementStateChanges inactivePendingChanges =
+        simulatedInactiveSettlement->simulationState().changesSince(
+            inactiveOpeningVersions
+        );
+
+    PALADIN_CHECK(
+        inactivePendingChanges.has(
+            Paladin::SettlementStateDomain::Scheduling
+        )
+    );
+
+    PALADIN_CHECK(
+        !inactivePendingChanges.has(
+            Paladin::SettlementStateDomain::Resources
+        )
+    );
+
+    PALADIN_CHECK(
+        simulationPipeline.transitionSettlementTier(
+            world,
+            settlementId,
+            Paladin::SettlementSimulationTier::Detailed
+        )
     );
 
     PALADIN_CHECK(
@@ -442,7 +473,44 @@ void runWorldTests()
 
     PALADIN_CHECK(
         simulatedInactiveSettlement->simulationState()
-            .totalSimulatedMinutes() == 60
+            .totalSimulatedMinutes() == 30
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food") > inactiveOpeningFood
+    );
+
+    const double inactiveFoodAfterTransition =
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food");
+
+    PALADIN_CHECK(
+        simulationPipeline.transitionSettlementTier(
+            world,
+            settlementId,
+            Paladin::SettlementSimulationTier::Inactive
+        )
+    );
+
+    simulationPipeline.tick(
+        world,
+        60
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food") > inactiveFoodAfterTransition
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .pendingSimulationMinutes() == 0
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .totalSimulatedMinutes() == 90
     );
 
     PALADIN_CHECK(
@@ -452,7 +520,7 @@ void runWorldTests()
 
     simulationPipeline.tick(
         world,
-        30 * gameMinutesPerDay - 60
+        30 * gameMinutesPerDay - 90
     );
 
     const std::uint64_t aiPopulationAfterStrategicStep =
