@@ -5,6 +5,10 @@
 #include "world/World.h"
 #include "world/generation/WorldGenerationSettings.h"
 
+#include <array>
+#include <queue>
+#include <vector>
+
 void runWorldTests()
 {
     Paladin::WorldGenerationSettings settings;
@@ -34,7 +38,10 @@ void runWorldTests()
             const Paladin::WorldTile* tile =
                 world.grid().tile({x, y});
 
-            if (tile->terrain == Paladin::TerrainType::Land)
+            if (
+                tile->terrain == Paladin::TerrainType::Land &&
+                world.canFoundSettlementAt({x, y})
+            )
             {
                 foundingPosition = {x, y};
                 foundLandTile = true;
@@ -52,6 +59,13 @@ void runWorldTests()
         );
 
     PALADIN_CHECK(settlementId.isValid());
+
+    PALADIN_CHECK(
+        world.territory().controllerAt({
+            foundingPosition.x,
+            foundingPosition.y
+        }) == polityId
+    );
 
     PALADIN_CHECK(
         !world.foundSettlement(
@@ -158,6 +172,13 @@ void runWorldTests()
 
     PALADIN_CHECK(capitalId.isValid());
 
+    PALADIN_CHECK(
+        world.territory().controllerAt({
+            capitalPosition.x,
+            capitalPosition.y
+        }) == polityId
+    );
+
     const Paladin::Polity* polity = world.polity(polityId);
     const Paladin::Settlement* capital = world.settlement(capitalId);
 
@@ -176,6 +197,40 @@ void runWorldTests()
     PALADIN_CHECK(capital->name() == "New Dawn");
     PALADIN_CHECK(capital->primaryCultureId() == culture->id());
     PALADIN_CHECK(culture->name() == "Dawnfolk");
+    PALADIN_CHECK(polity->flag().width == 7);
+    PALADIN_CHECK(polity->flag().height == 9);
+    PALADIN_CHECK(polity->flag().cells.size() == 63);
+
+    Paladin::FoundingIdentity editedIdentity{
+        "Dawn Realm",
+        "Dawnkin",
+        "",
+        {170, 62, 96},
+        "tribal"
+    };
+    editedIdentity.flag.primaryColor = {32, 180, 110};
+    editedIdentity.flag.cells[0] = {
+        true,
+        editedIdentity.flag.primaryColor
+    };
+
+    PALADIN_CHECK(
+        world.editPolityIdentity(polityId, editedIdentity)
+    );
+    PALADIN_CHECK(
+        world.renameSettlement(capitalId, "First Light")
+    );
+
+    polity = world.polity(polityId);
+    capital = world.settlement(capitalId);
+    culture = world.culture(polity->primaryCultureId());
+
+    PALADIN_CHECK(polity->name() == "Dawn Realm");
+    PALADIN_CHECK(culture->name() == "Dawnkin");
+    PALADIN_CHECK(capital->name() == "First Light");
+    PALADIN_CHECK(polity->startingOriginId() == "tribal");
+    PALADIN_CHECK(polity->mapColor() == editedIdentity.mapColor);
+    PALADIN_CHECK(polity->flag() == editedIdentity.flag);
 
     Paladin::WorldPosition aiCapitalPosition{};
     bool foundAiCapitalPosition = false;
@@ -249,6 +304,29 @@ void runWorldTests()
 
     PALADIN_CHECK(aiCapitalId.isValid());
 
+    PALADIN_CHECK(
+        world.territory().controllerAt({
+            aiCapitalPosition.x,
+            aiCapitalPosition.y
+        }) == aiPolityId
+    );
+
+    for (std::int32_t y = 0; y < world.grid().height(); ++y)
+    {
+        for (std::int32_t x = 0; x < world.grid().width(); ++x)
+        {
+            const Paladin::WorldTile* tile =
+                world.grid().tile({x, y});
+
+            if (tile->terrain == Paladin::TerrainType::Water)
+            {
+                PALADIN_CHECK(
+                    !world.territory().isControlled({x, y})
+                );
+            }
+        }
+    }
+
     Paladin::Settlement* simulatedPlayerCapital =
         world.settlement(capitalId);
 
@@ -279,6 +357,12 @@ void runWorldTests()
     Paladin::WorldSimulationPipeline simulationPipeline;
 
     PALADIN_CHECK(simulationPipeline.systemCount() == 2);
+    PALADIN_CHECK(
+        simulationPipeline.policies().detailed.minimumStepMinutes == 1
+    );
+    PALADIN_CHECK(
+        simulationPipeline.policies().inactive.minimumStepMinutes == 60
+    );
 
     const double playerOpeningFood =
         simulatedPlayerCapital->simulationState()
@@ -292,12 +376,18 @@ void runWorldTests()
         simulatedInactiveSettlement->simulationState()
             .stockpile().amount("food");
 
-    constexpr double gameSecondsPerDay =
-        24.0 * 60.0 * 60.0;
+    const Paladin::SettlementStateVersions playerOpeningVersions =
+        simulatedPlayerCapital->simulationState().versions();
+
+    const Paladin::SettlementStateVersions inactiveOpeningVersions =
+        simulatedInactiveSettlement->simulationState().versions();
+
+    constexpr std::uint64_t gameMinutesPerDay =
+        24 * 60;
 
     simulationPipeline.tick(
         world,
-        gameSecondsPerDay * 0.5
+        30
     );
 
     PALADIN_CHECK(
@@ -315,14 +405,44 @@ void runWorldTests()
             .stockpile().amount("food") == inactiveOpeningFood
     );
 
+    PALADIN_CHECK(
+        simulatedPlayerCapital->simulationState()
+            .totalSimulatedMinutes() == 30
+    );
+
+    PALADIN_CHECK(
+        simulatedPlayerCapital->simulationState()
+            .versions().resources > playerOpeningVersions.resources
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .pendingSimulationMinutes() == 30
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .versions().resources == inactiveOpeningVersions.resources
+    );
+
     simulationPipeline.tick(
         world,
-        gameSecondsPerDay * 0.5
+        30
     );
 
     PALADIN_CHECK(
         simulatedInactiveSettlement->simulationState()
             .stockpile().amount("food") > inactiveOpeningFood
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .pendingSimulationMinutes() == 0
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .totalSimulatedMinutes() == 60
     );
 
     PALADIN_CHECK(
@@ -332,7 +452,7 @@ void runWorldTests()
 
     simulationPipeline.tick(
         world,
-        gameSecondsPerDay * 29.0
+        30 * gameMinutesPerDay - 60
     );
 
     const std::uint64_t aiPopulationAfterStrategicStep =
@@ -343,12 +463,22 @@ void runWorldTests()
         aiPopulationAfterStrategicStep < 100
     );
 
-    constexpr double gameSecondsPerYear =
-        365.0 * gameSecondsPerDay;
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .pendingSimulationMinutes() == 0
+    );
+
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .totalSimulatedMinutes() == 30 * gameMinutesPerDay
+    );
+
+    constexpr std::uint64_t gameMinutesPerYear =
+        365 * gameMinutesPerDay;
 
     simulationPipeline.tick(
         world,
-        gameSecondsPerYear
+        gameMinutesPerYear
     );
 
     PALADIN_CHECK(
@@ -361,4 +491,243 @@ void runWorldTests()
             .population().residents() <
                 aiPopulationAfterStrategicStep
     );
+
+    Paladin::WorldGenerationSettings borderlandSettings;
+    borderlandSettings.width = 32;
+    borderlandSettings.height = 32;
+
+    Paladin::TerritoryFoundationPolicy borderlandPolicy =
+        Paladin::defaultTerritoryFoundationPolicy();
+
+    Paladin::World borderlandWorld(
+        borderlandSettings,
+        borderlandPolicy
+    );
+
+    for (
+        std::int32_t y = 0;
+        y < borderlandWorld.grid().height();
+        ++y
+    )
+    {
+        for (
+            std::int32_t x = 0;
+            x < borderlandWorld.grid().width();
+            ++x
+        )
+        {
+            borderlandWorld.grid().tile({x, y})->terrain =
+                Paladin::TerrainType::Land;
+        }
+    }
+
+    const Paladin::PolityId borderlandPolityId =
+        borderlandWorld.createPolity();
+
+    constexpr Paladin::WorldPosition borderlandCapital{16, 16};
+
+    PALADIN_CHECK(
+        borderlandWorld.foundCapitalSettlement(
+            borderlandCapital,
+            borderlandPolityId,
+            {
+                "Borderland Test Polity",
+                "Borderland Test Culture",
+                "Borderland Test Capital",
+                {120, 80, 190},
+                "civic"
+            }
+        ).isValid()
+    );
+
+    const std::int32_t regionHalfWidth =
+        borderlandPolicy.settlementRegionWidth / 2;
+
+    const std::int32_t regionHalfHeight =
+        borderlandPolicy.settlementRegionHeight / 2;
+
+    const std::int32_t regionMinimumX =
+        borderlandCapital.x - regionHalfWidth;
+
+    const std::int32_t regionMaximumX =
+        regionMinimumX
+        + borderlandPolicy.settlementRegionWidth - 1;
+
+    const std::int32_t regionMinimumY =
+        borderlandCapital.y - regionHalfHeight;
+
+    const std::int32_t regionMaximumY =
+        regionMinimumY
+        + borderlandPolicy.settlementRegionHeight - 1;
+
+    std::size_t claimedImmediateBorderlandTiles = 0;
+    std::size_t possibleImmediateBorderlandTiles = 0;
+
+    const auto countImmediateBorderlandTile =
+        [&](Paladin::WorldTilePosition position)
+        {
+            ++possibleImmediateBorderlandTiles;
+
+            if (
+                borderlandWorld.territory().controllerAt(position)
+                == borderlandPolityId
+            )
+            {
+                ++claimedImmediateBorderlandTiles;
+            }
+        };
+
+    for (
+        std::int32_t x = regionMinimumX;
+        x <= regionMaximumX;
+        ++x
+    )
+    {
+        countImmediateBorderlandTile({x, regionMinimumY - 1});
+        countImmediateBorderlandTile({x, regionMaximumY + 1});
+    }
+
+    for (
+        std::int32_t y = regionMinimumY;
+        y <= regionMaximumY;
+        ++y
+    )
+    {
+        countImmediateBorderlandTile({regionMinimumX - 1, y});
+        countImmediateBorderlandTile({regionMaximumX + 1, y});
+    }
+
+    PALADIN_CHECK(claimedImmediateBorderlandTiles > 0);
+    PALADIN_CHECK(
+        claimedImmediateBorderlandTiles
+        < possibleImmediateBorderlandTiles
+    );
+
+    const std::array<Paladin::WorldTilePosition, 4>
+        cardinalNeighborOffsets{
+            Paladin::WorldTilePosition{-1, 0},
+            Paladin::WorldTilePosition{1, 0},
+            Paladin::WorldTilePosition{0, -1},
+            Paladin::WorldTilePosition{0, 1}
+        };
+
+    std::vector<bool> visited(
+        borderlandWorld.grid().tileCount(),
+        false
+    );
+
+    std::queue<Paladin::WorldTilePosition> frontier;
+    frontier.push({borderlandCapital.x, borderlandCapital.y});
+
+    std::size_t connectedTileCount = 0;
+
+    while (!frontier.empty())
+    {
+        const Paladin::WorldTilePosition position = frontier.front();
+        frontier.pop();
+
+        const std::size_t index =
+            static_cast<std::size_t>(position.y)
+                * static_cast<std::size_t>(
+                    borderlandWorld.grid().width()
+                )
+            + static_cast<std::size_t>(position.x);
+
+        if (visited[index])
+        {
+            continue;
+        }
+
+        visited[index] = true;
+        ++connectedTileCount;
+
+        for (const Paladin::WorldTilePosition offset
+            : cardinalNeighborOffsets)
+        {
+            const Paladin::WorldTilePosition neighbor{
+                position.x + offset.x,
+                position.y + offset.y
+            };
+
+            if (
+                borderlandWorld.territory().controllerAt(neighbor)
+                == borderlandPolityId
+            )
+            {
+                frontier.push(neighbor);
+            }
+        }
+    }
+
+    PALADIN_CHECK(
+        connectedTileCount
+        == borderlandWorld.territory().controlledTileCount(
+            borderlandPolityId
+        )
+    );
+
+    constexpr Paladin::WorldPosition movedCapital{7, 7};
+    PALADIN_CHECK(
+        borderlandWorld.relocateSoleCapital(
+            borderlandPolityId,
+            movedCapital
+        )
+    );
+    PALADIN_CHECK(
+        borderlandWorld.settlement(
+            borderlandWorld.polity(borderlandPolityId)
+                ->capitalSettlementId()
+        )->position() == movedCapital
+    );
+    PALADIN_CHECK(
+        borderlandWorld.territory().controllerAt({7, 7})
+        == borderlandPolityId
+    );
+    PALADIN_CHECK(
+        !borderlandWorld.territory().controllerAt({16, 16}).isValid()
+    );
+
+    Paladin::World freshMovedWorld(
+        borderlandSettings,
+        borderlandPolicy
+    );
+
+    for (std::int32_t y = 0; y < freshMovedWorld.grid().height(); ++y)
+    {
+        for (std::int32_t x = 0; x < freshMovedWorld.grid().width(); ++x)
+        {
+            freshMovedWorld.grid().tile({x, y})->terrain =
+                Paladin::TerrainType::Land;
+        }
+    }
+
+    const Paladin::PolityId freshMovedPolityId =
+        freshMovedWorld.createPolity();
+
+    PALADIN_CHECK(
+        freshMovedWorld.foundCapitalSettlement(
+            movedCapital,
+            freshMovedPolityId,
+            {
+                "Fresh Move Test Polity",
+                "Fresh Move Test Culture",
+                "Fresh Move Test Capital",
+                {120, 80, 190},
+                "civic"
+            }
+        ).isValid()
+    );
+
+    for (std::int32_t y = 0; y < borderlandWorld.grid().height(); ++y)
+    {
+        for (std::int32_t x = 0; x < borderlandWorld.grid().width(); ++x)
+        {
+            PALADIN_CHECK(
+                borderlandWorld.territory()
+                    .controllerAt({x, y}).isValid()
+                == freshMovedWorld.territory()
+                    .controllerAt({x, y}).isValid()
+            );
+        }
+    }
 }

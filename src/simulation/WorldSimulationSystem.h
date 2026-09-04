@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "world/settlements/SettlementSimulationTier.h"
 
+#include <cstdint>
 #include <span>
 
 namespace Paladin
@@ -13,13 +14,13 @@ namespace Paladin
     {
         SettlementId settlementId;
         SettlementSimulationTier simulationTier =
-            SettlementSimulationTier::Summary;
-        double gameDeltaSeconds = 0.0;
+            SettlementSimulationTier::Inactive;
+        std::uint64_t gameMinutes = 0;
     };
 
     struct WorldSimulationStep
     {
-        double gameDeltaSeconds = 0.0;
+        std::uint64_t gameMinutes = 0;
         std::span<const SettlementSimulationStep> settlementSteps;
     };
 

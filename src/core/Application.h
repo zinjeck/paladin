@@ -1,5 +1,7 @@
 #pragma once
 
+#include "interaction/CameraNavigationPolicy.h"
+
 #include <memory>
 
 namespace Paladin
@@ -44,6 +46,7 @@ namespace Paladin
 
         void updateCameraMovement(double frameDeltaSeconds);
         void updateCameraZoom(double frameDeltaSeconds);
+        void clampCameraToWorld() noexcept;
 
         void updateSettlementPlacementHover(
             double screenX,
@@ -75,5 +78,10 @@ namespace Paladin
         std::unique_ptr<WorldRenderer> worldRenderer_;
         std::unique_ptr<TileRenderMetrics>
             tileRenderMetrics_;
+
+        CameraNavigationPolicy cameraNavigationPolicy_ =
+            defaultCameraNavigationPolicy();
+        double edgeScrollDwellSeconds_ = 0.0;
+        bool movingCapital_ = false;
     };
 }

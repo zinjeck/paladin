@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/StrongId.h"
 #include "world/WorldPosition.h"
 
 #include <optional>
@@ -11,7 +12,7 @@ namespace Paladin
     class SettlementPlacementController
     {
     public:
-        void beginSelection() noexcept;
+        void beginSelection(PolityId ownerPolityId = {}) noexcept;
         void cancelSelection() noexcept;
 
         [[nodiscard]]
@@ -47,5 +48,6 @@ namespace Paladin
         bool selecting_ = false;
         std::optional<WorldPosition> hoveredPosition_;
         std::optional<WorldPosition> lockedPosition_;
+        PolityId ownerPolityId_;
     };
 }

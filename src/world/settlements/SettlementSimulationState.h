@@ -4,11 +4,24 @@
 #include "world/settlements/SettlementEconomy.h"
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/settlements/SettlementPopulation.h"
+#include "world/settlements/SettlementSimulationPolicy.h"
 #include "world/settlements/SettlementSimulationTier.h"
+
+#include <cstdint>
 
 namespace Paladin
 {
     class WorldSimulationPipeline;
+
+    struct SettlementStateVersions
+    {
+        std::uint64_t population = 0;
+        std::uint64_t resources = 0;
+        std::uint64_t economy = 0;
+        std::uint64_t scheduling = 0;
+
+        bool operator==(const SettlementStateVersions&) const = default;
+    };
 
     class SettlementSimulationState
     {
@@ -46,12 +59,25 @@ namespace Paladin
         [[nodiscard]]
         SettlementSimulationTier simulationTier() const noexcept;
 
+        [[nodiscard]]
+        std::uint64_t pendingSimulationMinutes() const noexcept;
+
+        [[nodiscard]]
+        std::uint64_t totalSimulatedMinutes() const noexcept;
+
+        [[nodiscard]]
+        std::uint64_t completedSimulationSteps() const noexcept;
+
+        [[nodiscard]]
+        SettlementStateVersions versions() const noexcept;
+
     private:
         friend class WorldSimulationPipeline;
 
         [[nodiscard]]
-        double takeDueSimulationSeconds(
-            double gameDeltaSeconds
+        std::uint64_t takeDueSimulationMinutes(
+            std::uint64_t gameMinutes,
+            const SettlementSimulationPolicy& policy
         ) noexcept;
 
         bool initialized_ = false;
@@ -59,7 +85,10 @@ namespace Paladin
         ResourceStockpile stockpile_;
         SettlementEconomy economy_;
         SettlementSimulationTier simulationTier_ =
-            SettlementSimulationTier::Summary;
-        double pendingGameSeconds_ = 0.0;
+            SettlementSimulationTier::Inactive;
+        std::uint64_t pendingSimulationMinutes_ = 0;
+        std::uint64_t totalSimulatedMinutes_ = 0;
+        std::uint64_t completedSimulationSteps_ = 0;
+        std::uint64_t schedulingVersion_ = 0;
     };
 }

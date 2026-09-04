@@ -8,6 +8,8 @@
 
 namespace Paladin
 {
+    class World;
+
     class Culture
     {
     public:
@@ -33,6 +35,13 @@ namespace Paladin
         }
 
     private:
+        friend class World;
+
+        void setName(std::string name)
+        {
+            name_ = std::move(name);
+        }
+
         CultureId id_;
         std::string name_;
     };

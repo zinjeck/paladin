@@ -1,81 +1,79 @@
 #include "world/WorldTime.h"
 
-#include <cmath>
+#include <limits>
 
 namespace Paladin
 {
     WorldTime::WorldTime() noexcept = default;
 
 
-    void WorldTime::advance(
-        double gameSeconds
+    void WorldTime::advanceMinutes(
+        std::uint64_t gameMinutes
     ) noexcept
     {
-        if (gameSeconds <= 0.0)
+        if (gameMinutes == 0)
         {
             return;
         }
 
-        totalGameSeconds_ += gameSeconds;
+        constexpr std::uint64_t maximumMinutes =
+            std::numeric_limits<std::uint64_t>::max();
+
+        if (gameMinutes > maximumMinutes - totalGameMinutes_)
+        {
+            totalGameMinutes_ = maximumMinutes;
+            return;
+        }
+
+        totalGameMinutes_ += gameMinutes;
     }
 
 
     std::uint64_t WorldTime::day() const noexcept
     {
         return
-            static_cast<std::uint64_t>(
-                totalGameSeconds_ / SecondsPerDay
-            ) + 1;
+            totalGameMinutes_ / MinutesPerDay + 1;
     }
 
 
     int WorldTime::hour() const noexcept
     {
-        const double secondsToday =
-            secondsIntoDay();
-
         return static_cast<int>(
-            secondsToday / SecondsPerHour
+            totalGameMinutes_ % MinutesPerDay / MinutesPerHour
         );
     }
 
 
     int WorldTime::minute() const noexcept
     {
-        const double secondsToday =
-            secondsIntoDay();
-
         return static_cast<int>(
-            std::fmod(
-                secondsToday,
-                SecondsPerHour
-            ) / SecondsPerMinute
+            totalGameMinutes_ % MinutesPerHour
         );
     }
 
 
     int WorldTime::second() const noexcept
     {
-        return static_cast<int>(
-            std::fmod(
-                secondsIntoDay(),
-                SecondsPerMinute
-            )
-        );
+        return 0;
     }
 
 
     double WorldTime::secondsIntoDay() const noexcept
     {
-        return std::fmod(
-            totalGameSeconds_,
-            SecondsPerDay
+        return static_cast<double>(
+            totalGameMinutes_ % MinutesPerDay * 60
         );
     }
 
 
     double WorldTime::totalGameSeconds() const noexcept
     {
-        return totalGameSeconds_;
+        return static_cast<double>(totalGameMinutes_) * 60.0;
+    }
+
+
+    std::uint64_t WorldTime::totalGameMinutes() const noexcept
+    {
+        return totalGameMinutes_;
     }
 }

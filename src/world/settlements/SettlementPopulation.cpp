@@ -57,7 +57,8 @@ namespace Paladin
         DemographicRates rates
     ) noexcept
         : residents_(residents),
-          rates_(normalizedRates(rates))
+          rates_(normalizedRates(rates)),
+          version_(1)
     {
     }
 
@@ -71,11 +72,25 @@ namespace Paladin
         return rates_;
     }
 
+
+    std::uint64_t SettlementPopulation::version() const noexcept
+    {
+        return version_;
+    }
+
     void SettlementPopulation::setRates(
         DemographicRates rates
     ) noexcept
     {
-        rates_ = normalizedRates(rates);
+        const DemographicRates nextRates = normalizedRates(rates);
+
+        if (rates_ == nextRates)
+        {
+            return;
+        }
+
+        rates_ = nextRates;
+        ++version_;
     }
 
     void SettlementPopulation::applyNetChange(
@@ -86,6 +101,9 @@ namespace Paladin
         {
             return;
         }
+
+        const std::uint64_t openingResidents = residents_;
+        const double openingFractionalChange = fractionalChange_;
 
         fractionalChange_ += populationChange;
 
@@ -108,6 +126,7 @@ namespace Paladin
             {
                 residents_ = maximumResidents;
                 fractionalChange_ = 0.0;
+                ++version_;
                 return;
             }
 
@@ -117,11 +136,8 @@ namespace Paladin
             residents_ += appliedGrowth;
             fractionalChange_ -=
                 static_cast<double>(appliedGrowth);
-
-            return;
         }
-
-        if (fractionalChange_ <= -1.0)
+        else if (fractionalChange_ <= -1.0)
         {
             const double requestedDecline =
                 std::floor(-fractionalChange_);
@@ -133,6 +149,7 @@ namespace Paladin
             {
                 residents_ = 0;
                 fractionalChange_ = 0.0;
+                ++version_;
                 return;
             }
 
@@ -142,6 +159,14 @@ namespace Paladin
             residents_ -= appliedDecline;
             fractionalChange_ +=
                 static_cast<double>(appliedDecline);
+        }
+
+        if (
+            residents_ != openingResidents ||
+            fractionalChange_ != openingFractionalChange
+        )
+        {
+            ++version_;
         }
     }
 }

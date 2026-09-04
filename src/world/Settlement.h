@@ -106,6 +106,11 @@ namespace Paladin
             position_ = position;
         }
 
+        void setName(std::string name)
+        {
+            name_ = std::move(name);
+        }
+
         void setOwnerPolity(
             PolityId polityId
         ) noexcept

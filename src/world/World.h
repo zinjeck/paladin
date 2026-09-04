@@ -13,6 +13,8 @@
 #include "world/WorldGrid.h"
 #include "world/generation/WorldGenerationSettings.h"
 #include "world/settlements/SettlementFoundationProfile.h"
+#include "world/territory/TerritoryFoundationPolicy.h"
+#include "world/territory/TerritoryMap.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -28,12 +30,17 @@ namespace Paladin
         explicit World(
             const WorldGenerationSettings& generationSettings
         );
+
+        World(
+            const WorldGenerationSettings& generationSettings,
+            TerritoryFoundationPolicy territoryFoundationPolicy
+        );
         ~World();
 
         World(const World&) = delete;
         World& operator=(const World&) = delete;
 
-        void tick(double deltaSeconds);
+        void advanceTime(std::uint64_t gameMinutes) noexcept;
 
 
         // ====================================================
@@ -61,6 +68,12 @@ namespace Paladin
         [[nodiscard]]
         bool canFoundSettlementAt(
             WorldPosition position
+        ) const noexcept;
+
+        [[nodiscard]]
+        bool canFoundSettlementAt(
+            WorldPosition position,
+            PolityId ownerPolityId
         ) const noexcept;
 
         [[nodiscard]]
@@ -151,6 +164,13 @@ namespace Paladin
         const WorldGrid& grid() const noexcept;
 
         [[nodiscard]]
+        const TerritoryMap& territory() const noexcept;
+
+        [[nodiscard]]
+        const TerritoryFoundationPolicy&
+        territoryFoundationPolicy() const noexcept;
+
+        [[nodiscard]]
         std::uint64_t generationSeed() const noexcept;
 
         [[nodiscard]]
@@ -161,6 +181,9 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<const Culture> cultures() const noexcept;
+
+        [[nodiscard]]
+        std::span<const Polity> polities() const noexcept;
 
         // ====================================================
         // Settlement relationships
@@ -179,6 +202,24 @@ namespace Paladin
             SettlementId settlementId,
             WorldPosition position
         ) noexcept;
+
+        [[nodiscard]]
+        bool renameSettlement(
+            SettlementId settlementId,
+            std::string name
+        );
+
+        [[nodiscard]]
+        bool editPolityIdentity(
+            PolityId polityId,
+            const FoundingIdentity& identity
+        );
+
+        [[nodiscard]]
+        bool relocateSoleCapital(
+            PolityId polityId,
+            WorldPosition position
+        );
 
 
         // ====================================================
@@ -221,6 +262,8 @@ namespace Paladin
         WorldTime time_;
         std::uint64_t generationSeed_ = 0;
         WorldGrid grid_;
+        TerritoryMap territory_;
+        TerritoryFoundationPolicy territoryFoundationPolicy_;
     
         EntityRegistry<
             Settlement,

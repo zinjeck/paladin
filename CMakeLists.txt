@@ -20,6 +20,7 @@ add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
     src/core/SimulationClock.cpp
+    src/interaction/CameraNavigationPolicy.cpp
     src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
@@ -28,6 +29,8 @@ add_executable(Paladin
     src/rendering/OverlayRenderer.cpp
     src/rendering/WorldRenderer.cpp
     src/rendering/SettlementMarkerRenderer.cpp
+    src/rendering/TerritoryPresentationPolicy.cpp
+    src/rendering/TerritoryRenderer.cpp
     src/simulation/Simulation.cpp
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
@@ -41,11 +44,16 @@ add_executable(Paladin
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
+    src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp
+    src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/territory/TerritoryFoundationPolicy.cpp
+    src/world/territory/TerritoryFoundationSystem.cpp
+    src/world/territory/TerritoryMap.cpp
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/GrayUiRenderer.cpp
@@ -90,11 +98,16 @@ add_executable(PaladinTests
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
+    src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp
+    src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/territory/TerritoryFoundationPolicy.cpp
+    src/world/territory/TerritoryFoundationSystem.cpp
+    src/world/territory/TerritoryMap.cpp
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp

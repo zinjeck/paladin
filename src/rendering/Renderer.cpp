@@ -3,6 +3,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
+
 namespace Paladin
 {
     Renderer::Renderer(SDL_Window* window)
@@ -86,6 +88,35 @@ namespace Paladin
     }
 
 
+    void Renderer::fillRectangles(
+        std::span<const RenderRectangle> rectangles,
+        RenderColor color
+    )
+    {
+        static_assert(sizeof(RenderRectangle) == sizeof(SDL_FRect));
+        static_assert(alignof(RenderRectangle) == alignof(SDL_FRect));
+
+        if (rectangles.empty())
+        {
+            return;
+        }
+
+        SDL_SetRenderDrawColor(
+            renderer_,
+            color.red,
+            color.green,
+            color.blue,
+            color.alpha
+        );
+
+        SDL_RenderFillRects(
+            renderer_,
+            reinterpret_cast<const SDL_FRect*>(rectangles.data()),
+            static_cast<int>(rectangles.size())
+        );
+    }
+
+
     std::unique_ptr<Texture> Renderer::loadBitmapTexture(
         const char* filePath
     )
@@ -137,6 +168,99 @@ namespace Paladin
                 width,
                 height
             )
+        );
+    }
+
+
+    std::unique_ptr<Texture> Renderer::createTextureFromPixels(
+        int width,
+        int height,
+        std::span<const RenderColor> pixels
+    )
+    {
+        static_assert(sizeof(RenderColor) == 4);
+
+        if (
+            width <= 0 ||
+            height <= 0 ||
+            pixels.size() !=
+                static_cast<std::size_t>(width)
+                    * static_cast<std::size_t>(height)
+        )
+        {
+            return nullptr;
+        }
+
+        SDL_Texture* texture = SDL_CreateTexture(
+            renderer_,
+            SDL_PIXELFORMAT_RGBA32,
+            SDL_TEXTUREACCESS_STATIC,
+            width,
+            height
+        );
+
+        if (!texture)
+        {
+            SDL_Log(
+                "SDL_CreateTexture failed: %s",
+                SDL_GetError()
+            );
+
+            return nullptr;
+        }
+
+        if (!SDL_UpdateTexture(
+                texture,
+                nullptr,
+                pixels.data(),
+                width * static_cast<int>(sizeof(RenderColor))
+            ))
+        {
+            SDL_Log(
+                "SDL_UpdateTexture failed: %s",
+                SDL_GetError()
+            );
+
+            SDL_DestroyTexture(texture);
+            return nullptr;
+        }
+
+        SDL_SetTextureScaleMode(
+            texture,
+            SDL_SCALEMODE_NEAREST
+        );
+
+        SDL_SetTextureBlendMode(
+            texture,
+            SDL_BLENDMODE_BLEND
+        );
+
+        return std::unique_ptr<Texture>(
+            new Texture(texture, width, height)
+        );
+    }
+
+
+    bool Renderer::updateTexturePixels(
+        Texture& texture,
+        std::span<const RenderColor> pixels
+    )
+    {
+        if (
+            pixels.size() !=
+                static_cast<std::size_t>(texture.width_)
+                    * static_cast<std::size_t>(texture.height_)
+        )
+        {
+            return false;
+        }
+
+        return SDL_UpdateTexture(
+            texture.texture_,
+            nullptr,
+            pixels.data(),
+            texture.width_
+                * static_cast<int>(sizeof(RenderColor))
         );
     }
 

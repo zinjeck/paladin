@@ -1,6 +1,7 @@
 #include "world/settlements/SettlementSimulationState.h"
 
 #include <cmath>
+#include <limits>
 #include <utility>
 
 namespace Paladin
@@ -60,7 +61,10 @@ namespace Paladin
         stockpile_ = std::move(initialStockpile);
         economy_ = std::move(initialEconomy);
         simulationTier_ = profile.initialSimulationTier;
-        pendingGameSeconds_ = 0.0;
+        pendingSimulationMinutes_ = 0;
+        totalSimulatedMinutes_ = 0;
+        completedSimulationSteps_ = 0;
+        schedulingVersion_ = 1;
         initialized_ = true;
         return true;
     }
@@ -110,7 +114,13 @@ namespace Paladin
         SettlementSimulationTier tier
     ) noexcept
     {
+        if (simulationTier_ == tier)
+        {
+            return;
+        }
+
         simulationTier_ = tier;
+        ++schedulingVersion_;
     }
 
     SettlementSimulationTier
@@ -119,54 +129,86 @@ namespace Paladin
         return simulationTier_;
     }
 
-    double SettlementSimulationState::takeDueSimulationSeconds(
-        double gameDeltaSeconds
+
+    std::uint64_t
+    SettlementSimulationState::pendingSimulationMinutes() const noexcept
+    {
+        return pendingSimulationMinutes_;
+    }
+
+
+    std::uint64_t
+    SettlementSimulationState::totalSimulatedMinutes() const noexcept
+    {
+        return totalSimulatedMinutes_;
+    }
+
+
+    std::uint64_t
+    SettlementSimulationState::completedSimulationSteps() const noexcept
+    {
+        return completedSimulationSteps_;
+    }
+
+
+    SettlementStateVersions
+    SettlementSimulationState::versions() const noexcept
+    {
+        return {
+            population_.version(),
+            stockpile_.version(),
+            economy_.version(),
+            schedulingVersion_
+        };
+    }
+
+
+    std::uint64_t
+    SettlementSimulationState::takeDueSimulationMinutes(
+        std::uint64_t gameMinutes,
+        const SettlementSimulationPolicy& policy
     ) noexcept
     {
-        if (
-            !initialized_ ||
-            !std::isfinite(gameDeltaSeconds) ||
-            gameDeltaSeconds <= 0.0
-        )
+        if (!initialized_ || gameMinutes == 0 || !policy.isValid())
         {
-            return 0.0;
+            return 0;
         }
 
-        pendingGameSeconds_ += gameDeltaSeconds;
+        constexpr std::uint64_t maximumMinutes =
+            std::numeric_limits<std::uint64_t>::max();
 
-        if (!std::isfinite(pendingGameSeconds_))
+        if (gameMinutes > maximumMinutes - pendingSimulationMinutes_)
         {
-            pendingGameSeconds_ = 0.0;
-            return 0.0;
+            pendingSimulationMinutes_ = maximumMinutes;
+        }
+        else
+        {
+            pendingSimulationMinutes_ += gameMinutes;
         }
 
-        constexpr double gameSecondsPerDay =
-            24.0 * 60.0 * 60.0;
-
-        double minimumStepSeconds = 0.0;
-
-        switch (simulationTier_)
+        if (pendingSimulationMinutes_ < policy.minimumStepMinutes)
         {
-            case SettlementSimulationTier::Detailed:
-                minimumStepSeconds = 0.0;
-                break;
-
-            case SettlementSimulationTier::Summary:
-                minimumStepSeconds = gameSecondsPerDay;
-                break;
-
-            case SettlementSimulationTier::Strategic:
-                minimumStepSeconds = 30.0 * gameSecondsPerDay;
-                break;
+            ++schedulingVersion_;
+            return 0;
         }
 
-        if (pendingGameSeconds_ < minimumStepSeconds)
+        const std::uint64_t dueMinutes =
+            pendingSimulationMinutes_ -
+            pendingSimulationMinutes_ % policy.minimumStepMinutes;
+
+        pendingSimulationMinutes_ -= dueMinutes;
+
+        if (dueMinutes > maximumMinutes - totalSimulatedMinutes_)
         {
-            return 0.0;
+            totalSimulatedMinutes_ = maximumMinutes;
+        }
+        else
+        {
+            totalSimulatedMinutes_ += dueMinutes;
         }
 
-        const double dueSeconds = pendingGameSeconds_;
-        pendingGameSeconds_ = 0.0;
-        return dueSeconds;
+        ++completedSimulationSteps_;
+        ++schedulingVersion_;
+        return dueMinutes;
     }
 }

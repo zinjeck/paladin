@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace Paladin
 {
@@ -62,6 +63,45 @@ namespace Paladin
         ) noexcept = default;
     };
 
+    struct FlagCell
+    {
+        bool painted = false;
+        MapColor color{};
+
+        friend constexpr bool operator==(
+            const FlagCell&,
+            const FlagCell&
+        ) noexcept = default;
+    };
+
+    struct PolityFlag
+    {
+        static constexpr std::size_t defaultWidth = 7;
+        static constexpr std::size_t defaultHeight = 9;
+
+        std::size_t width = defaultWidth;
+        std::size_t height = defaultHeight;
+        MapColor primaryColor{210, 54, 54};
+        std::vector<FlagCell> cells = std::vector<FlagCell>(
+            defaultWidth * defaultHeight,
+            FlagCell{}
+        );
+
+        [[nodiscard]]
+        bool isValid() const noexcept
+        {
+            return
+                width > 0 &&
+                height > 0 &&
+                cells.size() == width * height;
+        }
+
+        friend bool operator==(
+            const PolityFlag&,
+            const PolityFlag&
+        ) = default;
+    };
+
     inline std::string trimFoundingName(
         std::string_view name
     )
@@ -97,5 +137,6 @@ namespace Paladin
         std::string capitalName;
         MapColor mapColor;
         std::string polityOriginId;
+        PolityFlag flag;
     };
 }

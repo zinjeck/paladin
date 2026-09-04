@@ -73,6 +73,12 @@ namespace Paladin
         text_.clear();
     }
 
+    void UiTextField::setText(std::string_view text)
+    {
+        text_.clear();
+        appendText(text);
+    }
+
     const std::string& UiTextField::text() const noexcept
     {
         return text_;

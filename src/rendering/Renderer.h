@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 
 struct SDL_Renderer;
 
@@ -24,6 +25,14 @@ namespace Paladin
 
         std::uint8_t alpha = 255;
 
+    };
+
+    struct RenderRectangle
+    {
+        float x = 0.0F;
+        float y = 0.0F;
+        float width = 0.0F;
+        float height = 0.0F;
     };
 
     class Renderer
@@ -62,9 +71,27 @@ namespace Paladin
 
         );
 
+        void fillRectangles(
+            std::span<const RenderRectangle> rectangles,
+            RenderColor color
+        );
+
         [[nodiscard]]
         std::unique_ptr<Texture> loadBitmapTexture(
             const char* filePath
+        );
+
+        [[nodiscard]]
+        std::unique_ptr<Texture> createTextureFromPixels(
+            int width,
+            int height,
+            std::span<const RenderColor> pixels
+        );
+
+        [[nodiscard]]
+        bool updateTexturePixels(
+            Texture& texture,
+            std::span<const RenderColor> pixels
         );
 
         void drawTexture(

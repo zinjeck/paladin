@@ -112,6 +112,7 @@ namespace Paladin
         lastFlows_ = std::move(snapshots);
         populationNeedFulfillment_ = 1.0;
         populationSustainableSupplyRatio_ = 1.0;
+        ++version_;
         return true;
     }
 
@@ -225,6 +226,8 @@ namespace Paladin
             populationNeedFulfillment_ = 1.0;
             populationSustainableSupplyRatio_ = 1.0;
         }
+
+        ++version_;
     }
 
     std::span<const ResourceFlowRate>
@@ -248,5 +251,11 @@ namespace Paladin
         const noexcept
     {
         return populationSustainableSupplyRatio_;
+    }
+
+
+    std::uint64_t SettlementEconomy::version() const noexcept
+    {
+        return version_;
     }
 }

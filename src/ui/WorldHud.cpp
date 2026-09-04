@@ -6,6 +6,9 @@ namespace Paladin
 {
     WorldHud::WorldHud()
         : selectRegionButton_("Select Region"),
+          moveCapitalButton_("Move Capital"),
+          renameCapitalButton_("Rename Capital"),
+          editPolityButton_("Edit Polity"),
           backButton_("Back")
     {
     }
@@ -15,14 +18,33 @@ namespace Paladin
         int viewportHeight
     ) noexcept
     {
-        constexpr float width = 220.0F;
+        constexpr float width = 190.0F;
         constexpr float height = 44.0F;
+        constexpr float gap = 10.0F;
 
         selectRegionButton_.setBounds({
             (
                 static_cast<float>(viewportWidth)
                 - width
             ) * 0.5F,
+            16.0F,
+            width,
+            height
+        });
+
+        const float actionRowWidth = width * 3.0F + gap * 2.0F;
+        const float actionRowX =
+            (static_cast<float>(viewportWidth) - actionRowWidth) * 0.5F;
+
+        moveCapitalButton_.setBounds({actionRowX, 16.0F, width, height});
+        renameCapitalButton_.setBounds({
+            actionRowX + width + gap,
+            16.0F,
+            width,
+            height
+        });
+        editPolityButton_.setBounds({
+            actionRowX + (width + gap) * 2.0F,
             16.0F,
             width,
             height
@@ -39,26 +61,59 @@ namespace Paladin
     void WorldHud::pointerMoved(float x, float y) noexcept
     {
         selectRegionButton_.pointerMoved(x, y);
+        moveCapitalButton_.pointerMoved(x, y);
+        renameCapitalButton_.pointerMoved(x, y);
+        editPolityButton_.pointerMoved(x, y);
         backButton_.pointerMoved(x, y);
     }
 
-    void WorldHud::setRegionSelectionAvailable(
-        bool available
-    ) noexcept
+    void WorldHud::setCapitalEstablished(bool established) noexcept
     {
-        regionSelectionAvailable_ = available;
-        selectRegionButton_.setEnabled(available);
+        capitalEstablished_ = established;
     }
 
     bool WorldHud::pointerPressed(float x, float y) noexcept
     {
-        const bool selectRegionCaptured =
-            selectRegionButton_.pointerPressed(x, y);
+        bool actionCaptured = false;
+
+        if (capitalEstablished_)
+        {
+            actionCaptured =
+                moveCapitalButton_.pointerPressed(x, y) ||
+                renameCapitalButton_.pointerPressed(x, y) ||
+                editPolityButton_.pointerPressed(x, y);
+        }
+        else
+        {
+            actionCaptured = selectRegionButton_.pointerPressed(x, y);
+        }
 
         const bool backCaptured =
             backButton_.pointerPressed(x, y);
 
-        return selectRegionCaptured || backCaptured;
+        return
+            actionCaptured || backCaptured;
+    }
+
+    bool WorldHud::containsInteractivePoint(
+        float x,
+        float y
+    ) const noexcept
+    {
+        return
+            backButton_.containsPoint(x, y) ||
+            (
+                !capitalEstablished_ &&
+                selectRegionButton_.containsPoint(x, y)
+            ) ||
+            (
+                capitalEstablished_ &&
+                (
+                    moveCapitalButton_.containsPoint(x, y) ||
+                    renameCapitalButton_.containsPoint(x, y) ||
+                    editPolityButton_.containsPoint(x, y)
+                )
+            );
     }
 
     WorldHudAction WorldHud::pointerReleased(
@@ -69,12 +124,37 @@ namespace Paladin
         const bool selectRegionClicked =
             selectRegionButton_.pointerReleased(x, y);
 
+        const bool moveClicked =
+            moveCapitalButton_.pointerReleased(x, y);
+
+        const bool renameClicked =
+            renameCapitalButton_.pointerReleased(x, y);
+
+        const bool editClicked =
+            editPolityButton_.pointerReleased(x, y);
+
         const bool backClicked =
             backButton_.pointerReleased(x, y);
 
-        if (regionSelectionAvailable_ && selectRegionClicked)
+        if (!capitalEstablished_ && selectRegionClicked)
         {
             return WorldHudAction::SelectRegion;
+        }
+
+
+        if (capitalEstablished_ && moveClicked)
+        {
+            return WorldHudAction::MoveCapital;
+        }
+
+        if (capitalEstablished_ && renameClicked)
+        {
+            return WorldHudAction::RenameCapital;
+        }
+
+        if (capitalEstablished_ && editClicked)
+        {
+            return WorldHudAction::EditPolity;
         }
 
         if (backClicked)
@@ -91,10 +171,17 @@ namespace Paladin
         bool regionSelectionActive
     )
     {
-        if (regionSelectionAvailable_)
+        if (!capitalEstablished_)
         {
             selectRegionButton_.setSelected(regionSelectionActive);
             selectRegionButton_.render(renderer, uiRenderer);
+        }
+        else
+        {
+            moveCapitalButton_.setSelected(regionSelectionActive);
+            moveCapitalButton_.render(renderer, uiRenderer);
+            renameCapitalButton_.render(renderer, uiRenderer);
+            editPolityButton_.render(renderer, uiRenderer);
         }
 
         backButton_.render(renderer, uiRenderer);

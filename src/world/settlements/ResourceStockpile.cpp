@@ -85,7 +85,13 @@ namespace Paladin
             iterator->resourceId == resourceId
         )
         {
+            if (iterator->amount == newAmount)
+            {
+                return true;
+            }
+
             iterator->amount = newAmount;
+            ++version_;
             return true;
         }
 
@@ -93,6 +99,8 @@ namespace Paladin
             iterator,
             {std::move(resourceId), newAmount}
         );
+
+        ++version_;
 
         return true;
     }
@@ -123,12 +131,24 @@ namespace Paladin
 
     void ResourceStockpile::clear() noexcept
     {
+        if (entries_.empty())
+        {
+            return;
+        }
+
         entries_.clear();
+        ++version_;
     }
 
     std::span<const StockpileEntry>
     ResourceStockpile::entries() const noexcept
     {
         return entries_;
+    }
+
+
+    std::uint64_t ResourceStockpile::version() const noexcept
+    {
+        return version_;
     }
 }

@@ -55,6 +55,12 @@ namespace Paladin
             return startingOriginId_;
         }
 
+        [[nodiscard]]
+        const PolityFlag& flag() const noexcept
+        {
+            return flag_;
+        }
+
     private:
         friend class World;
 
@@ -63,14 +69,29 @@ namespace Paladin
             CultureId cultureId,
             MapColor mapColor,
             std::string polityName,
-            std::string startingOriginId
-        ) noexcept
+            std::string startingOriginId,
+            PolityFlag flag
+        )
         {
             capitalSettlementId_ = settlementId;
             primaryCultureId_ = cultureId;
             mapColor_ = mapColor;
             name_ = std::move(polityName);
             startingOriginId_ = std::move(startingOriginId);
+            flag_ = std::move(flag);
+        }
+
+        void editIdentity(
+            MapColor mapColor,
+            std::string polityName,
+            std::string startingOriginId,
+            PolityFlag flag
+        )
+        {
+            mapColor_ = mapColor;
+            name_ = std::move(polityName);
+            startingOriginId_ = std::move(startingOriginId);
+            flag_ = std::move(flag);
         }
 
         PolityId id_;
@@ -79,5 +100,6 @@ namespace Paladin
         MapColor mapColor_;
         std::string name_;
         std::string startingOriginId_;
+        PolityFlag flag_;
     };
 }

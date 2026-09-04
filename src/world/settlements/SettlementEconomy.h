@@ -60,10 +60,14 @@ namespace Paladin
         [[nodiscard]]
         double populationSustainableSupplyRatio() const noexcept;
 
+        [[nodiscard]]
+        std::uint64_t version() const noexcept;
+
     private:
         std::vector<ResourceFlowRate> flowRates_;
         std::vector<ResourceFlowSnapshot> lastFlows_;
         double populationNeedFulfillment_ = 1.0;
         double populationSustainableSupplyRatio_ = 1.0;
+        std::uint64_t version_ = 0;
     };
 }

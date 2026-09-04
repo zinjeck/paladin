@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
@@ -36,7 +37,11 @@ namespace Paladin
         [[nodiscard]]
         std::span<const StockpileEntry> entries() const noexcept;
 
+        [[nodiscard]]
+        std::uint64_t version() const noexcept;
+
     private:
         std::vector<StockpileEntry> entries_;
+        std::uint64_t version_ = 0;
     };
 }

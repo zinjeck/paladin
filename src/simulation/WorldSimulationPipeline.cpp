@@ -5,14 +5,24 @@
 #include "world/Settlement.h"
 #include "world/World.h"
 
-#include <cmath>
 #include <memory>
+#include <stdexcept>
 #include <utility>
 
 namespace Paladin
 {
-    WorldSimulationPipeline::WorldSimulationPipeline()
+    WorldSimulationPipeline::WorldSimulationPipeline(
+        SettlementSimulationPolicies policies
+    )
+        : policies_(std::move(policies))
     {
+        if (!policies_.isValid())
+        {
+            throw std::invalid_argument(
+                "Settlement simulation policies must use positive cadences."
+            );
+        }
+
         static_cast<void>(
             addSystem(
                 std::make_unique<SettlementEconomySystem>()
@@ -43,13 +53,10 @@ namespace Paladin
 
     void WorldSimulationPipeline::tick(
         World& world,
-        double gameDeltaSeconds
+        std::uint64_t gameMinutes
     )
     {
-        if (
-            !std::isfinite(gameDeltaSeconds) ||
-            gameDeltaSeconds <= 0.0
-        )
+        if (gameMinutes == 0)
         {
             return;
         }
@@ -62,10 +69,16 @@ namespace Paladin
             SettlementSimulationState& state =
                 settlement.simulationState();
 
-            const double dueSeconds =
-                state.takeDueSimulationSeconds(gameDeltaSeconds);
+            const SettlementSimulationTier tier =
+                state.simulationTier();
 
-            if (dueSeconds <= 0.0)
+            const std::uint64_t dueMinutes =
+                state.takeDueSimulationMinutes(
+                    gameMinutes,
+                    policies_.forTier(tier)
+                );
+
+            if (dueMinutes == 0)
             {
                 continue;
             }
@@ -73,14 +86,14 @@ namespace Paladin
             settlementSteps_.push_back(
                 {
                     settlement.id(),
-                    state.simulationTier(),
-                    dueSeconds
+                    tier,
+                    dueMinutes
                 }
             );
         }
 
         const WorldSimulationStep step{
-            gameDeltaSeconds,
+            gameMinutes,
             settlementSteps_
         };
 
@@ -94,5 +107,12 @@ namespace Paladin
     std::size_t WorldSimulationPipeline::systemCount() const noexcept
     {
         return systems_.size();
+    }
+
+
+    const SettlementSimulationPolicies&
+    WorldSimulationPipeline::policies() const noexcept
+    {
+        return policies_;
     }
 }

@@ -22,6 +22,9 @@ namespace Paladin
         void pointerMoved(float x, float y) noexcept;
 
         [[nodiscard]]
+        bool containsPoint(float x, float y) const noexcept;
+
+        [[nodiscard]]
         bool pointerPressed(float x, float y) noexcept;
 
         [[nodiscard]]

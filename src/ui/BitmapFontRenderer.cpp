@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace Paladin
 {
@@ -98,6 +99,8 @@ namespace Paladin
     ) const
     {
         float cursorX = x;
+        std::vector<RenderRectangle> rectangles;
+        rectangles.reserve(text.size() * 18U);
 
         for (const char character : text)
         {
@@ -117,7 +120,7 @@ namespace Paladin
                         continue;
                     }
 
-                    renderer.fillRectangle(
+                    rectangles.push_back({
                         cursorX
                             + static_cast<float>(column)
                                 * pixelSize,
@@ -125,13 +128,14 @@ namespace Paladin
                             + static_cast<float>(row)
                                 * pixelSize,
                         pixelSize,
-                        pixelSize,
-                        color
-                    );
+                        pixelSize
+                    });
                 }
             }
 
             cursorX += 6.0F * pixelSize;
         }
+
+        renderer.fillRectangles(rectangles, color);
     }
 }

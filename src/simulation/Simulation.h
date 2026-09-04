@@ -11,6 +11,7 @@ namespace Paladin
 {
     class World;
     class WorldSimulationPipeline;
+    struct WorldGenerationSettings;
 
     enum class SimulationSpeed
     {
@@ -25,6 +26,9 @@ namespace Paladin
     {
     public:
         Simulation();
+        explicit Simulation(
+            const WorldGenerationSettings& generationSettings
+        );
         ~Simulation();
 
         Simulation(const Simulation&) = delete;
@@ -55,18 +59,37 @@ namespace Paladin
         PolityId playerPolityId() const noexcept;
 
         [[nodiscard]]
-        SettlementId activeSettlementId() const noexcept;
+        SettlementId presentedSettlementId() const noexcept;
 
         [[nodiscard]]
-        bool setActiveSettlement(
+        SettlementId detailedSimulationSettlementId() const noexcept;
+
+        [[nodiscard]]
+        bool setPresentedSettlement(
             SettlementId settlementId
         ) noexcept;
+
+        [[nodiscard]]
+        bool setDetailedSimulationSettlement(
+            SettlementId settlementId
+        ) noexcept;
+
+        void clearDetailedSimulationSettlement() noexcept;
 
         [[nodiscard]]
         SettlementId foundPlayerCapital(
             WorldPosition position,
             const FoundingIdentity& identity
         );
+
+        [[nodiscard]]
+        bool renamePlayerCapital(std::string name);
+
+        [[nodiscard]]
+        bool editPlayerPolity(const FoundingIdentity& identity);
+
+        [[nodiscard]]
+        bool movePlayerCapital(WorldPosition position);
 
     private:
         [[nodiscard]]
@@ -79,11 +102,13 @@ namespace Paladin
             worldSimulationPipeline_;
 
         PolityId playerPolityId_;
-        SettlementId activeSettlementId_;
+        SettlementId presentedSettlementId_;
+        SettlementId detailedSimulationSettlementId_;
 
         SimulationSpeed speed_ =
             SimulationSpeed::Normal;
 
         std::uint64_t tickCount_ = 0;
+        double pendingGameMinutes_ = 0.0;
     };
 }

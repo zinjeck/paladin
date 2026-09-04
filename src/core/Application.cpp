@@ -17,6 +17,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <memory>
@@ -141,8 +142,13 @@ namespace Paladin
                     renderer_->outputHeight()
                 );
 
-                worldHud_->setRegionSelectionAvailable(
-                    simulation_->world().settlementCount() == 0
+                const Polity* playerPolity = simulation_->world().polity(
+                    simulation_->playerPolityId()
+                );
+
+                worldHud_->setCapitalEstablished(
+                    playerPolity &&
+                    playerPolity->capitalSettlementId().isValid()
                 );
 
                 foundingPanel_->layout(
@@ -229,7 +235,10 @@ namespace Paladin
                     {
                         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                         {
-                            cancelFoundingFlow();
+                            if (!foundingPanel_->closeTopLayer())
+                            {
+                                cancelFoundingFlow();
+                            }
                         }
                         else if (
                             event.key.scancode
@@ -266,7 +275,10 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_RIGHT
                     )
                     {
-                        cancelFoundingFlow();
+                        if (!foundingPanel_->closeTopLayer())
+                        {
+                            cancelFoundingFlow();
+                        }
                     }
 
                     if (
@@ -321,6 +333,33 @@ namespace Paladin
                 {
                     settlementPlacementController_
                         ->cancelSelection();
+                    movingCapital_ = false;
+                }
+
+                if (
+                    event.type == SDL_EVENT_KEY_DOWN &&
+                    !event.key.repeat &&
+                    (
+                        event.key.scancode == SDL_SCANCODE_EQUALS ||
+                        event.key.scancode == SDL_SCANCODE_KP_PLUS ||
+                        event.key.scancode == SDL_SCANCODE_MINUS ||
+                        event.key.scancode == SDL_SCANCODE_KP_MINUS
+                    )
+                )
+                {
+                    float mouseX = 0.0F;
+                    float mouseY = 0.0F;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+
+                    const bool zoomingIn =
+                        event.key.scancode == SDL_SCANCODE_EQUALS ||
+                        event.key.scancode == SDL_SCANCODE_KP_PLUS;
+
+                    applyCameraZoom(
+                        zoomingIn ? 1.15 : 0.85,
+                        static_cast<double>(mouseX),
+                        static_cast<double>(mouseY)
+                    );
                 }
 
                 if (event.type == SDL_EVENT_MOUSE_WHEEL)
@@ -364,6 +403,7 @@ namespace Paladin
                 {
                     settlementPlacementController_
                         ->cancelSelection();
+                    movingCapital_ = false;
                 }
 
                 if (
@@ -395,10 +435,25 @@ namespace Paladin
 
                         if (locked)
                         {
-                            foundingPanel_->open();
-                            SDL_StartTextInput(
-                                window_->nativeHandle()
-                            );
+                            if (movingCapital_)
+                            {
+                                if (simulation_->movePlayerCapital(
+                                    *settlementPlacementController_
+                                        ->lockedPosition()
+                                ))
+                                {
+                                    settlementPlacementController_
+                                        ->cancelSelection();
+                                    movingCapital_ = false;
+                                }
+                            }
+                            else
+                            {
+                                foundingPanel_->open();
+                                SDL_StartTextInput(
+                                    window_->nativeHandle()
+                                );
+                            }
                         }
                     }
                 }
@@ -416,8 +471,53 @@ namespace Paladin
 
                     if (action == WorldHudAction::SelectRegion)
                     {
+                        movingCapital_ = false;
                         settlementPlacementController_
                             ->beginSelection();
+                    }
+                    else if (action == WorldHudAction::MoveCapital)
+                    {
+                        movingCapital_ = true;
+                        settlementPlacementController_->beginSelection();
+                    }
+                    else if (
+                        action == WorldHudAction::RenameCapital ||
+                        action == WorldHudAction::EditPolity
+                    )
+                    {
+                        const World& world = simulation_->world();
+                        const Polity* polity = world.polity(
+                            simulation_->playerPolityId()
+                        );
+                        const Settlement* capital = polity
+                            ? world.settlement(polity->capitalSettlementId())
+                            : nullptr;
+                        const Culture* culture = polity
+                            ? world.culture(polity->primaryCultureId())
+                            : nullptr;
+
+                        if (polity && capital && culture)
+                        {
+                            if (action == WorldHudAction::RenameCapital)
+                            {
+                                foundingPanel_->openForCapitalRename(
+                                    capital->name()
+                                );
+                            }
+                            else
+                            {
+                                foundingPanel_->openForPolityEdit({
+                                    std::string(polity->name()),
+                                    std::string(culture->name()),
+                                    std::string(capital->name()),
+                                    polity->mapColor(),
+                                    std::string(polity->startingOriginId()),
+                                    polity->flag()
+                                });
+                            }
+
+                            SDL_StartTextInput(window_->nativeHandle());
+                        }
                     }
                     else if (action == WorldHudAction::Back)
                     {
@@ -483,7 +583,9 @@ namespace Paladin
             renderer_->beginFrame();
 
             std::array<TileOverlayRenderItem, 1> overlays{};
+            std::array<TileOutlineRenderItem, 1> outlines{};
             std::size_t overlayCount = 0;
+            std::size_t outlineCount = 0;
 
             const std::optional<WorldPosition> hoveredPosition =
                 settlementPlacementController_->hoveredPosition();
@@ -502,17 +604,55 @@ namespace Paladin
                             simulation_->world()
                         );
 
+                const TerritoryFoundationPolicy& territoryPolicy =
+                    simulation_->world()
+                        .territoryFoundationPolicy();
+
+                const double regionX =
+                    static_cast<double>(hoveredPosition->x)
+                    - static_cast<double>(
+                        territoryPolicy.settlementRegionWidth / 2
+                    );
+
+                const double regionY =
+                    static_cast<double>(hoveredPosition->y)
+                    - static_cast<double>(
+                        territoryPolicy.settlementRegionHeight / 2
+                    );
+
+                const RenderColor previewColor = validPlacement
+                    ? RenderColor{72, 220, 112, 220}
+                    : RenderColor{232, 70, 70, 230};
+
                 overlays[0] = {
-                    static_cast<double>(hoveredPosition->x),
-                    static_cast<double>(hoveredPosition->y),
-                    1.0,
-                    1.0,
+                    regionX,
+                    regionY,
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionWidth
+                    ),
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionHeight
+                    ),
                     validPlacement
-                        ? RenderColor{72, 220, 112, 110}
-                        : RenderColor{232, 70, 70, 120}
+                        ? RenderColor{72, 220, 112, 34}
+                        : RenderColor{232, 70, 70, 42}
+                };
+
+                outlines[0] = {
+                    regionX,
+                    regionY,
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionWidth
+                    ),
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionHeight
+                    ),
+                    2.0F,
+                    previewColor
                 };
 
                 overlayCount = 1;
+                outlineCount = 1;
             }
             else if (lockedPosition)
             {
@@ -521,20 +661,59 @@ namespace Paladin
                         ? foundingPanel_->selectedColor()
                         : MapColor{238, 190, 64};
 
+                const TerritoryFoundationPolicy& territoryPolicy =
+                    simulation_->world()
+                        .territoryFoundationPolicy();
+
+                const double regionX =
+                    static_cast<double>(lockedPosition->x)
+                    - static_cast<double>(
+                        territoryPolicy.settlementRegionWidth / 2
+                    );
+
+                const double regionY =
+                    static_cast<double>(lockedPosition->y)
+                    - static_cast<double>(
+                        territoryPolicy.settlementRegionHeight / 2
+                    );
+
                 overlays[0] = {
-                    static_cast<double>(lockedPosition->x),
-                    static_cast<double>(lockedPosition->y),
-                    1.0,
-                    1.0,
+                    regionX,
+                    regionY,
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionWidth
+                    ),
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionHeight
+                    ),
                     RenderColor{
                         selectedColor.red,
                         selectedColor.green,
                         selectedColor.blue,
-                        140
+                        38
+                    }
+                };
+
+                outlines[0] = {
+                    regionX,
+                    regionY,
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionWidth
+                    ),
+                    static_cast<double>(
+                        territoryPolicy.settlementRegionHeight
+                    ),
+                    2.0F,
+                    RenderColor{
+                        selectedColor.red,
+                        selectedColor.green,
+                        selectedColor.blue,
+                        235
                     }
                 };
 
                 overlayCount = 1;
+                outlineCount = 1;
             }
 
             worldRenderer_->render(
@@ -546,6 +725,10 @@ namespace Paladin
                 std::span<const TileOverlayRenderItem>(
                     overlays.data(),
                     overlayCount
+                ),
+                std::span<const TileOutlineRenderItem>(
+                    outlines.data(),
+                    outlineCount
                 )
             );
 
@@ -590,6 +773,8 @@ namespace Paladin
         tileRenderMetrics_ =
             std::make_unique<TileRenderMetrics>();
 
+        edgeScrollDwellSeconds_ = 0.0;
+        movingCapital_ = false;
         simulationClock_->reset();
         screen_ = Screen::World;
     }
@@ -605,6 +790,8 @@ namespace Paladin
         camera_.reset();
         simulation_.reset();
 
+        edgeScrollDwellSeconds_ = 0.0;
+        movingCapital_ = false;
         simulationClock_->reset();
         screen_ = Screen::MainMenu;
 
@@ -619,6 +806,7 @@ namespace Paladin
         foundingPanel_->close();
         SDL_StopTextInput(window_->nativeHandle());
         settlementPlacementController_->cancelSelection();
+        movingCapital_ = false;
     }
 
     void Application::confirmFoundingFlow()
@@ -631,36 +819,53 @@ namespace Paladin
             return;
         }
 
-        const std::optional<WorldPosition> lockedPosition =
-            settlementPlacementController_->lockedPosition();
+        const FoundingPanelMode mode = foundingPanel_->mode();
+        const FoundingIdentity identity = foundingPanel_->identity();
 
-        if (!lockedPosition)
+        bool completed = false;
+        SettlementId settlementId;
+
+        if (mode == FoundingPanelMode::Founding)
         {
-            cancelFoundingFlow();
-            return;
-        }
+            const std::optional<WorldPosition> lockedPosition =
+                settlementPlacementController_->lockedPosition();
 
-        const SettlementId settlementId =
-            simulation_->foundPlayerCapital(
+            if (!lockedPosition)
+            {
+                cancelFoundingFlow();
+                return;
+            }
+
+            settlementId = simulation_->foundPlayerCapital(
                 *lockedPosition,
-                foundingPanel_->identity()
+                identity
             );
-
-        if (!settlementId.isValid())
-        {
-            return;
+            completed = settlementId.isValid();
         }
+        else if (mode == FoundingPanelMode::RenameCapital)
+        {
+            completed = simulation_->renamePlayerCapital(
+                identity.capitalName
+            );
+        }
+        else
+        {
+            completed = simulation_->editPlayerPolity(identity);
+        }
+
+        if (!completed) return;
 
         foundingPanel_->close();
         SDL_StopTextInput(window_->nativeHandle());
         settlementPlacementController_->cancelSelection();
 
-        SDL_Log(
-            "Founded player capital %llu.",
-            static_cast<unsigned long long>(
-                settlementId.value()
-            )
-        );
+        if (settlementId.isValid())
+        {
+            SDL_Log(
+                "Founded player capital %llu.",
+                static_cast<unsigned long long>(settlementId.value())
+            );
+        }
     }
 
     void Application::updateCameraMovement(
@@ -693,7 +898,121 @@ namespace Paladin
             directionY += 1.0;
         }
 
-        const double directionLength =
+        double panSpeedTilesPerSecondAtZoomOne =
+            cameraNavigationPolicy_
+                .keyboardPanSpeedTilesPerSecondAtZoomOne;
+
+        const bool keyboardMoving =
+            directionX != 0.0 || directionY != 0.0;
+
+        if (keyboardMoving)
+        {
+            edgeScrollDwellSeconds_ = 0.0;
+        }
+        else
+        {
+            float mouseX = 0.0F;
+            float mouseY = 0.0F;
+
+            const SDL_MouseButtonFlags mouseButtons =
+                SDL_GetMouseState(&mouseX, &mouseY);
+
+            const SDL_WindowFlags windowFlags =
+                SDL_GetWindowFlags(window_->nativeHandle());
+
+            const float viewportWidth =
+                static_cast<float>(renderer_->outputWidth());
+
+            const float viewportHeight =
+                static_cast<float>(renderer_->outputHeight());
+
+            const bool edgeScrollEligible =
+                (
+                    windowFlags & SDL_WINDOW_INPUT_FOCUS
+                ) != 0 &&
+                (
+                    windowFlags & SDL_WINDOW_MOUSE_FOCUS
+                ) != 0 &&
+                mouseButtons == 0 &&
+                mouseX >= 0.0F &&
+                mouseY >= 0.0F &&
+                mouseX < viewportWidth &&
+                mouseY < viewportHeight &&
+                !worldHud_->containsInteractivePoint(
+                    mouseX,
+                    mouseY
+                );
+
+            if (edgeScrollEligible)
+            {
+                const float activationWidth = std::min(
+                    cameraNavigationPolicy_
+                        .edgeActivationWidthPixels,
+                    std::min(viewportWidth, viewportHeight) * 0.5F
+                );
+
+                const auto edgeAxis = [this, activationWidth](
+                    float position,
+                    float extent
+                )
+                {
+                    double intensity = 0.0;
+
+                    if (position < activationWidth)
+                    {
+                        intensity = -(
+                            1.0
+                            - static_cast<double>(position)
+                                / activationWidth
+                        );
+                    }
+                    else if (position > extent - activationWidth)
+                    {
+                        intensity =
+                            1.0
+                            - static_cast<double>(extent - position)
+                                / activationWidth;
+                    }
+
+                    return std::copysign(
+                        std::pow(
+                            std::abs(intensity),
+                            cameraNavigationPolicy_
+                                .edgeResponseExponent
+                        ),
+                        intensity
+                    );
+                };
+
+                directionX = edgeAxis(mouseX, viewportWidth);
+                directionY = edgeAxis(mouseY, viewportHeight);
+            }
+
+            if (directionX != 0.0 || directionY != 0.0)
+            {
+                edgeScrollDwellSeconds_ += frameDeltaSeconds;
+
+                if (
+                    edgeScrollDwellSeconds_ <
+                    cameraNavigationPolicy_
+                        .edgeActivationDelaySeconds
+                )
+                {
+                    return;
+                }
+
+                panSpeedTilesPerSecondAtZoomOne =
+                    cameraNavigationPolicy_
+                        .edgePanSpeedTilesPerSecondAtZoomOne;
+            }
+            else
+            {
+                edgeScrollDwellSeconds_ = 0.0;
+                return;
+            }
+        }
+
+        double directionLength =
             std::hypot(directionX, directionY);
 
         if (directionLength == 0.0)
@@ -701,11 +1020,12 @@ namespace Paladin
             return;
         }
 
-        directionX /= directionLength;
-        directionY /= directionLength;
-
-        constexpr double panSpeedTilesPerSecondAtZoomOne =
-            162.5;
+        if (directionLength > 1.0)
+        {
+            directionX /= directionLength;
+            directionY /= directionLength;
+            directionLength = 1.0;
+        }
 
         const double panSpeedTilesPerSecond =
             panSpeedTilesPerSecondAtZoomOne
@@ -719,6 +1039,8 @@ namespace Paladin
                 * panSpeedTilesPerSecond
                 * frameDeltaSeconds
         );
+
+        clampCameraToWorld();
     }
 
     void Application::updateCameraZoom(
@@ -889,6 +1211,77 @@ namespace Paladin
                 - screenOffsetX / newTilePixels,
             worldTileYUnderCursor
                 - screenOffsetY / newTilePixels
+        );
+
+        clampCameraToWorld();
+    }
+
+
+    void Application::clampCameraToWorld() noexcept
+    {
+        if (
+            !camera_ ||
+            !simulation_ ||
+            !renderer_ ||
+            !tileRenderMetrics_
+        )
+        {
+            return;
+        }
+
+        const double tilePixels =
+            tileRenderMetrics_->scaledTilePixels(camera_->zoom());
+
+        if (tilePixels <= 0.0)
+        {
+            return;
+        }
+
+        const double worldWidth = static_cast<double>(
+            simulation_->world().grid().width()
+        );
+
+        const double worldHeight = static_cast<double>(
+            simulation_->world().grid().height()
+        );
+
+        const double halfVisibleWidth =
+            static_cast<double>(renderer_->outputWidth())
+            / (2.0 * tilePixels);
+
+        const double halfVisibleHeight =
+            static_cast<double>(renderer_->outputHeight())
+            / (2.0 * tilePixels);
+
+        const auto clampAxis = [](
+            double position,
+            double worldSize,
+            double halfVisibleSize
+        ) noexcept
+        {
+            if (halfVisibleSize * 2.0 >= worldSize)
+            {
+                return worldSize * 0.5;
+            }
+
+            return std::clamp(
+                position,
+                halfVisibleSize,
+                worldSize - halfVisibleSize
+            );
+        };
+
+        camera_->setPosition(
+            clampAxis(
+                camera_->tileX(),
+                worldWidth,
+                halfVisibleWidth
+            ),
+            clampAxis(
+                camera_->tileY(),
+                worldHeight,
+                halfVisibleHeight
+            )
         );
     }
 }

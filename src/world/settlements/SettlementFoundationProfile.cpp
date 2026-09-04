@@ -39,7 +39,7 @@ namespace Paladin
             };
 
         profile.initialSimulationTier =
-            SettlementSimulationTier::Summary;
+            SettlementSimulationTier::Inactive;
 
         return profile;
     }

@@ -2,13 +2,17 @@
 #include "world/TerrainType.h"
 #include "world/PolityOrigin.h"
 #include "world/generation/WorldGenerator.h"
+#include "world/territory/TerritoryFoundationSystem.h"
 
 #include <utility>
 
 namespace Paladin
 {
     World::World()
-        : World(WorldGenerationSettings{})
+        : World(
+              WorldGenerationSettings{},
+              defaultTerritoryFoundationPolicy()
+          )
     {
     }
 
@@ -16,10 +20,29 @@ namespace Paladin
     World::World(
         const WorldGenerationSettings& generationSettings
     )
+        : World(
+              generationSettings,
+              defaultTerritoryFoundationPolicy()
+          )
+    {
+    }
+
+
+    World::World(
+        const WorldGenerationSettings& generationSettings,
+        TerritoryFoundationPolicy territoryFoundationPolicy
+    )
         : generationSeed_(generationSettings.seed),
           grid_(
               generationSettings.width,
               generationSettings.height
+          ),
+          territory_(
+              generationSettings.width,
+              generationSettings.height
+          ),
+          territoryFoundationPolicy_(
+              std::move(territoryFoundationPolicy)
           )
     {
         WorldGenerator{}.generate(
@@ -31,11 +54,11 @@ namespace Paladin
     World::~World() = default;
 
 
-    void World::tick(double deltaSeconds)
+    void World::advanceTime(
+        std::uint64_t gameMinutes
+    ) noexcept
     {
-        time_.advance(deltaSeconds);
-    
-        // Future strategic systems will update here.
+        time_.advanceMinutes(gameMinutes);
     }
 
     WorldTime& World::time() noexcept
@@ -61,6 +84,19 @@ namespace Paladin
     }
 
 
+    const TerritoryMap& World::territory() const noexcept
+    {
+        return territory_;
+    }
+
+
+    const TerritoryFoundationPolicy&
+    World::territoryFoundationPolicy() const noexcept
+    {
+        return territoryFoundationPolicy_;
+    }
+
+
     std::uint64_t World::generationSeed() const noexcept
     {
         return generationSeed_;
@@ -82,6 +118,12 @@ namespace Paladin
     std::span<const Culture> World::cultures() const noexcept
     {
         return cultures_.entities();
+    }
+
+
+    std::span<const Polity> World::polities() const noexcept
+    {
+        return polities_.entities();
     }
 
     // ========================================================
@@ -129,6 +171,15 @@ namespace Paladin
         WorldPosition position
     ) const noexcept
     {
+        return canFoundSettlementAt(position, {});
+    }
+
+
+    bool World::canFoundSettlementAt(
+        WorldPosition position,
+        PolityId ownerPolityId
+    ) const noexcept
+    {
         const WorldTile* tile =
             grid_.tile({
                 position.x,
@@ -136,6 +187,54 @@ namespace Paladin
             });
 
         if (!tile || tile->terrain != TerrainType::Land)
+        {
+            return false;
+        }
+
+        if (
+            territoryFoundationPolicy_.settlementRegionWidth <= 0 ||
+            territoryFoundationPolicy_.settlementRegionHeight <= 0
+        )
+        {
+            return false;
+        }
+
+        const WorldTilePosition regionTopLeft{
+            position.x
+                - territoryFoundationPolicy_
+                    .settlementRegionWidth / 2,
+            position.y
+                - territoryFoundationPolicy_
+                    .settlementRegionHeight / 2
+        };
+
+        const WorldTilePosition regionBottomRight{
+            regionTopLeft.x
+                + territoryFoundationPolicy_
+                    .settlementRegionWidth - 1,
+            regionTopLeft.y
+                + territoryFoundationPolicy_
+                    .settlementRegionHeight - 1
+        };
+
+        if (
+            !grid_.isValidPosition(regionTopLeft) ||
+            !grid_.isValidPosition(regionBottomRight)
+        )
+        {
+            return false;
+        }
+
+        const PolityId existingController =
+            territory_.controllerAt({
+                position.x,
+                position.y
+            });
+
+        if (
+            existingController.isValid() &&
+            existingController != ownerPolityId
+        )
         {
             return false;
         }
@@ -172,20 +271,35 @@ namespace Paladin
     )
     {
         if (
-            !canFoundSettlementAt(position) ||
+            !canFoundSettlementAt(position, ownerPolityId) ||
             !polities_.contains(ownerPolityId)
         )
         {
             return {};
         }
 
-        return settlements_.create(
+        const SettlementId settlementId = settlements_.create(
             position,
             std::string{},
             ownerPolityId,
             CultureId{},
             foundationProfile
         );
+
+        static_cast<void>(
+            TerritoryFoundationSystem{}
+                .establishSettlementTerritory(
+                    grid_,
+                    territory_,
+                    position,
+                    ownerPolityId,
+                    territoryFoundationPolicy_,
+                    territoryFoundationPolicy_
+                        .settlementBorderlandTraversalBudget
+                )
+        );
+
+        return settlementId;
     }
 
 
@@ -216,11 +330,12 @@ namespace Paladin
         if (
             !ownerPolity ||
             ownerPolity->capitalSettlementId().isValid() ||
-            !canFoundSettlementAt(position) ||
+            !canFoundSettlementAt(position, ownerPolityId) ||
             !isValidFoundingName(identity.polityName) ||
             !isValidFoundingName(identity.cultureName) ||
             !isValidFoundingName(identity.capitalName) ||
-            !isKnownPolityOrigin(identity.polityOriginId)
+            !isKnownPolityOrigin(identity.polityOriginId) ||
+            !identity.flag.isValid()
         )
         {
             return {};
@@ -265,7 +380,21 @@ namespace Paladin
             cultureId,
             identity.mapColor,
             std::move(polityName),
-            std::move(originId)
+            std::move(originId),
+            identity.flag
+        );
+
+        static_cast<void>(
+            TerritoryFoundationSystem{}
+                .establishSettlementTerritory(
+                    grid_,
+                    territory_,
+                    position,
+                    ownerPolityId,
+                    territoryFoundationPolicy_,
+                    territoryFoundationPolicy_
+                        .capitalBorderlandTraversalBudget
+                )
         );
 
         return settlementId;
@@ -400,6 +529,124 @@ namespace Paladin
         }
 
         targetSettlement->setPosition(position);
+
+        return true;
+    }
+
+
+    bool World::renameSettlement(
+        SettlementId settlementId,
+        std::string name
+    )
+    {
+        Settlement* targetSettlement = settlements_.find(settlementId);
+
+        if (!targetSettlement || !isValidFoundingName(name))
+        {
+            return false;
+        }
+
+        targetSettlement->setName(trimFoundingName(name));
+        return true;
+    }
+
+
+    bool World::editPolityIdentity(
+        PolityId polityId,
+        const FoundingIdentity& identity
+    )
+    {
+        Polity* targetPolity = polities_.find(polityId);
+
+        if (
+            !targetPolity ||
+            !isValidFoundingName(identity.polityName) ||
+            !isValidFoundingName(identity.cultureName) ||
+            !isKnownPolityOrigin(identity.polityOriginId) ||
+            !identity.flag.isValid()
+        )
+        {
+            return false;
+        }
+
+        Culture* primaryCulture = cultures_.find(
+            targetPolity->primaryCultureId()
+        );
+
+        if (!primaryCulture)
+        {
+            return false;
+        }
+
+        primaryCulture->setName(
+            trimFoundingName(identity.cultureName)
+        );
+
+        targetPolity->editIdentity(
+            identity.mapColor,
+            trimFoundingName(identity.polityName),
+            identity.polityOriginId,
+            identity.flag
+        );
+
+        return true;
+    }
+
+
+    bool World::relocateSoleCapital(
+        PolityId polityId,
+        WorldPosition position
+    )
+    {
+        Polity* targetPolity = polities_.find(polityId);
+
+        if (!targetPolity || !canFoundSettlementAt(position, polityId))
+        {
+            return false;
+        }
+
+        Settlement* capital = settlements_.find(
+            targetPolity->capitalSettlementId()
+        );
+
+        if (!capital)
+        {
+            return false;
+        }
+
+        std::size_t ownedSettlementCount = 0;
+
+        for (const Settlement& settlement : settlements_.entities())
+        {
+            if (settlement.ownerPolityId() == polityId)
+            {
+                ++ownedSettlementCount;
+            }
+        }
+
+        // This setup operation deliberately cannot erase territory belonging
+        // to additional settlements. A later colony/capital-transfer system
+        // can provide territory provenance for established polities.
+        if (ownedSettlementCount != 1)
+        {
+            return false;
+        }
+
+        territory_.clearController(polityId);
+        capital->setPosition(position);
+
+        static_cast<void>(
+            TerritoryFoundationSystem{}
+                .establishSettlementTerritory(
+                    grid_,
+                    territory_,
+                    position,
+                    polityId,
+                    territoryFoundationPolicy_,
+                    territoryFoundationPolicy_
+                        .capitalBorderlandTraversalBudget
+                )
+        );
 
         return true;
     }

@@ -31,6 +31,7 @@ namespace Paladin
         void appendText(std::string_view text);
         void backspace() noexcept;
         void clear() noexcept;
+        void setText(std::string_view text);
 
         [[nodiscard]]
         const std::string& text() const noexcept;

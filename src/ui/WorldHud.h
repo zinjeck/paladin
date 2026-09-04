@@ -11,6 +11,9 @@ namespace Paladin
     {
         None,
         SelectRegion,
+        MoveCapital,
+        RenameCapital,
+        EditPolity,
         Back
     };
 
@@ -24,13 +27,17 @@ namespace Paladin
             int viewportHeight
         ) noexcept;
 
-        void setRegionSelectionAvailable(
-            bool available
-        ) noexcept;
+        void setCapitalEstablished(bool established) noexcept;
         void pointerMoved(float x, float y) noexcept;
 
         [[nodiscard]]
         bool pointerPressed(float x, float y) noexcept;
+
+        [[nodiscard]]
+        bool containsInteractivePoint(
+            float x,
+            float y
+        ) const noexcept;
 
         [[nodiscard]]
         WorldHudAction pointerReleased(float x, float y) noexcept;
@@ -43,7 +50,10 @@ namespace Paladin
 
     private:
         UiButton selectRegionButton_;
+        UiButton moveCapitalButton_;
+        UiButton renameCapitalButton_;
+        UiButton editPolityButton_;
         UiButton backButton_;
-        bool regionSelectionAvailable_ = true;
+        bool capitalEstablished_ = false;
     };
 }

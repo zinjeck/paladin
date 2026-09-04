@@ -12,8 +12,8 @@ namespace Paladin
         const WorldSimulationStep& step
     )
     {
-        constexpr double gameSecondsPerYear =
-            365.0 * 24.0 * 60.0 * 60.0;
+        constexpr double gameMinutesPerYear =
+            365.0 * 24.0 * 60.0;
 
         for (
             const SettlementSimulationStep& settlementStep
@@ -70,8 +70,8 @@ namespace Paladin
                 );
 
             const double elapsedYears =
-                settlementStep.gameDeltaSeconds /
-                gameSecondsPerYear;
+                static_cast<double>(settlementStep.gameMinutes) /
+                gameMinutesPerYear;
 
             const double projectedChange =
                 (

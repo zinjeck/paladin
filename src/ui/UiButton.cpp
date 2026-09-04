@@ -42,6 +42,11 @@ namespace Paladin
         hovered_ = enabled_ && bounds_.contains(x, y);
     }
 
+    bool UiButton::containsPoint(float x, float y) const noexcept
+    {
+        return enabled_ && bounds_.contains(x, y);
+    }
+
     bool UiButton::pointerPressed(float x, float y) noexcept
     {
         pressed_ = enabled_ && bounds_.contains(x, y);

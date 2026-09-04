@@ -13,6 +13,8 @@ namespace Paladin
         double annualNetMigration = 0.0;
         double annualDeathsAtZeroNeedFulfillmentPerPerson = 0.20;
         double maximumAnnualSurplusBirthsPerPerson = 0.005;
+
+        bool operator==(const DemographicRates&) const = default;
     };
 
     class SettlementPopulation
@@ -31,6 +33,9 @@ namespace Paladin
         [[nodiscard]]
         DemographicRates rates() const noexcept;
 
+        [[nodiscard]]
+        std::uint64_t version() const noexcept;
+
         void setRates(DemographicRates rates) noexcept;
 
     private:
@@ -41,5 +46,6 @@ namespace Paladin
         std::uint64_t residents_ = 0;
         double fractionalChange_ = 0.0;
         DemographicRates rates_;
+        std::uint64_t version_ = 0;
     };
 }

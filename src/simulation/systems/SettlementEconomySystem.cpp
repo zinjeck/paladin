@@ -10,8 +10,8 @@ namespace Paladin
         const WorldSimulationStep& step
     )
     {
-        constexpr double gameSecondsPerDay =
-            24.0 * 60.0 * 60.0;
+        constexpr double gameMinutesPerDay =
+            24.0 * 60.0;
 
         for (
             const SettlementSimulationStep& settlementStep
@@ -32,8 +32,8 @@ namespace Paladin
             state.economy().simulate(
                 state.stockpile(),
                 state.population().residents(),
-                settlementStep.gameDeltaSeconds /
-                    gameSecondsPerDay
+                static_cast<double>(settlementStep.gameMinutes) /
+                    gameMinutesPerDay
             );
         }
     }

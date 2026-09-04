@@ -17,7 +17,7 @@ namespace Paladin
         std::vector<StockpileEntry> initialResources;
         std::vector<ResourceFlowRate> resourceFlowRates;
         SettlementSimulationTier initialSimulationTier =
-            SettlementSimulationTier::Summary;
+            SettlementSimulationTier::Inactive;
     };
 
     [[nodiscard]]

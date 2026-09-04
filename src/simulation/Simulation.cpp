@@ -3,13 +3,24 @@
 #include "simulation/WorldSimulationPipeline.h"
 
 #include "world/World.h"
+#include "world/generation/WorldGenerationSeed.h"
 
+#include <cmath>
+#include <limits>
 #include <memory>
 
 namespace Paladin
 {
     Simulation::Simulation()
-        : world_(std::make_unique<World>()),
+        : Simulation(withRandomWorldSeed())
+    {
+    }
+
+
+    Simulation::Simulation(
+        const WorldGenerationSettings& generationSettings
+    )
+        : world_(std::make_unique<World>(generationSettings)),
           worldSimulationPipeline_(
               std::make_unique<WorldSimulationPipeline>()
           )
@@ -35,14 +46,46 @@ namespace Paladin
 
         ++tickCount_;
 
-        const double gameDeltaSeconds =
-            realDeltaSeconds * multiplier;
+        constexpr double realSecondsPerGameMinute = 60.0;
 
-        synchronizeSettlementSimulationTiers();
-        world_->tick(gameDeltaSeconds);
+        // Preserve the existing real-time pace while committing only whole
+        // authoritative world minutes.
+        const double gameDeltaMinutes =
+            realDeltaSeconds * multiplier /
+            realSecondsPerGameMinute;
+
+        if (
+            !std::isfinite(gameDeltaMinutes) ||
+            gameDeltaMinutes <= 0.0
+        )
+        {
+            return;
+        }
+
+        pendingGameMinutes_ += gameDeltaMinutes;
+
+        const double wholeMinutes = std::floor(pendingGameMinutes_);
+
+        if (wholeMinutes < 1.0)
+        {
+            return;
+        }
+
+        const double maximumMinutes = static_cast<double>(
+            std::numeric_limits<std::uint64_t>::max()
+        );
+
+        const std::uint64_t gameMinutes =
+            wholeMinutes >= maximumMinutes
+                ? std::numeric_limits<std::uint64_t>::max()
+                : static_cast<std::uint64_t>(wholeMinutes);
+
+        pendingGameMinutes_ -= static_cast<double>(gameMinutes);
+
+        world_->advanceTime(gameMinutes);
         worldSimulationPipeline_->tick(
             *world_,
-            gameDeltaSeconds
+            gameMinutes
         );
     }
 
@@ -92,13 +135,20 @@ namespace Paladin
     }
 
 
-    SettlementId Simulation::activeSettlementId() const noexcept
+    SettlementId Simulation::presentedSettlementId() const noexcept
     {
-        return activeSettlementId_;
+        return presentedSettlementId_;
     }
 
 
-    bool Simulation::setActiveSettlement(
+    SettlementId
+    Simulation::detailedSimulationSettlementId() const noexcept
+    {
+        return detailedSimulationSettlementId_;
+    }
+
+
+    bool Simulation::setPresentedSettlement(
         SettlementId settlementId
     ) noexcept
     {
@@ -113,9 +163,36 @@ namespace Paladin
             return false;
         }
 
-        activeSettlementId_ = settlementId;
+        presentedSettlementId_ = settlementId;
+        return true;
+    }
+
+
+    bool Simulation::setDetailedSimulationSettlement(
+        SettlementId settlementId
+    ) noexcept
+    {
+        const Settlement* settlement =
+            world_->settlement(settlementId);
+
+        if (
+            !settlement ||
+            settlement->ownerPolityId() != playerPolityId_
+        )
+        {
+            return false;
+        }
+
+        detailedSimulationSettlementId_ = settlementId;
         synchronizeSettlementSimulationTiers();
         return true;
+    }
+
+
+    void Simulation::clearDetailedSimulationSettlement() noexcept
+    {
+        detailedSimulationSettlementId_ = {};
+        synchronizeSettlementSimulationTiers();
     }
 
 
@@ -134,11 +211,42 @@ namespace Paladin
         if (settlementId.isValid())
         {
             static_cast<void>(
-                setActiveSettlement(settlementId)
+                setPresentedSettlement(settlementId)
+            );
+
+            static_cast<void>(
+                setDetailedSimulationSettlement(settlementId)
             );
         }
 
         return settlementId;
+    }
+
+
+    bool Simulation::renamePlayerCapital(std::string name)
+    {
+        const Polity* polity = world_->polity(playerPolityId_);
+
+        return
+            polity &&
+            world_->renameSettlement(
+                polity->capitalSettlementId(),
+                std::move(name)
+            );
+    }
+
+
+    bool Simulation::editPlayerPolity(
+        const FoundingIdentity& identity
+    )
+    {
+        return world_->editPolityIdentity(playerPolityId_, identity);
+    }
+
+
+    bool Simulation::movePlayerCapital(WorldPosition position)
+    {
+        return world_->relocateSoleCapital(playerPolityId_, position);
     }
 
 
@@ -149,7 +257,10 @@ namespace Paladin
             SettlementSimulationTier tier =
                 SettlementSimulationTier::Strategic;
 
-            if (settlement.id() == activeSettlementId_)
+            if (
+                settlement.id() ==
+                detailedSimulationSettlementId_
+            )
             {
                 tier = SettlementSimulationTier::Detailed;
             }
@@ -157,7 +268,7 @@ namespace Paladin
                 settlement.ownerPolityId() == playerPolityId_
             )
             {
-                tier = SettlementSimulationTier::Summary;
+                tier = SettlementSimulationTier::Inactive;
             }
 
             settlement.simulationState().setSimulationTier(tier);

@@ -7,6 +7,7 @@
 #include "world/WorldGrid.h"
 #include "world/WorldTile.h"
 #include "world/generation/WorldGenerationSettings.h"
+#include "world/generation/WorldGenerationSeed.h"
 
 #include <bit>
 #include <cstddef>
@@ -206,6 +207,20 @@ namespace
 
 void runWorldGenerationTests()
 {
+    const Paladin::WorldGenerationSettings firstRandomSettings =
+        Paladin::withRandomWorldSeed();
+
+    const Paladin::WorldGenerationSettings secondRandomSettings =
+        Paladin::withRandomWorldSeed();
+
+    PALADIN_CHECK(
+        firstRandomSettings.seed != secondRandomSettings.seed
+    );
+    PALADIN_CHECK(
+        firstRandomSettings.landmassTemplateId
+        == secondRandomSettings.landmassTemplateId
+    );
+
     testDeterministicWorldGeneration();
     testGeneratedWorldInvariants();
 }
