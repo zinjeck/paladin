@@ -385,7 +385,28 @@ namespace Paladin
             + (minute_ < 10 ? "0" : "")
             + std::to_string(minute_);
 
-        constexpr float timePixelSize = 2.25F;
+        constexpr float preferredTimePixelSize = 2.0F;
+        constexpr float timeHorizontalPadding = 16.0F;
+
+        const float timeWidthAtPreferredSize =
+            dayAndTime.empty()
+                ? 0.0F
+                : (
+                    static_cast<float>(dayAndTime.size()) * 6.0F
+                    - 1.0F
+                ) * preferredTimePixelSize;
+
+        const float availableTimeWidth = std::max(
+            1.0F,
+            dayTimePanel_.width - timeHorizontalPadding
+        );
+
+        const float timePixelSize =
+            timeWidthAtPreferredSize > availableTimeWidth
+                ? preferredTimePixelSize
+                    * availableTimeWidth
+                    / timeWidthAtPreferredSize
+                : preferredTimePixelSize;
 
         uiRenderer.drawLabel(
             renderer,

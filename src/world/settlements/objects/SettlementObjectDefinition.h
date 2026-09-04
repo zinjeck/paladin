@@ -22,6 +22,12 @@ namespace Paladin
         DragRectangle
     };
 
+    enum class SettlementObjectPlacementLayer : std::uint8_t
+    {
+        Structure,
+        Infrastructure
+    };
+
     struct SettlementObjectVisualStyle
     {
         std::array<std::uint8_t, 3> frameColor{};
@@ -48,6 +54,9 @@ namespace Paladin
         bool bypassesConstruction = false;
         bool uniquePerSettlement = false;
         bool separateConstructionSitePerTile = false;
+        bool allowsPartialPlacement = false;
+        SettlementObjectPlacementLayer placementLayer =
+            SettlementObjectPlacementLayer::Structure;
         SettlementObjectVisualStyle visual;
     };
 

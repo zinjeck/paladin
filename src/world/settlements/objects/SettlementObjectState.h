@@ -49,6 +49,13 @@ namespace Paladin
             ConstructionSitePhase::AwaitingConstruction;
     };
 
+    enum class SettlementTilePlacementStatus : std::uint8_t
+    {
+        Buildable,
+        InvalidTerrain,
+        Occupied
+    };
+
     class SettlementObjectState
     {
     public:
@@ -62,6 +69,13 @@ namespace Paladin
             const WorldGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
+        ) const noexcept;
+
+        [[nodiscard]]
+        SettlementTilePlacementStatus placementStatusAt(
+            const WorldGrid& grid,
+            const SettlementObjectDefinition& definition,
+            WorldTilePosition position
         ) const noexcept;
 
         [[nodiscard]]
@@ -99,14 +113,26 @@ namespace Paladin
         [[nodiscard]]
         bool hasObjectType(std::string_view objectTypeId) const noexcept;
 
-        void occupy(const SettlementObjectFootprint& footprint) noexcept;
+        void removeInfrastructureWithin(
+            const SettlementObjectFootprint& footprint
+        );
+
+        void occupy(
+            const SettlementObjectDefinition& definition,
+            const SettlementObjectFootprint& footprint
+        ) noexcept;
+
+        void clearInfrastructureOccupancy(
+            const SettlementObjectFootprint& footprint
+        ) noexcept;
 
         [[nodiscard]]
         std::size_t tileIndex(WorldTilePosition position) const noexcept;
 
         std::int32_t mapWidth_ = 0;
         std::int32_t mapHeight_ = 0;
-        std::vector<std::uint8_t> occupiedTiles_;
+        std::vector<std::uint8_t> structureOccupiedTiles_;
+        std::vector<std::uint8_t> infrastructureOccupiedTiles_;
         std::vector<CompletedSettlementObject> completedObjects_;
         std::vector<SettlementConstructionSite> constructionSites_;
         IdGenerator<SettlementObjectId> objectIds_;

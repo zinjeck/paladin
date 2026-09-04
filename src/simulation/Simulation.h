@@ -15,6 +15,19 @@ namespace Paladin
     class SettlementMap;
     struct WorldGenerationSettings;
 
+    struct SimulationTimingSettings
+    {
+        std::uint64_t gameMinutesPerStep = 2;
+        double realSecondsPerStep = 5.0 / 6.0;
+    };
+
+    [[nodiscard]]
+    constexpr SimulationTimingSettings
+    defaultSimulationTimingSettings() noexcept
+    {
+        return {};
+    }
+
     enum class SimulationSpeed
     {
         Paused,
@@ -29,7 +42,9 @@ namespace Paladin
     public:
         Simulation();
         explicit Simulation(
-            const WorldGenerationSettings& generationSettings
+            const WorldGenerationSettings& generationSettings,
+            SimulationTimingSettings timingSettings =
+                defaultSimulationTimingSettings()
         );
         ~Simulation();
 
@@ -131,6 +146,8 @@ namespace Paladin
 
         std::uint64_t tickCount_ = 0;
         double pendingGameMinutes_ = 0.0;
+        SimulationTimingSettings timingSettings_ =
+            defaultSimulationTimingSettings();
         SettlementMapGenerator settlementMapGenerator_;
     };
 }

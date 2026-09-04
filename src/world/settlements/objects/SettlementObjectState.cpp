@@ -5,12 +5,29 @@
 #include "world/WorldTile.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
 
 namespace Paladin
 {
+    namespace
+    {
+        bool footprintsIntersect(
+            const SettlementObjectFootprint& left,
+            const SettlementObjectFootprint& right
+        ) noexcept
+        {
+            return
+                left.topLeft.x < right.topLeft.x + right.width &&
+                left.topLeft.x + left.width > right.topLeft.x &&
+                left.topLeft.y < right.topLeft.y + right.height &&
+                left.topLeft.y + left.height > right.topLeft.y;
+        }
+    }
+
+
     bool SettlementObjectFootprint::contains(
         WorldTilePosition position
     ) const noexcept
@@ -29,7 +46,14 @@ namespace Paladin
     )
         : mapWidth_(mapWidth),
           mapHeight_(mapHeight),
-          occupiedTiles_(
+          structureOccupiedTiles_(
+              mapWidth > 0 && mapHeight > 0
+                  ? static_cast<std::size_t>(mapWidth)
+                    * static_cast<std::size_t>(mapHeight)
+                  : 0,
+              0
+          ),
+          infrastructureOccupiedTiles_(
               mapWidth > 0 && mapHeight > 0
                   ? static_cast<std::size_t>(mapWidth)
                     * static_cast<std::size_t>(mapHeight)
@@ -72,6 +96,8 @@ namespace Paladin
             return false;
         }
 
+        std::size_t buildableTileCount = 0;
+
         for (
             std::int32_t y = footprint.topLeft.y;
             y <= bottomRight.y;
@@ -84,22 +110,61 @@ namespace Paladin
                 ++x
             )
             {
-                const WorldTilePosition position{x, y};
-                const WorldTile* tile = grid.tile(position);
+                const SettlementTilePlacementStatus status =
+                    placementStatusAt(grid, definition, {x, y});
 
-                if (
-                    !tile ||
-                    tile->terrain == TerrainType::Water ||
-                    tile->terrain == TerrainType::Mountain ||
-                    occupiedTiles_[tileIndex(position)] != 0
-                )
+                if (status == SettlementTilePlacementStatus::Buildable)
+                {
+                    ++buildableTileCount;
+                }
+                else if (!definition.allowsPartialPlacement)
                 {
                     return false;
                 }
             }
         }
 
-        return true;
+        return buildableTileCount > 0;
+    }
+
+
+    SettlementTilePlacementStatus
+    SettlementObjectState::placementStatusAt(
+        const WorldGrid& grid,
+        const SettlementObjectDefinition& definition,
+        WorldTilePosition position
+    ) const noexcept
+    {
+        const WorldTile* tile = grid.tile(position);
+
+        if (
+            grid.width() != mapWidth_ ||
+            grid.height() != mapHeight_ ||
+            !tile ||
+            tile->terrain == TerrainType::Water ||
+            tile->terrain == TerrainType::Mountain
+        )
+        {
+            return SettlementTilePlacementStatus::InvalidTerrain;
+        }
+
+        const std::size_t index = tileIndex(position);
+
+        if (structureOccupiedTiles_[index] != 0)
+        {
+            return SettlementTilePlacementStatus::Occupied;
+        }
+
+        if (
+            definition.placementLayer ==
+                SettlementObjectPlacementLayer::Infrastructure &&
+            infrastructureOccupiedTiles_[index] != 0
+        )
+        {
+            return SettlementTilePlacementStatus::Occupied;
+        }
+
+        return SettlementTilePlacementStatus::Buildable;
     }
 
 
@@ -117,13 +182,21 @@ namespace Paladin
             return false;
         }
 
+        if (
+            definition.placementLayer ==
+                SettlementObjectPlacementLayer::Structure
+        )
+        {
+            removeInfrastructureWithin(footprint);
+        }
+
         completedObjects_.push_back({
             objectIds_.generate(),
             std::string(definition.id),
             footprint
         });
 
-        occupy(footprint);
+        occupy(definition, footprint);
         ++presentationVersion_;
         return true;
     }
@@ -143,6 +216,14 @@ namespace Paladin
             return false;
         }
 
+        if (
+            definition.placementLayer ==
+                SettlementObjectPlacementLayer::Structure
+        )
+        {
+            removeInfrastructureWithin(footprint);
+        }
+
         if (definition.separateConstructionSitePerTile)
         {
             for (
@@ -157,11 +238,32 @@ namespace Paladin
                     ++x
                 )
                 {
+                    const WorldTilePosition position{x, y};
+
+                    if (
+                        placementStatusAt(
+                            grid,
+                            definition,
+                            position
+                        ) != SettlementTilePlacementStatus::Buildable
+                    )
+                    {
+                        continue;
+                    }
+
+                    const SettlementObjectFootprint tileFootprint{
+                        position,
+                        1,
+                        1
+                    };
+
                     constructionSites_.push_back({
                         constructionSiteIds_.generate(),
                         std::string(definition.id),
-                        {{x, y}, 1, 1}
+                        tileFootprint
                     });
+
+                    occupy(definition, tileFootprint);
                 }
             }
         }
@@ -172,9 +274,10 @@ namespace Paladin
                 std::string(definition.id),
                 footprint
             });
+
+            occupy(definition, footprint);
         }
 
-        occupy(footprint);
         ++presentationVersion_;
         return true;
     }
@@ -246,7 +349,87 @@ namespace Paladin
     }
 
 
+    void SettlementObjectState::removeInfrastructureWithin(
+        const SettlementObjectFootprint& footprint
+    )
+    {
+        const auto removeCompleted = [this, &footprint](
+            const CompletedSettlementObject& object
+        )
+        {
+            const SettlementObjectDefinition* definition =
+                SettlementObjectCatalog::definition(object.objectTypeId);
+
+            if (
+                !definition ||
+                definition->placementLayer !=
+                    SettlementObjectPlacementLayer::Infrastructure ||
+                !footprintsIntersect(object.footprint, footprint)
+            )
+            {
+                return false;
+            }
+
+            clearInfrastructureOccupancy(object.footprint);
+            return true;
+        };
+
+        const auto removeConstruction = [this, &footprint](
+            const SettlementConstructionSite& site
+        )
+        {
+            const SettlementObjectDefinition* definition =
+                SettlementObjectCatalog::definition(site.objectTypeId);
+
+            if (
+                !definition ||
+                definition->placementLayer !=
+                    SettlementObjectPlacementLayer::Infrastructure ||
+                !footprintsIntersect(site.footprint, footprint)
+            )
+            {
+                return false;
+            }
+
+            clearInfrastructureOccupancy(site.footprint);
+            return true;
+        };
+
+        std::erase_if(completedObjects_, removeCompleted);
+        std::erase_if(constructionSites_, removeConstruction);
+    }
+
+
     void SettlementObjectState::occupy(
+        const SettlementObjectDefinition& definition,
+        const SettlementObjectFootprint& footprint
+    ) noexcept
+    {
+        std::vector<std::uint8_t>& occupiedTiles =
+            definition.placementLayer ==
+                SettlementObjectPlacementLayer::Infrastructure
+                ? infrastructureOccupiedTiles_
+                : structureOccupiedTiles_;
+
+        for (
+            std::int32_t y = footprint.topLeft.y;
+            y < footprint.topLeft.y + footprint.height;
+            ++y
+        )
+        {
+            for (
+                std::int32_t x = footprint.topLeft.x;
+                x < footprint.topLeft.x + footprint.width;
+                ++x
+            )
+            {
+                occupiedTiles[tileIndex({x, y})] = 1;
+            }
+        }
+    }
+
+
+    void SettlementObjectState::clearInfrastructureOccupancy(
         const SettlementObjectFootprint& footprint
     ) noexcept
     {
@@ -262,7 +445,7 @@ namespace Paladin
                 ++x
             )
             {
-                occupiedTiles_[tileIndex({x, y})] = 1;
+                infrastructureOccupiedTiles_[tileIndex({x, y})] = 0;
             }
         }
     }

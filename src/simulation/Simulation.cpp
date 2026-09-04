@@ -13,19 +13,33 @@
 namespace Paladin
 {
     Simulation::Simulation()
-        : Simulation(withRandomWorldSeed())
+        : Simulation(
+              withRandomWorldSeed(),
+              defaultSimulationTimingSettings()
+          )
     {
     }
 
 
     Simulation::Simulation(
-        const WorldGenerationSettings& generationSettings
+        const WorldGenerationSettings& generationSettings,
+        SimulationTimingSettings timingSettings
     )
         : world_(std::make_unique<World>(generationSettings)),
           worldSimulationPipeline_(
               std::make_unique<WorldSimulationPipeline>()
-          )
+          ),
+          timingSettings_(timingSettings)
     {
+        if (
+            timingSettings_.gameMinutesPerStep == 0 ||
+            !std::isfinite(timingSettings_.realSecondsPerStep) ||
+            timingSettings_.realSecondsPerStep <= 0.0
+        )
+        {
+            timingSettings_ = defaultSimulationTimingSettings();
+        }
+
         playerPolityId_ = world_->createPolity();
     }
 
@@ -47,13 +61,15 @@ namespace Paladin
 
         ++tickCount_;
 
-        constexpr double realSecondsPerGameMinute = 60.0;
+        const double gameMinutesPerRealSecond =
+            static_cast<double>(timingSettings_.gameMinutesPerStep) /
+            timingSettings_.realSecondsPerStep;
 
-        // Preserve the existing real-time pace while committing only whole
-        // authoritative world minutes.
+        // Commit only whole authoritative world minutes while retaining the
+        // fractional phase between fixed simulation updates.
         const double gameDeltaMinutes =
-            realDeltaSeconds * multiplier /
-            realSecondsPerGameMinute;
+            realDeltaSeconds * multiplier *
+            gameMinutesPerRealSecond;
 
         if (
             !std::isfinite(gameDeltaMinutes) ||
