@@ -63,6 +63,7 @@ namespace Paladin
                 case '+': return {0, 4, 4, 31, 4, 4, 0};
                 case '.': return {0, 0, 0, 0, 0, 12, 12};
                 case '/': return {1, 1, 2, 4, 8, 16, 16};
+                case '\'': return {4, 4, 2, 0, 0, 0, 0};
                 case ' ': return {0, 0, 0, 0, 0, 0, 0};
                 default: return {14, 17, 1, 2, 4, 0, 4};
             }

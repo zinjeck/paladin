@@ -10,6 +10,7 @@
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/GrayUiRenderer.h"
+#include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/WorldHud.h"
 #include "world/World.h"
@@ -72,10 +73,18 @@ namespace Paladin
 
         worldHud_ =
             std::make_unique<WorldHud>();
+
+        foundingPanel_ =
+            std::make_unique<FoundingPanel>();
     }
 
     Application::~Application()
     {
+        if (window_)
+        {
+            SDL_StopTextInput(window_->nativeHandle());
+        }
+
         tileRenderMetrics_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
@@ -83,6 +92,7 @@ namespace Paladin
         simulation_.reset();
 
         worldHud_.reset();
+        foundingPanel_.reset();
         mainMenu_.reset();
         grayUiRenderer_.reset();
         simulationClock_.reset();
@@ -104,7 +114,8 @@ namespace Paladin
             !simulationClock_ ||
             !grayUiRenderer_ ||
             !mainMenu_ ||
-            !worldHud_
+            !worldHud_ ||
+            !foundingPanel_
         )
         {
             return 1;
@@ -125,7 +136,19 @@ namespace Paladin
             }
             else
             {
-                worldHud_->layout(renderer_->outputWidth());
+                worldHud_->layout(
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+
+                worldHud_->setRegionSelectionAvailable(
+                    simulation_->world().settlementCount() == 0
+                );
+
+                foundingPanel_->layout(
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
             }
 
             SDL_Event event;
@@ -180,6 +203,104 @@ namespace Paladin
                         }
 
                         // Tutorial intentionally has no action yet.
+                    }
+
+                    continue;
+                }
+
+                if (foundingPanel_->isOpen())
+                {
+                    if (event.type == SDL_EVENT_MOUSE_MOTION)
+                    {
+                        foundingPanel_->pointerMoved(
+                            event.motion.x,
+                            event.motion.y
+                        );
+                    }
+
+                    if (event.type == SDL_EVENT_TEXT_INPUT)
+                    {
+                        foundingPanel_->appendText(
+                            event.text.text
+                        );
+                    }
+
+                    if (event.type == SDL_EVENT_KEY_DOWN)
+                    {
+                        if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+                        {
+                            cancelFoundingFlow();
+                        }
+                        else if (
+                            event.key.scancode
+                            == SDL_SCANCODE_BACKSPACE
+                        )
+                        {
+                            foundingPanel_->backspace();
+                        }
+                        else if (
+                            event.key.scancode == SDL_SCANCODE_TAB
+                        )
+                        {
+                            foundingPanel_->focusNextField();
+                        }
+                        else if (
+                            event.key.scancode == SDL_SCANCODE_RETURN ||
+                            event.key.scancode == SDL_SCANCODE_KP_ENTER
+                        )
+                        {
+                            const FoundingPanelAction action =
+                                foundingPanel_->submit();
+
+                            if (
+                                action == FoundingPanelAction::Confirm
+                            )
+                            {
+                                confirmFoundingFlow();
+                            }
+                        }
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_RIGHT
+                    )
+                    {
+                        cancelFoundingFlow();
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        foundingPanel_->pointerPressed(
+                            event.button.x,
+                            event.button.y
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        const FoundingPanelAction action =
+                            foundingPanel_->pointerReleased(
+                                event.button.x,
+                                event.button.y
+                            );
+
+                        if (action == FoundingPanelAction::Cancel)
+                        {
+                            cancelFoundingFlow();
+                        }
+                        else if (
+                            action == FoundingPanelAction::Confirm
+                        )
+                        {
+                            confirmFoundingFlow();
+                        }
                     }
 
                     continue;
@@ -266,20 +387,17 @@ namespace Paladin
                             static_cast<double>(event.button.y)
                         );
 
-                        const SettlementId foundedSettlementId =
+                        const bool locked =
                             settlementPlacementController_
-                                ->tryFoundSettlement(
-                                    simulation_->world(),
-                                    simulation_->playerPolityId()
+                                ->lockHoveredSelection(
+                                    simulation_->world()
                                 );
 
-                        if (foundedSettlementId.isValid())
+                        if (locked)
                         {
-                            SDL_Log(
-                                "Founded settlement %llu.",
-                                static_cast<unsigned long long>(
-                                    foundedSettlementId.value()
-                                )
+                            foundingPanel_->open();
+                            SDL_StartTextInput(
+                                window_->nativeHandle()
                             );
                         }
                     }
@@ -290,15 +408,20 @@ namespace Paladin
                     event.button.button == SDL_BUTTON_LEFT
                 )
                 {
-                    if (
+                    const WorldHudAction action =
                         worldHud_->pointerReleased(
                             event.button.x,
                             event.button.y
-                        )
-                    )
+                        );
+
+                    if (action == WorldHudAction::SelectRegion)
                     {
                         settlementPlacementController_
                             ->beginSelection();
+                    }
+                    else if (action == WorldHudAction::Back)
+                    {
+                        endWorldSession();
                     }
                 }
             }
@@ -324,13 +447,16 @@ namespace Paladin
                 continue;
             }
 
-            updateCameraMovement(
-                simulationClock_->frameDeltaSeconds()
-            );
+            if (!foundingPanel_->isOpen())
+            {
+                updateCameraMovement(
+                    simulationClock_->frameDeltaSeconds()
+                );
 
-            updateCameraZoom(
-                simulationClock_->frameDeltaSeconds()
-            );
+                updateCameraZoom(
+                    simulationClock_->frameDeltaSeconds()
+                );
+            }
 
             if (settlementPlacementController_->isSelecting())
             {
@@ -362,6 +488,9 @@ namespace Paladin
             const std::optional<WorldPosition> hoveredPosition =
                 settlementPlacementController_->hoveredPosition();
 
+            const std::optional<WorldPosition> lockedPosition =
+                settlementPlacementController_->lockedPosition();
+
             if (
                 settlementPlacementController_->isSelecting() &&
                 hoveredPosition
@@ -385,6 +514,28 @@ namespace Paladin
 
                 overlayCount = 1;
             }
+            else if (lockedPosition)
+            {
+                const MapColor selectedColor =
+                    foundingPanel_->isOpen()
+                        ? foundingPanel_->selectedColor()
+                        : MapColor{238, 190, 64};
+
+                overlays[0] = {
+                    static_cast<double>(lockedPosition->x),
+                    static_cast<double>(lockedPosition->y),
+                    1.0,
+                    1.0,
+                    RenderColor{
+                        selectedColor.red,
+                        selectedColor.green,
+                        selectedColor.blue,
+                        140
+                    }
+                };
+
+                overlayCount = 1;
+            }
 
             worldRenderer_->render(
                 *renderer_,
@@ -401,7 +552,12 @@ namespace Paladin
             worldHud_->render(
                 *renderer_,
                 *grayUiRenderer_,
-                settlementPlacementController_->isSelecting()
+                settlementPlacementController_->isActive()
+            );
+
+            foundingPanel_->render(
+                *renderer_,
+                *grayUiRenderer_
             );
 
             renderer_->endFrame();
@@ -436,6 +592,75 @@ namespace Paladin
 
         simulationClock_->reset();
         screen_ = Screen::World;
+    }
+
+    void Application::endWorldSession()
+    {
+        foundingPanel_->close();
+        SDL_StopTextInput(window_->nativeHandle());
+
+        tileRenderMetrics_.reset();
+        worldRenderer_.reset();
+        settlementPlacementController_.reset();
+        camera_.reset();
+        simulation_.reset();
+
+        simulationClock_->reset();
+        screen_ = Screen::MainMenu;
+
+        mainMenu_->layout(
+            renderer_->outputWidth(),
+            renderer_->outputHeight()
+        );
+    }
+
+    void Application::cancelFoundingFlow()
+    {
+        foundingPanel_->close();
+        SDL_StopTextInput(window_->nativeHandle());
+        settlementPlacementController_->cancelSelection();
+    }
+
+    void Application::confirmFoundingFlow()
+    {
+        if (
+            !foundingPanel_->isOpen() ||
+            !foundingPanel_->canConfirm()
+        )
+        {
+            return;
+        }
+
+        const std::optional<WorldPosition> lockedPosition =
+            settlementPlacementController_->lockedPosition();
+
+        if (!lockedPosition)
+        {
+            cancelFoundingFlow();
+            return;
+        }
+
+        const SettlementId settlementId =
+            simulation_->foundPlayerCapital(
+                *lockedPosition,
+                foundingPanel_->identity()
+            );
+
+        if (!settlementId.isValid())
+        {
+            return;
+        }
+
+        foundingPanel_->close();
+        SDL_StopTextInput(window_->nativeHandle());
+        settlementPlacementController_->cancelSelection();
+
+        SDL_Log(
+            "Founded player capital %llu.",
+            static_cast<unsigned long long>(
+                settlementId.value()
+            )
+        );
     }
 
     void Application::updateCameraMovement(

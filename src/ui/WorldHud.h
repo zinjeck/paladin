@@ -7,19 +7,33 @@ namespace Paladin
     class GrayUiRenderer;
     class Renderer;
 
+    enum class WorldHudAction
+    {
+        None,
+        SelectRegion,
+        Back
+    };
+
     class WorldHud
     {
     public:
         WorldHud();
 
-        void layout(int viewportWidth) noexcept;
+        void layout(
+            int viewportWidth,
+            int viewportHeight
+        ) noexcept;
+
+        void setRegionSelectionAvailable(
+            bool available
+        ) noexcept;
         void pointerMoved(float x, float y) noexcept;
 
         [[nodiscard]]
         bool pointerPressed(float x, float y) noexcept;
 
         [[nodiscard]]
-        bool pointerReleased(float x, float y) noexcept;
+        WorldHudAction pointerReleased(float x, float y) noexcept;
 
         void render(
             Renderer& renderer,
@@ -29,5 +43,7 @@ namespace Paladin
 
     private:
         UiButton selectRegionButton_;
+        UiButton backButton_;
+        bool regionSelectionAvailable_ = true;
     };
 }

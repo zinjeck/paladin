@@ -82,6 +82,19 @@ namespace Paladin
     }
 
 
+    SettlementId Simulation::foundPlayerCapital(
+        WorldPosition position,
+        const FoundingIdentity& identity
+    )
+    {
+        return world_->foundCapitalSettlement(
+            position,
+            playerPolityId_,
+            identity
+        );
+    }
+
+
     double Simulation::speedMultiplier() const noexcept
     {
         switch (speed_)

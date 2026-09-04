@@ -14,8 +14,10 @@ namespace Paladin
     public:
         explicit UiButton(std::string text);
 
+        void setText(std::string text);
         void setBounds(UiRectangle bounds) noexcept;
         void setSelected(bool selected) noexcept;
+        void setEnabled(bool enabled) noexcept;
 
         void pointerMoved(float x, float y) noexcept;
 
@@ -38,5 +40,6 @@ namespace Paladin
         bool hovered_ = false;
         bool pressed_ = false;
         bool selected_ = false;
+        bool enabled_ = true;
     };
 }

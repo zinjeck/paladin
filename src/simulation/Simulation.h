@@ -1,6 +1,8 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "world/FoundingIdentity.h"
+#include "world/WorldPosition.h"
 
 #include <cstdint>
 #include <memory>
@@ -50,6 +52,12 @@ namespace Paladin
 
         [[nodiscard]]
         PolityId playerPolityId() const noexcept;
+
+        [[nodiscard]]
+        SettlementId foundPlayerCapital(
+            WorldPosition position,
+            const FoundingIdentity& identity
+        );
 
     private:
         [[nodiscard]]

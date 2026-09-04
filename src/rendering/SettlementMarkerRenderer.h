@@ -1,12 +1,12 @@
 #pragma once
 
-#include <span>
+#include "ui/BitmapFontRenderer.h"
 
 namespace Paladin
 {
     class Camera2D;
     class Renderer;
-    class Settlement;
+    class World;
 
     struct TileRenderMetrics;
 
@@ -15,9 +15,12 @@ namespace Paladin
     public:
         void render(
             Renderer& renderer,
-            std::span<const Settlement> settlements,
+            const World& world,
             const Camera2D& camera,
             const TileRenderMetrics& metrics
         ) const;
+
+    private:
+        BitmapFontRenderer fontRenderer_;
     };
 }

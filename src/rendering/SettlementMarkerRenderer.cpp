@@ -4,12 +4,15 @@
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/Settlement.h"
+#include "world/World.h"
+
+#include <algorithm>
 
 namespace Paladin
 {
     void SettlementMarkerRenderer::render(
         Renderer& renderer,
-        std::span<const Settlement> settlements,
+        const World& world,
         const Camera2D& camera,
         const TileRenderMetrics& metrics
     ) const
@@ -26,7 +29,7 @@ namespace Paladin
         constexpr float outerMarkerSize = 11.0F;
         constexpr float innerMarkerSize = 7.0F;
 
-        for (const Settlement& settlement : settlements)
+        for (const Settlement& settlement : world.settlements())
         {
             const WorldPosition position =
                 settlement.position();
@@ -67,12 +70,78 @@ namespace Paladin
                 {38, 27, 18, 255}
             );
 
+            RenderColor markerColor{244, 197, 72, 255};
+
+            if (const Polity* polity =
+                    world.polity(settlement.ownerPolityId()))
+            {
+                const MapColor mapColor = polity->mapColor();
+                markerColor = {
+                    mapColor.red,
+                    mapColor.green,
+                    mapColor.blue,
+                    255
+                };
+            }
+
             renderer.fillRectangle(
                 centerX - innerMarkerSize * 0.5F,
                 centerY - innerMarkerSize * 0.5F,
                 innerMarkerSize,
                 innerMarkerSize,
-                {244, 197, 72, 255}
+                markerColor
+            );
+
+            if (settlement.name().empty())
+            {
+                continue;
+            }
+
+            constexpr float preferredPixelSize = 2.0F;
+            constexpr float maximumLabelWidth = 180.0F;
+
+            const float preferredLabelWidth =
+                fontRenderer_.measureWidth(
+                    settlement.name(),
+                    preferredPixelSize
+                );
+
+            const float pixelSize =
+                preferredLabelWidth > maximumLabelWidth
+                    ? preferredPixelSize
+                        * maximumLabelWidth
+                        / preferredLabelWidth
+                    : preferredPixelSize;
+
+            const float labelWidth =
+                fontRenderer_.measureWidth(
+                    settlement.name(),
+                    pixelSize
+                );
+
+            const float labelX = centerX - labelWidth * 0.5F;
+            const float labelY =
+                centerY
+                - outerMarkerSize * 0.5F
+                - 7.0F * pixelSize
+                - 5.0F;
+
+            fontRenderer_.drawText(
+                renderer,
+                settlement.name(),
+                labelX + 1.0F,
+                labelY + 1.0F,
+                pixelSize,
+                {0, 0, 0, 220}
+            );
+
+            fontRenderer_.drawText(
+                renderer,
+                settlement.name(),
+                labelX,
+                labelY,
+                pixelSize,
+                {246, 246, 248, 255}
             );
         }
     }

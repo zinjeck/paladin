@@ -11,6 +11,11 @@ namespace Paladin
     {
     }
 
+    void UiButton::setText(std::string text)
+    {
+        text_ = std::move(text);
+    }
+
     void UiButton::setBounds(UiRectangle bounds) noexcept
     {
         bounds_ = bounds;
@@ -21,21 +26,32 @@ namespace Paladin
         selected_ = selected;
     }
 
+    void UiButton::setEnabled(bool enabled) noexcept
+    {
+        enabled_ = enabled;
+
+        if (!enabled_)
+        {
+            hovered_ = false;
+            pressed_ = false;
+        }
+    }
+
     void UiButton::pointerMoved(float x, float y) noexcept
     {
-        hovered_ = bounds_.contains(x, y);
+        hovered_ = enabled_ && bounds_.contains(x, y);
     }
 
     bool UiButton::pointerPressed(float x, float y) noexcept
     {
-        pressed_ = bounds_.contains(x, y);
+        pressed_ = enabled_ && bounds_.contains(x, y);
         return pressed_;
     }
 
     bool UiButton::pointerReleased(float x, float y) noexcept
     {
         const bool clicked =
-            pressed_ && bounds_.contains(x, y);
+            enabled_ && pressed_ && bounds_.contains(x, y);
 
         pressed_ = false;
         return clicked;
@@ -57,7 +73,8 @@ namespace Paladin
             text_,
             hovered_,
             pressed_,
-            selected_
+            selected_,
+            enabled_
         );
     }
 }

@@ -4,6 +4,8 @@
 #include "core/StrongId.h"
 
 #include "world/Army.h"
+#include "world/Culture.h"
+#include "world/FoundingIdentity.h"
 #include "world/Polity.h"
 #include "world/Settlement.h"
 #include "world/WorldPosition.h"
@@ -14,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 
 namespace Paladin
 {
@@ -45,6 +48,11 @@ namespace Paladin
         PolityId createPolity();
 
         [[nodiscard]]
+        CultureId createCulture(
+            std::string name
+        );
+
+        [[nodiscard]]
         ArmyId createArmy(
             WorldPosition position = {}
         );
@@ -58,6 +66,13 @@ namespace Paladin
         SettlementId foundSettlement(
             WorldPosition position,
             PolityId ownerPolityId
+        );
+
+        [[nodiscard]]
+        SettlementId foundCapitalSettlement(
+            WorldPosition position,
+            PolityId ownerPolityId,
+            const FoundingIdentity& identity
         );
 
 
@@ -84,6 +99,16 @@ namespace Paladin
         [[nodiscard]]
         const Polity* polity(
             PolityId id
+        ) const noexcept;
+
+        [[nodiscard]]
+        Culture* culture(
+            CultureId id
+        ) noexcept;
+
+        [[nodiscard]]
+        const Culture* culture(
+            CultureId id
         ) const noexcept;
 
 
@@ -114,6 +139,9 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<const Settlement> settlements() const noexcept;
+
+        [[nodiscard]]
+        std::span<const Culture> cultures() const noexcept;
 
         // ====================================================
         // Settlement relationships
@@ -164,6 +192,9 @@ namespace Paladin
         std::size_t polityCount() const noexcept;
 
         [[nodiscard]]
+        std::size_t cultureCount() const noexcept;
+
+        [[nodiscard]]
         std::size_t armyCount() const noexcept;
 
 
@@ -181,6 +212,11 @@ namespace Paladin
             Polity,
             PolityId
         > polities_;
+
+        EntityRegistry<
+            Culture,
+            CultureId
+        > cultures_;
 
         EntityRegistry<
             Army,

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/StrongId.h"
 #include "world/WorldPosition.h"
 
 #include <optional>
@@ -18,6 +17,12 @@ namespace Paladin
         [[nodiscard]]
         bool isSelecting() const noexcept;
 
+        [[nodiscard]]
+        bool hasLockedSelection() const noexcept;
+
+        [[nodiscard]]
+        bool isActive() const noexcept;
+
         void setHoveredPosition(
             std::optional<WorldPosition> position
         ) noexcept;
@@ -31,13 +36,16 @@ namespace Paladin
         ) const noexcept;
 
         [[nodiscard]]
-        SettlementId tryFoundSettlement(
-            World& world,
-            PolityId ownerPolityId
-        );
+        bool lockHoveredSelection(
+            const World& world
+        ) noexcept;
+
+        [[nodiscard]]
+        std::optional<WorldPosition> lockedPosition() const noexcept;
 
     private:
         bool selecting_ = false;
         std::optional<WorldPosition> hoveredPosition_;
+        std::optional<WorldPosition> lockedPosition_;
     };
 }

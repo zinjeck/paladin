@@ -29,7 +29,7 @@ namespace Paladin
 
         settlementMarkerRenderer_.render(
             renderer,
-            world.settlements(),
+            world,
             camera,
             metrics
         );

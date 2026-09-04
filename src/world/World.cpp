@@ -1,6 +1,9 @@
 #include "world/World.h"
 #include "world/TerrainType.h"
+#include "world/PolityOrigin.h"
 #include "world/generation/WorldGenerator.h"
+
+#include <utility>
 
 namespace Paladin
 {
@@ -69,6 +72,12 @@ namespace Paladin
         return settlements_.entities();
     }
 
+
+    std::span<const Culture> World::cultures() const noexcept
+    {
+        return cultures_.entities();
+    }
+
     // ========================================================
     // Creation
     // ========================================================
@@ -84,6 +93,21 @@ namespace Paladin
     PolityId World::createPolity()
     {
         return polities_.create();
+    }
+
+
+    CultureId World::createCulture(
+        std::string name
+    )
+    {
+        if (!isValidFoundingName(name))
+        {
+            return {};
+        }
+
+        return cultures_.create(
+            trimFoundingName(name)
+        );
     }
 
 
@@ -147,6 +171,72 @@ namespace Paladin
     }
 
 
+    SettlementId World::foundCapitalSettlement(
+        WorldPosition position,
+        PolityId ownerPolityId,
+        const FoundingIdentity& identity
+    )
+    {
+        Polity* ownerPolity = polities_.find(ownerPolityId);
+
+        if (
+            !ownerPolity ||
+            ownerPolity->capitalSettlementId().isValid() ||
+            !canFoundSettlementAt(position) ||
+            !isValidFoundingName(identity.polityName) ||
+            !isValidFoundingName(identity.cultureName) ||
+            !isValidFoundingName(identity.capitalName) ||
+            !isKnownPolityOrigin(identity.polityOriginId)
+        )
+        {
+            return {};
+        }
+
+        std::string polityName =
+            trimFoundingName(identity.polityName);
+
+        std::string cultureName =
+            trimFoundingName(identity.cultureName);
+
+        std::string capitalName =
+            trimFoundingName(identity.capitalName);
+
+        std::string originId = identity.polityOriginId;
+
+        const CultureId cultureId =
+            cultures_.create(
+                std::move(cultureName)
+            );
+
+        SettlementId settlementId;
+
+        try
+        {
+            settlementId = settlements_.create(
+                position,
+                std::move(capitalName),
+                ownerPolityId,
+                cultureId
+            );
+        }
+        catch (...)
+        {
+            cultures_.erase(cultureId);
+            throw;
+        }
+
+        ownerPolity->establishCapital(
+            settlementId,
+            cultureId,
+            identity.mapColor,
+            std::move(polityName),
+            std::move(originId)
+        );
+
+        return settlementId;
+    }
+
+
     // ========================================================
     // Lookup
     // ========================================================
@@ -180,6 +270,22 @@ namespace Paladin
     ) const noexcept
     {
         return polities_.find(id);
+    }
+
+
+    Culture* World::culture(
+        CultureId id
+    ) noexcept
+    {
+        return cultures_.find(id);
+    }
+
+
+    const Culture* World::culture(
+        CultureId id
+    ) const noexcept
+    {
+        return cultures_.find(id);
     }
 
 
@@ -342,6 +448,12 @@ namespace Paladin
     std::size_t World::polityCount() const noexcept
     {
         return polities_.size();
+    }
+
+
+    std::size_t World::cultureCount() const noexcept
+    {
+        return cultures_.size();
     }
 
 

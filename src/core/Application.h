@@ -6,6 +6,7 @@ namespace Paladin
 {
     class Camera2D;
     class GrayUiRenderer;
+    class FoundingPanel;
     class MainMenu;
     class Renderer;
     class SettlementPlacementController;
@@ -36,6 +37,10 @@ namespace Paladin
         };
 
         void startWorldSession();
+        void endWorldSession();
+
+        void cancelFoundingFlow();
+        void confirmFoundingFlow();
 
         void updateCameraMovement(double frameDeltaSeconds);
         void updateCameraZoom(double frameDeltaSeconds);
@@ -61,6 +66,7 @@ namespace Paladin
         std::unique_ptr<GrayUiRenderer> grayUiRenderer_;
         std::unique_ptr<MainMenu> mainMenu_;
         std::unique_ptr<WorldHud> worldHud_;
+        std::unique_ptr<FoundingPanel> foundingPanel_;
 
         std::unique_ptr<Simulation> simulation_;
         std::unique_ptr<Camera2D> camera_;

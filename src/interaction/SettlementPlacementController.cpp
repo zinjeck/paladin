@@ -7,17 +7,29 @@ namespace Paladin
     void SettlementPlacementController::beginSelection() noexcept
     {
         selecting_ = true;
+        lockedPosition_.reset();
     }
 
     void SettlementPlacementController::cancelSelection() noexcept
     {
         selecting_ = false;
         hoveredPosition_.reset();
+        lockedPosition_.reset();
     }
 
     bool SettlementPlacementController::isSelecting() const noexcept
     {
         return selecting_;
+    }
+
+    bool SettlementPlacementController::hasLockedSelection() const noexcept
+    {
+        return lockedPosition_.has_value();
+    }
+
+    bool SettlementPlacementController::isActive() const noexcept
+    {
+        return selecting_ || hasLockedSelection();
     }
 
     void SettlementPlacementController::setHoveredPosition(
@@ -43,27 +55,24 @@ namespace Paladin
             world.canFoundSettlementAt(*hoveredPosition_);
     }
 
-    SettlementId SettlementPlacementController::tryFoundSettlement(
-        World& world,
-        PolityId ownerPolityId
-    )
+    bool SettlementPlacementController::lockHoveredSelection(
+        const World& world
+    ) noexcept
     {
-        if (!selecting_ || !hoveredPosition_)
+        if (!hasValidPlacement(world))
         {
-            return {};
+            return false;
         }
 
-        const SettlementId settlementId =
-            world.foundSettlement(
-                *hoveredPosition_,
-                ownerPolityId
-            );
+        lockedPosition_ = hoveredPosition_;
+        hoveredPosition_.reset();
+        selecting_ = false;
+        return true;
+    }
 
-        if (settlementId.isValid())
-        {
-            cancelSelection();
-        }
-
-        return settlementId;
+    std::optional<WorldPosition>
+    SettlementPlacementController::lockedPosition() const noexcept
+    {
+        return lockedPosition_;
     }
 }

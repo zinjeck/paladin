@@ -40,7 +40,9 @@ add_executable(Paladin
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/GrayUiRenderer.cpp
+    src/ui/FoundingPanel.cpp
     src/ui/UiButton.cpp
+    src/ui/UiTextField.cpp
     src/ui/MainMenu.cpp
     src/ui/WorldHud.cpp
 )

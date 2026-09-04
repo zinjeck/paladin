@@ -111,9 +111,11 @@ namespace Paladin
     struct PolityIdTag;
     struct ArmyIdTag;
     struct CitizenIdTag;
+    struct CultureIdTag;
 
     using SettlementId = StrongId<SettlementIdTag>;
     using PolityId = StrongId<PolityIdTag>;
     using ArmyId = StrongId<ArmyIdTag>;
     using CitizenId = StrongId<CitizenIdTag>;
+    using CultureId = StrongId<CultureIdTag>;
 }
