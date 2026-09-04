@@ -3,6 +3,7 @@
 #include "world/WorldGrid.h"
 #include "world/generation/ClimateGenerator.h"
 #include "world/generation/LandmassGenerator.h"
+#include "world/generation/LandmassGenerationTemplate.h"
 #include "world/generation/TerrainBiomeClassifier.h"
 #include "world/generation/WorldGenerationSettings.h"
 
@@ -37,15 +38,40 @@ namespace Paladin
                 );
             }
 
+            const LandmassGenerationTemplate* landmassTemplate =
+                findLandmassGenerationTemplate(
+                    settings.landmassTemplateId
+                );
+
             if (
-                settings.minimumContinentCount < 3 ||
-                settings.maximumContinentCount > 5 ||
-                settings.minimumContinentCount
-                    > settings.maximumContinentCount
+                !landmassTemplate ||
+                !isValidLandmassGenerationTemplate(
+                    *landmassTemplate
+                )
             )
             {
                 throw std::invalid_argument(
-                    "World generation requires between three and five continents."
+                    "World generation requires a valid landmass template."
+                );
+            }
+
+            const LandmassContinentCountRange continentCount =
+                resolveLandmassContinentCountRange(
+                    *landmassTemplate,
+                    settings.minimumContinentCount,
+                    settings.maximumContinentCount
+                );
+
+            if (
+                continentCount.minimum <= 0 ||
+                continentCount.maximum < continentCount.minimum ||
+                static_cast<std::size_t>(
+                    continentCount.maximum
+                ) > landmassTemplate->continentSlots.size()
+            )
+            {
+                throw std::invalid_argument(
+                    "World generation continent count exceeds the selected template."
                 );
             }
 

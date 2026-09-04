@@ -10,6 +10,46 @@ namespace Paladin
 {
     inline constexpr std::size_t maximumFoundingNameLength = 40;
 
+    namespace Detail
+    {
+        struct FoundingNameBounds
+        {
+            std::size_t first = 0;
+            std::size_t last = 0;
+        };
+
+        inline FoundingNameBounds foundingNameBounds(
+            std::string_view name
+        ) noexcept
+        {
+            std::size_t first = 0;
+
+            while (
+                first < name.size() &&
+                std::isspace(
+                    static_cast<unsigned char>(name[first])
+                )
+            )
+            {
+                ++first;
+            }
+
+            std::size_t last = name.size();
+
+            while (
+                last > first &&
+                std::isspace(
+                    static_cast<unsigned char>(name[last - 1])
+                )
+            )
+            {
+                --last;
+            }
+
+            return {first, last};
+        }
+    }
+
     struct MapColor
     {
         std::uint8_t red = 210;
@@ -26,64 +66,28 @@ namespace Paladin
         std::string_view name
     )
     {
-        std::size_t first = 0;
+        const Detail::FoundingNameBounds bounds =
+            Detail::foundingNameBounds(name);
 
-        while (
-            first < name.size() &&
-            std::isspace(
-                static_cast<unsigned char>(name[first])
+        return std::string(
+            name.substr(
+                bounds.first,
+                bounds.last - bounds.first
             )
-        )
-        {
-            ++first;
-        }
-
-        std::size_t last = name.size();
-
-        while (
-            last > first &&
-            std::isspace(
-                static_cast<unsigned char>(name[last - 1])
-            )
-        )
-        {
-            --last;
-        }
-
-        return std::string(name.substr(first, last - first));
+        );
     }
 
     inline bool isValidFoundingName(
         std::string_view name
     ) noexcept
     {
-        std::size_t first = 0;
-
-        while (
-            first < name.size() &&
-            std::isspace(
-                static_cast<unsigned char>(name[first])
-            )
-        )
-        {
-            ++first;
-        }
-
-        std::size_t last = name.size();
-
-        while (
-            last > first &&
-            std::isspace(
-                static_cast<unsigned char>(name[last - 1])
-            )
-        )
-        {
-            --last;
-        }
+        const Detail::FoundingNameBounds bounds =
+            Detail::foundingNameBounds(name);
 
         return
-            last > first &&
-            last - first <= maximumFoundingNameLength;
+            bounds.last > bounds.first &&
+            bounds.last - bounds.first <=
+                maximumFoundingNameLength;
     }
 
     struct FoundingIdentity

@@ -3,25 +3,35 @@
 #include "world/Settlement.h"
 #include "world/World.h"
 
+#include <algorithm>
+
 namespace Paladin
 {
     void SettlementPopulationSystem::tick(
         World& world,
-        double gameDeltaSeconds
+        const WorldSimulationStep& step
     )
     {
         constexpr double gameSecondsPerYear =
             365.0 * 24.0 * 60.0 * 60.0;
 
-        const double elapsedYears =
-            gameDeltaSeconds / gameSecondsPerYear;
-
-        for (Settlement& settlement : world.settlements())
+        for (
+            const SettlementSimulationStep& settlementStep
+            : step.settlementSteps
+        )
         {
-            SettlementSimulationState& state =
-                settlement.simulationState();
+            Settlement* settlement =
+                world.settlement(settlementStep.settlementId);
 
-            if (!state.isActive())
+            if (!settlement)
+            {
+                continue;
+            }
+
+            SettlementSimulationState& state =
+                settlement->simulationState();
+
+            if (!state.isInitialized())
             {
                 continue;
             }
@@ -31,12 +41,37 @@ namespace Paladin
 
             const DemographicRates rates = population.rates();
 
+            const double needFulfillment =
+                state.economy().populationNeedFulfillment();
+
+            const double sustainableSupplyRatio =
+                state.economy()
+                    .populationSustainableSupplyRatio();
+
+            const double shortageDeathsPerPerson =
+                (1.0 - needFulfillment) *
+                rates
+                    .annualDeathsAtZeroNeedFulfillmentPerPerson;
+
+            const double surplusBirthsPerPerson =
+                std::clamp(
+                    sustainableSupplyRatio - 1.0,
+                    0.0,
+                    1.0
+                ) * rates.maximumAnnualSurplusBirthsPerPerson;
+
             const double annualNaturalChange =
                 static_cast<double>(population.residents())
                 * (
                     rates.annualBirthsPerPerson
+                    + surplusBirthsPerPerson
                     - rates.annualDeathsPerPerson
+                    - shortageDeathsPerPerson
                 );
+
+            const double elapsedYears =
+                settlementStep.gameDeltaSeconds /
+                gameSecondsPerYear;
 
             const double projectedChange =
                 (

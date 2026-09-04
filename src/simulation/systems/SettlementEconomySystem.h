@@ -4,7 +4,7 @@
 
 namespace Paladin
 {
-    class SettlementPopulationSystem final
+    class SettlementEconomySystem final
         : public WorldSimulationSystem
     {
     public:

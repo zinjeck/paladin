@@ -38,6 +38,7 @@ namespace Paladin
         const double gameDeltaSeconds =
             realDeltaSeconds * multiplier;
 
+        synchronizeSettlementSimulationTiers();
         world_->tick(gameDeltaSeconds);
         worldSimulationPipeline_->tick(
             *world_,
@@ -91,16 +92,76 @@ namespace Paladin
     }
 
 
+    SettlementId Simulation::activeSettlementId() const noexcept
+    {
+        return activeSettlementId_;
+    }
+
+
+    bool Simulation::setActiveSettlement(
+        SettlementId settlementId
+    ) noexcept
+    {
+        const Settlement* settlement =
+            world_->settlement(settlementId);
+
+        if (
+            !settlement ||
+            settlement->ownerPolityId() != playerPolityId_
+        )
+        {
+            return false;
+        }
+
+        activeSettlementId_ = settlementId;
+        synchronizeSettlementSimulationTiers();
+        return true;
+    }
+
+
     SettlementId Simulation::foundPlayerCapital(
         WorldPosition position,
         const FoundingIdentity& identity
     )
     {
-        return world_->foundCapitalSettlement(
+        const SettlementId settlementId =
+            world_->foundCapitalSettlement(
             position,
             playerPolityId_,
             identity
         );
+
+        if (settlementId.isValid())
+        {
+            static_cast<void>(
+                setActiveSettlement(settlementId)
+            );
+        }
+
+        return settlementId;
+    }
+
+
+    void Simulation::synchronizeSettlementSimulationTiers() noexcept
+    {
+        for (Settlement& settlement : world_->settlements())
+        {
+            SettlementSimulationTier tier =
+                SettlementSimulationTier::Strategic;
+
+            if (settlement.id() == activeSettlementId_)
+            {
+                tier = SettlementSimulationTier::Detailed;
+            }
+            else if (
+                settlement.ownerPolityId() == playerPolityId_
+            )
+            {
+                tier = SettlementSimulationTier::Summary;
+            }
+
+            settlement.simulationState().setSimulationTier(tier);
+        }
     }
 
 

@@ -55,6 +55,14 @@ namespace Paladin
         PolityId playerPolityId() const noexcept;
 
         [[nodiscard]]
+        SettlementId activeSettlementId() const noexcept;
+
+        [[nodiscard]]
+        bool setActiveSettlement(
+            SettlementId settlementId
+        ) noexcept;
+
+        [[nodiscard]]
         SettlementId foundPlayerCapital(
             WorldPosition position,
             const FoundingIdentity& identity
@@ -64,11 +72,14 @@ namespace Paladin
         [[nodiscard]]
         double speedMultiplier() const noexcept;
 
+        void synchronizeSettlementSimulationTiers() noexcept;
+
         std::unique_ptr<World> world_;
         std::unique_ptr<WorldSimulationPipeline>
             worldSimulationPipeline_;
 
         PolityId playerPolityId_;
+        SettlementId activeSettlementId_;
 
         SimulationSpeed speed_ =
             SimulationSpeed::Normal;

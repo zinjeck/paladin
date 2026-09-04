@@ -27,6 +27,27 @@ namespace Paladin
                 rates.annualNetMigration = 0.0;
             }
 
+            rates.annualDeathsAtZeroNeedFulfillmentPerPerson =
+                std::isfinite(
+                    rates.annualDeathsAtZeroNeedFulfillmentPerPerson
+                )
+                    ? std::max(
+                        0.0,
+                        rates
+                            .annualDeathsAtZeroNeedFulfillmentPerPerson
+                    )
+                    : 0.0;
+
+            rates.maximumAnnualSurplusBirthsPerPerson =
+                std::isfinite(
+                    rates.maximumAnnualSurplusBirthsPerPerson
+                )
+                    ? std::max(
+                        0.0,
+                        rates.maximumAnnualSurplusBirthsPerPerson
+                    )
+                    : 0.0;
+
             return rates;
         }
     }

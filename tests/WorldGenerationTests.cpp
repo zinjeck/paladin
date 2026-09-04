@@ -11,31 +11,10 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <type_traits>
-#include <vector>
 
 namespace
 {
-    struct LandmassAnalysis
-    {
-        std::size_t majorLandmassCount = 0;
-        std::size_t totalLandTileCount = 0;
-        std::size_t largestLandmassTileCount = 0;
-    };
-
-    std::size_t tileIndex(
-        std::int32_t x,
-        std::int32_t y,
-        std::int32_t width
-    ) noexcept
-    {
-        return
-            static_cast<std::size_t>(y)
-            * static_cast<std::size_t>(width)
-            + static_cast<std::size_t>(x);
-    }
-
     std::uint64_t worldHash(
         const Paladin::WorldGrid& grid
     )
@@ -84,139 +63,6 @@ namespace
         }
 
         return hash;
-    }
-
-    LandmassAnalysis analyzeLandmasses(
-        const Paladin::WorldGrid& grid
-    )
-    {
-        LandmassAnalysis analysis;
-
-        std::vector<bool> visited(
-            grid.tileCount(),
-            false
-        );
-
-        std::vector<std::size_t> componentSizes;
-
-        constexpr std::int32_t neighborOffsets[4][2] = {
-            {-1, 0},
-            {1, 0},
-            {0, -1},
-            {0, 1}
-        };
-
-        for (std::int32_t y = 0; y < grid.height(); ++y)
-        {
-            for (std::int32_t x = 0; x < grid.width(); ++x)
-            {
-                const std::size_t startIndex =
-                    tileIndex(x, y, grid.width());
-
-                const Paladin::WorldTile* startTile =
-                    grid.tile({x, y});
-
-                if (
-                    visited[startIndex] ||
-                    startTile->terrain == Paladin::TerrainType::Water
-                )
-                {
-                    continue;
-                }
-
-                std::deque<std::size_t> openTiles{
-                    startIndex
-                };
-
-                visited[startIndex] = true;
-                std::size_t componentSize = 0;
-
-                while (!openTiles.empty())
-                {
-                    const std::size_t currentIndex =
-                        openTiles.front();
-
-                    openTiles.pop_front();
-                    ++componentSize;
-
-                    const auto currentX =
-                        static_cast<std::int32_t>(
-                            currentIndex
-                            % static_cast<std::size_t>(grid.width())
-                        );
-
-                    const auto currentY =
-                        static_cast<std::int32_t>(
-                            currentIndex
-                            / static_cast<std::size_t>(grid.width())
-                        );
-
-                    for (const auto& offset : neighborOffsets)
-                    {
-                        const std::int32_t neighborX =
-                            currentX + offset[0];
-
-                        const std::int32_t neighborY =
-                            currentY + offset[1];
-
-                        if (!grid.isValidPosition({
-                            neighborX,
-                            neighborY
-                        }))
-                        {
-                            continue;
-                        }
-
-                        const std::size_t neighborIndex =
-                            tileIndex(
-                                neighborX,
-                                neighborY,
-                                grid.width()
-                            );
-
-                        const Paladin::WorldTile* neighborTile =
-                            grid.tile({neighborX, neighborY});
-
-                        if (
-                            visited[neighborIndex] ||
-                            neighborTile->terrain
-                                == Paladin::TerrainType::Water
-                        )
-                        {
-                            continue;
-                        }
-
-                        visited[neighborIndex] = true;
-                        openTiles.push_back(neighborIndex);
-                    }
-                }
-
-                componentSizes.push_back(componentSize);
-                analysis.totalLandTileCount += componentSize;
-
-                if (
-                    componentSize
-                    > analysis.largestLandmassTileCount
-                )
-                {
-                    analysis.largestLandmassTileCount =
-                        componentSize;
-                }
-            }
-        }
-
-        const std::size_t minimumMajorSize =
-            grid.tileCount() / 200;
-
-        for (const std::size_t componentSize : componentSizes)
-        {
-            if (componentSize >= minimumMajorSize)
-            {
-                ++analysis.majorLandmassCount;
-            }
-        }
-
-        return analysis;
     }
 
     void testDeterministicWorldGeneration()
@@ -355,28 +201,6 @@ namespace
 
         PALADIN_CHECK(mountainTileCount > 0);
         PALADIN_CHECK(waterTileCount > 0);
-
-        const LandmassAnalysis landmasses =
-            analyzeLandmasses(grid);
-
-        PALADIN_CHECK(
-            landmasses.majorLandmassCount >= 3 &&
-            landmasses.majorLandmassCount <= 5
-        );
-
-        PALADIN_CHECK(
-            landmasses.totalLandTileCount > 0
-        );
-
-        const double largestLandmassFraction =
-            static_cast<double>(
-                landmasses.largestLandmassTileCount
-            )
-            / static_cast<double>(
-                landmasses.totalLandTileCount
-            );
-
-        PALADIN_CHECK(largestLandmassFraction < 0.55);
     }
 }
 

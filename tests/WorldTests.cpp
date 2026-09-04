@@ -75,7 +75,7 @@ void runWorldTests()
     );
 
     PALADIN_CHECK(
-        settlement->simulationState().isActive()
+        settlement->simulationState().isInitialized()
     );
 
     PALADIN_CHECK(
@@ -206,6 +206,33 @@ void runWorldTests()
     const Paladin::PolityId aiPolityId =
         world.createPolity();
 
+    Paladin::SettlementFoundationProfile aiFoundationProfile =
+        Paladin::defaultSettlementFoundationProfile();
+
+    aiFoundationProfile.initialSimulationTier =
+        Paladin::SettlementSimulationTier::Strategic;
+
+    aiFoundationProfile.demographicRates =
+        {0.0, 0.0, 0.0, 0.20, 0.0};
+
+    for (Paladin::StockpileEntry& resource
+        : aiFoundationProfile.initialResources)
+    {
+        if (resource.resourceId == "food")
+        {
+            resource.amount = 0.0;
+        }
+    }
+
+    for (Paladin::ResourceFlowRate& flowRate
+        : aiFoundationProfile.resourceFlowRates)
+    {
+        if (flowRate.resourceId == "food")
+        {
+            flowRate.dailyProductionPerResident = 0.0;
+        }
+    }
+
     const Paladin::SettlementId aiCapitalId =
         world.foundCapitalSettlement(
             aiCapitalPosition,
@@ -216,7 +243,8 @@ void runWorldTests()
                 "Riverhold",
                 {55, 145, 95},
                 "tribal"
-            }
+            },
+            aiFoundationProfile
         );
 
     PALADIN_CHECK(aiCapitalId.isValid());
@@ -227,8 +255,12 @@ void runWorldTests()
     Paladin::Settlement* simulatedAiCapital =
         world.settlement(aiCapitalId);
 
+    Paladin::Settlement* simulatedInactiveSettlement =
+        world.settlement(settlementId);
+
     PALADIN_CHECK(simulatedPlayerCapital != nullptr);
     PALADIN_CHECK(simulatedAiCapital != nullptr);
+    PALADIN_CHECK(simulatedInactiveSettlement != nullptr);
 
     PALADIN_CHECK(
         simulatedPlayerCapital->simulationState()
@@ -240,13 +272,79 @@ void runWorldTests()
             .population().residents() == 100
     );
 
-    simulatedAiCapital->simulationState()
-        .population().setRates({0.0, 0.02, 0.0});
+    simulatedPlayerCapital->simulationState().setSimulationTier(
+        Paladin::SettlementSimulationTier::Detailed
+    );
 
     Paladin::WorldSimulationPipeline simulationPipeline;
 
+    PALADIN_CHECK(simulationPipeline.systemCount() == 2);
+
+    const double playerOpeningFood =
+        simulatedPlayerCapital->simulationState()
+            .stockpile().amount("food");
+
+    const double aiOpeningFood =
+        simulatedAiCapital->simulationState()
+            .stockpile().amount("food");
+
+    const double inactiveOpeningFood =
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food");
+
+    constexpr double gameSecondsPerDay =
+        24.0 * 60.0 * 60.0;
+
+    simulationPipeline.tick(
+        world,
+        gameSecondsPerDay * 0.5
+    );
+
+    PALADIN_CHECK(
+        simulatedPlayerCapital->simulationState()
+            .stockpile().amount("food") > playerOpeningFood
+    );
+
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .stockpile().amount("food") == aiOpeningFood
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food") == inactiveOpeningFood
+    );
+
+    simulationPipeline.tick(
+        world,
+        gameSecondsPerDay * 0.5
+    );
+
+    PALADIN_CHECK(
+        simulatedInactiveSettlement->simulationState()
+            .stockpile().amount("food") > inactiveOpeningFood
+    );
+
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .population().residents() == 100
+    );
+
+    simulationPipeline.tick(
+        world,
+        gameSecondsPerDay * 29.0
+    );
+
+    const std::uint64_t aiPopulationAfterStrategicStep =
+        simulatedAiCapital->simulationState()
+            .population().residents();
+
+    PALADIN_CHECK(
+        aiPopulationAfterStrategicStep < 100
+    );
+
     constexpr double gameSecondsPerYear =
-        365.0 * 24.0 * 60.0 * 60.0;
+        365.0 * gameSecondsPerDay;
 
     simulationPipeline.tick(
         world,
@@ -255,11 +353,12 @@ void runWorldTests()
 
     PALADIN_CHECK(
         simulatedPlayerCapital->simulationState()
-            .population().residents() == 101
+            .population().residents() > 100
     );
 
     PALADIN_CHECK(
         simulatedAiCapital->simulationState()
-            .population().residents() == 98
+            .population().residents() <
+                aiPopulationAfterStrategicStep
     );
 }

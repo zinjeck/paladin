@@ -30,16 +30,19 @@ add_executable(Paladin
     src/rendering/SettlementMarkerRenderer.cpp
     src/simulation/Simulation.cpp
     src/simulation/WorldSimulationPipeline.cpp
+    src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/world/World.cpp
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
+    src/world/generation/LandmassGenerationTemplate.cpp
     src/world/generation/LandmassGenerator.cpp
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
     src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationState.cpp
@@ -82,15 +85,18 @@ add_executable(PaladinTests
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
+    src/world/generation/LandmassGenerationTemplate.cpp
     src/world/generation/LandmassGenerator.cpp
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
     src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationState.cpp
     src/simulation/WorldSimulationPipeline.cpp
+    src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
 )
 

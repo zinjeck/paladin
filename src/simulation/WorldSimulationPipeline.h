@@ -1,5 +1,7 @@
 #pragma once
 
+#include "simulation/WorldSimulationSystem.h"
+
 #include <cstddef>
 #include <memory>
 #include <vector>
@@ -7,7 +9,6 @@
 namespace Paladin
 {
     class World;
-    class WorldSimulationSystem;
 
     class WorldSimulationPipeline
     {
@@ -40,5 +41,6 @@ namespace Paladin
         // Registration order is execution order. This makes cross-system
         // dependencies explicit and deterministic.
         std::vector<std::unique_ptr<WorldSimulationSystem>> systems_;
+        std::vector<SettlementSimulationStep> settlementSteps_;
     };
 }

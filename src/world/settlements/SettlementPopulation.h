@@ -11,6 +11,8 @@ namespace Paladin
         double annualBirthsPerPerson = 0.025;
         double annualDeathsPerPerson = 0.015;
         double annualNetMigration = 0.0;
+        double annualDeathsAtZeroNeedFulfillmentPerPerson = 0.20;
+        double maximumAnnualSurplusBirthsPerPerson = 0.005;
     };
 
     class SettlementPopulation
