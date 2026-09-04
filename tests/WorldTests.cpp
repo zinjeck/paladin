@@ -1,5 +1,6 @@
 #include "TestFramework.h"
 
+#include "simulation/WorldSimulationPipeline.h"
 #include "world/TerrainType.h"
 #include "world/World.h"
 #include "world/generation/WorldGenerationSettings.h"
@@ -71,6 +72,25 @@ void runWorldTests()
     PALADIN_CHECK(
         settlement->ownerPolityId()
         == polityId
+    );
+
+    PALADIN_CHECK(
+        settlement->simulationState().isActive()
+    );
+
+    PALADIN_CHECK(
+        settlement->simulationState().population().residents()
+        == 100
+    );
+
+    PALADIN_CHECK(
+        settlement->simulationState().stockpile().amount("food")
+        == 600.0
+    );
+
+    PALADIN_CHECK(
+        settlement->simulationState().stockpile().amount("materials")
+        == 120.0
     );
 
     PALADIN_CHECK(
@@ -156,4 +176,90 @@ void runWorldTests()
     PALADIN_CHECK(capital->name() == "New Dawn");
     PALADIN_CHECK(capital->primaryCultureId() == culture->id());
     PALADIN_CHECK(culture->name() == "Dawnfolk");
+
+    Paladin::WorldPosition aiCapitalPosition{};
+    bool foundAiCapitalPosition = false;
+
+    for (
+        std::int32_t y = 0;
+        y < world.grid().height() && !foundAiCapitalPosition;
+        ++y
+    )
+    {
+        for (
+            std::int32_t x = 0;
+            x < world.grid().width();
+            ++x
+        )
+        {
+            if (world.canFoundSettlementAt({x, y}))
+            {
+                aiCapitalPosition = {x, y};
+                foundAiCapitalPosition = true;
+                break;
+            }
+        }
+    }
+
+    PALADIN_CHECK(foundAiCapitalPosition);
+
+    const Paladin::PolityId aiPolityId =
+        world.createPolity();
+
+    const Paladin::SettlementId aiCapitalId =
+        world.foundCapitalSettlement(
+            aiCapitalPosition,
+            aiPolityId,
+            {
+                "River Confederacy",
+                "Riverfolk",
+                "Riverhold",
+                {55, 145, 95},
+                "tribal"
+            }
+        );
+
+    PALADIN_CHECK(aiCapitalId.isValid());
+
+    Paladin::Settlement* simulatedPlayerCapital =
+        world.settlement(capitalId);
+
+    Paladin::Settlement* simulatedAiCapital =
+        world.settlement(aiCapitalId);
+
+    PALADIN_CHECK(simulatedPlayerCapital != nullptr);
+    PALADIN_CHECK(simulatedAiCapital != nullptr);
+
+    PALADIN_CHECK(
+        simulatedPlayerCapital->simulationState()
+            .population().residents() == 100
+    );
+
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .population().residents() == 100
+    );
+
+    simulatedAiCapital->simulationState()
+        .population().setRates({0.0, 0.02, 0.0});
+
+    Paladin::WorldSimulationPipeline simulationPipeline;
+
+    constexpr double gameSecondsPerYear =
+        365.0 * 24.0 * 60.0 * 60.0;
+
+    simulationPipeline.tick(
+        world,
+        gameSecondsPerYear
+    );
+
+    PALADIN_CHECK(
+        simulatedPlayerCapital->simulationState()
+            .population().residents() == 101
+    );
+
+    PALADIN_CHECK(
+        simulatedAiCapital->simulationState()
+            .population().residents() == 98
+    );
 }

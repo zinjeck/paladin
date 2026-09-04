@@ -10,6 +10,7 @@
 namespace Paladin
 {
     class World;
+    class WorldSimulationPipeline;
 
     enum class SimulationSpeed
     {
@@ -64,6 +65,8 @@ namespace Paladin
         double speedMultiplier() const noexcept;
 
         std::unique_ptr<World> world_;
+        std::unique_ptr<WorldSimulationPipeline>
+            worldSimulationPipeline_;
 
         PolityId playerPolityId_;
 

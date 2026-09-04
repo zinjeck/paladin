@@ -1,5 +1,7 @@
 #include "simulation/Simulation.h"
 
+#include "simulation/WorldSimulationPipeline.h"
+
 #include "world/World.h"
 
 #include <memory>
@@ -7,7 +9,10 @@
 namespace Paladin
 {
     Simulation::Simulation()
-        : world_(std::make_unique<World>())
+        : world_(std::make_unique<World>()),
+          worldSimulationPipeline_(
+              std::make_unique<WorldSimulationPipeline>()
+          )
     {
         playerPolityId_ = world_->createPolity();
     }
@@ -20,8 +25,6 @@ namespace Paladin
         double realDeltaSeconds
     )
     {
-        ++tickCount_;
-
         const double multiplier =
             speedMultiplier();
 
@@ -30,10 +33,16 @@ namespace Paladin
             return;
         }
 
+        ++tickCount_;
+
         const double gameDeltaSeconds =
             realDeltaSeconds * multiplier;
 
         world_->tick(gameDeltaSeconds);
+        worldSimulationPipeline_->tick(
+            *world_,
+            gameDeltaSeconds
+        );
     }
 
 

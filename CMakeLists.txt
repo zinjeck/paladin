@@ -29,6 +29,8 @@ add_executable(Paladin
     src/rendering/WorldRenderer.cpp
     src/rendering/SettlementMarkerRenderer.cpp
     src/simulation/Simulation.cpp
+    src/simulation/WorldSimulationPipeline.cpp
+    src/simulation/systems/SettlementPopulationSystem.cpp
     src/world/World.cpp
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
@@ -37,6 +39,10 @@ add_executable(Paladin
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
+    src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementFoundationProfile.cpp
+    src/world/settlements/SettlementPopulation.cpp
+    src/world/settlements/SettlementSimulationState.cpp
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/GrayUiRenderer.cpp
@@ -80,6 +86,12 @@ add_executable(PaladinTests
     src/world/generation/ClimateGenerator.cpp
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
+    src/world/settlements/ResourceStockpile.cpp
+    src/world/settlements/SettlementFoundationProfile.cpp
+    src/world/settlements/SettlementPopulation.cpp
+    src/world/settlements/SettlementSimulationState.cpp
+    src/simulation/WorldSimulationPipeline.cpp
+    src/simulation/systems/SettlementPopulationSystem.cpp
 )
 
 target_include_directories(PaladinTests PRIVATE

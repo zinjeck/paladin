@@ -1,0 +1,43 @@
+#pragma once
+
+#include <cstdint>
+
+namespace Paladin
+{
+    class SettlementPopulationSystem;
+
+    struct DemographicRates
+    {
+        double annualBirthsPerPerson = 0.025;
+        double annualDeathsPerPerson = 0.015;
+        double annualNetMigration = 0.0;
+    };
+
+    class SettlementPopulation
+    {
+    public:
+        SettlementPopulation() noexcept = default;
+
+        SettlementPopulation(
+            std::uint64_t residents,
+            DemographicRates rates
+        ) noexcept;
+
+        [[nodiscard]]
+        std::uint64_t residents() const noexcept;
+
+        [[nodiscard]]
+        DemographicRates rates() const noexcept;
+
+        void setRates(DemographicRates rates) noexcept;
+
+    private:
+        friend class SettlementPopulationSystem;
+
+        void applyNetChange(double populationChange) noexcept;
+
+        std::uint64_t residents_ = 0;
+        double fractionalChange_ = 0.0;
+        DemographicRates rates_;
+    };
+}

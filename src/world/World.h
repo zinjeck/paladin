@@ -12,6 +12,7 @@
 #include "world/WorldTime.h"
 #include "world/WorldGrid.h"
 #include "world/generation/WorldGenerationSettings.h"
+#include "world/settlements/SettlementFoundationProfile.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -69,10 +70,25 @@ namespace Paladin
         );
 
         [[nodiscard]]
+        SettlementId foundSettlement(
+            WorldPosition position,
+            PolityId ownerPolityId,
+            const SettlementFoundationProfile& foundationProfile
+        );
+
+        [[nodiscard]]
         SettlementId foundCapitalSettlement(
             WorldPosition position,
             PolityId ownerPolityId,
             const FoundingIdentity& identity
+        );
+
+        [[nodiscard]]
+        SettlementId foundCapitalSettlement(
+            WorldPosition position,
+            PolityId ownerPolityId,
+            const FoundingIdentity& identity,
+            const SettlementFoundationProfile& foundationProfile
         );
 
 
@@ -139,6 +155,9 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<const Settlement> settlements() const noexcept;
+
+        [[nodiscard]]
+        std::span<Settlement> settlements() noexcept;
 
         [[nodiscard]]
         std::span<const Culture> cultures() const noexcept;

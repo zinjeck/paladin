@@ -2,7 +2,10 @@
 
 #include "core/StrongId.h"
 #include "world/WorldPosition.h"
+#include "world/settlements/SettlementFoundationProfile.h"
+#include "world/settlements/SettlementSimulationState.h"
 
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,7 +31,8 @@ namespace Paladin
             WorldPosition position,
             std::string name,
             PolityId ownerPolityId,
-            CultureId primaryCultureId
+            CultureId primaryCultureId,
+            const SettlementFoundationProfile& foundationProfile
         )
             : id_(id),
               position_(position),
@@ -36,6 +40,12 @@ namespace Paladin
               ownerPolityId_(ownerPolityId),
               primaryCultureId_(primaryCultureId)
         {
+            if (!simulationState_.bootstrap(foundationProfile))
+            {
+                throw std::invalid_argument(
+                    "Invalid settlement foundation profile."
+                );
+            }
         }
 
         [[nodiscard]]
@@ -74,6 +84,18 @@ namespace Paladin
             return primaryCultureId_;
         }
 
+        [[nodiscard]]
+        SettlementSimulationState& simulationState() noexcept
+        {
+            return simulationState_;
+        }
+
+        [[nodiscard]]
+        const SettlementSimulationState& simulationState() const noexcept
+        {
+            return simulationState_;
+        }
+
     private:
         friend class World;
 
@@ -100,5 +122,6 @@ namespace Paladin
         // Invalid ID means independent / currently unowned.
         PolityId ownerPolityId_;
         CultureId primaryCultureId_;
+        SettlementSimulationState simulationState_;
     };
 }

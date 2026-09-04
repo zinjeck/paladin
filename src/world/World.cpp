@@ -73,6 +73,12 @@ namespace Paladin
     }
 
 
+    std::span<Settlement> World::settlements() noexcept
+    {
+        return settlements_.entities();
+    }
+
+
     std::span<const Culture> World::cultures() const noexcept
     {
         return cultures_.entities();
@@ -151,6 +157,20 @@ namespace Paladin
         PolityId ownerPolityId
     )
     {
+        return foundSettlement(
+            position,
+            ownerPolityId,
+            defaultSettlementFoundationProfile()
+        );
+    }
+
+
+    SettlementId World::foundSettlement(
+        WorldPosition position,
+        PolityId ownerPolityId,
+        const SettlementFoundationProfile& foundationProfile
+    )
+    {
         if (
             !canFoundSettlementAt(position) ||
             !polities_.contains(ownerPolityId)
@@ -159,15 +179,13 @@ namespace Paladin
             return {};
         }
 
-        const SettlementId settlementId =
-            settlements_.create(position);
-
-        Settlement* foundedSettlement =
-            settlements_.find(settlementId);
-
-        foundedSettlement->setOwnerPolity(ownerPolityId);
-
-        return settlementId;
+        return settlements_.create(
+            position,
+            std::string{},
+            ownerPolityId,
+            CultureId{},
+            foundationProfile
+        );
     }
 
 
@@ -175,6 +193,22 @@ namespace Paladin
         WorldPosition position,
         PolityId ownerPolityId,
         const FoundingIdentity& identity
+    )
+    {
+        return foundCapitalSettlement(
+            position,
+            ownerPolityId,
+            identity,
+            defaultSettlementFoundationProfile()
+        );
+    }
+
+
+    SettlementId World::foundCapitalSettlement(
+        WorldPosition position,
+        PolityId ownerPolityId,
+        const FoundingIdentity& identity,
+        const SettlementFoundationProfile& foundationProfile
     )
     {
         Polity* ownerPolity = polities_.find(ownerPolityId);
@@ -216,7 +250,8 @@ namespace Paladin
                 position,
                 std::move(capitalName),
                 ownerPolityId,
-                cultureId
+                cultureId,
+                foundationProfile
             );
         }
         catch (...)
