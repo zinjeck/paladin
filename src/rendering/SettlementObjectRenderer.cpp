@@ -68,7 +68,7 @@ namespace Paladin
                 static_cast<double>(footprint.topLeft.y),
                 static_cast<double>(footprint.width),
                 static_cast<double>(footprint.height),
-                1.5F,
+                2.5F,
                 color
             };
         }
@@ -267,6 +267,12 @@ namespace Paladin
                     site.footprint,
                     renderColor(definition->visual.fillColor, 105)
                 );
+                if (definition->id != SettlementObjectTypes::Road)
+                    cachedInfrastructureOutlines_.push_back(footprintOutline(
+                        site.footprint, settlementPlacementOutlineColor(
+                            site.phase == ConstructionSitePhase::ReadyToBuild
+                                ? SettlementPlacementVisualState::ReadyToBuild
+                                : SettlementPlacementVisualState::AwaitingMaterials)));
 
             }
 

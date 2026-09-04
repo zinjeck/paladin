@@ -65,6 +65,7 @@ add_executable(Paladin
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/settlements/SettlementEmploymentState.cpp
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp
     src/simulation/systems/SettlementCitizenMovement.cpp
@@ -85,6 +86,7 @@ add_executable(Paladin
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/CityHud.cpp
+    src/ui/EmploymentPanel.cpp
     src/ui/GrayUiRenderer.cpp
     src/ui/FoundingPanel.cpp
     src/ui/UiButton.cpp
@@ -126,6 +128,7 @@ enable_testing()
 add_executable(PaladinTests
     tests/TestMain.cpp
     tests/SettlementActivityTests.cpp
+    tests/SettlementEmploymentTests.cpp
     tests/CoreTests.cpp
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
@@ -142,6 +145,7 @@ add_executable(PaladinTests
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/settlements/SettlementEmploymentState.cpp
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp
     src/simulation/systems/SettlementCitizenMovement.cpp

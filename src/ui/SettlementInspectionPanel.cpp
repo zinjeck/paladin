@@ -12,6 +12,7 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 
 #include <algorithm>
+#include <array>
 #include <string>
 
 namespace Paladin
@@ -132,8 +133,18 @@ namespace Paladin
                     * static_cast<float>(1U + deliveryCount);
         }
 
+        const WorkplaceId selectedWorkplace = object
+            ? settlementMap.employment().forObject(object->id)
+            : WorkplaceId{};
+        if (selectedWorkplace != workplaceId_)
+        {
+            nameField_.setFocused(false);
+            workplaceId_ = selectedWorkplace;
+        }
+        const auto* workplace = settlementMap.employment().workplace(workplaceId_);
+        const float detailsHeight = citizen ? 92.0F : workplace ? 78.0F : 0.0F;
         const float totalHeight = objectPanelHeight
-            + constructionPanelHeight;
+            + constructionPanelHeight + detailsHeight;
 
         Camera2D panelCamera = camera;
         if (citizen)
@@ -154,15 +165,27 @@ namespace Paladin
 
         grayUiRenderer.drawPanel(renderer, renderedBounds_);
 
-        constexpr float objectNamePixelSize = 3.0F;
+        constexpr float preferredNamePixelSize = 3.0F;
         const std::string_view title = citizen
             ? std::string_view(citizen->name)
-            : definition->displayName;
+            : workplace ? std::string_view(workplace->name) : definition->displayName;
+        const float objectNamePixelSize = std::min(preferredNamePixelSize,
+            (renderedBounds_.width - 24) / std::max(1.0F, float(title.size()) * 6 - 1));
         const float objectNameWidth = retroFontRenderer_.measureWidth(
             title,
             objectNamePixelSize
         );
-        retroFontRenderer_.drawText(
+        if (workplace)
+        {
+            const UiRectangle titleBounds{renderedBounds_.x + 5, renderedBounds_.y + 5,
+                renderedBounds_.width - 10, 39};
+            nameButton_.setBounds(titleBounds);
+            nameButton_.setText(workplace->name);
+            nameField_.setBounds(titleBounds);
+            if (nameField_.focused()) nameField_.render(renderer, grayUiRenderer);
+            else nameButton_.render(renderer, grayUiRenderer);
+        }
+        else retroFontRenderer_.drawText(
             renderer,
             title,
             renderedBounds_.x
@@ -172,14 +195,46 @@ namespace Paladin
             {242, 242, 244, 255}
         );
 
-        if (!constructionSite)
+        if (citizen)
         {
-            return;
+            const auto* job = settlementMap.employment().workplace(citizen->workplaceId);
+            const std::array<std::string, 3> rows{
+                "Age: " + std::to_string(citizen->ageYears),
+                std::string("Sex: ") + (citizen->sex == CitizenSex::Male ? "Male" : "Female"),
+                "Job: " + (job ? job->name : std::string("Unemployed"))
+            };
+            for (std::size_t i = 0; i < rows.size(); ++i)
+            {
+                const float scale = std::min(2.0F, (renderedBounds_.width - 26) /
+                    std::max(1.0F, float(rows[i].size()) * 6 - 1));
+                grayUiRenderer.drawLabel(renderer, rows[i], renderedBounds_.x + 13,
+                    renderedBounds_.y + 56 + float(i) * 27, scale);
+            }
         }
+        if (workplace)
+        {
+            const auto employed = settlementMap.employment().employed(workplace->id, citizenState);
+            grayUiRenderer.drawLabel(renderer, "Employment: " + std::to_string(employed)
+                + "/" + std::to_string(workplace->capacity),
+                renderedBounds_.x + 13, renderedBounds_.y + 62, 1.5F);
+            const auto y = renderedBounds_.y + 52;
+            decreaseButton_.setBounds({renderedBounds_.x + renderedBounds_.width - 78, y, 28, 28});
+            increaseButton_.setBounds({renderedBounds_.x + renderedBounds_.width - 43, y, 28, 28});
+            decreaseButton_.setEnabled(employed > 0);
+            increaseButton_.setEnabled(workplace->capacity < workplace->maximumCapacity
+                && settlementMap.employment().unemployed(citizenState) > 0);
+            decreaseButton_.render(renderer, grayUiRenderer);
+            increaseButton_.render(renderer, grayUiRenderer);
+            grayUiRenderer.drawLabel(renderer,
+                nameField_.focused() ? "Enter saves / Escape cancels"
+                    : workplace->operational ? "Workplace ready" : "Awaiting construction",
+                renderedBounds_.x + 13, renderedBounds_.y + 98, 1.25F);
+        }
+        if (!constructionSite) return;
 
         const UiRectangle constructionBounds{
             renderedBounds_.x,
-            renderedBounds_.y + objectPanelHeight,
+            renderedBounds_.y + objectPanelHeight + detailsHeight,
             renderedBounds_.width,
             constructionPanelHeight
         };
@@ -228,8 +283,52 @@ namespace Paladin
     {
         renderedBounds_ = {};
         hasRenderedBounds_ = false;
+        workplaceId_ = {};
+        nameField_.setFocused(false);
     }
 
+
+    void SettlementInspectionPanel::pointerMoved(float x, float y)
+    {
+        nameButton_.pointerMoved(x, y);
+        decreaseButton_.pointerMoved(x, y);
+        increaseButton_.pointerMoved(x, y);
+    }
+    bool SettlementInspectionPanel::pointerPressed(float x, float y)
+    {
+        if (!containsPoint(x, y)) return false;
+        if (workplaceId_)
+        {
+            static_cast<void>(nameButton_.pointerPressed(x, y));
+            static_cast<void>(decreaseButton_.pointerPressed(x, y));
+            static_cast<void>(increaseButton_.pointerPressed(x, y));
+        }
+        return true;
+    }
+    void SettlementInspectionPanel::pointerReleased(float x, float y,
+        SettlementMap& map, SettlementCitizenState& citizens, double minute)
+    {
+        const bool title = nameButton_.pointerReleased(x, y);
+        const bool less = decreaseButton_.pointerReleased(x, y);
+        const bool more = increaseButton_.pointerReleased(x, y);
+        const auto* workplace = map.employment().workplace(workplaceId_);
+        if (!workplace) return;
+        if (title && !nameField_.focused())
+        {
+            nameField_.setText(workplace->name);
+            nameField_.setFocused(true);
+        }
+        if (less || more)
+        {
+            map.employment().adjust(workplaceId_, more ? 1 : -1, citizens);
+            map.employment().record(minute, citizens);
+        }
+    }
+    void SettlementInspectionPanel::finishRename(SettlementMap& map, bool commit)
+    {
+        if (!commit || map.employment().rename(workplaceId_, nameField_.text()))
+            nameField_.setFocused(false);
+    }
 
     UiRectangle SettlementInspectionPanel::anchoredBounds(
         const SettlementObjectFootprint& footprint,

@@ -31,6 +31,15 @@ namespace Paladin
         ) noexcept;
 
         void clear() noexcept;
+        void selectWorkplace(SettlementObjectId object, ConstructionSiteId site) noexcept
+        {
+            clear();
+            objectId_ = object;
+            constructionSiteId_ = site;
+            kind_ = object ? SettlementInspectionKind::CompletedObject
+                : site ? SettlementInspectionKind::ConstructionSite : SettlementInspectionKind::None;
+            placePanelOnRight_ = true;
+        }
 
         [[nodiscard]]
         SettlementInspectionKind kind() const noexcept;

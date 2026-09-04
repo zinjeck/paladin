@@ -101,6 +101,7 @@ namespace Paladin
               UiButton("Command")
           }
     {
+        setSettlementStatus(false, 8);
         optionButtons_.reserve(menuOptions.size());
         optionBounds_.resize(menuOptions.size());
 
@@ -146,6 +147,7 @@ namespace Paladin
             });
         }
 
+        toolbarBounds_ = {rowX, rowY, rowWidth, categoryButtonHeight};
         std::array<std::size_t, CategoryCount> stackOffsets{};
 
         for (std::size_t index = 0; index < menuOptions.size(); ++index)
@@ -232,6 +234,15 @@ namespace Paladin
     }
 
 
+    void CityHud::setSettlementStatus(bool hasKeep, std::size_t population) noexcept
+    {
+        population_ = population;
+        if (hasKeep_ && !hasKeep) closeCategoryMenus();
+        hasKeep_ = hasKeep;
+        for (std::size_t i = 0; i < bottomButtons_.size(); ++i)
+            bottomButtons_[i].setEnabled(i == 0 || hasKeep_);
+    }
+
     void CityHud::setCityInformation(
         std::string cityName,
         std::uint64_t day,
@@ -273,7 +284,7 @@ namespace Paladin
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
         const bool goodsCaptured = goodsButton_.pointerPressed(x, y);
-        bool captured = goodsCaptured || (goodsOpen_ && std::any_of(goodsCells_.begin(), goodsCells_.end(),
+        bool captured = toolbarBounds_.contains(x, y) || goodsCaptured || (goodsOpen_ && std::any_of(goodsCells_.begin(), goodsCells_.end(),
             [=](const auto& cell) { return cell.contains(x, y); })) || backButton_.pointerPressed(x, y)
             || cityNamePanel_.contains(x, y)
             || dayTimePanel_.contains(x, y)
@@ -312,7 +323,7 @@ namespace Paladin
             }
         }
 
-        if (goodsButton_.containsPoint(x, y)
+        if (toolbarBounds_.contains(x, y) || goodsButton_.containsPoint(x, y)
             || (goodsOpen_ && std::any_of(goodsCells_.begin(), goodsCells_.end(),
                 [=](const auto& cell) { return cell.contains(x, y); }))
             || backButton_.containsPoint(x, y)
@@ -355,12 +366,15 @@ namespace Paladin
             goodsOpen_ = !goodsOpen_;
             goodsButton_.setSelected(goodsOpen_);
         }
-        for (UiButton& button : topButtons_)
+        CityHudAction topAction = CityHudAction::None;
+        constexpr std::array topActions{CityHudAction::Employment, CityHudAction::Technology,
+            CityHudAction::Military, CityHudAction::Economy};
+        for (std::size_t i = 0; i < topButtons_.size(); ++i)
         {
-            // Connect destinations when these gameplay screens exist.
-            if (button.pointerReleased(x, y))
+            if (topButtons_[i].pointerReleased(x, y))
             {
                 closeCategoryMenus();
+                topAction = topActions[i];
             }
         }
 
@@ -419,6 +433,8 @@ namespace Paladin
             }
         }
 
+        if (topAction != CityHudAction::None) return topAction;
+
         if (backClicked)
         {
             closeCategoryMenus();
@@ -461,6 +477,13 @@ namespace Paladin
         uiRenderer.drawPanel(renderer, cityNamePanel_);
         uiRenderer.drawPanel(renderer, dayTimePanel_);
         uiRenderer.drawPanel(renderer, reservedPanel_);
+        const auto populationLabel = std::string("Population:") + (hasKeep_ ? " " + std::to_string(population_) : "");
+        const float populationScale = std::min(1.5F,
+            (reservedPanel_.width - 12) / (float(populationLabel.size()) * 6 - 1));
+        uiRenderer.drawLabel(renderer, populationLabel,
+            centeredLabelX(reservedPanel_, populationLabel, populationScale),
+            reservedPanel_.y + (reservedPanel_.height - 7 * populationScale) * .5F,
+            populationScale);
 
         const std::string visibleCityName = cityName_.empty()
             ? std::string("Unnamed City")
@@ -562,7 +585,7 @@ namespace Paladin
                 }
                 std::ostringstream amount;
                 amount << std::fixed << std::setprecision(0)
-                    << std::floor(std::max(0.0, i == 0 ? stoneAmount_ : woodAmount_));
+                    << std::floor(std::max(0.0, i == 0 ? stoneAmount_ : lumberAmount_));
                 const auto label = amount.str();
                 const float size = std::min(2.0F, (cell.width - 8) /
                     std::max(1.0F, float(label.size()) * 6 - 1));

@@ -19,6 +19,10 @@ namespace Paladin
         None,
         BeginObjectPlacement,
         BeginCommand,
+        Employment,
+        Technology,
+        Military,
+        Economy,
         Back
     };
 
@@ -38,10 +42,11 @@ namespace Paladin
             return minimapPanel_;
         }
 
-        void setGoodsAmounts(double stone, double wood) noexcept
+        void setSettlementStatus(bool hasKeep, std::size_t population) noexcept;
+        void setGoodsAmounts(double stone, double lumber) noexcept
         {
             stoneAmount_ = stone;
-            woodAmount_ = wood;
+            lumberAmount_ = lumber;
         }
 
         void pointerMoved(float x, float y) noexcept;
@@ -87,9 +92,12 @@ namespace Paladin
         UiButton goodsButton_{"Goods"};
         std::array<UiRectangle, 6> goodsCells_{};
         bool goodsOpen_ = false;
+        bool hasKeep_ = false;
+        std::size_t population_ = 8;
         double stoneAmount_ = 0;
-        double woodAmount_ = 0;
+        double lumberAmount_ = 0;
         std::array<UiButton, CategoryCount> bottomButtons_;
+        UiRectangle toolbarBounds_;
         std::vector<UiButton> optionButtons_;
         std::vector<UiRectangle> optionBounds_;
         std::size_t openCategory_ = CategoryCount;

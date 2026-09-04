@@ -46,7 +46,10 @@ namespace Paladin
     std::vector<SettlementTilePosition> SettlementNavigation::findPath(const SettlementMap& map,
         SettlementTilePosition start, SettlementTilePosition goal, const CitizenMovementPolicy& policy) const
     {
-        if (!map.grid().isValidPosition(start) || !walkable(map, goal)) return {};
+        if (!map.grid().isValidPosition(start) || !walkable(map, goal)
+            || !std::isfinite(policy.roadSpeedMultiplier) || policy.roadSpeedMultiplier <= 0
+            || !std::isfinite(policy.diagonalCost) || policy.diagonalCost < 1
+            || policy.diagonalCost > 2) return {};
         const int width = map.grid().width();
         const auto index = [width](SettlementTilePosition p) { return std::size_t(p.y) * width + p.x; };
         const auto position = [width](std::size_t i) { return SettlementTilePosition{int(i % width), int(i / width)}; };

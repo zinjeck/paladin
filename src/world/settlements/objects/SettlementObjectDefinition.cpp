@@ -7,10 +7,9 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::array<SettlementConstructionResourceCost, 2>
+        constexpr std::array<SettlementConstructionResourceCost, 1>
             initialConstructionResourceCosts{{
-                {SettlementResourceTypes::Lumber, 0},
-                {SettlementResourceTypes::Stone, 0}
+                {SettlementResourceTypes::Lumber, 4}
             }};
 
         constexpr std::array<SettlementObjectDefinition, 8>
@@ -42,7 +41,7 @@ namespace Paladin
                     true,
                     SettlementObjectPlacementLayer::Infrastructure,
                     {{74, 28, 11}, {143, 64, 26}, 1.0F, 1.0F},
-                    initialConstructionResourceCosts
+                    {}
                 },
                 {
                     SettlementObjectTypes::House,

@@ -12,6 +12,7 @@
 namespace Paladin
 {
     class SettlementMap;
+    class SettlementEmploymentState;
 
     enum class CitizenSex : std::uint8_t
     {
@@ -22,7 +23,9 @@ namespace Paladin
     enum class CitizenActivity : std::uint8_t
     {
         Idle,
-        AssignedToCommand
+        AssignedToCommand,
+        TravelingToWork,
+        AtWork
     };
 
     struct CitizenIdlePolicy
@@ -45,6 +48,9 @@ namespace Paladin
         SettlementTilePosition tilePosition{-1, -1};
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
+        std::uint16_t ageYears = 20; // No aging until the lifecycle system is enabled.
+        WorkplaceId workplaceId;
+        double nextWorkCheckMinutes = 0;
         SettlementTilePosition idleAnchor{-1, -1};
         SettlementTilePosition destination{-1, -1};
         std::vector<SettlementTilePosition> path;
@@ -94,12 +100,14 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t version() const noexcept;
 
+        void resetLocalPlacement() noexcept;
         void tickMovement(const SettlementMap& map, double gameMinutes);
         bool moveTo(CitizenId id, const SettlementMap& map, SettlementTilePosition destination);
         CitizenMovementPolicy movementPolicy;
         CitizenIdlePolicy idlePolicy;
 
     private:
+        friend class SettlementEmploymentState;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;

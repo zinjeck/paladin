@@ -89,16 +89,31 @@ void runSettlementActivityTests()
     PALADIN_CHECK(movementMap.objectState().placeCompletedObject(movementMap.grid(), *keep,
         {{10, 10}, keep->previewWidth, keep->previewHeight}));
     citizens.placeUnpositionedCitizens(movementMap);
+    citizens.idlePolicy.standProbability = 1;
     const auto id = citizens.citizens().front().id;
     PALADIN_CHECK(citizens.moveTo(id, movementMap, {2, 10}));
     const auto initial = citizens.citizen(id)->tilePosition;
+    citizens.tickMovement(movementMap, 0);
+    PALADIN_CHECK(citizens.citizen(id)->visualX() == initial.x);
     citizens.tickMovement(movementMap, .1);
     PALADIN_CHECK(citizens.citizen(id)->tilePosition == initial);
     PALADIN_CHECK(citizens.citizen(id)->visualX() != initial.x
         || citizens.citizen(id)->visualY() != initial.y);
     for (int i = 0; i < 400; ++i) citizens.tickMovement(movementMap, .1);
-    PALADIN_CHECK((citizens.citizen(id)->tilePosition == SettlementTilePosition{2, 10})
-        || citizens.citizen(id)->idleAnchor.x >= 0);
+    PALADIN_CHECK((citizens.citizen(id)->tilePosition == SettlementTilePosition{2, 10}));
+    PALADIN_CHECK(citizens.moveTo(id, movementMap, {8, 10}));
+    auto obstacle = *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
+    obstacle.previewWidth = obstacle.previewHeight = 1;
+    obstacle.minimumWidth = obstacle.minimumHeight = 1;
+    const auto blocked = citizens.citizen(id)->path.front();
+    PALADIN_CHECK(movementMap.objectState().createConstructionSites(
+        movementMap.grid(), obstacle, {blocked, 1, 1}));
+    for (int i = 0; i < 400; ++i)
+    {
+        citizens.tickMovement(movementMap, .1);
+        PALADIN_CHECK(citizens.citizen(id)->tilePosition != blocked);
+    }
+    PALADIN_CHECK((citizens.citizen(id)->tilePosition == SettlementTilePosition{8, 10}));
 
     SettlementCitizenState idleA, idleB;
     PALADIN_CHECK(idleA.initialize(4, 921));

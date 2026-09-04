@@ -84,7 +84,11 @@ namespace Paladin
             auto& state = settlement->simulationState();
             if (auto* map = settlementMap(detailedSimulationSettlementId_))
             {
+                map->employment().synchronize(map->objectState(), state.citizens());
+                map->employment().tickAttendance(*map, state.citizens(),
+                    world_->time().totalGameMinutes() + pendingGameMinutes_);
                 state.citizens().tickMovement(*map, gameDeltaMinutes);
+                map->employment().record(world_->time().totalGameMinutes(), state.citizens());
                 map->commandState().pruneInvalid(*map, state.citizens());
             }
         }
@@ -335,7 +339,8 @@ namespace Paladin
             world_->foundCapitalSettlement(
             position,
             playerPolityId_,
-            identity
+            identity,
+            playerSettlementFoundationProfile(world_->generationSeed())
         );
 
         if (settlementId.isValid())

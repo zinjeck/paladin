@@ -65,7 +65,7 @@ namespace Paladin
             profile.initialDetailedCitizenCount > 0 &&
             !citizens_.initialize(
                 profile.initialDetailedCitizenCount,
-                profile.initialPopulation
+                profile.citizenSeed ? profile.citizenSeed : profile.initialPopulation
             )
         )
         {
@@ -336,6 +336,7 @@ namespace Paladin
             return;
         }
 
+        citizens_.resetLocalPlacement();
         localMap_ = std::move(localMap);
         citizens_.placeUnpositionedCitizens(*localMap_);
         ++localMapVersion_;
@@ -349,6 +350,7 @@ namespace Paladin
             return;
         }
 
+        citizens_.resetLocalPlacement();
         localMap_.reset();
         ++localMapVersion_;
     }

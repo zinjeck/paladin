@@ -27,8 +27,6 @@ namespace Paladin
     {
         SettlementCommandId id;
         std::string commandTypeId;
-        SettlementObjectFootprint footprint;
-        CitizenId assignedCitizenId;
         std::vector<SettlementCommandTarget> targets;
     };
 

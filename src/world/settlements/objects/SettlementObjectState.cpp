@@ -55,6 +55,61 @@ namespace Paladin
     }
 
 
+    std::size_t SettlementObjectState::cancelConstructionWithin(
+        const SettlementObjectFootprint& area)
+    {
+        if (area.width <= 0 || area.height <= 0) return 0;
+        std::size_t removed = 0;
+        std::vector<SettlementConstructionSite> retained;
+        retained.reserve(constructionSites_.size());
+        for (const auto& site : constructionSites_)
+        {
+            if (!footprintsIntersect(area, site.footprint))
+            {
+                retained.push_back(site);
+                continue;
+            }
+            ++removed;
+            if (site.objectTypeId != SettlementObjectTypes::Road) continue;
+            // Road sites are compacted runs: cancel only the selected tiles.
+            const auto& f = site.footprint;
+            const int right = f.topLeft.x + f.width, bottom = f.topLeft.y + f.height;
+            const int leftCut = std::max(f.topLeft.x, area.topLeft.x);
+            const int topCut = std::max(f.topLeft.y, area.topLeft.y);
+            const int rightCut = std::min(right, area.topLeft.x + area.width);
+            const int bottomCut = std::min(bottom, area.topLeft.y + area.height);
+            const std::array<SettlementObjectFootprint, 4> pieces{{
+                {f.topLeft, f.width, topCut - f.topLeft.y},
+                {{f.topLeft.x, bottomCut}, f.width, bottom - bottomCut},
+                {{f.topLeft.x, topCut}, leftCut - f.topLeft.x, bottomCut - topCut},
+                {{rightCut, topCut}, right - rightCut, bottomCut - topCut}
+            }};
+            bool reusedId = false;
+            for (const auto& piece : pieces)
+            {
+                if (piece.width <= 0 || piece.height <= 0) continue;
+                auto remainder = site;
+                remainder.footprint = piece;
+                if (reusedId) remainder.id = constructionSiteIds_.generate();
+                reusedId = true;
+                retained.push_back(std::move(remainder));
+            }
+        }
+        if (removed == 0) return 0;
+        constructionSites_ = std::move(retained);
+        // Rebuild both layers so an overlapping road survives a cancelled structure.
+        std::fill(structureOccupiedTiles_.begin(), structureOccupiedTiles_.end(), 0);
+        std::fill(infrastructureOccupiedTiles_.begin(), infrastructureOccupiedTiles_.end(), 0);
+        for (const auto& object : completedObjects_)
+            if (const auto* definition = SettlementObjectCatalog::definition(object.objectTypeId))
+                occupy(*definition, object.footprint);
+        for (const auto& site : constructionSites_)
+            if (const auto* definition = SettlementObjectCatalog::definition(site.objectTypeId))
+                occupy(*definition, site.footprint);
+        ++presentationVersion_;
+        return removed;
+    }
+
     bool SettlementObjectFootprint::contains(
         SettlementTilePosition position
     ) const noexcept
@@ -104,6 +159,12 @@ namespace Paladin
     {
     }
 
+
+    bool SettlementObjectState::hasCityKeep() const noexcept
+    {
+        return std::any_of(completedObjects_.begin(), completedObjects_.end(),
+            [](const auto& object) { return object.objectTypeId == SettlementObjectTypes::CityKeep; });
+    }
 
     bool SettlementObjectState::canPlace(
         const SettlementGrid& grid,

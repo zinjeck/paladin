@@ -1,6 +1,7 @@
 #include <exception>
 #include <iostream>
 
+void runSettlementEmploymentTests();
 void runSettlementActivityTests();
 void runCoreTests();
 void runWorldTests();
@@ -10,6 +11,7 @@ int main()
 {
     try
     {
+        runSettlementEmploymentTests();
         runSettlementActivityTests();
         runCoreTests();
         runWorldTests();

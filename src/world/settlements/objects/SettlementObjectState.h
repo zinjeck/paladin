@@ -154,6 +154,8 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t presentationVersion() const noexcept;
 
+        bool hasCityKeep() const noexcept;
+        std::size_t cancelConstructionWithin(const SettlementObjectFootprint& area);
         bool blocksMovement(SettlementTilePosition position) const noexcept
         {
             return position.x < 0 || position.y < 0

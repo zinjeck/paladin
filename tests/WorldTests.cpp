@@ -846,6 +846,16 @@ void runWorldTests()
     Paladin::SettlementObjectPlacementController objectPlacement;
 
     PALADIN_CHECK(objectPlacement.beginPlacement(
+        Paladin::SettlementObjectTypes::CityKeep
+    ));
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{19, 10});
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{19, 10}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::CompletedObject
+    );
+    PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
+
+    PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::FishingGrounds
     ));
 
@@ -876,7 +886,7 @@ void runWorldTests()
         localMap.objectState().constructionSites().front().phase ==
             Paladin::ConstructionSitePhase::AwaitingMaterials
     );
-    PALADIN_CHECK(localMap.objectState().completedObjects().empty());
+    PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
 
     const Paladin::SettlementObjectDefinition* stockpileDefinition =
         Paladin::SettlementObjectCatalog::definition(
@@ -916,16 +926,12 @@ void runWorldTests()
         localMap.objectState().constructionSiteAt({8, 8});
     PALADIN_CHECK(houseSite != nullptr);
     PALADIN_CHECK(houseSite->progressPermille == 0);
-    PALADIN_CHECK(houseSite->resourceDeliveries.size() == 2);
+    PALADIN_CHECK(houseSite->resourceDeliveries.size() == 1);
     PALADIN_CHECK(
         houseSite->resourceDeliveries[0].resourceId ==
             Paladin::SettlementResourceTypes::Lumber
     );
-    PALADIN_CHECK(houseSite->resourceDeliveries[0].requiredAmount == 0);
-    PALADIN_CHECK(
-        houseSite->resourceDeliveries[1].resourceId ==
-            Paladin::SettlementResourceTypes::Stone
-    );
+    PALADIN_CHECK(houseSite->resourceDeliveries[0].requiredAmount == 4);
 
     Paladin::SettlementCitizenState citizens;
     Paladin::SettlementInspectionController inspection;
@@ -1015,15 +1021,6 @@ void runWorldTests()
     );
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 6);
 
-    PALADIN_CHECK(objectPlacement.beginPlacement(
-        Paladin::SettlementObjectTypes::CityKeep
-    ));
-    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{19, 10});
-    PALADIN_CHECK(
-        objectPlacement.pointerPressed({{19, 10}}, localMap)
-        == Paladin::SettlementPlacementCommitResult::CompletedObject
-    );
-    PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 6);
     PALADIN_CHECK(inspection.selectAt(
         {19, 10},

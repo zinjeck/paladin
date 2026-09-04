@@ -15,6 +15,7 @@
 #include "simulation/Simulation.h"
 #include "ui/GrayUiRenderer.h"
 #include "ui/CityHud.h"
+#include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/SimulationSpeedControls.h"
@@ -83,6 +84,7 @@ namespace Paladin
         worldHud_ =
             std::make_unique<WorldHud>();
 
+        employmentPanel_ = std::make_unique<EmploymentPanel>();
         cityHud_ =
             std::make_unique<CityHud>();
 
@@ -118,6 +120,7 @@ namespace Paladin
         simulation_.reset();
 
         worldHud_.reset();
+        employmentPanel_.reset();
         cityHud_.reset();
         simulationSpeedControls_.reset();
         foundingPanel_.reset();
@@ -373,8 +376,74 @@ namespace Paladin
 
                 if (screen_ == Screen::City)
                 {
+                    SettlementMap* currentMap = simulation_->settlementMap(activeCitySettlementId_);
+                    Settlement* currentSettlement = simulation_->world().settlement(activeCitySettlementId_);
+                    if (currentMap && currentSettlement)
+                    {
+                        auto& citizens = currentSettlement->simulationState().citizens();
+                        currentMap->employment().synchronize(currentMap->objectState(), citizens);
+                        currentMap->employment().record(simulation_->world().time().totalGameMinutes(), citizens);
+                        cityHud_->setSettlementStatus(currentMap->objectState().hasCityKeep(), citizens.citizens().size());
+                        if (settlementInspectionPanel_->editingName())
+                        {
+                            if (event.type == SDL_EVENT_TEXT_INPUT)
+                            {
+                                settlementInspectionPanel_->appendText(event.text.text);
+                                continue;
+                            }
+                            if (event.type == SDL_EVENT_KEY_DOWN)
+                            {
+                                if (event.key.scancode == SDL_SCANCODE_BACKSPACE)
+                                    settlementInspectionPanel_->backspace();
+                                else if (event.key.scancode == SDL_SCANCODE_RETURN || event.key.scancode == SDL_SCANCODE_KP_ENTER)
+                                    settlementInspectionPanel_->finishRename(*currentMap, true);
+                                else if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+                                    settlementInspectionPanel_->finishRename(*currentMap, false);
+                                if (!settlementInspectionPanel_->editingName()) SDL_StopTextInput(window_->nativeHandle());
+                                continue;
+                            }
+                        }
+                        if (employmentPanel_->isOpen())
+                        {
+                            if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
+                                || (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT))
+                            {
+                                employmentPanel_->close();
+                                employmentCapturedPointer_ = false;
+                                continue;
+                            }
+                            if (event.type == SDL_EVENT_MOUSE_WHEEL
+                                && employmentPanel_->containsPoint(event.wheel.mouse_x, event.wheel.mouse_y))
+                            {
+                                employmentPanel_->scroll(event.wheel.y);
+                                continue;
+                            }
+                            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
+                            {
+                                employmentCapturedPointer_ = employmentPanel_->pointerPressed(event.button.x, event.button.y);
+                                if (employmentCapturedPointer_) continue;
+                            }
+                            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT
+                                && employmentCapturedPointer_)
+                            {
+                                employmentPanel_->pointerReleased(event.button.x, event.button.y, *currentMap, citizens,
+                                    simulation_->world().time().totalGameMinutes());
+                                employmentCapturedPointer_ = false;
+                                if (const auto* workplace = currentMap->employment().workplace(employmentPanel_->takeFocusedWorkplace()))
+                                {
+                                    camera_->setPosition(workplace->footprint.topLeft.x + workplace->footprint.width * 0.5,
+                                        workplace->footprint.topLeft.y + workplace->footprint.height * 0.5);
+                                    clampCameraToWorld();
+                                    settlementInspectionController_->selectWorkplace(workplace->objectId, workplace->constructionId);
+                                    settlementInspectionPanel_->clearLayout();
+                                }
+                                continue;
+                            }
+                        }
+                    }
                     if (event.type == SDL_EVENT_MOUSE_MOTION)
                     {
+                        settlementInspectionPanel_->pointerMoved(event.motion.x, event.motion.y);
                         cityHud_->pointerMoved(
                             event.motion.x,
                             event.motion.y
@@ -481,7 +550,7 @@ namespace Paladin
                     )
                     {
                         const bool inspectionPanelCapturedPointer =
-                            settlementInspectionPanel_->containsPoint(
+                            settlementInspectionPanel_->pointerPressed(
                                 event.button.x,
                                 event.button.y
                             );
@@ -593,13 +662,34 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_LEFT
                     )
                     {
+                        if (currentMap && currentSettlement)
+                        {
+                            settlementInspectionPanel_->pointerReleased(event.button.x, event.button.y,
+                                *currentMap, currentSettlement->simulationState().citizens(),
+                                simulation_->world().time().totalGameMinutes());
+                            if (settlementInspectionPanel_->editingName()) SDL_StartTextInput(window_->nativeHandle());
+                            else SDL_StopTextInput(window_->nativeHandle());
+                        }
                         const CityHudAction action =
                             cityHud_->pointerReleased(
                                 event.button.x,
                                 event.button.y
                             );
 
-                        if (action == CityHudAction::Back)
+                        if (action == CityHudAction::Employment || action == CityHudAction::Technology
+                            || action == CityHudAction::Military || action == CityHudAction::Economy)
+                        {
+                            const auto section = action == CityHudAction::Technology ? "Technology"
+                                : action == CityHudAction::Military ? "Military"
+                                : action == CityHudAction::Economy ? "Economy" : "Employment";
+                            employmentPanel_->toggle(section);
+                            settlementInspectionController_->clear();
+                            settlementInspectionPanel_->clearLayout();
+                            SDL_StopTextInput(window_->nativeHandle());
+                            settlementObjectPlacementController_->cancelPlacement();
+                            settlementCommandController_->cancel();
+                        }
+                        else if (action == CityHudAction::Back)
                         {
                             returnToWorldFromCity();
                         }
@@ -1021,13 +1111,11 @@ namespace Paladin
 
             if (screen_ == Screen::City)
             {
-                updateCameraMovement(
-                    simulationClock_->frameDeltaSeconds()
-                );
-
-                updateCameraZoom(
-                    simulationClock_->frameDeltaSeconds()
-                );
+                if (!settlementInspectionPanel_->editingName())
+                {
+                    updateCameraMovement(simulationClock_->frameDeltaSeconds());
+                    updateCameraZoom(simulationClock_->frameDeltaSeconds());
+                }
 
                 if (settlementObjectPlacementController_->isActive())
                 {
@@ -1065,10 +1153,19 @@ namespace Paladin
 
                 renderer_->beginFrame();
 
-                const SettlementMap* settlementMap =
-                    simulation_->settlementMap(
-                        activeCitySettlementId_
-                    );
+                SettlementMap* settlementMap =
+                    simulation_->settlementMap(activeCitySettlementId_);
+                if (settlementMap)
+                {
+                    auto* owner = simulation_->world().settlement(activeCitySettlementId_);
+                    if (owner)
+                    {
+                        auto& citizens = owner->simulationState().citizens();
+                        settlementMap->employment().synchronize(settlementMap->objectState(), citizens);
+                        settlementMap->employment().record(simulation_->world().time().totalGameMinutes(), citizens);
+                        cityHud_->setSettlementStatus(settlementMap->objectState().hasCityKeep(), citizens.citizens().size());
+                    }
+                }
 
                 if (settlementMap)
                 {
@@ -1141,6 +1238,9 @@ namespace Paladin
                     *renderer_,
                     *grayUiRenderer_
                 );
+                if (settlementMap && citySettlement)
+                    employmentPanel_->render(*renderer_, *grayUiRenderer_, *settlementMap,
+                        citySettlement->simulationState().citizens(), worldTime.totalGameMinutes());
 
                 renderer_->endFrame();
                 continue;
@@ -1501,6 +1601,10 @@ namespace Paladin
         simulationControlsUnlocked_ = true;
         simulationControlsCapturedPointer_ = false;
         movingCapital_ = false;
+        employmentPanel_->close();
+        employmentCapturedPointer_ = false;
+        cityHud_->setSettlementStatus(settlementMap->objectState().hasCityKeep(),
+            simulation_->world().settlement(capitalId)->simulationState().citizens().citizens().size());
         screen_ = Screen::City;
 
         simulationSpeedControls_->layout(renderer_->outputWidth());
@@ -1514,6 +1618,8 @@ namespace Paladin
 
     void Application::returnToWorldFromCity()
     {
+        employmentPanel_->close();
+        SDL_StopTextInput(window_->nativeHandle());
         if (screen_ != Screen::City || !simulation_)
         {
             return;
@@ -2087,6 +2193,7 @@ namespace Paladin
         {
             return
                 cityHud_->containsInteractivePoint(x, y) ||
+                employmentPanel_->containsPoint(x, y) ||
                 settlementInspectionPanel_->containsPoint(x, y);
         }
 

@@ -1,6 +1,7 @@
 #include "ui/BitmapFontRenderer.h"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -59,6 +60,12 @@ namespace Paladin
                 case '8': return {14, 17, 17, 14, 17, 17, 14};
                 case '9': return {14, 17, 17, 15, 1, 1, 14};
 
+                case '<': return {2, 4, 8, 16, 8, 4, 2};
+                case '>': return {8, 4, 2, 1, 2, 4, 8};
+                case '%': return {25, 25, 2, 4, 8, 19, 19};
+                case '|': return {4, 4, 4, 4, 4, 4, 4};
+                case '(': return {2, 4, 8, 8, 8, 4, 2};
+                case ')': return {8, 4, 2, 2, 2, 4, 8};
                 case ':': return {0, 4, 4, 0, 4, 4, 0};
                 case '-': return {0, 0, 0, 31, 0, 0, 0};
                 case '+': return {0, 4, 4, 31, 4, 4, 0};
@@ -120,16 +127,13 @@ namespace Paladin
                         continue;
                     }
 
-                    rectangles.push_back({
-                        cursorX
-                            + static_cast<float>(column)
-                                * pixelSize,
-                        y
-                            + static_cast<float>(row)
-                                * pixelSize,
-                        pixelSize,
-                        pixelSize
-                    });
+                    // Shared rounded edges avoid gaps between adjacent
+                    // bitmap pixels when a label uses a fractional scale.
+                    const float left = std::round(cursorX + static_cast<float>(column) * pixelSize);
+                    const float top = std::round(y + static_cast<float>(row) * pixelSize);
+                    const float right = std::round(cursorX + static_cast<float>(column + 1) * pixelSize);
+                    const float bottom = std::round(y + static_cast<float>(row + 1) * pixelSize);
+                    rectangles.push_back({left, top, right - left, bottom - top});
                 }
             }
 

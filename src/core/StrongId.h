@@ -115,6 +115,7 @@ namespace Paladin
     struct SettlementObjectIdTag;
     struct ConstructionSiteIdTag;
     struct SettlementCommandIdTag;
+    struct WorkplaceIdTag;
 
     using SettlementId = StrongId<SettlementIdTag>;
     using PolityId = StrongId<PolityIdTag>;
@@ -123,5 +124,6 @@ namespace Paladin
     using CultureId = StrongId<CultureIdTag>;
     using SettlementObjectId = StrongId<SettlementObjectIdTag>;
     using ConstructionSiteId = StrongId<ConstructionSiteIdTag>;
+    using WorkplaceId = StrongId<WorkplaceIdTag>;
     using SettlementCommandId = StrongId<SettlementCommandIdTag>;
 }

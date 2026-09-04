@@ -88,6 +88,12 @@ namespace Paladin
     }
 
 
+    void Renderer::drawLine(float x1, float y1, float x2, float y2, RenderColor color)
+    {
+        SDL_SetRenderDrawColor(renderer_, color.red, color.green, color.blue, color.alpha);
+        SDL_RenderLine(renderer_, x1, y1, x2, y2);
+    }
+
     void Renderer::fillRectangles(
         std::span<const RenderRectangle> rectangles,
         RenderColor color

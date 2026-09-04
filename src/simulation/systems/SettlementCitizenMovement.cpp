@@ -15,6 +15,27 @@ namespace Paladin
         return tilePosition.y + (pathIndex < path.size()
             ? (path[pathIndex].y - tilePosition.y) * std::clamp(stepProgress / stepDuration, 0.0, 1.0) : 0);
     }
+    void SettlementCitizenState::resetLocalPlacement() noexcept
+    {
+        navigation_ = {};
+        decisionCursor_ = 0;
+        for (auto& citizen : citizens_)
+        {
+            citizen.tilePosition = {-1, -1};
+            citizen.idleAnchor = {-1, -1};
+            citizen.destination = {-1, -1};
+            citizen.path.clear();
+            citizen.pathIndex = 0;
+            citizen.stepProgress = 0;
+            citizen.idleWait = -1;
+            citizen.explicitMovement = false;
+            citizen.assignedCommandId = {};
+        citizen.workplaceId = {};
+        citizen.nextWorkCheckMinutes = 0;
+            citizen.activity = CitizenActivity::Idle;
+        }
+        ++version_;
+    }
     bool SettlementCitizenState::moveTo(CitizenId id, const SettlementMap& map,
         SettlementTilePosition destination)
     {
@@ -27,6 +48,8 @@ namespace Paladin
             citizen.path = std::move(path);
             citizen.pathIndex = 0;
             citizen.stepProgress = 0;
+            citizen.stepDuration = navigation_.stepCost(map, citizen.tilePosition,
+                citizen.path.front(), movementPolicy);
             citizen.destination = destination;
             citizen.explicitMovement = true;
             ++version_;
@@ -38,13 +61,17 @@ namespace Paladin
     {
         if (!std::isfinite(minutes) || minutes <= 0 || citizens_.empty()
             || !std::isfinite(movementPolicy.tilesPerGameMinute)
-            || movementPolicy.tilesPerGameMinute <= 0) return;
+            || movementPolicy.tilesPerGameMinute <= 0
+            || !std::isfinite(movementPolicy.roadSpeedMultiplier)
+            || movementPolicy.roadSpeedMultiplier <= 0
+            || !std::isfinite(movementPolicy.diagonalCost)
+            || movementPolicy.diagonalCost < 1 || movementPolicy.diagonalCost > 2) return;
         navigation_.synchronize(map);
         std::size_t requests = 0;
         for (auto& citizen : citizens_)
         {
             if (!map.grid().isValidPosition(citizen.tilePosition)) continue;
-            if (citizen.idleWait >= 0) citizen.idleWait -= minutes;
+            if (citizen.idleWait >= 0) citizen.idleWait = std::max(0.0, citizen.idleWait - minutes);
             double travel = minutes * movementPolicy.tilesPerGameMinute;
             while (citizen.pathIndex < citizen.path.size())
             {

@@ -7,6 +7,7 @@
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 
+#include "world/generation/GenerationNoise.h"
 #include <algorithm>
 #include <cmath>
 #include <array>
@@ -94,11 +95,11 @@ namespace Paladin
 
         behaviorSeed_ = nameSeed;
         citizens_.reserve(static_cast<std::size_t>(citizenCount));
-        const std::uint64_t maleCount = citizenCount / 2;
+
 
         for (std::uint64_t index = 0; index < citizenCount; ++index)
         {
-            const CitizenSex sex = index < maleCount
+            const CitizenSex sex = (GenerationNoise::mix(nameSeed ^ (index * 104729ULL)) & 1U) == 0
                 ? CitizenSex::Male
                 : CitizenSex::Female;
             const auto& names = sex == CitizenSex::Male

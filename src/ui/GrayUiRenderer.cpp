@@ -64,7 +64,7 @@ namespace Paladin
 
         if (!enabled)
         {
-            fillColor = {56, 56, 59, 220};
+            fillColor = {56, 56, 59, 85};
         }
         else if (selected)
         {
@@ -86,7 +86,7 @@ namespace Paladin
             bounds.y,
             bounds.width,
             bounds.height,
-            {150, 150, 156, 255}
+            {150, 150, 156, static_cast<std::uint8_t>(enabled ? 255 : 100)}
         );
 
         renderer.fillRectangle(
@@ -98,7 +98,7 @@ namespace Paladin
         );
 
         constexpr float preferredTextPixelSize = 3.0F;
-        constexpr float horizontalTextPadding = 20.0F;
+        const float horizontalTextPadding = text.size() == 1 ? 8.0F : 20.0F;
 
         const float textWidthAtPreferredSize =
             fontRenderer_.measureWidth(

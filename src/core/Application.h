@@ -12,6 +12,7 @@ namespace Paladin
 {
     class Camera2D;
     class CityHud;
+    class EmploymentPanel;
     class CityRenderer;
     class GrayUiRenderer;
     class FoundingPanel;
@@ -93,6 +94,8 @@ namespace Paladin
         std::unique_ptr<MainMenu> mainMenu_;
         std::unique_ptr<WorldHud> worldHud_;
         std::unique_ptr<CityHud> cityHud_;
+        std::unique_ptr<EmploymentPanel> employmentPanel_;
+        bool employmentCapturedPointer_ = false;
         std::unique_ptr<SimulationSpeedControls>
             simulationSpeedControls_;
         std::unique_ptr<FoundingPanel> foundingPanel_;

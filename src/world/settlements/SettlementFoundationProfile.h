@@ -13,6 +13,7 @@ namespace Paladin
     struct SettlementFoundationProfile
     {
         std::uint64_t initialPopulation = 100;
+        std::uint64_t citizenSeed = 0;
         std::uint64_t initialDetailedCitizenCount = 8;
         DemographicRates demographicRates;
         std::vector<StockpileEntry> initialResources;
@@ -23,4 +24,5 @@ namespace Paladin
 
     [[nodiscard]]
     SettlementFoundationProfile defaultSettlementFoundationProfile();
+    SettlementFoundationProfile playerSettlementFoundationProfile(std::uint64_t seed);
 }

@@ -3,6 +3,20 @@
 
 namespace Paladin
 {
+    SettlementFoundationProfile playerSettlementFoundationProfile(std::uint64_t seed)
+    {
+        auto profile = defaultSettlementFoundationProfile();
+        profile.initialPopulation = profile.initialDetailedCitizenCount;
+        profile.citizenSeed = seed;
+        // Player goods will come from concrete tasks/production, not passive
+        // per-resident placeholder flows.
+        profile.resourceFlowRates.clear();
+        // Aggregate births/deaths would invent residents without citizen records.
+        // A later lifecycle system will create/remove both together.
+        profile.demographicRates = {0, 0, 0, 0, 0};
+        return profile;
+    }
+
     SettlementFoundationProfile defaultSettlementFoundationProfile()
     {
         SettlementFoundationProfile profile;

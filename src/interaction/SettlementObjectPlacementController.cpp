@@ -183,6 +183,7 @@ namespace Paladin
 
         return
             definition &&
+            (settlementMap.objectState().hasCityKeep() || definition->id == SettlementObjectTypes::CityKeep) &&
             footprint &&
             settlementMap.objectState().canPlace(
                 settlementMap.grid(),
@@ -255,6 +256,8 @@ namespace Paladin
     )
     {
         SettlementObjectState& state = settlementMap.objectState();
+        if (!state.hasCityKeep() && definition.id != SettlementObjectTypes::CityKeep)
+            return SettlementPlacementCommitResult::None;
         SettlementPlacementCommitResult result =
             SettlementPlacementCommitResult::None;
 
