@@ -69,6 +69,13 @@ namespace Paladin
         std::optional<SettlementObjectFootprint>
         currentFootprint() const noexcept;
 
+        [[nodiscard]]
+        SettlementPlacementCommitResult commitFootprint(
+            const SettlementObjectDefinition& definition,
+            const SettlementObjectFootprint& footprint,
+            SettlementMap& settlementMap
+        );
+
         std::string activeObjectTypeId_;
         std::optional<WorldTilePosition> hoveredPosition_;
         std::optional<WorldTilePosition> dragStart_;

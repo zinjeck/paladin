@@ -81,53 +81,44 @@ namespace Paladin
     {
         const SettlementObjectDefinition* definition = activeDefinition();
 
-        if (!definition || !position)
+        if (!definition)
         {
             return SettlementPlacementCommitResult::None;
         }
 
         if (lockedFootprint_)
         {
-            if (!lockedFootprint_->contains(*position))
-            {
-                return SettlementPlacementCommitResult::None;
-            }
-
-            SettlementObjectState& state = settlementMap.objectState();
-            SettlementPlacementCommitResult result =
-                SettlementPlacementCommitResult::None;
-
-            if (definition->bypassesConstruction)
-            {
-                if (state.placeCompletedObject(
-                    settlementMap.grid(),
-                    *definition,
-                    *lockedFootprint_
-                ))
-                {
-                    result =
-                        SettlementPlacementCommitResult::CompletedObject;
-                }
-            }
-            else if (state.createConstructionSites(
-                settlementMap.grid(),
+            return commitFootprint(
                 *definition,
-                *lockedFootprint_
-            ))
-            {
-                result =
-                    SettlementPlacementCommitResult::ConstructionSites;
-            }
+                *lockedFootprint_,
+                settlementMap
+            );
+        }
 
-            if (result != SettlementPlacementCommitResult::None)
-            {
-                cancelPlacement();
-            }
-
-            return result;
+        if (!position)
+        {
+            return SettlementPlacementCommitResult::None;
         }
 
         hoveredPosition_ = position;
+
+        if (
+            definition->selectionMode ==
+                SettlementFootprintSelectionMode::Fixed
+        )
+        {
+            const std::optional<SettlementObjectFootprint> footprint =
+                currentFootprint();
+
+            return footprint
+                ? commitFootprint(
+                    *definition,
+                    *footprint,
+                    settlementMap
+                )
+                : SettlementPlacementCommitResult::None;
+        }
+
         dragStart_ = position;
         dragging_ = true;
         return SettlementPlacementCommitResult::None;
@@ -253,5 +244,45 @@ namespace Paladin
             right - left + 1,
             bottom - top + 1
         };
+    }
+
+
+    SettlementPlacementCommitResult
+    SettlementObjectPlacementController::commitFootprint(
+        const SettlementObjectDefinition& definition,
+        const SettlementObjectFootprint& footprint,
+        SettlementMap& settlementMap
+    )
+    {
+        SettlementObjectState& state = settlementMap.objectState();
+        SettlementPlacementCommitResult result =
+            SettlementPlacementCommitResult::None;
+
+        if (definition.bypassesConstruction)
+        {
+            if (state.placeCompletedObject(
+                settlementMap.grid(),
+                definition,
+                footprint
+            ))
+            {
+                result = SettlementPlacementCommitResult::CompletedObject;
+            }
+        }
+        else if (state.createConstructionSites(
+            settlementMap.grid(),
+            definition,
+            footprint
+        ))
+        {
+            result = SettlementPlacementCommitResult::ConstructionSites;
+        }
+
+        if (result != SettlementPlacementCommitResult::None)
+        {
+            cancelPlacement();
+        }
+
+        return result;
     }
 }

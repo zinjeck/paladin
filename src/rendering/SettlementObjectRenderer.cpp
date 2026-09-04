@@ -230,6 +230,98 @@ namespace Paladin
             return;
         }
 
+        if (definition->allowsPartialPlacement)
+        {
+            std::vector<TileOverlayRenderItem> tileOverlays;
+            tileOverlays.reserve(
+                static_cast<std::size_t>(preview->height) + 1U
+            );
+
+            // Paint the selectable area once, then cover only contiguous
+            // blocked runs. This keeps a large road drag independent of its
+            // valid tile count instead of issuing one draw per tile.
+            tileOverlays.push_back({
+                static_cast<double>(preview->topLeft.x),
+                static_cast<double>(preview->topLeft.y),
+                static_cast<double>(preview->width),
+                static_cast<double>(preview->height),
+                {55, 135, 225, 145}
+            });
+
+            for (
+                std::int32_t y = preview->topLeft.y;
+                y < preview->topLeft.y + preview->height;
+                ++y
+            )
+            {
+                std::optional<std::int32_t> blockedRunStart;
+
+                for (
+                    std::int32_t x = preview->topLeft.x;
+                    x <= preview->topLeft.x + preview->width;
+                    ++x
+                )
+                {
+                    const bool inFootprint =
+                        x < preview->topLeft.x + preview->width;
+
+                    const bool blocked =
+                        inFootprint &&
+                        settlementMap.objectState().placementStatusAt(
+                            settlementMap.grid(),
+                            *definition,
+                            {x, y}
+                        ) != SettlementTilePlacementStatus::Buildable;
+
+                    if (blocked && !blockedRunStart)
+                    {
+                        blockedRunStart = x;
+                    }
+                    else if (!blocked && blockedRunStart)
+                    {
+                        tileOverlays.push_back({
+                            static_cast<double>(*blockedRunStart),
+                            static_cast<double>(y),
+                            static_cast<double>(x - *blockedRunStart),
+                            1.0,
+                            {232, 70, 70, 185}
+                        });
+
+                        blockedRunStart.reset();
+                    }
+                }
+            }
+
+            const std::array<TileOutlineRenderItem, 1> selectionOutline{{
+                {
+                    static_cast<double>(preview->topLeft.x),
+                    static_cast<double>(preview->topLeft.y),
+                    static_cast<double>(preview->width),
+                    static_cast<double>(preview->height),
+                    2.0F,
+                    placementController.hasLockedFootprint()
+                        ? RenderColor{242, 202, 78, 245}
+                        : RenderColor{80, 160, 245, 245}
+                }
+            }};
+
+            overlayRenderer_.render(
+                renderer,
+                tileOverlays,
+                camera,
+                metrics
+            );
+
+            overlayRenderer_.renderOutlines(
+                renderer,
+                selectionOutline,
+                camera,
+                metrics
+            );
+
+            return;
+        }
+
         const bool valid =
             placementController.visibleFootprintIsValid(settlementMap);
 
