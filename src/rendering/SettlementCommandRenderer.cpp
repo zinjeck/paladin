@@ -27,21 +27,16 @@ namespace Paladin
 
         for (const SettlementCommand& command : state.commands())
         {
-            overlays.push_back({
-                static_cast<double>(command.footprint.topLeft.x),
-                static_cast<double>(command.footprint.topLeft.y),
-                static_cast<double>(command.footprint.width),
-                static_cast<double>(command.footprint.height),
-                {255, 199, 31, 28}
-            });
-            outlines.push_back({
-                static_cast<double>(command.footprint.topLeft.x),
-                static_cast<double>(command.footprint.topLeft.y),
-                static_cast<double>(command.footprint.width),
-                static_cast<double>(command.footprint.height),
-                1.0F,
-                {255, 214, 64, 150}
-            });
+            for (const auto& target : command.targets)
+            {
+                if (!target.objectId && !target.constructionId) continue;
+                const auto& footprint = target.footprint;
+                overlays.push_back({
+                    double(footprint.topLeft.x), double(footprint.topLeft.y),
+                    double(footprint.width), double(footprint.height),
+                    {255, 199, 31, 65}
+                });
+            }
         }
 
         overlayRenderer_.render(renderer, overlays, camera, metrics);

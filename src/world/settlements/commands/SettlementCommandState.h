@@ -14,6 +14,14 @@
 namespace Paladin
 {
     class SettlementCitizenState;
+    class SettlementMap;
+
+    struct SettlementCommandTarget
+    {
+        SettlementObjectFootprint footprint;
+        SettlementObjectId objectId;
+        ConstructionSiteId constructionId;
+    };
 
     struct SettlementCommand
     {
@@ -21,6 +29,7 @@ namespace Paladin
         std::string commandTypeId;
         SettlementObjectFootprint footprint;
         CitizenId assignedCitizenId;
+        std::vector<SettlementCommandTarget> targets;
     };
 
     class SettlementCommandState
@@ -28,7 +37,7 @@ namespace Paladin
     public:
         [[nodiscard]]
         bool add(
-            const SettlementGrid& grid,
+            SettlementMap& map,
             std::string_view commandTypeId,
             const SettlementObjectFootprint& footprint,
             SettlementCitizenState& citizens
@@ -36,6 +45,7 @@ namespace Paladin
 
         [[nodiscard]]
         std::size_t cancelIntersecting(
+            SettlementMap& map,
             const SettlementObjectFootprint& footprint,
             SettlementCitizenState& citizens
         );
@@ -46,7 +56,11 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t version() const noexcept;
 
+        void pruneInvalid(SettlementMap& map, SettlementCitizenState& citizens);
+
     private:
+        std::uint64_t prunedObjects_ = ~std::uint64_t(0);
+        std::uint64_t prunedFeatures_ = ~std::uint64_t(0);
         std::vector<SettlementCommand> commands_;
         IdGenerator<SettlementCommandId> commandIds_;
         std::uint64_t version_ = 0;

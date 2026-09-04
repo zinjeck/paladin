@@ -349,7 +349,7 @@ namespace Paladin
             }
         }
 
-        return std::make_unique<SettlementMap>(
+        auto result = std::make_unique<SettlementMap>(
             std::move(cityGrid),
             sourceRegionCenter,
             sourceRegionWidth,
@@ -357,5 +357,7 @@ namespace Paladin
             settings.localTilesPerWorldTile,
             seed
         );
+        result->naturalFeatures().generate(result->grid(), seed);
+        return result;
     }
 }

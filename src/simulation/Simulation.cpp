@@ -79,6 +79,16 @@ namespace Paladin
             return;
         }
 
+        if (Settlement* settlement = world_->settlement(detailedSimulationSettlementId_))
+        {
+            auto& state = settlement->simulationState();
+            if (auto* map = settlementMap(detailedSimulationSettlementId_))
+            {
+                state.citizens().tickMovement(*map, gameDeltaMinutes);
+                map->commandState().pruneInvalid(*map, state.citizens());
+            }
+        }
+
         pendingGameMinutes_ += gameDeltaMinutes;
 
         const double wholeMinutes = std::floor(pendingGameMinutes_);

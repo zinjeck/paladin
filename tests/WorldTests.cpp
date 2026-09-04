@@ -1074,10 +1074,11 @@ void runWorldTests()
         inspection.selectedCitizen(citizens) ==
             &citizens.citizens().front()
     );
+    localMap.naturalFeatures().set({0, 0}, Paladin::NaturalFeatureKind::Tree);
     PALADIN_CHECK(
         localMap.commandState().add(
-            localMap.grid(),
-            Paladin::SettlementCommandTypes::Gather,
+            localMap,
+            Paladin::SettlementCommandTypes::ChopTree,
             {{0, 0}, 24, 24},
             citizens
         )
@@ -1085,10 +1086,11 @@ void runWorldTests()
     PALADIN_CHECK(localMap.commandState().commands().size() == 1);
     PALADIN_CHECK(
         citizens.citizens().front().activity ==
-            Paladin::CitizenActivity::AssignedToCommand
+            Paladin::CitizenActivity::Idle
     );
     PALADIN_CHECK(
         localMap.commandState().cancelIntersecting(
+            localMap,
             {{0, 0}, 1, 1},
             citizens
         ) == 1

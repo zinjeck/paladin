@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/SettlementGrid.h"
+#include "world/settlements/SettlementNaturalFeatures.h"
 #include "world/WorldTilePosition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 #include "world/settlements/commands/SettlementCommandState.h"
@@ -54,8 +55,12 @@ namespace Paladin
         [[nodiscard]]
         const SettlementCommandState& commandState() const noexcept;
 
+        SettlementNaturalFeatures& naturalFeatures() noexcept { return naturalFeatures_; }
+        const SettlementNaturalFeatures& naturalFeatures() const noexcept { return naturalFeatures_; }
+
     private:
         SettlementGrid grid_;
+        SettlementNaturalFeatures naturalFeatures_;
         SettlementObjectState objectState_;
         SettlementCommandState commandState_;
         WorldTilePosition sourceRegionCenter_;

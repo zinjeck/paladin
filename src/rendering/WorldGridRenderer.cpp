@@ -96,6 +96,23 @@ namespace Paladin
     }
 
 
+    void WorldGridRenderer::renderOverview(
+        Renderer& renderer,
+        float x, float y, float width, float height
+    ) const
+    {
+        if (cachedTerrainTexture_ && width > 0.0F && height > 0.0F)
+        {
+            renderer.drawTexture(
+                *cachedTerrainTexture_, 0.0F, 0.0F,
+                static_cast<float>(cachedTerrainTexture_->width()),
+                static_cast<float>(cachedTerrainTexture_->height()),
+                x, y, width, height
+            );
+        }
+    }
+
+
     template<typename Grid>
     void WorldGridRenderer::renderGrid(
         Renderer& renderer,

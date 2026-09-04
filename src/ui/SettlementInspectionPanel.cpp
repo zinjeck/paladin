@@ -135,13 +135,19 @@ namespace Paladin
         const float totalHeight = objectPanelHeight
             + constructionPanelHeight;
 
+        Camera2D panelCamera = camera;
+        if (citizen)
+        {
+            panelCamera.move(citizen->tilePosition.x - citizen->visualX(),
+                citizen->tilePosition.y - citizen->visualY());
+        }
         renderedBounds_ = anchoredBounds(
             footprint,
             controller.placePanelOnRight(),
             panelWidth,
             totalHeight,
             renderer,
-            camera,
+            panelCamera,
             metrics
         );
         hasRenderedBounds_ = true;

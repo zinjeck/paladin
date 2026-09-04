@@ -38,6 +38,7 @@ add_executable(Paladin
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
     src/rendering/CityRenderer.cpp
+    src/rendering/SettlementNaturalFeatureRenderer.cpp
     src/rendering/Texture.cpp
     src/rendering/SpriteRenderer.cpp
     src/rendering/OverlayRenderer.cpp
@@ -64,6 +65,9 @@ add_executable(Paladin
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/settlements/SettlementNaturalFeatures.cpp
+    src/simulation/systems/SettlementNavigation.cpp
+    src/simulation/systems/SettlementCitizenMovement.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementResourceDefinition.cpp
@@ -121,6 +125,7 @@ enable_testing()
 
 add_executable(PaladinTests
     tests/TestMain.cpp
+    tests/SettlementActivityTests.cpp
     tests/CoreTests.cpp
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
@@ -137,6 +142,9 @@ add_executable(PaladinTests
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/settlements/SettlementNaturalFeatures.cpp
+    src/simulation/systems/SettlementNavigation.cpp
+    src/simulation/systems/SettlementCitizenMovement.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementResourceDefinition.cpp

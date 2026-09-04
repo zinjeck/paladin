@@ -13,6 +13,7 @@ namespace Paladin
         std::uint64_t generationSeed
     ) noexcept
         : grid_(std::move(grid)),
+          naturalFeatures_(grid_.width(), grid_.height()),
           objectState_(grid_.width(), grid_.height()),
           sourceRegionCenter_(sourceRegionCenter),
           sourceRegionWidth_(sourceRegionWidth),

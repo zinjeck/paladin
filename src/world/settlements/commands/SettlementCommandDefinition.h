@@ -5,11 +5,13 @@
 
 namespace Paladin
 {
+    enum class CommandTargetKind { Tree, Rock, Gatherable, Animal, Object };
+
     struct SettlementCommandDefinition
     {
         std::string_view id;
         std::string_view displayName;
-        bool assignsCitizen = true;
+        CommandTargetKind targetKind = CommandTargetKind::Tree;
     };
 
     namespace SettlementCommandTypes

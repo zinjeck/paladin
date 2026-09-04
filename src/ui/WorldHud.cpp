@@ -53,15 +53,15 @@ namespace Paladin
         });
 
         backButton_.setBounds({
-            16.0F,
-            static_cast<float>(viewportHeight) - height - 16.0F,
+            0.0F,
+            static_cast<float>(viewportHeight) - height,
             140.0F,
             height
         });
 
         playButton_.setBounds({
-            static_cast<float>(viewportWidth) - 140.0F - 16.0F,
-            static_cast<float>(viewportHeight) - height - 16.0F,
+            static_cast<float>(viewportWidth) - 140.0F,
+            static_cast<float>(viewportHeight) - height,
             140.0F,
             height
         });

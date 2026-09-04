@@ -9,7 +9,7 @@ namespace Paladin
 {
     namespace
     {
-        constexpr float buttonSide = 36.0F;
+        constexpr float buttonSide = SimulationSpeedControls::ButtonSide;
 
         bool nearlyEqual(double left, double right) noexcept
         {
@@ -31,17 +31,12 @@ namespace Paladin
 
     void SimulationSpeedControls::layout(int viewportWidth) noexcept
     {
-        const float rowWidth =
-            buttonSide * static_cast<float>(ButtonCount);
-
-        const float rowX =
-            (static_cast<float>(viewportWidth) - rowWidth) * 0.5F;
-
         for (std::size_t index = 0; index < buttons_.size(); ++index)
         {
             bounds_[index] = {
-                rowX + static_cast<float>(index) * buttonSide,
-                8.0F,
+                static_cast<float>(viewportWidth)
+                    - static_cast<float>(index + 1) * buttonSide,
+                0.0F,
                 buttonSide,
                 buttonSide
             };

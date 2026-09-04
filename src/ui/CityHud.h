@@ -32,6 +32,18 @@ namespace Paladin
             int viewportHeight
         ) noexcept;
 
+        [[nodiscard]]
+        const UiRectangle& minimapBounds() const noexcept
+        {
+            return minimapPanel_;
+        }
+
+        void setGoodsAmounts(double stone, double wood) noexcept
+        {
+            stoneAmount_ = stone;
+            woodAmount_ = wood;
+        }
+
         void pointerMoved(float x, float y) noexcept;
 
         void setCityInformation(
@@ -70,6 +82,13 @@ namespace Paladin
         void closeCategoryMenus() noexcept;
 
         UiButton backButton_;
+        std::array<UiButton, 4> topButtons_;
+        UiRectangle minimapPanel_;
+        UiButton goodsButton_{"Goods"};
+        std::array<UiRectangle, 6> goodsCells_{};
+        bool goodsOpen_ = false;
+        double stoneAmount_ = 0;
+        double woodAmount_ = 0;
         std::array<UiButton, CategoryCount> bottomButtons_;
         std::vector<UiButton> optionButtons_;
         std::vector<UiRectangle> optionBounds_;

@@ -154,6 +154,13 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t presentationVersion() const noexcept;
 
+        bool blocksMovement(SettlementTilePosition position) const noexcept
+        {
+            return position.x < 0 || position.y < 0
+                || position.x >= mapWidth_ || position.y >= mapHeight_
+                || structureOccupiedTiles_[tileIndex(position)] != 0;
+        }
+
     private:
         [[nodiscard]]
         bool footprintSizeIsAllowed(

@@ -8,6 +8,7 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstddef>
 #include <deque>
@@ -91,6 +92,7 @@ namespace Paladin
             return false;
         }
 
+        behaviorSeed_ = nameSeed;
         citizens_.reserve(static_cast<std::size_t>(citizenCount));
         const std::uint64_t maleCount = citizenCount / 2;
 
@@ -267,6 +269,8 @@ namespace Paladin
 
             citizen.activity = CitizenActivity::AssignedToCommand;
             citizen.assignedCommandId = commandId;
+            citizen.path.clear();
+            citizen.stepProgress = 0;
             ++version_;
             return citizen.id;
         }
@@ -289,6 +293,7 @@ namespace Paladin
 
             citizen.activity = CitizenActivity::Idle;
             citizen.assignedCommandId = {};
+            citizen.idleWait = -1;
             changed = true;
         }
 
@@ -332,7 +337,8 @@ namespace Paladin
             citizens_.rend(),
             [position](const SettlementCitizen& citizen)
             {
-                return citizen.tilePosition == position;
+                return SettlementTilePosition{int(std::floor(citizen.visualX() + .5)),
+                    int(std::floor(citizen.visualY() + .5))} == position;
             }
         );
 

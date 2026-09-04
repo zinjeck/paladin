@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "simulation/systems/SettlementNavigation.h"
 #include "world/SettlementTilePosition.h"
 
 #include <cstdint>
@@ -24,6 +25,18 @@ namespace Paladin
         AssignedToCommand
     };
 
+    struct CitizenIdlePolicy
+    {
+        double minimumWaitMinutes = 5;
+        double maximumWaitMinutes = 15;
+        double standProbability = .35;
+        int anchorRadius = 4;
+        int destinationRadius = 4;
+        std::size_t maximumPathSteps = 6;
+        std::size_t maximumExpandedNodes = 96;
+        std::size_t decisionsPerTick = 64;
+    };
+
     struct SettlementCitizen
     {
         CitizenId id;
@@ -32,6 +45,17 @@ namespace Paladin
         SettlementTilePosition tilePosition{-1, -1};
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
+        SettlementTilePosition idleAnchor{-1, -1};
+        SettlementTilePosition destination{-1, -1};
+        std::vector<SettlementTilePosition> path;
+        std::size_t pathIndex = 0;
+        double stepProgress = 0;
+        double stepDuration = 1;
+        double idleWait = -1;
+        std::uint64_t choiceSequence = 0;
+        bool explicitMovement = false;
+        double visualX() const noexcept;
+        double visualY() const noexcept;
     };
 
     class SettlementCitizenState
@@ -70,7 +94,15 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t version() const noexcept;
 
+        void tickMovement(const SettlementMap& map, double gameMinutes);
+        bool moveTo(CitizenId id, const SettlementMap& map, SettlementTilePosition destination);
+        CitizenMovementPolicy movementPolicy;
+        CitizenIdlePolicy idlePolicy;
+
     private:
+        SettlementNavigation navigation_;
+        std::uint64_t behaviorSeed_ = 0;
+        std::size_t decisionCursor_ = 0;
         std::vector<SettlementCitizen> citizens_;
         IdGenerator<CitizenId> citizenIds_;
         std::uint64_t version_ = 0;

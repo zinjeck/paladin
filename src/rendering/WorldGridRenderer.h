@@ -37,6 +37,12 @@ namespace Paladin
             const TileRenderMetrics& metrics
         ) const;
 
+        // Reuses the terrain texture populated by render().
+        void renderOverview(
+            Renderer& renderer,
+            float x, float y, float width, float height
+        ) const;
+
     private:
         template<typename Grid>
         void renderGrid(

@@ -22,6 +22,8 @@ namespace Paladin
     class SimulationSpeedControls
     {
     public:
+        static constexpr float ButtonSide = 48.0F;
+        static constexpr float RowWidth = ButtonSide * 4;
         SimulationSpeedControls();
 
         void layout(int viewportWidth) noexcept;

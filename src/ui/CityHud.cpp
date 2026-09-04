@@ -1,4 +1,8 @@
 #include "ui/CityHud.h"
+#include "ui/SimulationSpeedControls.h"
+#include <cmath>
+#include <sstream>
+#include <iomanip>
 
 #include "rendering/Renderer.h"
 #include "ui/GrayUiRenderer.h"
@@ -82,6 +86,12 @@ namespace Paladin
 
     CityHud::CityHud()
         : backButton_("Back"),
+          topButtons_{
+              UiButton("Employment"),
+              UiButton("Technology"),
+              UiButton("Military"),
+              UiButton("Economy")
+          },
           bottomButtons_{
               UiButton("Rule"),
               UiButton("Roads"),
@@ -156,29 +166,66 @@ namespace Paladin
         }
 
         backButton_.setBounds({
-            16.0F,
-            static_cast<float>(viewportHeight) - backHeight - 16.0F,
+            0.0F,
+            static_cast<float>(viewportHeight) - backHeight,
             backWidth,
             backHeight
         });
 
         cityNamePanel_ = {
-            16.0F,
-            16.0F,
+            0.0F,
+            0.0F,
             informationWidth,
             informationTopHeight
         };
 
         dayTimePanel_ = {
-            16.0F,
-            16.0F + informationTopHeight,
+            0.0F,
+            informationTopHeight,
             informationWidth * 0.5F,
             informationBottomHeight
         };
 
+        const float topButtonWidth = std::clamp(
+            (static_cast<float>(viewportWidth) - informationWidth - SimulationSpeedControls::RowWidth)
+                / static_cast<float>(topButtons_.size()),
+            0.0F, 140.0F
+        );
+        for (std::size_t index = 0; index < topButtons_.size(); ++index)
+        {
+            topButtons_[index].setBounds({
+                informationWidth + static_cast<float>(index) * topButtonWidth,
+                0.0F, topButtonWidth, 44.0F
+            });
+        }
+
+        const float goodsWidth = 144.0F;
+        const float goodsX = static_cast<float>(viewportWidth) - goodsWidth;
+        goodsButton_.setBounds({goodsX, SimulationSpeedControls::ButtonSide, goodsWidth, 32.0F});
+        for (std::size_t i = 0; i < goodsCells_.size(); ++i)
+        {
+            goodsCells_[i] = {
+                goodsX + static_cast<float>(i % 2) * 72.0F,
+                SimulationSpeedControls::ButtonSide + 32.0F
+                    + static_cast<float>(i / 2) * 58.0F,
+                72.0F, 58.0F
+            };
+        }
+
+        // Reserve the corner without covering the construction toolbar.
+        const float minimapSide = std::max(0.0F, std::min({
+            220.0F, rowX - 8.0F,
+            static_cast<float>(viewportHeight) - 100.0F
+        }));
+        minimapPanel_ = {
+            static_cast<float>(viewportWidth) - minimapSide,
+            static_cast<float>(viewportHeight) - minimapSide,
+            minimapSide, minimapSide
+        };
+
         reservedPanel_ = {
-            16.0F + informationWidth * 0.5F,
-            16.0F + informationTopHeight,
+            informationWidth * 0.5F,
+            informationTopHeight,
             informationWidth * 0.5F,
             informationBottomHeight
         };
@@ -202,6 +249,11 @@ namespace Paladin
     void CityHud::pointerMoved(float x, float y) noexcept
     {
         backButton_.pointerMoved(x, y);
+        goodsButton_.pointerMoved(x, y);
+        for (UiButton& button : topButtons_)
+        {
+            button.pointerMoved(x, y);
+        }
 
         for (UiButton& button : bottomButtons_)
         {
@@ -220,7 +272,17 @@ namespace Paladin
 
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
-        bool captured = backButton_.pointerPressed(x, y);
+        const bool goodsCaptured = goodsButton_.pointerPressed(x, y);
+        bool captured = goodsCaptured || (goodsOpen_ && std::any_of(goodsCells_.begin(), goodsCells_.end(),
+            [=](const auto& cell) { return cell.contains(x, y); })) || backButton_.pointerPressed(x, y)
+            || cityNamePanel_.contains(x, y)
+            || dayTimePanel_.contains(x, y)
+            || reservedPanel_.contains(x, y)
+            || minimapPanel_.contains(x, y);
+        for (UiButton& button : topButtons_)
+        {
+            captured = button.pointerPressed(x, y) || captured;
+        }
 
         for (UiButton& button : bottomButtons_)
         {
@@ -242,7 +304,22 @@ namespace Paladin
 
     bool CityHud::containsInteractivePoint(float x, float y) const noexcept
     {
-        if (backButton_.containsPoint(x, y))
+        for (const UiButton& button : topButtons_)
+        {
+            if (button.containsPoint(x, y))
+            {
+                return true;
+            }
+        }
+
+        if (goodsButton_.containsPoint(x, y)
+            || (goodsOpen_ && std::any_of(goodsCells_.begin(), goodsCells_.end(),
+                [=](const auto& cell) { return cell.contains(x, y); }))
+            || backButton_.containsPoint(x, y)
+            || cityNamePanel_.contains(x, y)
+            || dayTimePanel_.contains(x, y)
+            || reservedPanel_.contains(x, y)
+            || minimapPanel_.contains(x, y))
         {
             return true;
         }
@@ -273,6 +350,19 @@ namespace Paladin
     CityHudAction CityHud::pointerReleased(float x, float y) noexcept
     {
         const bool backClicked = backButton_.pointerReleased(x, y);
+        if (goodsButton_.pointerReleased(x, y))
+        {
+            goodsOpen_ = !goodsOpen_;
+            goodsButton_.setSelected(goodsOpen_);
+        }
+        for (UiButton& button : topButtons_)
+        {
+            // Connect destinations when these gameplay screens exist.
+            if (button.pointerReleased(x, y))
+            {
+                closeCategoryMenus();
+            }
+        }
 
         for (std::size_t index = 0; index < bottomButtons_.size(); ++index)
         {
@@ -445,6 +535,41 @@ namespace Paladin
         );
 
         backButton_.render(renderer, uiRenderer);
+        for (const UiButton& button : topButtons_)
+        {
+            button.render(renderer, uiRenderer);
+        }
+        uiRenderer.drawPanel(renderer, minimapPanel_);
+        goodsButton_.render(renderer, uiRenderer);
+        if (goodsOpen_)
+        {
+            for (const auto& cell : goodsCells_) uiRenderer.drawPanel(renderer, cell);
+            for (std::size_t i = 0; i < 2; ++i)
+            {
+                const auto& cell = goodsCells_[i];
+                const float x = cell.x + cell.width * .5F;
+                const float y = cell.y + 9.0F;
+                const RenderColor edge = i == 0 ? RenderColor{67, 69, 73, 255}
+                    : RenderColor{75, 43, 23, 255};
+                const RenderColor fill = i == 0 ? RenderColor{164, 168, 174, 255}
+                    : RenderColor{157, 105, 54, 255};
+                renderer.fillRectangle(x - 10, y, 20, 20, edge);
+                renderer.fillRectangle(x - 7, y + 3, 14, 14, fill);
+                if (i == 1)
+                {
+                    renderer.fillRectangle(x - 4, y + 4, 2, 12, edge);
+                    renderer.fillRectangle(x + 3, y + 4, 2, 12, edge);
+                }
+                std::ostringstream amount;
+                amount << std::fixed << std::setprecision(0)
+                    << std::floor(std::max(0.0, i == 0 ? stoneAmount_ : woodAmount_));
+                const auto label = amount.str();
+                const float size = std::min(2.0F, (cell.width - 8) /
+                    std::max(1.0F, float(label.size()) * 6 - 1));
+                uiRenderer.drawLabel(renderer, label,
+                    centeredLabelX(cell, label, size), cell.y + 38, size);
+            }
+        }
 
         for (const UiButton& button : bottomButtons_)
         {

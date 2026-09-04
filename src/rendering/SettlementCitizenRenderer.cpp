@@ -25,11 +25,11 @@ namespace Paladin
         {
             const double centerX =
                 static_cast<double>(renderer.outputWidth()) * 0.5 +
-                (static_cast<double>(citizen.tilePosition.x) + 0.5 -
+                (citizen.visualX() + 0.5 -
                     camera.tileX()) * tilePixels;
             const double centerY =
                 static_cast<double>(renderer.outputHeight()) * 0.5 +
-                (static_cast<double>(citizen.tilePosition.y) + 0.5 -
+                (citizen.visualY() + 0.5 -
                     camera.tileY()) * tilePixels;
 
             if (

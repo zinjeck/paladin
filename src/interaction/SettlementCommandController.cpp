@@ -100,13 +100,14 @@ namespace Paladin
         if (isCancelMode())
         {
             return settlementMap.commandState().cancelIntersecting(
+                settlementMap,
                 *footprint,
                 citizens
             ) > 0;
         }
 
         return settlementMap.commandState().add(
-            settlementMap.grid(),
+            settlementMap,
             commandTypeId_,
             *footprint,
             citizens

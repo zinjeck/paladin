@@ -280,6 +280,7 @@ namespace Paladin
 
         if (result != SettlementPlacementCommitResult::None)
         {
+            settlementMap.naturalFeatures().clear(footprint);
             cancelPlacement();
         }
 

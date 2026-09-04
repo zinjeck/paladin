@@ -1121,10 +1121,21 @@ namespace Paladin
                     worldTime.minute()
                 );
 
+                cityHud_->setGoodsAmounts(
+                    citySettlement ? citySettlement->simulationState().stockpile().amount("stone") : 0,
+                    citySettlement ? citySettlement->simulationState().stockpile().amount("lumber") : 0
+                );
                 cityHud_->render(
                     *renderer_,
                     *grayUiRenderer_
                 );
+                if (settlementMap)
+                {
+                    cityRenderer_->renderMinimap(
+                        *renderer_, *settlementMap, *camera_,
+                        *tileRenderMetrics_, cityHud_->minimapBounds()
+                    );
+                }
 
                 simulationSpeedControls_->render(
                     *renderer_,
