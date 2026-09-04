@@ -9,6 +9,14 @@ namespace Paladin
     {
     }
 
+    void SimulationClock::reset() noexcept
+    {
+        frameDeltaSeconds_ = 0.0;
+        accumulatorSeconds_ = 0.0;
+        previousTimeSeconds_ = 0.0;
+        firstFrame_ = true;
+    }
+
     void SimulationClock::beginFrame()
     {
         frameDeltaSeconds_ = 0.0;

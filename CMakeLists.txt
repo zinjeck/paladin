@@ -38,6 +38,11 @@ add_executable(Paladin
     src/world/generation/TerrainBiomeClassifier.cpp
     src/world/generation/WorldGenerator.cpp
     src/rendering/WorldGridRenderer.cpp
+    src/ui/BitmapFontRenderer.cpp
+    src/ui/GrayUiRenderer.cpp
+    src/ui/UiButton.cpp
+    src/ui/MainMenu.cpp
+    src/ui/WorldHud.cpp
 )
 
 target_include_directories(Paladin PRIVATE

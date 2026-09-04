@@ -4,6 +4,22 @@
 
 namespace Paladin
 {
+    void SettlementPlacementController::beginSelection() noexcept
+    {
+        selecting_ = true;
+    }
+
+    void SettlementPlacementController::cancelSelection() noexcept
+    {
+        selecting_ = false;
+        hoveredPosition_.reset();
+    }
+
+    bool SettlementPlacementController::isSelecting() const noexcept
+    {
+        return selecting_;
+    }
+
     void SettlementPlacementController::setHoveredPosition(
         std::optional<WorldPosition> position
     ) noexcept
@@ -22,6 +38,7 @@ namespace Paladin
     ) const noexcept
     {
         return
+            selecting_ &&
             hoveredPosition_.has_value() &&
             world.canFoundSettlementAt(*hoveredPosition_);
     }
@@ -31,14 +48,22 @@ namespace Paladin
         PolityId ownerPolityId
     )
     {
-        if (!hoveredPosition_)
+        if (!selecting_ || !hoveredPosition_)
         {
             return {};
         }
 
-        return world.foundSettlement(
-            *hoveredPosition_,
-            ownerPolityId
-        );
+        const SettlementId settlementId =
+            world.foundSettlement(
+                *hoveredPosition_,
+                ownerPolityId
+            );
+
+        if (settlementId.isValid())
+        {
+            cancelSelection();
+        }
+
+        return settlementId;
     }
 }

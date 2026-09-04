@@ -12,6 +12,12 @@ namespace Paladin
     class SettlementPlacementController
     {
     public:
+        void beginSelection() noexcept;
+        void cancelSelection() noexcept;
+
+        [[nodiscard]]
+        bool isSelecting() const noexcept;
+
         void setHoveredPosition(
             std::optional<WorldPosition> position
         ) noexcept;
@@ -31,6 +37,7 @@ namespace Paladin
         );
 
     private:
+        bool selecting_ = false;
         std::optional<WorldPosition> hoveredPosition_;
     };
 }

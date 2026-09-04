@@ -3,14 +3,17 @@
 #include "core/SimulationClock.h"
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
+#include "rendering/Camera2D.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
-#include "simulation/Simulation.h"
-#include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
-
+#include "simulation/Simulation.h"
+#include "ui/GrayUiRenderer.h"
+#include "ui/MainMenu.h"
+#include "ui/WorldHud.h"
 #include "world/World.h"
+
 #include <SDL3/SDL.h>
 
 #include <array>
@@ -61,27 +64,14 @@ namespace Paladin
         simulationClock_ =
             std::make_unique<SimulationClock>(20.0);
 
-        simulation_ =
-            std::make_unique<Simulation>();
+        grayUiRenderer_ =
+            std::make_unique<GrayUiRenderer>();
 
-        camera_ =
-            std::make_unique<Camera2D>(
-                static_cast<double>(
-                    simulation_->world().grid().width()
-                ) * 0.5,
-                static_cast<double>(
-                    simulation_->world().grid().height()
-                ) * 0.5
-            );
+        mainMenu_ =
+            std::make_unique<MainMenu>();
 
-        settlementPlacementController_ =
-            std::make_unique<SettlementPlacementController>();
-        
-        worldRenderer_ =
-            std::make_unique<WorldRenderer>();
-        
-        tileRenderMetrics_ =
-            std::make_unique<TileRenderMetrics>();
+        worldHud_ =
+            std::make_unique<WorldHud>();
     }
 
     Application::~Application()
@@ -90,8 +80,11 @@ namespace Paladin
         worldRenderer_.reset();
         settlementPlacementController_.reset();
         camera_.reset();
-
         simulation_.reset();
+
+        worldHud_.reset();
+        mainMenu_.reset();
+        grayUiRenderer_.reset();
         simulationClock_.reset();
         renderer_.reset();
         window_.reset();
@@ -109,11 +102,9 @@ namespace Paladin
             !window_ ||
             !renderer_ ||
             !simulationClock_ ||
-            !simulation_ ||
-            !camera_ ||
-            !settlementPlacementController_ ||
-            !worldRenderer_ ||
-            !tileRenderMetrics_
+            !grayUiRenderer_ ||
+            !mainMenu_ ||
+            !worldHud_
         )
         {
             return 1;
@@ -125,6 +116,18 @@ namespace Paladin
         {
             simulationClock_->beginFrame();
 
+            if (screen_ == Screen::MainMenu)
+            {
+                mainMenu_->layout(
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+            }
+            else
+            {
+                worldHud_->layout(renderer_->outputWidth());
+            }
+
             SDL_Event event;
 
             while (SDL_PollEvent(&event))
@@ -132,6 +135,71 @@ namespace Paladin
                 if (event.type == SDL_EVENT_QUIT)
                 {
                     running = false;
+                    continue;
+                }
+
+                if (screen_ == Screen::MainMenu)
+                {
+                    if (event.type == SDL_EVENT_MOUSE_MOTION)
+                    {
+                        mainMenu_->pointerMoved(
+                            event.motion.x,
+                            event.motion.y
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        mainMenu_->pointerPressed(
+                            event.button.x,
+                            event.button.y
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        const MainMenuAction action =
+                            mainMenu_->pointerReleased(
+                                event.button.x,
+                                event.button.y
+                            );
+
+                        if (action == MainMenuAction::Play)
+                        {
+                            startWorldSession();
+                        }
+                        else if (action == MainMenuAction::Exit)
+                        {
+                            running = false;
+                        }
+
+                        // Tutorial intentionally has no action yet.
+                    }
+
+                    continue;
+                }
+
+                if (event.type == SDL_EVENT_MOUSE_MOTION)
+                {
+                    worldHud_->pointerMoved(
+                        event.motion.x,
+                        event.motion.y
+                    );
+                }
+
+                if (
+                    event.type == SDL_EVENT_KEY_DOWN &&
+                    event.key.scancode == SDL_SCANCODE_ESCAPE
+                )
+                {
+                    settlementPlacementController_
+                        ->cancelSelection();
                 }
 
                 if (event.type == SDL_EVENT_MOUSE_WHEEL)
@@ -170,31 +238,90 @@ namespace Paladin
 
                 if (
                     event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                    event.button.button == SDL_BUTTON_RIGHT
+                )
+                {
+                    settlementPlacementController_
+                        ->cancelSelection();
+                }
+
+                if (
+                    event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
                     event.button.button == SDL_BUTTON_LEFT
                 )
                 {
-                    updateSettlementPlacementHover(
-                        static_cast<double>(event.button.x),
-                        static_cast<double>(event.button.y)
-                    );
-
-                    const SettlementId foundedSettlementId =
-                        settlementPlacementController_
-                            ->tryFoundSettlement(
-                                simulation_->world(),
-                                simulation_->playerPolityId()
-                            );
-
-                    if (foundedSettlementId.isValid())
-                    {
-                        SDL_Log(
-                            "Founded settlement %llu.",
-                            static_cast<unsigned long long>(
-                                foundedSettlementId.value()
-                            )
+                    const bool hudCapturedPointer =
+                        worldHud_->pointerPressed(
+                            event.button.x,
+                            event.button.y
                         );
+
+                    if (
+                        !hudCapturedPointer &&
+                        settlementPlacementController_->isSelecting()
+                    )
+                    {
+                        updateSettlementPlacementHover(
+                            static_cast<double>(event.button.x),
+                            static_cast<double>(event.button.y)
+                        );
+
+                        const SettlementId foundedSettlementId =
+                            settlementPlacementController_
+                                ->tryFoundSettlement(
+                                    simulation_->world(),
+                                    simulation_->playerPolityId()
+                                );
+
+                        if (foundedSettlementId.isValid())
+                        {
+                            SDL_Log(
+                                "Founded settlement %llu.",
+                                static_cast<unsigned long long>(
+                                    foundedSettlementId.value()
+                                )
+                            );
+                        }
                     }
                 }
+
+                if (
+                    event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                    event.button.button == SDL_BUTTON_LEFT
+                )
+                {
+                    if (
+                        worldHud_->pointerReleased(
+                            event.button.x,
+                            event.button.y
+                        )
+                    )
+                    {
+                        settlementPlacementController_
+                            ->beginSelection();
+                    }
+                }
+            }
+
+            if (!running)
+            {
+                break;
+            }
+
+            if (screen_ == Screen::MainMenu)
+            {
+                while (simulationClock_->shouldTick())
+                {
+                    simulationClock_->consumeTick();
+                }
+
+                renderer_->beginFrame();
+                mainMenu_->render(
+                    *renderer_,
+                    *grayUiRenderer_
+                );
+                renderer_->endFrame();
+                continue;
             }
 
             updateCameraMovement(
@@ -205,15 +332,18 @@ namespace Paladin
                 simulationClock_->frameDeltaSeconds()
             );
 
-            float mouseX = 0.0F;
-            float mouseY = 0.0F;
+            if (settlementPlacementController_->isSelecting())
+            {
+                float mouseX = 0.0F;
+                float mouseY = 0.0F;
 
-            SDL_GetMouseState(&mouseX, &mouseY);
+                SDL_GetMouseState(&mouseX, &mouseY);
 
-            updateSettlementPlacementHover(
-                static_cast<double>(mouseX),
-                static_cast<double>(mouseY)
-            );
+                updateSettlementPlacementHover(
+                    static_cast<double>(mouseX),
+                    static_cast<double>(mouseY)
+                );
+            }
 
             while (simulationClock_->shouldTick())
             {
@@ -232,7 +362,10 @@ namespace Paladin
             const std::optional<WorldPosition> hoveredPosition =
                 settlementPlacementController_->hoveredPosition();
 
-            if (hoveredPosition)
+            if (
+                settlementPlacementController_->isSelecting() &&
+                hoveredPosition
+            )
             {
                 const bool validPlacement =
                     settlementPlacementController_
@@ -265,10 +398,44 @@ namespace Paladin
                 )
             );
 
+            worldHud_->render(
+                *renderer_,
+                *grayUiRenderer_,
+                settlementPlacementController_->isSelecting()
+            );
+
             renderer_->endFrame();
         }
 
         return 0;
+    }
+
+    void Application::startWorldSession()
+    {
+        simulation_ =
+            std::make_unique<Simulation>();
+
+        camera_ =
+            std::make_unique<Camera2D>(
+                static_cast<double>(
+                    simulation_->world().grid().width()
+                ) * 0.5,
+                static_cast<double>(
+                    simulation_->world().grid().height()
+                ) * 0.5
+            );
+
+        settlementPlacementController_ =
+            std::make_unique<SettlementPlacementController>();
+
+        worldRenderer_ =
+            std::make_unique<WorldRenderer>();
+
+        tileRenderMetrics_ =
+            std::make_unique<TileRenderMetrics>();
+
+        simulationClock_->reset();
+        screen_ = Screen::World;
     }
 
     void Application::updateCameraMovement(

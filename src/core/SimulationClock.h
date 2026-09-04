@@ -7,6 +7,7 @@ namespace Paladin
     public:
         explicit SimulationClock(double ticksPerSecond);
 
+        void reset() noexcept;
         void beginFrame();
 
         bool shouldTick() const;
