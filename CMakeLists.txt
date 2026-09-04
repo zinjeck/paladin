@@ -21,6 +21,7 @@ add_executable(Paladin
     src/core/Application.cpp
     src/core/SimulationClock.cpp
     src/interaction/CameraNavigationPolicy.cpp
+    src/interaction/SettlementObjectPlacementController.cpp
     src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
@@ -30,6 +31,7 @@ add_executable(Paladin
     src/rendering/OverlayRenderer.cpp
     src/rendering/WorldRenderer.cpp
     src/rendering/SettlementMarkerRenderer.cpp
+    src/rendering/SettlementObjectRenderer.cpp
     src/rendering/TerritoryPresentationPolicy.cpp
     src/rendering/TerritoryRenderer.cpp
     src/simulation/Simulation.cpp
@@ -54,6 +56,8 @@ add_executable(Paladin
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/settlements/objects/SettlementObjectDefinition.cpp
+    src/world/settlements/objects/SettlementObjectState.cpp
     src/world/territory/TerritoryFoundationPolicy.cpp
     src/world/territory/TerritoryFoundationSystem.cpp
     src/world/territory/TerritoryMap.cpp
@@ -65,6 +69,7 @@ add_executable(Paladin
     src/ui/UiButton.cpp
     src/ui/UiTextField.cpp
     src/ui/MainMenu.cpp
+    src/ui/SimulationSpeedControls.cpp
     src/ui/WorldHud.cpp
 )
 
@@ -111,12 +116,15 @@ add_executable(PaladinTests
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/settlements/objects/SettlementObjectDefinition.cpp
+    src/world/settlements/objects/SettlementObjectState.cpp
     src/world/territory/TerritoryFoundationPolicy.cpp
     src/world/territory/TerritoryFoundationSystem.cpp
     src/world/territory/TerritoryMap.cpp
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
+    src/interaction/SettlementObjectPlacementController.cpp
 )
 
 target_include_directories(PaladinTests PRIVATE

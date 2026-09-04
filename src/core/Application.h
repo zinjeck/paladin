@@ -2,8 +2,10 @@
 
 #include "core/StrongId.h"
 #include "interaction/CameraNavigationPolicy.h"
+#include "world/WorldTilePosition.h"
 
 #include <memory>
+#include <optional>
 
 namespace Paladin
 {
@@ -15,8 +17,10 @@ namespace Paladin
     class MainMenu;
     class Renderer;
     class SettlementPlacementController;
+    class SettlementObjectPlacementController;
     class Simulation;
     class SimulationClock;
+    class SimulationSpeedControls;
     class Window;
     class WorldHud;
     class WorldRenderer;
@@ -61,6 +65,12 @@ namespace Paladin
         [[nodiscard]]
         bool activeHudContainsPoint(float x, float y) const noexcept;
 
+        [[nodiscard]]
+        std::optional<WorldTilePosition> cityTileAtScreen(
+            double screenX,
+            double screenY
+        ) const noexcept;
+
         void updateSettlementPlacementHover(
             double screenX,
             double screenY
@@ -83,12 +93,16 @@ namespace Paladin
         std::unique_ptr<MainMenu> mainMenu_;
         std::unique_ptr<WorldHud> worldHud_;
         std::unique_ptr<CityHud> cityHud_;
+        std::unique_ptr<SimulationSpeedControls>
+            simulationSpeedControls_;
         std::unique_ptr<FoundingPanel> foundingPanel_;
 
         std::unique_ptr<Simulation> simulation_;
         std::unique_ptr<Camera2D> camera_;
         std::unique_ptr<SettlementPlacementController>
             settlementPlacementController_;
+        std::unique_ptr<SettlementObjectPlacementController>
+            settlementObjectPlacementController_;
         std::unique_ptr<WorldRenderer> worldRenderer_;
         std::unique_ptr<CityRenderer> cityRenderer_;
         std::unique_ptr<TileRenderMetrics>
@@ -100,5 +114,8 @@ namespace Paladin
         bool movingCapital_ = false;
         std::unique_ptr<Camera2D> savedWorldCamera_;
         SettlementId activeCitySettlementId_;
+        bool cityHudCapturedPointer_ = false;
+        bool simulationControlsUnlocked_ = false;
+        bool simulationControlsCapturedPointer_ = false;
     };
 }

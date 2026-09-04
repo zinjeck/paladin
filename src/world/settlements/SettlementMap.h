@@ -2,6 +2,7 @@
 
 #include "world/WorldGrid.h"
 #include "world/WorldPosition.h"
+#include "world/settlements/objects/SettlementObjectState.h"
 
 #include <cstdint>
 
@@ -40,8 +41,15 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t generationSeed() const noexcept;
 
+        [[nodiscard]]
+        SettlementObjectState& objectState() noexcept;
+
+        [[nodiscard]]
+        const SettlementObjectState& objectState() const noexcept;
+
     private:
         WorldGrid grid_;
+        SettlementObjectState objectState_;
         WorldPosition sourceRegionCenter_;
         std::int32_t sourceRegionWidth_ = 0;
         std::int32_t sourceRegionHeight_ = 0;

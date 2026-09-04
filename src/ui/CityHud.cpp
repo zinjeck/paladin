@@ -2,6 +2,7 @@
 
 #include "rendering/Renderer.h"
 #include "ui/GrayUiRenderer.h"
+#include "world/settlements/objects/SettlementObjectDefinition.h"
 
 #include <algorithm>
 #include <array>
@@ -21,55 +22,43 @@ namespace Paladin
         struct MenuOptionDefinition
         {
             std::size_t category = 0;
-            std::string_view label;
+            std::string_view objectTypeId;
+            std::string_view commandLabel;
             std::string_view firstLine;
             std::string_view secondLine;
-            bool hasObjectIcon = false;
-            RenderColor frameColor;
-            RenderColor fillColor;
-            float footprintWidth = 1.0F;
-            float footprintHeight = 1.0F;
         };
 
         constexpr std::array<MenuOptionDefinition, 14> menuOptions{{
             {
-                0, "City Keep", "City", "Keep", true,
-                {82, 77, 61, 255}, {219, 214, 194, 255}, 3.0F, 7.0F
+                0, SettlementObjectTypes::CityKeep, "", "City", "Keep"
             },
             {
-                1, "Road", "Road", "", true,
-                {74, 28, 11, 255}, {143, 64, 26, 255}, 1.0F, 1.0F
+                1, SettlementObjectTypes::Road, "", "Road", ""
             },
             {
-                2, "House", "House", "", true,
-                {82, 77, 61, 255}, {219, 214, 194, 255}, 3.0F, 3.0F
+                2, SettlementObjectTypes::House, "", "House", ""
             },
             {
-                3, "Stockpile", "Stockpile", "", true,
-                {117, 77, 31, 255}, {209, 163, 82, 255}, 2.0F, 2.0F
+                3, SettlementObjectTypes::Stockpile, "", "Stockpile", ""
             },
             {
-                4, "Fishing Grounds", "Fishing", "Grounds", true,
-                {15, 87, 102, 255}, {46, 158, 179, 255}, 3.0F, 3.0F
+                4, SettlementObjectTypes::FishingGrounds, "", "Fishing", "Grounds"
             },
             {
-                4, "Wheat Farm", "Wheat", "Farm", true,
-                {115, 87, 15, 255}, {214, 176, 46, 255}, 2.0F, 2.0F
+                4, SettlementObjectTypes::WheatFarm, "", "Wheat", "Farm"
             },
             {
-                4, "Pastureland", "Pastureland", "", true,
-                {56, 97, 31, 255}, {115, 176, 71, 255}, 4.0F, 4.0F
+                4, SettlementObjectTypes::Pastureland, "", "Pastureland", ""
             },
             {
-                4, "Bakery", "Bakery", "", true,
-                {74, 77, 79, 255}, {156, 158, 163, 255}, 3.0F, 3.0F
+                4, SettlementObjectTypes::Bakery, "", "Bakery", ""
             },
-            {5, "Cancel Task", "", "", false, {}, {}, 1.0F, 1.0F},
-            {5, "Demolish", "", "", false, {}, {}, 1.0F, 1.0F},
-            {5, "Hunt", "", "", false, {}, {}, 1.0F, 1.0F},
-            {5, "Gather", "", "", false, {}, {}, 1.0F, 1.0F},
-            {5, "Chop Trees", "", "", false, {}, {}, 1.0F, 1.0F},
-            {5, "Collect Rocks", "", "", false, {}, {}, 1.0F, 1.0F}
+            {5, "", "Cancel Task", "", ""},
+            {5, "", "Demolish", "", ""},
+            {5, "", "Hunt", "", ""},
+            {5, "", "Gather", "", ""},
+            {5, "", "Chop Trees", "", ""},
+            {5, "", "Collect Rocks", "", ""}
         }};
 
         float centeredLabelX(
@@ -106,9 +95,9 @@ namespace Paladin
         for (const MenuOptionDefinition& option : menuOptions)
         {
             optionButtons_.emplace_back(
-                option.hasObjectIcon
+                !option.objectTypeId.empty()
                     ? std::string()
-                    : std::string(option.label)
+                    : std::string(option.commandLabel)
             );
         }
     }
@@ -304,15 +293,23 @@ namespace Paladin
             }
         }
 
+        selectedObjectTypeId_.clear();
+
         for (std::size_t index = 0; index < optionButtons_.size(); ++index)
         {
             if (optionIsVisible(index))
             {
-                // These buttons intentionally expose the future object and
-                // command vocabulary without activating placement yet.
-                static_cast<void>(
-                    optionButtons_[index].pointerReleased(x, y)
-                );
+                const bool clicked =
+                    optionButtons_[index].pointerReleased(x, y);
+
+                if (
+                    clicked &&
+                    !menuOptions[index].objectTypeId.empty()
+                )
+                {
+                    selectedObjectTypeId_ =
+                        menuOptions[index].objectTypeId;
+                }
             }
             else
             {
@@ -327,7 +324,19 @@ namespace Paladin
             return CityHudAction::Back;
         }
 
+        if (!selectedObjectTypeId_.empty())
+        {
+            closeCategoryMenus();
+            return CityHudAction::BeginObjectPlacement;
+        }
+
         return CityHudAction::None;
+    }
+
+
+    std::string_view CityHud::selectedObjectTypeId() const noexcept
+    {
+        return selectedObjectTypeId_;
     }
 
 
@@ -409,7 +418,12 @@ namespace Paladin
 
             const MenuOptionDefinition& definition = menuOptions[index];
 
-            if (!definition.hasObjectIcon)
+            const SettlementObjectDefinition* objectDefinition =
+                SettlementObjectCatalog::definition(
+                    definition.objectTypeId
+                );
+
+            if (!objectDefinition)
             {
                 continue;
             }
@@ -424,12 +438,14 @@ namespace Paladin
                 ? bounds.height - 14.0F
                 : (isRoad ? 18.0F : 36.0F);
             const float scale = std::min(
-                maximumIconWidth / definition.footprintWidth,
-                maximumIconHeight / definition.footprintHeight
+                maximumIconWidth / objectDefinition->visual.iconWidth,
+                maximumIconHeight / objectDefinition->visual.iconHeight
             );
 
-            const float iconWidth = definition.footprintWidth * scale;
-            const float iconHeight = definition.footprintHeight * scale;
+            const float iconWidth =
+                objectDefinition->visual.iconWidth * scale;
+            const float iconHeight =
+                objectDefinition->visual.iconHeight * scale;
             const float iconX = bounds.x + (bounds.width - iconWidth) * 0.5F;
             const float iconY = bounds.y + (bounds.height - iconHeight) * 0.5F;
 
@@ -438,7 +454,12 @@ namespace Paladin
                 iconY,
                 iconWidth,
                 iconHeight,
-                definition.frameColor
+                {
+                    objectDefinition->visual.frameColor[0],
+                    objectDefinition->visual.frameColor[1],
+                    objectDefinition->visual.frameColor[2],
+                    255
+                }
             );
 
             constexpr float iconBorder = 2.0F;
@@ -453,7 +474,12 @@ namespace Paladin
                     iconY + iconBorder,
                     iconWidth - iconBorder * 2.0F,
                     iconHeight - iconBorder * 2.0F,
-                    definition.fillColor
+                    {
+                        objectDefinition->visual.fillColor[0],
+                        objectDefinition->visual.fillColor[1],
+                        objectDefinition->visual.fillColor[2],
+                        255
+                    }
                 );
             }
 

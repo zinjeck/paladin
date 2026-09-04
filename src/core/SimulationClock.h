@@ -10,9 +10,14 @@ namespace Paladin
         void reset() noexcept;
         void beginFrame();
 
+        void setPaused(bool paused) noexcept;
+        void setSpeedMultiplier(double multiplier) noexcept;
+
         bool shouldTick() const;
         void consumeTick();
 
+        bool isPaused() const noexcept;
+        double speedMultiplier() const noexcept;
         double fixedDeltaSeconds() const noexcept;
         double frameDeltaSeconds() const noexcept;
         double interpolationAlpha() const noexcept;
@@ -22,6 +27,8 @@ namespace Paladin
         double frameDeltaSeconds_ = 0.0;
         double accumulatorSeconds_ = 0.0;
         double previousTimeSeconds_ = 0.0;
+        double speedMultiplier_ = 1.0;
+        bool paused_ = true;
         bool firstFrame_ = true;
     };
 }

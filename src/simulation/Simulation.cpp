@@ -276,6 +276,18 @@ namespace Paladin
     }
 
 
+    SettlementMap* Simulation::settlementMap(
+        SettlementId settlementId
+    ) noexcept
+    {
+        Settlement* settlement = world_->settlement(settlementId);
+
+        return settlement
+            ? settlement->simulationState().localMap_.get()
+            : nullptr;
+    }
+
+
     const SettlementMap* Simulation::settlementMap(
         SettlementId settlementId
     ) const noexcept

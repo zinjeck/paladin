@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Paladin
@@ -16,6 +17,7 @@ namespace Paladin
     enum class CityHudAction
     {
         None,
+        BeginObjectPlacement,
         Back
     };
 
@@ -47,6 +49,9 @@ namespace Paladin
         [[nodiscard]]
         CityHudAction pointerReleased(float x, float y) noexcept;
 
+        [[nodiscard]]
+        std::string_view selectedObjectTypeId() const noexcept;
+
         void render(
             Renderer& renderer,
             const GrayUiRenderer& uiRenderer
@@ -69,6 +74,7 @@ namespace Paladin
         UiRectangle dayTimePanel_;
         UiRectangle reservedPanel_;
         std::string cityName_;
+        std::string selectedObjectTypeId_;
         std::uint64_t day_ = 1;
         int hour_ = 6;
         int minute_ = 0;

@@ -87,6 +87,11 @@ namespace Paladin
         );
 
         [[nodiscard]]
+        SettlementMap* settlementMap(
+            SettlementId settlementId
+        ) noexcept;
+
+        [[nodiscard]]
         const SettlementMap* settlementMap(
             SettlementId settlementId
         ) const noexcept;

@@ -70,9 +70,14 @@ namespace Paladin
     void WorldHud::pointerMoved(float x, float y) noexcept
     {
         selectRegionButton_.pointerMoved(x, y);
-        moveCapitalButton_.pointerMoved(x, y);
-        renameCapitalButton_.pointerMoved(x, y);
-        editPolityButton_.pointerMoved(x, y);
+
+        if (!simulationControlsUnlocked_)
+        {
+            moveCapitalButton_.pointerMoved(x, y);
+            renameCapitalButton_.pointerMoved(x, y);
+            editPolityButton_.pointerMoved(x, y);
+        }
+
         playButton_.pointerMoved(x, y);
         backButton_.pointerMoved(x, y);
     }
@@ -83,18 +88,30 @@ namespace Paladin
         playButton_.setEnabled(established);
     }
 
+    void WorldHud::setSimulationControlsUnlocked(bool unlocked) noexcept
+    {
+        simulationControlsUnlocked_ = unlocked;
+
+        if (unlocked)
+        {
+            moveCapitalButton_.cancelPress();
+            renameCapitalButton_.cancelPress();
+            editPolityButton_.cancelPress();
+        }
+    }
+
     bool WorldHud::pointerPressed(float x, float y) noexcept
     {
         bool actionCaptured = false;
 
-        if (capitalEstablished_)
+        if (capitalEstablished_ && !simulationControlsUnlocked_)
         {
             actionCaptured =
                 moveCapitalButton_.pointerPressed(x, y) ||
                 renameCapitalButton_.pointerPressed(x, y) ||
                 editPolityButton_.pointerPressed(x, y);
         }
-        else
+        else if (!capitalEstablished_)
         {
             actionCaptured = selectRegionButton_.pointerPressed(x, y);
         }
@@ -123,6 +140,7 @@ namespace Paladin
             ) ||
             (
                 capitalEstablished_ &&
+                !simulationControlsUnlocked_ &&
                 (
                     moveCapitalButton_.containsPoint(x, y) ||
                     renameCapitalButton_.containsPoint(x, y) ||
@@ -160,17 +178,29 @@ namespace Paladin
         }
 
 
-        if (capitalEstablished_ && moveClicked)
+        if (
+            capitalEstablished_ &&
+            !simulationControlsUnlocked_ &&
+            moveClicked
+        )
         {
             return WorldHudAction::MoveCapital;
         }
 
-        if (capitalEstablished_ && renameClicked)
+        if (
+            capitalEstablished_ &&
+            !simulationControlsUnlocked_ &&
+            renameClicked
+        )
         {
             return WorldHudAction::RenameCapital;
         }
 
-        if (capitalEstablished_ && editClicked)
+        if (
+            capitalEstablished_ &&
+            !simulationControlsUnlocked_ &&
+            editClicked
+        )
         {
             return WorldHudAction::EditPolity;
         }
@@ -199,7 +229,7 @@ namespace Paladin
             selectRegionButton_.setSelected(regionSelectionActive);
             selectRegionButton_.render(renderer, uiRenderer);
         }
-        else
+        else if (!simulationControlsUnlocked_)
         {
             moveCapitalButton_.setSelected(regionSelectionActive);
             moveCapitalButton_.render(renderer, uiRenderer);

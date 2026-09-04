@@ -13,6 +13,7 @@ namespace Paladin
         std::uint64_t generationSeed
     ) noexcept
         : grid_(std::move(grid)),
+          objectState_(grid_.width(), grid_.height()),
           sourceRegionCenter_(sourceRegionCenter),
           sourceRegionWidth_(sourceRegionWidth),
           sourceRegionHeight_(sourceRegionHeight),
@@ -61,5 +62,18 @@ namespace Paladin
     std::uint64_t SettlementMap::generationSeed() const noexcept
     {
         return generationSeed_;
+    }
+
+
+    SettlementObjectState& SettlementMap::objectState() noexcept
+    {
+        return objectState_;
+    }
+
+
+    const SettlementObjectState&
+    SettlementMap::objectState() const noexcept
+    {
+        return objectState_;
     }
 }

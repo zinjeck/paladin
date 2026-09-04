@@ -2,6 +2,7 @@
 
 #include "core/SimulationClock.h"
 #include "interaction/SettlementPlacementController.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
@@ -14,6 +15,7 @@
 #include "ui/CityHud.h"
 #include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
+#include "ui/SimulationSpeedControls.h"
 #include "ui/WorldHud.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
@@ -81,6 +83,9 @@ namespace Paladin
         cityHud_ =
             std::make_unique<CityHud>();
 
+        simulationSpeedControls_ =
+            std::make_unique<SimulationSpeedControls>();
+
         foundingPanel_ =
             std::make_unique<FoundingPanel>();
     }
@@ -96,12 +101,14 @@ namespace Paladin
         cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
+        settlementObjectPlacementController_.reset();
         camera_.reset();
         savedWorldCamera_.reset();
         simulation_.reset();
 
         worldHud_.reset();
         cityHud_.reset();
+        simulationSpeedControls_.reset();
         foundingPanel_.reset();
         mainMenu_.reset();
         grayUiRenderer_.reset();
@@ -126,6 +133,7 @@ namespace Paladin
             !mainMenu_ ||
             !worldHud_ ||
             !cityHud_ ||
+            !simulationSpeedControls_ ||
             !foundingPanel_
         )
         {
@@ -161,6 +169,10 @@ namespace Paladin
                     playerPolity->capitalSettlementId().isValid()
                 );
 
+                worldHud_->setSimulationControlsUnlocked(
+                    simulationControlsUnlocked_
+                );
+
                 foundingPanel_->layout(
                     renderer_->outputWidth(),
                     renderer_->outputHeight()
@@ -171,6 +183,25 @@ namespace Paladin
                 cityHud_->layout(
                     renderer_->outputWidth(),
                     renderer_->outputHeight()
+                );
+            }
+
+            const bool simulationControlsVisible =
+                screen_ == Screen::City ||
+                (
+                    screen_ == Screen::World &&
+                    simulationControlsUnlocked_
+                );
+
+            if (simulationControlsVisible)
+            {
+                simulationSpeedControls_->layout(
+                    renderer_->outputWidth()
+                );
+
+                simulationSpeedControls_->setPlaybackState(
+                    simulationClock_->isPaused(),
+                    simulationClock_->speedMultiplier()
                 );
             }
 
@@ -231,6 +262,102 @@ namespace Paladin
                     continue;
                 }
 
+                if (simulationControlsVisible)
+                {
+                    if (event.type == SDL_EVENT_MOUSE_MOTION)
+                    {
+                        simulationSpeedControls_->pointerMoved(
+                            event.motion.x,
+                            event.motion.y
+                        );
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        simulationControlsCapturedPointer_ =
+                            simulationSpeedControls_->pointerPressed(
+                                event.button.x,
+                                event.button.y
+                            );
+
+                        if (simulationControlsCapturedPointer_)
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                        event.button.button == SDL_BUTTON_LEFT
+                    )
+                    {
+                        const SimulationSpeedControlAction action =
+                            simulationSpeedControls_->pointerReleased(
+                                event.button.x,
+                                event.button.y
+                            );
+
+                        const bool captured =
+                            simulationControlsCapturedPointer_;
+
+                        simulationControlsCapturedPointer_ = false;
+
+                        if (action == SimulationSpeedControlAction::Pause)
+                        {
+                            simulationClock_->setPaused(true);
+                        }
+                        else if (
+                            action == SimulationSpeedControlAction::Normal
+                        )
+                        {
+                            simulationClock_->setSpeedMultiplier(1.0);
+                            simulationClock_->setPaused(false);
+                        }
+                        else if (
+                            action == SimulationSpeedControlAction::Double
+                        )
+                        {
+                            simulationClock_->setSpeedMultiplier(2.0);
+                            simulationClock_->setPaused(false);
+                        }
+                        else if (
+                            action == SimulationSpeedControlAction::Fast
+                        )
+                        {
+                            const double nextFastSpeed =
+                                !simulationClock_->isPaused() &&
+                                std::abs(
+                                    simulationClock_->speedMultiplier() - 3.0
+                                ) < 0.001
+                                    ? 5.0
+                                    : 3.0;
+
+                            simulationClock_->setSpeedMultiplier(
+                                nextFastSpeed
+                            );
+                            simulationClock_->setPaused(false);
+                        }
+
+                        if (
+                            action != SimulationSpeedControlAction::None
+                        )
+                        {
+                            simulationSpeedControls_->setPlaybackState(
+                                simulationClock_->isPaused(),
+                                simulationClock_->speedMultiplier()
+                            );
+                        }
+
+                        if (captured)
+                        {
+                            continue;
+                        }
+                    }
+                }
+
                 if (screen_ == Screen::City)
                 {
                     if (event.type == SDL_EVENT_MOUSE_MOTION)
@@ -238,6 +365,18 @@ namespace Paladin
                         cityHud_->pointerMoved(
                             event.motion.x,
                             event.motion.y
+                        );
+
+                        settlementObjectPlacementController_->pointerMoved(
+                            activeHudContainsPoint(
+                                event.motion.x,
+                                event.motion.y
+                            )
+                                ? std::nullopt
+                                : cityTileAtScreen(
+                                    event.motion.x,
+                                    event.motion.y
+                                )
                         );
                     }
 
@@ -247,6 +386,16 @@ namespace Paladin
                     )
                     {
                         returnToWorldFromCity();
+                        continue;
+                    }
+
+                    if (
+                        event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        event.button.button == SDL_BUTTON_RIGHT
+                    )
+                    {
+                        settlementObjectPlacementController_
+                            ->cancelPlacement();
                         continue;
                     }
 
@@ -305,12 +454,33 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_LEFT
                     )
                     {
-                        static_cast<void>(
+                        cityHudCapturedPointer_ =
                             cityHud_->pointerPressed(
                                 event.button.x,
                                 event.button.y
-                            )
-                        );
+                            );
+
+                        SettlementMap* settlementMap =
+                            simulation_->settlementMap(
+                                activeCitySettlementId_
+                            );
+
+                        if (
+                            !cityHudCapturedPointer_ &&
+                            settlementMap
+                        )
+                        {
+                            static_cast<void>(
+                                settlementObjectPlacementController_
+                                    ->pointerPressed(
+                                        cityTileAtScreen(
+                                            event.button.x,
+                                            event.button.y
+                                        ),
+                                        *settlementMap
+                                    )
+                            );
+                        }
                     }
 
                     if (
@@ -318,15 +488,51 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_LEFT
                     )
                     {
-                        if (
+                        const CityHudAction action =
                             cityHud_->pointerReleased(
                                 event.button.x,
                                 event.button.y
-                            ) == CityHudAction::Back
-                        )
+                            );
+
+                        if (action == CityHudAction::Back)
                         {
                             returnToWorldFromCity();
                         }
+                        else if (
+                            action ==
+                                CityHudAction::BeginObjectPlacement
+                        )
+                        {
+                            static_cast<void>(
+                                settlementObjectPlacementController_
+                                    ->beginPlacement(
+                                        cityHud_->selectedObjectTypeId()
+                                    )
+                            );
+                        }
+                        else if (!cityHudCapturedPointer_)
+                        {
+                            const SettlementMap* settlementMap =
+                                simulation_->settlementMap(
+                                    activeCitySettlementId_
+                                );
+
+                            if (settlementMap)
+                            {
+                                static_cast<void>(
+                                    settlementObjectPlacementController_
+                                        ->pointerReleased(
+                                            cityTileAtScreen(
+                                                event.button.x,
+                                                event.button.y
+                                            ),
+                                            *settlementMap
+                                        )
+                                );
+                            }
+                        }
+
+                        cityHudCapturedPointer_ = false;
                     }
 
                     continue;
@@ -679,6 +885,19 @@ namespace Paladin
                     simulationClock_->frameDeltaSeconds()
                 );
 
+                if (settlementObjectPlacementController_->isActive())
+                {
+                    float mouseX = 0.0F;
+                    float mouseY = 0.0F;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+
+                    settlementObjectPlacementController_->pointerMoved(
+                        cityHud_->containsInteractivePoint(mouseX, mouseY)
+                            ? std::nullopt
+                            : cityTileAtScreen(mouseX, mouseY)
+                    );
+                }
+
                 while (simulationClock_->shouldTick())
                 {
                     simulation_->tick(
@@ -701,7 +920,8 @@ namespace Paladin
                         *renderer_,
                         *settlementMap,
                         *camera_,
-                        *tileRenderMetrics_
+                        *tileRenderMetrics_,
+                        *settlementObjectPlacementController_
                     );
                 }
 
@@ -723,6 +943,11 @@ namespace Paladin
                 );
 
                 cityHud_->render(
+                    *renderer_,
+                    *grayUiRenderer_
+                );
+
+                simulationSpeedControls_->render(
                     *renderer_,
                     *grayUiRenderer_
                 );
@@ -922,6 +1147,14 @@ namespace Paladin
                 settlementPlacementController_->isActive()
             );
 
+            if (simulationControlsUnlocked_)
+            {
+                simulationSpeedControls_->render(
+                    *renderer_,
+                    *grayUiRenderer_
+                );
+            }
+
             foundingPanel_->render(
                 *renderer_,
                 *grayUiRenderer_
@@ -951,6 +1184,9 @@ namespace Paladin
         settlementPlacementController_ =
             std::make_unique<SettlementPlacementController>();
 
+        settlementObjectPlacementController_ =
+            std::make_unique<SettlementObjectPlacementController>();
+
         worldRenderer_ =
             std::make_unique<WorldRenderer>();
 
@@ -966,6 +1202,9 @@ namespace Paladin
         movingCapital_ = false;
         savedWorldCamera_.reset();
         activeCitySettlementId_ = {};
+        cityHudCapturedPointer_ = false;
+        simulationControlsUnlocked_ = false;
+        simulationControlsCapturedPointer_ = false;
         simulationClock_->reset();
         screen_ = Screen::World;
     }
@@ -979,6 +1218,7 @@ namespace Paladin
         cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
+        settlementObjectPlacementController_.reset();
         camera_.reset();
         savedWorldCamera_.reset();
         simulation_.reset();
@@ -986,6 +1226,9 @@ namespace Paladin
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
         activeCitySettlementId_ = {};
+        cityHudCapturedPointer_ = false;
+        simulationControlsUnlocked_ = false;
+        simulationControlsCapturedPointer_ = false;
         simulationClock_->reset();
         screen_ = Screen::MainMenu;
 
@@ -1052,8 +1295,19 @@ namespace Paladin
         activeCitySettlementId_ = capitalId;
         edgeScrollDwellSeconds_ = 0.0;
         settlementPlacementController_->cancelSelection();
+        settlementObjectPlacementController_->cancelPlacement();
+        cityHudCapturedPointer_ = false;
+        simulationControlsUnlocked_ = true;
+        simulationControlsCapturedPointer_ = false;
         movingCapital_ = false;
         screen_ = Screen::City;
+
+        simulationSpeedControls_->layout(renderer_->outputWidth());
+        simulationSpeedControls_->setPlaybackState(
+            simulationClock_->isPaused(),
+            simulationClock_->speedMultiplier()
+        );
+
         clampCameraToWorld();
     }
 
@@ -1063,6 +1317,10 @@ namespace Paladin
         {
             return;
         }
+
+        settlementObjectPlacementController_->cancelPlacement();
+        cityHudCapturedPointer_ = false;
+        simulationControlsCapturedPointer_ = false;
 
         if (!simulation_->clearDetailedSimulationSettlement())
         {
@@ -1089,6 +1347,13 @@ namespace Paladin
         activeCitySettlementId_ = {};
         edgeScrollDwellSeconds_ = 0.0;
         screen_ = Screen::World;
+
+        worldHud_->setSimulationControlsUnlocked(true);
+        worldHud_->layout(
+            renderer_->outputWidth(),
+            renderer_->outputHeight()
+        );
+
         clampCameraToWorld();
     }
 
@@ -1604,11 +1869,81 @@ namespace Paladin
         float y
     ) const noexcept
     {
+        if (
+            (
+                screen_ == Screen::City ||
+                (
+                    screen_ == Screen::World &&
+                    simulationControlsUnlocked_
+                )
+            ) &&
+            simulationSpeedControls_->containsInteractivePoint(x, y)
+        )
+        {
+            return true;
+        }
+
         if (screen_ == Screen::City)
         {
             return cityHud_->containsInteractivePoint(x, y);
         }
 
         return worldHud_->containsInteractivePoint(x, y);
+    }
+
+    std::optional<WorldTilePosition> Application::cityTileAtScreen(
+        double screenX,
+        double screenY
+    ) const noexcept
+    {
+        if (
+            screen_ != Screen::City ||
+            !camera_ ||
+            !renderer_ ||
+            !tileRenderMetrics_
+        )
+        {
+            return std::nullopt;
+        }
+
+        const SettlementMap* settlementMap = simulation_->settlementMap(
+            activeCitySettlementId_
+        );
+
+        if (!settlementMap)
+        {
+            return std::nullopt;
+        }
+
+        const double tilePixels =
+            tileRenderMetrics_->scaledTilePixels(camera_->zoom());
+
+        if (tilePixels <= 0.0)
+        {
+            return std::nullopt;
+        }
+
+        const double tileX =
+            camera_->tileX()
+            + (
+                screenX
+                - static_cast<double>(renderer_->outputWidth()) * 0.5
+            ) / tilePixels;
+
+        const double tileY =
+            camera_->tileY()
+            + (
+                screenY
+                - static_cast<double>(renderer_->outputHeight()) * 0.5
+            ) / tilePixels;
+
+        const WorldTilePosition position{
+            static_cast<std::int32_t>(std::floor(tileX)),
+            static_cast<std::int32_t>(std::floor(tileY))
+        };
+
+        return settlementMap->grid().isValidPosition(position)
+            ? std::optional<WorldTilePosition>(position)
+            : std::nullopt;
     }
 }

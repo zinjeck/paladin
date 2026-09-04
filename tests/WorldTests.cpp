@@ -1,12 +1,16 @@
 #include "TestFramework.h"
 
 #include "simulation/WorldSimulationPipeline.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "world/TerrainType.h"
 #include "world/World.h"
 #include "world/generation/WorldGenerationSettings.h"
+#include "world/settlements/SettlementMap.h"
+#include "world/settlements/objects/SettlementObjectDefinition.h"
 
 #include <array>
 #include <queue>
+#include <utility>
 #include <vector>
 
 void runWorldTests()
@@ -798,4 +802,103 @@ void runWorldTests()
             );
         }
     }
+
+    Paladin::WorldGrid localGrid(24, 24);
+
+    for (std::int32_t y = 0; y < localGrid.height(); ++y)
+    {
+        for (std::int32_t x = 0; x < localGrid.width(); ++x)
+        {
+            localGrid.tile({x, y})->terrain =
+                Paladin::TerrainType::Land;
+        }
+    }
+
+    localGrid.tile({15, 15})->terrain =
+        Paladin::TerrainType::Mountain;
+
+    Paladin::SettlementMap localMap(
+        std::move(localGrid),
+        {12, 12},
+        9,
+        9,
+        64,
+        44
+    );
+
+    Paladin::SettlementObjectPlacementController objectPlacement;
+
+    PALADIN_CHECK(objectPlacement.beginPlacement(
+        Paladin::SettlementObjectTypes::FishingGrounds
+    ));
+
+    objectPlacement.pointerMoved(Paladin::WorldTilePosition{2, 2});
+    PALADIN_CHECK(!objectPlacement.visibleFootprintIsValid(localMap));
+
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{2, 2}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::None
+    );
+    PALADIN_CHECK(!objectPlacement.pointerReleased({{2, 2}}, localMap));
+    PALADIN_CHECK(!objectPlacement.hasLockedFootprint());
+
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{2, 2}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::None
+    );
+    objectPlacement.pointerMoved(Paladin::WorldTilePosition{3, 3});
+    PALADIN_CHECK(objectPlacement.pointerReleased({{3, 3}}, localMap));
+    PALADIN_CHECK(objectPlacement.hasLockedFootprint());
+
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{2, 2}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::ConstructionSites
+    );
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 1);
+    PALADIN_CHECK(localMap.objectState().completedObjects().empty());
+
+    PALADIN_CHECK(objectPlacement.beginPlacement(
+        Paladin::SettlementObjectTypes::House
+    ));
+    objectPlacement.pointerMoved(Paladin::WorldTilePosition{8, 8});
+    PALADIN_CHECK(objectPlacement.visibleFootprintIsValid(localMap));
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{8, 8}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::None
+    );
+    PALADIN_CHECK(objectPlacement.pointerReleased({{8, 8}}, localMap));
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{8, 8}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::ConstructionSites
+    );
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 2);
+
+    PALADIN_CHECK(objectPlacement.beginPlacement(
+        Paladin::SettlementObjectTypes::Stockpile
+    ));
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{15, 15}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::None
+    );
+    objectPlacement.pointerMoved(Paladin::WorldTilePosition{16, 16});
+    PALADIN_CHECK(!objectPlacement.pointerReleased({{16, 16}}, localMap));
+    PALADIN_CHECK(!objectPlacement.hasLockedFootprint());
+    objectPlacement.cancelPlacement();
+    PALADIN_CHECK(!objectPlacement.isActive());
+
+    PALADIN_CHECK(objectPlacement.beginPlacement(
+        Paladin::SettlementObjectTypes::CityKeep
+    ));
+    objectPlacement.pointerMoved(Paladin::WorldTilePosition{19, 10});
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{19, 10}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::None
+    );
+    PALADIN_CHECK(objectPlacement.pointerReleased({{19, 10}}, localMap));
+    PALADIN_CHECK(
+        objectPlacement.pointerPressed({{19, 10}}, localMap)
+        == Paladin::SettlementPlacementCommitResult::CompletedObject
+    );
+    PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 2);
 }

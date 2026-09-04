@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <cmath>
+
 namespace Paladin
 {
     SimulationClock::SimulationClock(double ticksPerSecond)
@@ -14,6 +16,8 @@ namespace Paladin
         frameDeltaSeconds_ = 0.0;
         accumulatorSeconds_ = 0.0;
         previousTimeSeconds_ = 0.0;
+        speedMultiplier_ = 1.0;
+        paused_ = true;
         firstFrame_ = true;
     }
 
@@ -46,17 +50,48 @@ namespace Paladin
         }
 
         frameDeltaSeconds_ = frameTimeSeconds;
-        accumulatorSeconds_ += frameTimeSeconds;
+        if (!paused_)
+        {
+            accumulatorSeconds_ +=
+                frameTimeSeconds * speedMultiplier_;
+        }
+    }
+
+    void SimulationClock::setPaused(bool paused) noexcept
+    {
+        paused_ = paused;
+    }
+
+    void SimulationClock::setSpeedMultiplier(
+        double multiplier
+    ) noexcept
+    {
+        if (std::isfinite(multiplier) && multiplier > 0.0)
+        {
+            speedMultiplier_ = multiplier;
+        }
     }
 
     bool SimulationClock::shouldTick() const
     {
-        return accumulatorSeconds_ >= fixedDeltaSeconds_;
+        return
+            !paused_ &&
+            accumulatorSeconds_ >= fixedDeltaSeconds_;
     }
 
     void SimulationClock::consumeTick()
     {
         accumulatorSeconds_ -= fixedDeltaSeconds_;
+    }
+
+    bool SimulationClock::isPaused() const noexcept
+    {
+        return paused_;
+    }
+
+    double SimulationClock::speedMultiplier() const noexcept
+    {
+        return speedMultiplier_;
     }
 
     double SimulationClock::fixedDeltaSeconds() const noexcept

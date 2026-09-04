@@ -29,6 +29,7 @@ namespace Paladin
         ) noexcept;
 
         void setCapitalEstablished(bool established) noexcept;
+        void setSimulationControlsUnlocked(bool unlocked) noexcept;
         void pointerMoved(float x, float y) noexcept;
 
         [[nodiscard]]
@@ -57,5 +58,6 @@ namespace Paladin
         UiButton playButton_;
         UiButton backButton_;
         bool capitalEstablished_ = false;
+        bool simulationControlsUnlocked_ = false;
     };
 }
