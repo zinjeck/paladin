@@ -1,13 +1,98 @@
 #include "TestFramework.h"
+#include "debug/ConsoleCommand.h"
 #include "interaction/SettlementObjectPlacementController.h"
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/SettlementSimulationState.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <cmath>
+#include <optional>
+#include <set>
 using namespace Paladin;
 void runSettlementEmploymentTests()
 {
+    // Reuse the exact same map storage and revision; cache must follow
+    // identity.
+    {
+        std::optional<SettlementMap> slot;
+        SettlementNavigation navigation;
+        auto road =
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
+        road.bypassesConstruction = true;
+        auto fill = [&]()
+        {
+            SettlementGrid grid(8, 8);
+            for (int y = 0; y < 8; ++y)
+            {
+                for (int x = 0; x < 8; ++x)
+                {
+                    grid.tile({x, y})->terrain = TerrainType::Land;
+                }
+            }
+            slot.emplace(
+                std::move(grid),
+                WorldTilePosition{0, 0},
+                1,
+                1,
+                8,
+                711
+            );
+        };
+        fill();
+        const auto firstIdentity = slot->instanceId();
+        PALADIN_CHECK(slot->objectState().placeCompletedObject(
+            slot->grid(),
+            road,
+            {{2, 2}, 1, 1}
+        ));
+        navigation.synchronize(*slot);
+        PALADIN_CHECK(navigation.stepCost(*slot, {1, 2}, {2, 2}, {}) == .5);
+        slot.reset();
+        fill();
+        PALADIN_CHECK(slot->instanceId() != firstIdentity);
+        PALADIN_CHECK(slot->objectState().placeCompletedObject(
+            slot->grid(),
+            road,
+            {{5, 5}, 1, 1}
+        ));
+        navigation.synchronize(*slot);
+        PALADIN_CHECK(navigation.stepCost(*slot, {1, 2}, {2, 2}, {}) == 1);
+    }
+    PALADIN_CHECK(
+        parseConsoleCommand("stats").kind == ConsoleCommandKind::Stats
+    );
+    PALADIN_CHECK(parseConsoleCommand("  spawncitizens  ").count == 1);
+    PALADIN_CHECK(parseConsoleCommand("spawncitizens 400").count == 400);
+    for (const auto text :
+         {"spawncitizens -1",
+          "spawncitizens 0",
+          "spawncitizens 1.5",
+          "spawncitizens 4 extra",
+          "spawncitizens 999999999999999999999",
+          "stats extra",
+          "unknown"})
+    {
+        PALADIN_CHECK(
+            parseConsoleCommand(text).kind == ConsoleCommandKind::Invalid
+        );
+    }
+    SettlementSimulationState settlementA, settlementB;
+    PALADIN_CHECK(settlementA.bootstrap(playerSettlementFoundationProfile(43)));
+    PALADIN_CHECK(settlementB.bootstrap(playerSettlementFoundationProfile(44)));
+    PALADIN_CHECK(settlementA.spawnCitizens(1));
+    PALADIN_CHECK(settlementA.spawnCitizens(400));
+    PALADIN_CHECK(settlementA.population().residents() == 409);
+    PALADIN_CHECK(settlementA.citizens().citizens().size() == 409);
+    PALADIN_CHECK(settlementB.population().residents() == 8);
+    PALADIN_CHECK(!settlementA.spawnCitizens(0));
+    PALADIN_CHECK(!settlementA.spawnCitizens(100001));
+    std::set<std::uint64_t> spawnedIds;
+    for (const auto& c : settlementA.citizens().citizens())
+    {
+        PALADIN_CHECK(spawnedIds.insert(c.id.value()).second);
+        PALADIN_CHECK(c.ageYears == 20 && !c.workplaceId);
+    }
     const auto profile = playerSettlementFoundationProfile(555);
     PALADIN_CHECK(profile.initialPopulation == 8);
     PALADIN_CHECK(profile.initialDetailedCitizenCount == 8);

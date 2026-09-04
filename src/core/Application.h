@@ -1,4 +1,7 @@
 #pragma once
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "core/StrongId.h"
 #include "interaction/CameraNavigationPolicy.h"
@@ -13,6 +16,7 @@ namespace Paladin
     class Camera2D;
     class CityHud;
     class EmploymentPanel;
+    class DebugConsole;
     class CityRenderer;
     class GrayUiRenderer;
     class FoundingPanel;
@@ -54,6 +58,8 @@ namespace Paladin
         void startWorldSession();
         void endWorldSession();
         void enterPlayerCapitalCity();
+        void executeConsoleCommand(std::string_view text);
+        void renderDebug();
         void returnToWorldFromCity();
 
         void cancelFoundingFlow();
@@ -95,6 +101,11 @@ namespace Paladin
         std::unique_ptr<WorldHud> worldHud_;
         std::unique_ptr<CityHud> cityHud_;
         std::unique_ptr<EmploymentPanel> employmentPanel_;
+        std::unique_ptr<DebugConsole> debugConsole_;
+        std::vector<std::pair<SettlementId, std::unique_ptr<Camera2D>>>
+            cityCameras_;
+        std::string cachedStats_;
+        std::uint64_t nextStatsRefresh_ = 0;
         bool employmentCapturedPointer_ = false;
         std::unique_ptr<SimulationSpeedControls>
             simulationSpeedControls_;

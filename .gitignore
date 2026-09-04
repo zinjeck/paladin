@@ -266,3 +266,6 @@ assets/fonts
 #
 # Those contain Paladin's actual source code.
 # ============================================================
+
+# Local console command reference
+/debug-console-commands.txt

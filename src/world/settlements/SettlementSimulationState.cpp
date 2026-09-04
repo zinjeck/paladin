@@ -6,6 +6,20 @@
 
 namespace Paladin
 {
+bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
+{
+    if (!initialized_ || count > UINT64_MAX - population_.residents())
+    {
+        return false;
+    }
+    if (!citizens_.spawn(count))
+    {
+        return false;
+    }
+    population_.applyNetChange(static_cast<double>(count));
+    return true;
+}
+
     bool SettlementSimulationState::bootstrap(
         const SettlementFoundationProfile& profile
     )

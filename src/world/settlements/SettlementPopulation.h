@@ -40,6 +40,7 @@ namespace Paladin
 
     private:
         friend class SettlementPopulationSystem;
+        friend class SettlementSimulationState;
 
         void applyNetChange(double populationChange) noexcept;
 

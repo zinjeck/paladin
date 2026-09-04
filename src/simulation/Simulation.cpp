@@ -59,6 +59,7 @@ namespace Paladin
             return;
         }
 
+        ScopedTiming totalTimer{tickTiming};
         ++tickCount_;
 
         const double gameMinutesPerRealSecond =
@@ -81,6 +82,7 @@ namespace Paladin
 
         if (Settlement* settlement = world_->settlement(detailedSimulationSettlementId_))
         {
+            ScopedTiming citizenTimer{citizenTiming};
             auto& state = settlement->simulationState();
             if (auto* map = settlementMap(detailedSimulationSettlementId_))
             {
@@ -114,6 +116,7 @@ namespace Paladin
         pendingGameMinutes_ -= static_cast<double>(gameMinutes);
 
         world_->advanceTime(gameMinutes);
+        ScopedTiming aggregateTimer{aggregateTiming};
         worldSimulationPipeline_->tick(
             *world_,
             gameMinutes
@@ -464,3 +467,22 @@ namespace Paladin
         return 1.0;
     }
 }
+
+namespace Paladin
+{
+std::string Simulation::systemTimingText() const
+{
+    std::string text;
+    for (std::size_t i = 0; i < worldSimulationPipeline_->systemTimings.size();
+         ++i)
+    {
+        text += std::string(
+                    i == 0   ? "Economy: "
+                    : i == 1 ? "Population: "
+                             : "System: "
+                ) +
+                worldSimulationPipeline_->systemTimings[i].text() + "\n";
+    }
+    return text;
+}
+} // namespace Paladin

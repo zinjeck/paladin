@@ -1,28 +1,43 @@
 #include "world/settlements/SettlementMap.h"
+#include <atomic>
+#include <exception>
 
 #include <utility>
 
 namespace Paladin
 {
-    SettlementMap::SettlementMap(
-        SettlementGrid grid,
-        WorldTilePosition sourceRegionCenter,
-        std::int32_t sourceRegionWidth,
-        std::int32_t sourceRegionHeight,
-        std::int32_t localTilesPerWorldTile,
-        std::uint64_t generationSeed
-    ) noexcept
-        : grid_(std::move(grid)),
-          naturalFeatures_(grid_.width(), grid_.height()),
-          objectState_(grid_.width(), grid_.height()),
-          sourceRegionCenter_(sourceRegionCenter),
-          sourceRegionWidth_(sourceRegionWidth),
-          sourceRegionHeight_(sourceRegionHeight),
-          localTilesPerWorldTile_(localTilesPerWorldTile),
-          generationSeed_(generationSeed)
+namespace
+{
+std::uint64_t nextMapInstance() noexcept
+{
+    static std::atomic<std::uint64_t> next{1};
+    const auto id = next.fetch_add(1, std::memory_order_relaxed);
+    if (id == 0)
     {
+        std::terminate();
     }
+    return id;
+}
+} // namespace
 
+SettlementMap::SettlementMap(
+    SettlementGrid grid,
+    WorldTilePosition sourceRegionCenter,
+    std::int32_t sourceRegionWidth,
+    std::int32_t sourceRegionHeight,
+    std::int32_t localTilesPerWorldTile,
+    std::uint64_t generationSeed
+) noexcept :
+    instanceId_(nextMapInstance()), grid_(std::move(grid)),
+    naturalFeatures_(grid_.width(), grid_.height()),
+    objectState_(grid_.width(), grid_.height()),
+    sourceRegionCenter_(sourceRegionCenter),
+    sourceRegionWidth_(sourceRegionWidth),
+    sourceRegionHeight_(sourceRegionHeight),
+    localTilesPerWorldTile_(localTilesPerWorldTile),
+    generationSeed_(generationSeed)
+{
+}
 
     SettlementGrid& SettlementMap::grid() noexcept
     {

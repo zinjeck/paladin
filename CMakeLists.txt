@@ -87,6 +87,7 @@ add_executable(Paladin
     src/ui/BitmapFontRenderer.cpp
     src/ui/CityHud.cpp
     src/ui/EmploymentPanel.cpp
+    src/ui/DebugConsole.cpp
     src/ui/GrayUiRenderer.cpp
     src/ui/FoundingPanel.cpp
     src/ui/UiButton.cpp

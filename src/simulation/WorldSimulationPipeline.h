@@ -1,4 +1,5 @@
 #pragma once
+#include "debug/TimingSamples.h"
 
 #include "simulation/WorldSimulationSystem.h"
 #include "world/settlements/SettlementSimulationPolicy.h"
@@ -51,6 +52,7 @@ namespace Paladin
 
         [[nodiscard]]
         std::size_t systemCount() const noexcept;
+        std::vector<TimingSamples> systemTimings;
 
         [[nodiscard]]
         const SettlementSimulationPolicies& policies() const noexcept;

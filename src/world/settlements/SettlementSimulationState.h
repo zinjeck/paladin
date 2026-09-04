@@ -83,6 +83,8 @@ namespace Paladin
         [[nodiscard]]
         bool isInitialized() const noexcept;
 
+        bool spawnCitizens(std::uint64_t count);
+
         [[nodiscard]]
         SettlementPopulation& population() noexcept;
 

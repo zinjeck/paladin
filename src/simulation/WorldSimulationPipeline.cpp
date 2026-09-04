@@ -49,6 +49,7 @@ namespace Paladin
         }
 
         systems_.push_back(std::move(system));
+        systemTimings.emplace_back();
         return true;
     }
 
@@ -171,10 +172,10 @@ namespace Paladin
             settlementSteps
         };
 
-        for (const std::unique_ptr<WorldSimulationSystem>& system
-            : systems_)
+        for (std::size_t i = 0; i < systems_.size(); ++i)
         {
-            system->tick(world, step);
+            ScopedTiming timer{systemTimings[i]};
+            systems_[i]->tick(world, step);
         }
     }
 

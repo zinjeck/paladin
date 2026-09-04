@@ -13,6 +13,8 @@ namespace Paladin
 
     void SimulationClock::reset() noexcept
     {
+        limitHits = 0;
+        discardedSeconds = 0;
         frameDeltaSeconds_ = 0.0;
         accumulatorSeconds_ = 0.0;
         previousTimeSeconds_ = 0.0;
@@ -46,6 +48,8 @@ namespace Paladin
 
         if (frameTimeSeconds > maxFrameTimeSeconds)
         {
+            ++limitHits;
+            discardedSeconds += frameTimeSeconds - maxFrameTimeSeconds;
             frameTimeSeconds = maxFrameTimeSeconds;
         }
 

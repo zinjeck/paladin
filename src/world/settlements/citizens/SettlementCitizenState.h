@@ -73,6 +73,12 @@ namespace Paladin
             std::uint64_t nameSeed
         );
 
+        bool spawn(std::uint64_t count);
+        const SettlementNavigation& navigationDiagnostics() const noexcept
+        {
+            return navigation_;
+        }
+
         void placeUnpositionedCitizens(
             const SettlementMap& settlementMap
         );

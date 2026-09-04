@@ -1,4 +1,5 @@
 #pragma once
+#include "debug/TimingSamples.h"
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
@@ -52,6 +53,13 @@ namespace Paladin
         Simulation& operator=(const Simulation&) = delete;
 
         void tick(double realDeltaSeconds);
+        TimingSamples tickTiming, citizenTiming, aggregateTiming;
+        std::string systemTimingText() const;
+        double gameMinutesPerTick(double seconds) const noexcept
+        {
+            return seconds * timingSettings_.gameMinutesPerStep /
+                   timingSettings_.realSecondsPerStep;
+        }
 
         void setSpeed(
             SimulationSpeed speed

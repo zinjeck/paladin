@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace Paladin
 {
@@ -14,6 +15,12 @@ namespace Paladin
         void setSpeedMultiplier(double multiplier) noexcept;
 
         bool shouldTick() const;
+        double backlogTicks() const noexcept
+        {
+            return accumulatorSeconds_ / fixedDeltaSeconds_;
+        }
+        std::uint64_t limitHits = 0;
+        double discardedSeconds = 0;
         void consumeTick();
 
         bool isPaused() const noexcept;

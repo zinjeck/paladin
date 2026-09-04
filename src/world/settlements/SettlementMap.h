@@ -23,6 +23,19 @@ namespace Paladin
             std::uint64_t generationSeed
         ) noexcept;
 
+        // Simulation owns maps through unique_ptr. Maps never move or copy;
+        // identity also invalidates caches if allocator storage is reused.
+        SettlementMap(const SettlementMap&) = delete;
+        SettlementMap& operator=(const SettlementMap&) = delete;
+        SettlementMap(SettlementMap&&) = delete;
+        SettlementMap& operator=(SettlementMap&&) = delete;
+
+        [[nodiscard]]
+        std::uint64_t instanceId() const noexcept
+        {
+            return instanceId_;
+        }
+
         [[nodiscard]]
         SettlementGrid& grid() noexcept;
 
@@ -63,15 +76,16 @@ namespace Paladin
         const SettlementEmploymentState& employment() const noexcept { return employment_; }
 
     private:
-        SettlementEmploymentState employment_;
-        SettlementGrid grid_;
-        SettlementNaturalFeatures naturalFeatures_;
-        SettlementObjectState objectState_;
-        SettlementCommandState commandState_;
-        WorldTilePosition sourceRegionCenter_;
-        std::int32_t sourceRegionWidth_ = 0;
-        std::int32_t sourceRegionHeight_ = 0;
-        std::int32_t localTilesPerWorldTile_ = 0;
-        std::uint64_t generationSeed_ = 0;
+      const std::uint64_t instanceId_;
+      SettlementEmploymentState employment_;
+      SettlementGrid grid_;
+      SettlementNaturalFeatures naturalFeatures_;
+      SettlementObjectState objectState_;
+      SettlementCommandState commandState_;
+      WorldTilePosition sourceRegionCenter_;
+      std::int32_t sourceRegionWidth_ = 0;
+      std::int32_t sourceRegionHeight_ = 0;
+      std::int32_t localTilesPerWorldTile_ = 0;
+      std::uint64_t generationSeed_ = 0;
     };
 }

@@ -94,32 +94,51 @@ namespace Paladin
         }
 
         behaviorSeed_ = nameSeed;
-        citizens_.reserve(static_cast<std::size_t>(citizenCount));
+        return spawn(citizenCount);
+    }
 
-
-        for (std::uint64_t index = 0; index < citizenCount; ++index)
+    bool SettlementCitizenState::spawn(std::uint64_t citizenCount)
+    {
+        if (!citizenCount || citizenCount > 100000 ||
+            citizens_.size() > citizens_.max_size() - citizenCount)
         {
-            const CitizenSex sex = (GenerationNoise::mix(nameSeed ^ (index * 104729ULL)) & 1U) == 0
-                ? CitizenSex::Male
-                : CitizenSex::Female;
-            const auto& names = sex == CitizenSex::Male
-                ? maleNames
-                : femaleNames;
-            const std::size_t poolIndex = static_cast<std::size_t>(
-                (nameSeed + index * 17U) % names.size()
-            );
-
-            citizens_.push_back({
-                citizenIds_.generate(),
-                std::string(names[poolIndex]),
-                sex
-            });
+            return false;
         }
+        const auto nameSeed = behaviorSeed_;
+        const auto first = citizens_.size();
+        citizens_.reserve(first + static_cast<std::size_t>(citizenCount));
 
+        const auto savedIds = citizenIds_;
+        try
+        {
+            for (std::uint64_t index = first; index < first + citizenCount;
+                 ++index)
+            {
+                const CitizenSex sex =
+                    (GenerationNoise::mix(nameSeed ^ (index * 104729ULL)) &
+                     1U) == 0
+                        ? CitizenSex::Male
+                        : CitizenSex::Female;
+                const auto& names =
+                    sex == CitizenSex::Male ? maleNames : femaleNames;
+                const std::size_t poolIndex = static_cast<std::size_t>(
+                    (nameSeed + index * 17U) % names.size()
+                );
+
+                citizens_.push_back(
+                    {citizenIds_.generate(), std::string(names[poolIndex]), sex}
+                );
+            }
+        }
+        catch (...)
+        {
+            citizens_.resize(first);
+            citizenIds_ = savedIds;
+            throw;
+        }
         ++version_;
         return true;
     }
-
 
     void SettlementCitizenState::placeUnpositionedCitizens(
         const SettlementMap& settlementMap
