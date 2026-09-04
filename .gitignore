@@ -155,7 +155,7 @@ $RECYCLE.BIN/
 !.vscode/settings.json
 !.vscode/extensions.json
 licenses/
-*.ttf
+assets/fonts
 
 # ============================================================
 # SOURCE CODE SAFEGUARDS
