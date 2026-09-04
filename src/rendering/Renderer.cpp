@@ -1,4 +1,5 @@
 #include "rendering/Renderer.h"
+#include "rendering/Texture.h"
 
 #include <SDL3/SDL.h>
 
@@ -14,7 +15,14 @@ namespace Paladin
                 "SDL_CreateRenderer failed: %s",
                 SDL_GetError()
             );
+
+            return;
         }
+
+        SDL_SetRenderDrawBlendMode(
+            renderer_,
+            SDL_BLENDMODE_BLEND
+        );
     }
 
     Renderer::~Renderer()
@@ -74,6 +82,96 @@ namespace Paladin
         SDL_RenderFillRect(
             renderer_,
             &rectangle
+        );
+    }
+
+
+    std::unique_ptr<Texture> Renderer::loadBitmapTexture(
+        const char* filePath
+    )
+    {
+        SDL_Surface* surface =
+            SDL_LoadBMP(filePath);
+
+        if (!surface)
+        {
+            SDL_Log(
+                "SDL_LoadBMP failed for '%s': %s",
+                filePath,
+                SDL_GetError()
+            );
+
+            return nullptr;
+        }
+
+        const int width = surface->w;
+        const int height = surface->h;
+
+        SDL_Texture* texture =
+            SDL_CreateTextureFromSurface(
+                renderer_,
+                surface
+            );
+
+        SDL_DestroySurface(surface);
+
+        if (!texture)
+        {
+            SDL_Log(
+                "SDL_CreateTextureFromSurface failed for '%s': %s",
+                filePath,
+                SDL_GetError()
+            );
+
+            return nullptr;
+        }
+
+        SDL_SetTextureScaleMode(
+            texture,
+            SDL_SCALEMODE_NEAREST
+        );
+
+        return std::unique_ptr<Texture>(
+            new Texture(
+                texture,
+                width,
+                height
+            )
+        );
+    }
+
+
+    void Renderer::drawTexture(
+        const Texture& texture,
+        float sourceX,
+        float sourceY,
+        float sourceWidth,
+        float sourceHeight,
+        float destinationX,
+        float destinationY,
+        float destinationWidth,
+        float destinationHeight
+    )
+    {
+        const SDL_FRect source{
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight
+        };
+
+        const SDL_FRect destination{
+            destinationX,
+            destinationY,
+            destinationWidth,
+            destinationHeight
+        };
+
+        SDL_RenderTexture(
+            renderer_,
+            texture.texture_,
+            &source,
+            &destination
         );
     }
     

@@ -11,6 +11,8 @@ namespace Paladin
 
     void SimulationClock::beginFrame()
     {
+        frameDeltaSeconds_ = 0.0;
+
         const double currentTimeSeconds =
             static_cast<double>(SDL_GetTicksNS()) / 1'000'000'000.0;
 
@@ -35,6 +37,7 @@ namespace Paladin
             frameTimeSeconds = maxFrameTimeSeconds;
         }
 
+        frameDeltaSeconds_ = frameTimeSeconds;
         accumulatorSeconds_ += frameTimeSeconds;
     }
 
@@ -51,6 +54,11 @@ namespace Paladin
     double SimulationClock::fixedDeltaSeconds() const noexcept
     {
         return fixedDeltaSeconds_;
+    }
+
+    double SimulationClock::frameDeltaSeconds() const noexcept
+    {
+        return frameDeltaSeconds_;
     }
 
     double SimulationClock::interpolationAlpha() const noexcept

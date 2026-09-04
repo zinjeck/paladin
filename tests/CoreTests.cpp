@@ -2,6 +2,7 @@
 
 #include "core/EntityRegistry.h"
 #include "core/StrongId.h"
+#include "rendering/Camera2D.h"
 
 #include <type_traits>
 
@@ -107,6 +108,18 @@ namespace
         PALADIN_CHECK(first->value() == 10);
         PALADIN_CHECK(third->value() == 30);
     }
+
+
+    void testCameraZoomLimits()
+    {
+        Paladin::Camera2D camera;
+
+        camera.setZoom(0.01);
+        PALADIN_CHECK(camera.zoom() == 0.25);
+
+        camera.setZoom(100.0);
+        PALADIN_CHECK(camera.zoom() == 80.0);
+    }
 }
 
 
@@ -114,4 +127,5 @@ void runCoreTests()
 {
     testStrongIds();
     testEntityRegistry();
+    testCameraZoomLimits();
 }

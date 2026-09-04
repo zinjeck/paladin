@@ -1,4 +1,5 @@
 #include "world/World.h"
+#include "world/BiomeType.h"
 #include "world/TerrainType.h"
 
 namespace Paladin
@@ -27,6 +28,9 @@ namespace Paladin
                 {
                     tile->terrain =
                         TerrainType::Land;
+
+                    tile->biome =
+                        BiomeType::Plain;
                 }
             }
         }
@@ -46,6 +50,9 @@ namespace Paladin
             {
                 tile->terrain =
                     TerrainType::Mountain;
+
+                tile->biome =
+                    BiomeType::Plain;
             }
         }
     }

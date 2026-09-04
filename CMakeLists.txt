@@ -22,6 +22,10 @@ add_executable(Paladin
     src/core/SimulationClock.cpp
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
+    src/rendering/Texture.cpp
+    src/rendering/SpriteRenderer.cpp
+    src/rendering/OverlayRenderer.cpp
+    src/rendering/WorldRenderer.cpp
     src/simulation/Simulation.cpp
     src/world/World.cpp
     src/world/WorldTime.cpp

@@ -71,8 +71,8 @@ namespace Paladin
         }
 
     private:
-        static constexpr double MinimumZoom = 0.10;
-        static constexpr double MaximumZoom = 16.0;
+        static constexpr double MinimumZoom = 0.25;
+        static constexpr double MaximumZoom = 80.0;
 
         // Camera location is expressed in LOGICAL WORLD TILES.
         //

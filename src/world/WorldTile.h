@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/BiomeType.h"
 #include "world/TerrainType.h"
 
 namespace Paladin
@@ -8,5 +9,8 @@ namespace Paladin
     {
         TerrainType terrain =
             TerrainType::Water;
+
+        BiomeType biome =
+            BiomeType::Ocean;
     };
 }

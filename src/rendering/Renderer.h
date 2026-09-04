@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 struct SDL_Renderer;
 
@@ -9,6 +10,7 @@ struct SDL_Window;
 namespace Paladin
 
 {
+    class Texture;
 
     struct RenderColor
 
@@ -58,6 +60,23 @@ namespace Paladin
 
             RenderColor color
 
+        );
+
+        [[nodiscard]]
+        std::unique_ptr<Texture> loadBitmapTexture(
+            const char* filePath
+        );
+
+        void drawTexture(
+            const Texture& texture,
+            float sourceX,
+            float sourceY,
+            float sourceWidth,
+            float sourceHeight,
+            float destinationX,
+            float destinationY,
+            float destinationWidth,
+            float destinationHeight
         );
 
         [[nodiscard]]

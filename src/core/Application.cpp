@@ -6,11 +6,12 @@
 #include "simulation/Simulation.h"
 #include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
-#include "rendering/WorldGridRenderer.h"
+#include "rendering/WorldRenderer.h"
 
 #include "world/World.h"
 #include <SDL3/SDL.h>
 
+#include <cmath>
 #include <memory>
 
 namespace Paladin
@@ -64,8 +65,8 @@ namespace Paladin
                 128.0
             );
         
-        worldGridRenderer_ =
-            std::make_unique<WorldGridRenderer>();
+        worldRenderer_ =
+            std::make_unique<WorldRenderer>();
         
         tileRenderMetrics_ =
             std::make_unique<TileRenderMetrics>();
@@ -74,7 +75,7 @@ namespace Paladin
     Application::~Application()
     {
         tileRenderMetrics_.reset();
-        worldGridRenderer_.reset();
+        worldRenderer_.reset();
         camera_.reset();
 
         simulation_.reset();
@@ -97,7 +98,7 @@ namespace Paladin
             !simulationClock_ ||
             !simulation_ ||
             !camera_ ||
-            !worldGridRenderer_ ||
+            !worldRenderer_ ||
             !tileRenderMetrics_
         )
         {
@@ -118,7 +119,49 @@ namespace Paladin
                 {
                     running = false;
                 }
+
+                if (event.type == SDL_EVENT_MOUSE_WHEEL)
+                {
+                    double wheelDelta =
+                        static_cast<double>(event.wheel.y);
+
+                    if (
+                        event.wheel.direction
+                        == SDL_MOUSEWHEEL_FLIPPED
+                    )
+                    {
+                        wheelDelta = -wheelDelta;
+                    }
+
+                    constexpr double zoomInPerWheelStep = 1.15;
+                    constexpr double zoomOutPerWheelStep = 0.85;
+
+                    const double multiplier =
+                        wheelDelta > 0.0
+                            ? std::pow(
+                                zoomInPerWheelStep,
+                                wheelDelta
+                            )
+                            : std::pow(
+                                zoomOutPerWheelStep,
+                                -wheelDelta
+                            );
+
+                    applyCameraZoom(
+                        multiplier,
+                        static_cast<double>(event.wheel.mouse_x),
+                        static_cast<double>(event.wheel.mouse_y)
+                    );
+                }
             }
+
+            updateCameraMovement(
+                simulationClock_->frameDeltaSeconds()
+            );
+
+            updateCameraZoom(
+                simulationClock_->frameDeltaSeconds()
+            );
 
             while (simulationClock_->shouldTick())
             {
@@ -131,9 +174,9 @@ namespace Paladin
 
             renderer_->beginFrame();
 
-            worldGridRenderer_->render(
+            worldRenderer_->render(
                 *renderer_,
-                simulation_->world().grid(),
+                simulation_->world(),
                 *camera_,
                 *tileRenderMetrics_
             );
@@ -142,5 +185,171 @@ namespace Paladin
         }
 
         return 0;
+    }
+
+    void Application::updateCameraMovement(
+        double frameDeltaSeconds
+    )
+    {
+        const bool* keyboardState =
+            SDL_GetKeyboardState(nullptr);
+
+        double directionX = 0.0;
+        double directionY = 0.0;
+
+        if (keyboardState[SDL_SCANCODE_A])
+        {
+            directionX -= 1.0;
+        }
+
+        if (keyboardState[SDL_SCANCODE_D])
+        {
+            directionX += 1.0;
+        }
+
+        if (keyboardState[SDL_SCANCODE_W])
+        {
+            directionY -= 1.0;
+        }
+
+        if (keyboardState[SDL_SCANCODE_S])
+        {
+            directionY += 1.0;
+        }
+
+        const double directionLength =
+            std::hypot(directionX, directionY);
+
+        if (directionLength == 0.0)
+        {
+            return;
+        }
+
+        directionX /= directionLength;
+        directionY /= directionLength;
+
+        constexpr double panSpeedTilesPerSecondAtZoomOne =
+            162.5;
+
+        const double panSpeedTilesPerSecond =
+            panSpeedTilesPerSecondAtZoomOne
+            / camera_->zoom();
+
+        camera_->move(
+            directionX
+                * panSpeedTilesPerSecond
+                * frameDeltaSeconds,
+            directionY
+                * panSpeedTilesPerSecond
+                * frameDeltaSeconds
+        );
+    }
+
+    void Application::updateCameraZoom(
+        double frameDeltaSeconds
+    )
+    {
+        const bool* keyboardState =
+            SDL_GetKeyboardState(nullptr);
+
+        double zoomDirection = 0.0;
+
+        if (
+            keyboardState[SDL_SCANCODE_EQUALS] ||
+            keyboardState[SDL_SCANCODE_KP_PLUS]
+        )
+        {
+            zoomDirection += 1.0;
+        }
+
+        if (
+            keyboardState[SDL_SCANCODE_MINUS] ||
+            keyboardState[SDL_SCANCODE_KP_MINUS]
+        )
+        {
+            zoomDirection -= 1.0;
+        }
+
+        if (zoomDirection == 0.0)
+        {
+            return;
+        }
+
+        float mouseX = 0.0F;
+        float mouseY = 0.0F;
+
+        SDL_GetMouseState(&mouseX, &mouseY);
+
+        constexpr double keyboardZoomFactorPerSecond = 2.0;
+
+        applyCameraZoom(
+            std::pow(
+                keyboardZoomFactorPerSecond,
+                zoomDirection * frameDeltaSeconds
+            ),
+            static_cast<double>(mouseX),
+            static_cast<double>(mouseY)
+        );
+    }
+
+    void Application::applyCameraZoom(
+        double multiplier,
+        double screenX,
+        double screenY
+    )
+    {
+        if (multiplier <= 0.0 || multiplier == 1.0)
+        {
+            return;
+        }
+
+        const double viewportWidth =
+            static_cast<double>(renderer_->outputWidth());
+
+        const double viewportHeight =
+            static_cast<double>(renderer_->outputHeight());
+
+        if (viewportWidth <= 0.0 || viewportHeight <= 0.0)
+        {
+            return;
+        }
+
+        const double screenOffsetX =
+            screenX - viewportWidth * 0.5;
+
+        const double screenOffsetY =
+            screenY - viewportHeight * 0.5;
+
+        const double oldTilePixels =
+            tileRenderMetrics_->scaledTilePixels(
+                camera_->zoom()
+            );
+
+        if (oldTilePixels <= 0.0)
+        {
+            return;
+        }
+
+        const double worldTileXUnderCursor =
+            camera_->tileX()
+            + screenOffsetX / oldTilePixels;
+
+        const double worldTileYUnderCursor =
+            camera_->tileY()
+            + screenOffsetY / oldTilePixels;
+
+        camera_->multiplyZoom(multiplier);
+
+        const double newTilePixels =
+            tileRenderMetrics_->scaledTilePixels(
+                camera_->zoom()
+            );
+
+        camera_->setPosition(
+            worldTileXUnderCursor
+                - screenOffsetX / newTilePixels,
+            worldTileYUnderCursor
+                - screenOffsetY / newTilePixels
+        );
     }
 }
