@@ -1,7 +1,8 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldTilePosition.h"
+#include "world/SettlementGrid.h"
+#include "world/SettlementTilePosition.h"
 
 #include <cstdint>
 #include <string>
@@ -10,17 +11,16 @@
 
 namespace Paladin
 {
-    class WorldGrid;
     struct SettlementObjectDefinition;
 
     struct SettlementObjectFootprint
     {
-        WorldTilePosition topLeft;
+        SettlementTilePosition topLeft;
         std::int32_t width = 0;
         std::int32_t height = 0;
 
         [[nodiscard]]
-        bool contains(WorldTilePosition position) const noexcept;
+        bool contains(SettlementTilePosition position) const noexcept;
 
         friend constexpr bool operator==(
             const SettlementObjectFootprint&,
@@ -90,35 +90,35 @@ namespace Paladin
 
         [[nodiscard]]
         bool canPlace(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
         ) const noexcept;
 
         [[nodiscard]]
         SettlementPlacementAreaEvaluation evaluatePlacementArea(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
         ) const noexcept;
 
         [[nodiscard]]
         SettlementTilePlacementStatus placementStatusAt(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             const SettlementObjectDefinition& definition,
-            WorldTilePosition position
+            SettlementTilePosition position
         ) const noexcept;
 
         [[nodiscard]]
         bool placeCompletedObject(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
         );
 
         [[nodiscard]]
         bool createConstructionSites(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
         );
@@ -143,12 +143,12 @@ namespace Paladin
 
         [[nodiscard]]
         const CompletedSettlementObject* completedObjectAt(
-            WorldTilePosition position
+            SettlementTilePosition position
         ) const noexcept;
 
         [[nodiscard]]
         const SettlementConstructionSite* constructionSiteAt(
-            WorldTilePosition position
+            SettlementTilePosition position
         ) const noexcept;
 
         [[nodiscard]]
@@ -178,10 +178,10 @@ namespace Paladin
         ) noexcept;
 
         [[nodiscard]]
-        std::size_t tileIndex(WorldTilePosition position) const noexcept;
+        std::size_t tileIndex(SettlementTilePosition position) const noexcept;
 
         void rebuildPlacementPrefixCache(
-            const WorldGrid& grid
+            const SettlementGrid& grid
         ) const noexcept;
 
         [[nodiscard]]
@@ -199,7 +199,7 @@ namespace Paladin
         IdGenerator<SettlementObjectId> objectIds_;
         IdGenerator<ConstructionSiteId> constructionSiteIds_;
         std::uint64_t presentationVersion_ = 0;
-        mutable const WorldGrid* cachedPlacementGrid_ = nullptr;
+        mutable const SettlementGrid* cachedPlacementGrid_ = nullptr;
         mutable std::uint64_t cachedPlacementVersion_ =
             static_cast<std::uint64_t>(-1);
         mutable std::vector<std::uint32_t> structureBlockedPrefix_;

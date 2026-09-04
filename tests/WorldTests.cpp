@@ -28,7 +28,7 @@ void runWorldTests()
     const Paladin::PolityId polityId =
         world.createPolity();
 
-    Paladin::WorldPosition foundingPosition{};
+    Paladin::WorldTilePosition foundingPosition{};
     bool foundLandTile = false;
 
     for (
@@ -136,7 +136,7 @@ void runWorldTests()
         settlement->ownerPolityId() == polityId
     );
 
-    Paladin::WorldPosition capitalPosition{
+    Paladin::WorldTilePosition capitalPosition{
         foundingPosition.x + 1,
         foundingPosition.y
     };
@@ -240,7 +240,7 @@ void runWorldTests()
     PALADIN_CHECK(polity->mapColor() == editedIdentity.mapColor);
     PALADIN_CHECK(polity->flag() == editedIdentity.flag);
 
-    Paladin::WorldPosition aiCapitalPosition{};
+    Paladin::WorldTilePosition aiCapitalPosition{};
     bool foundAiCapitalPosition = false;
 
     for (
@@ -613,7 +613,7 @@ void runWorldTests()
     const Paladin::PolityId borderlandPolityId =
         borderlandWorld.createPolity();
 
-    constexpr Paladin::WorldPosition borderlandCapital{16, 16};
+    constexpr Paladin::WorldTilePosition borderlandCapital{16, 16};
 
     PALADIN_CHECK(
         borderlandWorld.foundCapitalSettlement(
@@ -755,7 +755,7 @@ void runWorldTests()
         )
     );
 
-    constexpr Paladin::WorldPosition movedCapital{7, 7};
+    constexpr Paladin::WorldTilePosition movedCapital{7, 7};
     PALADIN_CHECK(
         borderlandWorld.relocateSoleCapital(
             borderlandPolityId,
@@ -820,7 +820,7 @@ void runWorldTests()
         }
     }
 
-    Paladin::WorldGrid localGrid(24, 24);
+    Paladin::SettlementGrid localGrid(24, 24);
 
     for (std::int32_t y = 0; y < localGrid.height(); ++y)
     {
@@ -849,7 +849,7 @@ void runWorldTests()
         Paladin::SettlementObjectTypes::FishingGrounds
     ));
 
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{2, 2});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{2, 2});
     PALADIN_CHECK(!objectPlacement.visibleFootprintIsValid(localMap));
 
     PALADIN_CHECK(
@@ -863,7 +863,7 @@ void runWorldTests()
         objectPlacement.pointerPressed({{2, 2}}, localMap)
         == Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{3, 3});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{3, 3});
     PALADIN_CHECK(objectPlacement.pointerReleased({{3, 3}}, localMap));
     PALADIN_CHECK(objectPlacement.hasLockedFootprint());
 
@@ -884,7 +884,7 @@ void runWorldTests()
         );
 
     PALADIN_CHECK(stockpileDefinition != nullptr);
-    Paladin::WorldGrid unrestrictedSizeGrid(30, 2);
+    Paladin::SettlementGrid unrestrictedSizeGrid(30, 2);
     for (std::int32_t x = 0; x < unrestrictedSizeGrid.width(); ++x)
     {
         unrestrictedSizeGrid.tile({x, 0})->terrain =
@@ -904,7 +904,7 @@ void runWorldTests()
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::House
     ));
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{8, 8});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{8, 8});
     PALADIN_CHECK(objectPlacement.visibleFootprintIsValid(localMap));
     PALADIN_CHECK(
         objectPlacement.pointerPressed({{8, 8}}, localMap)
@@ -927,10 +927,12 @@ void runWorldTests()
             Paladin::SettlementResourceTypes::Stone
     );
 
+    Paladin::SettlementCitizenState citizens;
     Paladin::SettlementInspectionController inspection;
     PALADIN_CHECK(inspection.selectAt(
         {8, 8},
         localMap.objectState(),
+        citizens,
         true
     ));
     PALADIN_CHECK(
@@ -945,7 +947,7 @@ void runWorldTests()
         objectPlacement.pointerPressed({{15, 15}}, localMap)
         == Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{16, 16});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{16, 16});
     PALADIN_CHECK(!objectPlacement.pointerReleased({{16, 16}}, localMap));
     PALADIN_CHECK(!objectPlacement.hasLockedFootprint());
     objectPlacement.cancelPlacement();
@@ -958,7 +960,7 @@ void runWorldTests()
         objectPlacement.pointerPressed({{10, 15}}, localMap)
         == Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{14, 15});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{14, 15});
     PALADIN_CHECK(objectPlacement.pointerReleased({{14, 15}}, localMap));
     PALADIN_CHECK(
         objectPlacement.pointerPressed(std::nullopt, localMap)
@@ -973,7 +975,7 @@ void runWorldTests()
         objectPlacement.pointerPressed({{12, 15}}, localMap)
         == Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{16, 15});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{16, 15});
     PALADIN_CHECK(objectPlacement.pointerReleased({{16, 15}}, localMap));
 
     const Paladin::SettlementObjectDefinition* roadDefinition =
@@ -1005,7 +1007,7 @@ void runWorldTests()
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::House
     ));
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{12, 15});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{12, 15});
     PALADIN_CHECK(objectPlacement.visibleFootprintIsValid(localMap));
     PALADIN_CHECK(
         objectPlacement.pointerPressed({{12, 15}}, localMap)
@@ -1016,7 +1018,7 @@ void runWorldTests()
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::CityKeep
     ));
-    objectPlacement.pointerMoved(Paladin::WorldTilePosition{19, 10});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{19, 10});
     PALADIN_CHECK(
         objectPlacement.pointerPressed({{19, 10}}, localMap)
         == Paladin::SettlementPlacementCommitResult::CompletedObject
@@ -1026,17 +1028,52 @@ void runWorldTests()
     PALADIN_CHECK(inspection.selectAt(
         {19, 10},
         localMap.objectState(),
+        citizens,
         false
     ));
     PALADIN_CHECK(
         inspection.selectedObject(localMap.objectState()) != nullptr
     );
 
-    Paladin::SettlementCitizenState citizens;
     PALADIN_CHECK(citizens.initialize(8, 42));
     citizens.placeUnpositionedCitizens(localMap);
     PALADIN_CHECK(citizens.citizens().size() == 8);
     PALADIN_CHECK(!citizens.citizens().front().name.empty());
+    const Paladin::SettlementObjectFootprint keepFootprint =
+        localMap.objectState().completedObjects().front().footprint;
+    for (const Paladin::SettlementCitizen& citizen : citizens.citizens())
+    {
+        PALADIN_CHECK(!keepFootprint.contains(citizen.tilePosition));
+
+        const std::int32_t horizontalDistance =
+            citizen.tilePosition.x < keepFootprint.topLeft.x
+                ? keepFootprint.topLeft.x - citizen.tilePosition.x
+                : citizen.tilePosition.x >=
+                    keepFootprint.topLeft.x + keepFootprint.width
+                    ? citizen.tilePosition.x -
+                        (keepFootprint.topLeft.x + keepFootprint.width - 1)
+                    : 0;
+        const std::int32_t verticalDistance =
+            citizen.tilePosition.y < keepFootprint.topLeft.y
+                ? keepFootprint.topLeft.y - citizen.tilePosition.y
+                : citizen.tilePosition.y >=
+                    keepFootprint.topLeft.y + keepFootprint.height
+                    ? citizen.tilePosition.y -
+                        (keepFootprint.topLeft.y + keepFootprint.height - 1)
+                    : 0;
+
+        PALADIN_CHECK(horizontalDistance + verticalDistance == 1);
+    }
+    PALADIN_CHECK(inspection.selectAt(
+        citizens.citizens().front().tilePosition,
+        localMap.objectState(),
+        citizens,
+        true
+    ));
+    PALADIN_CHECK(
+        inspection.selectedCitizen(citizens) ==
+            &citizens.citizens().front()
+    );
     PALADIN_CHECK(
         localMap.commandState().add(
             localMap.grid(),

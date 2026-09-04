@@ -1,23 +1,9 @@
 #pragma once
 
-#include <compare>
-#include <cstdint>
+#include "world/TilePosition.h"
 
 namespace Paladin
 {
-    struct WorldTilePosition
-    {
-        std::int32_t x = 0;
-        std::int32_t y = 0;
-
-        friend constexpr bool operator==(
-            const WorldTilePosition&,
-            const WorldTilePosition&
-        ) noexcept = default;
-
-        friend constexpr auto operator<=>(
-            const WorldTilePosition&,
-            const WorldTilePosition&
-        ) noexcept = default;
-    };
+    struct WorldTileSpaceTag;
+    using WorldTilePosition = TilePosition<WorldTileSpaceTag>;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 
 #include <cstdint>
 #include <memory>
@@ -29,7 +29,7 @@ namespace Paladin
         [[nodiscard]]
         std::unique_ptr<SettlementMap> generate(
             const WorldGrid& sourceGrid,
-            WorldPosition sourceRegionCenter,
+            WorldTilePosition sourceRegionCenter,
             std::int32_t sourceRegionWidth,
             std::int32_t sourceRegionHeight,
             std::uint64_t worldSeed,

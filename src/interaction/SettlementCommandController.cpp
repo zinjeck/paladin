@@ -48,7 +48,7 @@ namespace Paladin
 
 
     void SettlementCommandController::pointerMoved(
-        std::optional<WorldTilePosition> position
+        std::optional<SettlementTilePosition> position
     ) noexcept
     {
         if (isActive())
@@ -59,7 +59,7 @@ namespace Paladin
 
 
     void SettlementCommandController::pointerPressed(
-        std::optional<WorldTilePosition> position
+        std::optional<SettlementTilePosition> position
     ) noexcept
     {
         if (!isActive() || !position)
@@ -73,7 +73,7 @@ namespace Paladin
 
 
     bool SettlementCommandController::pointerReleased(
-        std::optional<WorldTilePosition> position,
+        std::optional<SettlementTilePosition> position,
         SettlementMap& settlementMap,
         SettlementCitizenState& citizens
     )
@@ -122,7 +122,7 @@ namespace Paladin
             return std::nullopt;
         }
 
-        const WorldTilePosition start = dragStart_.value_or(
+        const SettlementTilePosition start = dragStart_.value_or(
             *hoveredPosition_
         );
         const std::int32_t left = std::min(start.x, hoveredPosition_->x);

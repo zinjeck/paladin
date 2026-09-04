@@ -1,6 +1,6 @@
 #include "world/settlements/commands/SettlementCommandState.h"
 
-#include "world/WorldGrid.h"
+#include "world/SettlementGrid.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/commands/SettlementCommandDefinition.h"
 
@@ -25,7 +25,7 @@ namespace Paladin
 
 
     bool SettlementCommandState::add(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         std::string_view commandTypeId,
         const SettlementObjectFootprint& footprint,
         SettlementCitizenState& citizens
@@ -33,7 +33,7 @@ namespace Paladin
     {
         const SettlementCommandDefinition* definition =
             SettlementCommandCatalog::definition(commandTypeId);
-        const WorldTilePosition bottomRight{
+        const SettlementTilePosition bottomRight{
             footprint.topLeft.x + footprint.width - 1,
             footprint.topLeft.y + footprint.height - 1
         };

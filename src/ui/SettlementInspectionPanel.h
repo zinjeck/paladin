@@ -10,6 +10,7 @@ namespace Paladin
     class GrayUiRenderer;
     class Renderer;
     class SettlementInspectionController;
+    class SettlementCitizenState;
     class SettlementMap;
     struct SettlementObjectFootprint;
     struct TileRenderMetrics;
@@ -22,6 +23,7 @@ namespace Paladin
             GrayUiRenderer& grayUiRenderer,
             const SettlementInspectionController& controller,
             const SettlementMap& settlementMap,
+            const SettlementCitizenState& citizenState,
             const Camera2D& camera,
             const TileRenderMetrics& metrics
         );

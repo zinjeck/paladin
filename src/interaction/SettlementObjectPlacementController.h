@@ -1,6 +1,6 @@
 #pragma once
 
-#include "world/WorldTilePosition.h"
+#include "world/SettlementTilePosition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 
 #include <optional>
@@ -40,18 +40,18 @@ namespace Paladin
         const SettlementObjectDefinition* activeDefinition() const noexcept;
 
         void pointerMoved(
-            std::optional<WorldTilePosition> position
+            std::optional<SettlementTilePosition> position
         ) noexcept;
 
         [[nodiscard]]
         SettlementPlacementCommitResult pointerPressed(
-            std::optional<WorldTilePosition> position,
+            std::optional<SettlementTilePosition> position,
             SettlementMap& settlementMap
         );
 
         [[nodiscard]]
         bool pointerReleased(
-            std::optional<WorldTilePosition> position,
+            std::optional<SettlementTilePosition> position,
             const SettlementMap& settlementMap
         ) noexcept;
 
@@ -77,8 +77,8 @@ namespace Paladin
         );
 
         std::string activeObjectTypeId_;
-        std::optional<WorldTilePosition> hoveredPosition_;
-        std::optional<WorldTilePosition> dragStart_;
+        std::optional<SettlementTilePosition> hoveredPosition_;
+        std::optional<SettlementTilePosition> dragStart_;
         std::optional<SettlementObjectFootprint> lockedFootprint_;
         bool dragging_ = false;
     };

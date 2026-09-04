@@ -317,7 +317,7 @@ namespace Paladin
 
 
     SettlementId Simulation::foundPlayerCapital(
-        WorldPosition position,
+        WorldTilePosition position,
         const FoundingIdentity& identity
     )
     {
@@ -361,7 +361,7 @@ namespace Paladin
     }
 
 
-    bool Simulation::movePlayerCapital(WorldPosition position)
+    bool Simulation::movePlayerCapital(WorldTilePosition position)
     {
         const Polity* polity = world_->polity(playerPolityId_);
 

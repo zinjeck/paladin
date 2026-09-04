@@ -131,7 +131,7 @@ namespace Paladin
     // ========================================================
 
     SettlementId World::createSettlement(
-        WorldPosition position
+        WorldTilePosition position
     )
     {
         return settlements_.create(position);
@@ -160,7 +160,7 @@ namespace Paladin
 
 
     ArmyId World::createArmy(
-        WorldPosition position
+        WorldTilePosition position
     )
     {
         return armies_.create(position);
@@ -168,7 +168,7 @@ namespace Paladin
 
 
     bool World::canFoundSettlementAt(
-        WorldPosition position
+        WorldTilePosition position
     ) const noexcept
     {
         return canFoundSettlementAt(position, {});
@@ -176,7 +176,7 @@ namespace Paladin
 
 
     bool World::canFoundSettlementAt(
-        WorldPosition position,
+        WorldTilePosition position,
         PolityId ownerPolityId
     ) const noexcept
     {
@@ -252,7 +252,7 @@ namespace Paladin
 
 
     SettlementId World::foundSettlement(
-        WorldPosition position,
+        WorldTilePosition position,
         PolityId ownerPolityId
     )
     {
@@ -265,7 +265,7 @@ namespace Paladin
 
 
     SettlementId World::foundSettlement(
-        WorldPosition position,
+        WorldTilePosition position,
         PolityId ownerPolityId,
         const SettlementFoundationProfile& foundationProfile
     )
@@ -304,7 +304,7 @@ namespace Paladin
 
 
     SettlementId World::foundCapitalSettlement(
-        WorldPosition position,
+        WorldTilePosition position,
         PolityId ownerPolityId,
         const FoundingIdentity& identity
     )
@@ -319,7 +319,7 @@ namespace Paladin
 
 
     SettlementId World::foundCapitalSettlement(
-        WorldPosition position,
+        WorldTilePosition position,
         PolityId ownerPolityId,
         const FoundingIdentity& identity,
         const SettlementFoundationProfile& foundationProfile
@@ -517,7 +517,7 @@ namespace Paladin
 
     bool World::setSettlementPosition(
         SettlementId settlementId,
-        WorldPosition position
+        WorldTilePosition position
     ) noexcept
     {
         Settlement* targetSettlement =
@@ -595,7 +595,7 @@ namespace Paladin
 
     bool World::relocateSoleCapital(
         PolityId polityId,
-        WorldPosition position
+        WorldTilePosition position
     )
     {
         Polity* targetPolity = polities_.find(polityId);
@@ -700,7 +700,7 @@ namespace Paladin
 
     bool World::setArmyPosition(
         ArmyId armyId,
-        WorldPosition position
+        WorldTilePosition position
     ) noexcept
     {
         Army* targetArmy =

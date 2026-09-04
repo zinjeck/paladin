@@ -1,12 +1,16 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 
 #include "world/TerrainType.h"
-#include "world/WorldGrid.h"
+#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/SettlementObjectState.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
+#include <deque>
 #include <string_view>
 
 namespace Paladin
@@ -34,15 +38,45 @@ namespace Paladin
         };
 
         bool isWalkableCitizenTile(
-            const WorldGrid& grid,
-            WorldTilePosition position
+            const SettlementMap& settlementMap,
+            SettlementTilePosition position
         ) noexcept
         {
+            const SettlementGrid& grid = settlementMap.grid();
             const WorldTile* tile = grid.tile(position);
+
+            if (
+                !tile ||
+                tile->terrain == TerrainType::Water ||
+                tile->terrain == TerrainType::Mountain
+            )
+            {
+                return false;
+            }
+
+            const SettlementObjectState& objectState =
+                settlementMap.objectState();
+            const CompletedSettlementObject* object =
+                objectState.completedObjectAt(position);
+            const SettlementConstructionSite* constructionSite =
+                objectState.constructionSiteAt(position);
+
+            const auto blocksCitizen = [](std::string_view objectTypeId)
+            {
+                const SettlementObjectDefinition* definition =
+                    SettlementObjectCatalog::definition(objectTypeId);
+                return
+                    !definition ||
+                    definition->placementLayer ==
+                        SettlementObjectPlacementLayer::Structure;
+            };
+
             return
-                tile &&
-                tile->terrain != TerrainType::Water &&
-                tile->terrain != TerrainType::Mountain;
+                (!object || !blocksCitizen(object->objectTypeId)) &&
+                (
+                    !constructionSite ||
+                    !blocksCitizen(constructionSite->objectTypeId)
+                );
         }
     }
 
@@ -88,45 +122,103 @@ namespace Paladin
         const SettlementMap& settlementMap
     )
     {
-        const WorldGrid& grid = settlementMap.grid();
+        const SettlementGrid& grid = settlementMap.grid();
         if (grid.width() <= 0 || grid.height() <= 0)
         {
             return;
         }
 
-        const WorldTilePosition center{
-            grid.width() / 2,
-            grid.height() / 2
-        };
-        std::vector<WorldTilePosition> spawnTiles;
-        spawnTiles.reserve(citizens_.size());
+        const CompletedSettlementObject* cityKeep = nullptr;
 
-        for (
-            std::int32_t radius = 0;
-            spawnTiles.size() < citizens_.size() &&
-                radius < grid.width() + grid.height();
-            ++radius
+        for (const CompletedSettlementObject& object :
+            settlementMap.objectState().completedObjects())
+        {
+            if (object.objectTypeId == SettlementObjectTypes::CityKeep)
+            {
+                cityKeep = &object;
+                break;
+            }
+        }
+
+        if (!cityKeep)
+        {
+            return;
+        }
+
+        std::vector<SettlementTilePosition> spawnTiles;
+        spawnTiles.reserve(citizens_.size());
+        std::vector<std::uint8_t> visited(
+            static_cast<std::size_t>(grid.width()) *
+                static_cast<std::size_t>(grid.height()),
+            0
+        );
+        std::deque<SettlementTilePosition> searchFrontier;
+
+        const auto enqueue = [&grid, &visited, &searchFrontier](
+            SettlementTilePosition position
         )
         {
-            for (std::int32_t y = center.y - radius; y <= center.y + radius; ++y)
+            if (!grid.isValidPosition(position))
             {
-                for (std::int32_t x = center.x - radius; x <= center.x + radius; ++x)
-                {
-                    if (
-                        radius > 0 &&
-                        x > center.x - radius && x < center.x + radius &&
-                        y > center.y - radius && y < center.y + radius
-                    )
-                    {
-                        continue;
-                    }
+                return;
+            }
 
-                    const WorldTilePosition position{x, y};
-                    if (isWalkableCitizenTile(grid, position))
-                    {
-                        spawnTiles.push_back(position);
-                    }
-                }
+            const std::size_t index =
+                static_cast<std::size_t>(position.y) *
+                    static_cast<std::size_t>(grid.width()) +
+                static_cast<std::size_t>(position.x);
+
+            if (visited[index] != 0)
+            {
+                return;
+            }
+
+            visited[index] = 1;
+            searchFrontier.push_back(position);
+        };
+
+        for (
+            std::int32_t y = cityKeep->footprint.topLeft.y;
+            y < cityKeep->footprint.topLeft.y + cityKeep->footprint.height;
+            ++y
+        )
+        {
+            for (
+                std::int32_t x = cityKeep->footprint.topLeft.x;
+                x < cityKeep->footprint.topLeft.x + cityKeep->footprint.width;
+                ++x
+            )
+            {
+                enqueue({x, y});
+            }
+        }
+
+        constexpr std::array<SettlementTilePosition, 4> neighborOffsets{{
+            {0, -1}, {-1, 0}, {1, 0}, {0, 1}
+        }};
+
+        while (
+            !searchFrontier.empty() &&
+            spawnTiles.size() < citizens_.size()
+        )
+        {
+            const SettlementTilePosition position = searchFrontier.front();
+            searchFrontier.pop_front();
+
+            if (
+                !cityKeep->footprint.contains(position) &&
+                isWalkableCitizenTile(settlementMap, position)
+            )
+            {
+                spawnTiles.push_back(position);
+            }
+
+            for (const SettlementTilePosition offset : neighborOffsets)
+            {
+                enqueue({
+                    position.x + offset.x,
+                    position.y + offset.y
+                });
             }
         }
 
@@ -211,6 +303,40 @@ namespace Paladin
     SettlementCitizenState::citizens() const noexcept
     {
         return citizens_;
+    }
+
+
+    const SettlementCitizen* SettlementCitizenState::citizen(
+        CitizenId id
+    ) const noexcept
+    {
+        const auto iterator = std::find_if(
+            citizens_.begin(),
+            citizens_.end(),
+            [id](const SettlementCitizen& citizen)
+            {
+                return citizen.id == id;
+            }
+        );
+
+        return iterator == citizens_.end() ? nullptr : &*iterator;
+    }
+
+
+    const SettlementCitizen* SettlementCitizenState::citizenAt(
+        SettlementTilePosition position
+    ) const noexcept
+    {
+        const auto iterator = std::find_if(
+            citizens_.rbegin(),
+            citizens_.rend(),
+            [position](const SettlementCitizen& citizen)
+            {
+                return citizen.tilePosition == position;
+            }
+        );
+
+        return iterator == citizens_.rend() ? nullptr : &*iterator;
     }
 
 

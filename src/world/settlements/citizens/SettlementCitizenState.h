@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldTilePosition.h"
+#include "world/SettlementTilePosition.h"
 
 #include <cstdint>
 #include <span>
@@ -29,7 +29,7 @@ namespace Paladin
         CitizenId id;
         std::string name;
         CitizenSex sex = CitizenSex::Male;
-        WorldTilePosition tilePosition{-1, -1};
+        SettlementTilePosition tilePosition{-1, -1};
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
     };
@@ -58,6 +58,14 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<const SettlementCitizen> citizens() const noexcept;
+
+        [[nodiscard]]
+        const SettlementCitizen* citizen(CitizenId id) const noexcept;
+
+        [[nodiscard]]
+        const SettlementCitizen* citizenAt(
+            SettlementTilePosition position
+        ) const noexcept;
 
         [[nodiscard]]
         std::uint64_t version() const noexcept;

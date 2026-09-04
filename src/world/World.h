@@ -8,7 +8,7 @@
 #include "world/FoundingIdentity.h"
 #include "world/Polity.h"
 #include "world/Settlement.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 #include "world/WorldTime.h"
 #include "world/WorldGrid.h"
 #include "world/generation/WorldGenerationSettings.h"
@@ -49,7 +49,7 @@ namespace Paladin
 
         [[nodiscard]]
         SettlementId createSettlement(
-            WorldPosition position = {}
+            WorldTilePosition position = {}
         );
 
         [[nodiscard]]
@@ -62,43 +62,43 @@ namespace Paladin
 
         [[nodiscard]]
         ArmyId createArmy(
-            WorldPosition position = {}
+            WorldTilePosition position = {}
         );
 
         [[nodiscard]]
         bool canFoundSettlementAt(
-            WorldPosition position
+            WorldTilePosition position
         ) const noexcept;
 
         [[nodiscard]]
         bool canFoundSettlementAt(
-            WorldPosition position,
+            WorldTilePosition position,
             PolityId ownerPolityId
         ) const noexcept;
 
         [[nodiscard]]
         SettlementId foundSettlement(
-            WorldPosition position,
+            WorldTilePosition position,
             PolityId ownerPolityId
         );
 
         [[nodiscard]]
         SettlementId foundSettlement(
-            WorldPosition position,
+            WorldTilePosition position,
             PolityId ownerPolityId,
             const SettlementFoundationProfile& foundationProfile
         );
 
         [[nodiscard]]
         SettlementId foundCapitalSettlement(
-            WorldPosition position,
+            WorldTilePosition position,
             PolityId ownerPolityId,
             const FoundingIdentity& identity
         );
 
         [[nodiscard]]
         SettlementId foundCapitalSettlement(
-            WorldPosition position,
+            WorldTilePosition position,
             PolityId ownerPolityId,
             const FoundingIdentity& identity,
             const SettlementFoundationProfile& foundationProfile
@@ -200,7 +200,7 @@ namespace Paladin
 
         bool setSettlementPosition(
             SettlementId settlementId,
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept;
 
         [[nodiscard]]
@@ -218,7 +218,7 @@ namespace Paladin
         [[nodiscard]]
         bool relocateSoleCapital(
             PolityId polityId,
-            WorldPosition position
+            WorldTilePosition position
         );
 
 
@@ -237,7 +237,7 @@ namespace Paladin
 
         bool setArmyPosition(
             ArmyId armyId,
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept;
 
 

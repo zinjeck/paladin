@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "interaction/CameraNavigationPolicy.h"
 #include "world/WorldTilePosition.h"
+#include "world/SettlementTilePosition.h"
 
 #include <memory>
 #include <optional>
@@ -27,7 +28,6 @@ namespace Paladin
     class Window;
     class WorldHud;
     class WorldRenderer;
-    class WorldGrid;
 
     struct TileRenderMetrics;
 
@@ -63,13 +63,10 @@ namespace Paladin
         void clampCameraToWorld() noexcept;
 
         [[nodiscard]]
-        const WorldGrid* activeGrid() const noexcept;
-
-        [[nodiscard]]
         bool activeHudContainsPoint(float x, float y) const noexcept;
 
         [[nodiscard]]
-        std::optional<WorldTilePosition> cityTileAtScreen(
+        std::optional<SettlementTilePosition> cityTileAtScreen(
             double screenX,
             double screenY
         ) const noexcept;

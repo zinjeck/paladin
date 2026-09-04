@@ -31,7 +31,7 @@ namespace Paladin
 
         for (const Settlement& settlement : world.settlements())
         {
-            const WorldPosition position =
+            const WorldTilePosition position =
                 settlement.position();
 
             const float centerX =

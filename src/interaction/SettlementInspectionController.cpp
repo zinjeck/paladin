@@ -2,15 +2,30 @@
 
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 
 namespace Paladin
 {
     bool SettlementInspectionController::selectAt(
-        WorldTilePosition position,
+        SettlementTilePosition position,
         const SettlementObjectState& objectState,
+        const SettlementCitizenState& citizenState,
         bool placePanelOnRight
     ) noexcept
     {
+        const SettlementCitizen* citizen =
+            citizenState.citizenAt(position);
+
+        if (citizen)
+        {
+            kind_ = SettlementInspectionKind::Citizen;
+            citizenId_ = citizen->id;
+            constructionSiteId_ = {};
+            objectId_ = {};
+            placePanelOnRight_ = placePanelOnRight;
+            return true;
+        }
+
         const SettlementConstructionSite* constructionSite =
             objectState.constructionSiteAt(position);
 
@@ -22,6 +37,7 @@ namespace Paladin
             kind_ = SettlementInspectionKind::ConstructionSite;
             constructionSiteId_ = constructionSite->id;
             objectId_ = {};
+            citizenId_ = {};
             placePanelOnRight_ = placePanelOnRight;
             return true;
         }
@@ -37,6 +53,7 @@ namespace Paladin
             kind_ = SettlementInspectionKind::CompletedObject;
             objectId_ = object->id;
             constructionSiteId_ = {};
+            citizenId_ = {};
             placePanelOnRight_ = placePanelOnRight;
             return true;
         }
@@ -51,6 +68,7 @@ namespace Paladin
         kind_ = SettlementInspectionKind::None;
         objectId_ = {};
         constructionSiteId_ = {};
+        citizenId_ = {};
     }
 
 
@@ -85,6 +103,17 @@ namespace Paladin
     {
         return kind_ == SettlementInspectionKind::ConstructionSite
             ? objectState.constructionSite(constructionSiteId_)
+            : nullptr;
+    }
+
+
+    const SettlementCitizen*
+    SettlementInspectionController::selectedCitizen(
+        const SettlementCitizenState& citizenState
+    ) const noexcept
+    {
+        return kind_ == SettlementInspectionKind::Citizen
+            ? citizenState.citizen(citizenId_)
             : nullptr;
     }
 }

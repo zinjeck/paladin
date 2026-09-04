@@ -7,6 +7,7 @@
 #include "ui/GrayUiRenderer.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 
@@ -19,7 +20,6 @@ namespace Paladin
     {
         constexpr float panelWidth = 340.0F;
         constexpr float objectPanelHeight = 50.0F;
-        constexpr float panelGap = 6.0F;
         constexpr float normalLineHeight = 25.0F;
         constexpr float constructionVerticalPadding = 12.0F;
 
@@ -73,6 +73,7 @@ namespace Paladin
         GrayUiRenderer& grayUiRenderer,
         const SettlementInspectionController& controller,
         const SettlementMap& settlementMap,
+        const SettlementCitizenState& citizenState,
         const Camera2D& camera,
         const TileRenderMetrics& metrics
     )
@@ -84,28 +85,35 @@ namespace Paladin
             controller.selectedObject(objectState);
         const SettlementConstructionSite* constructionSite =
             controller.selectedConstructionSite(objectState);
+        const SettlementCitizen* citizen =
+            controller.selectedCitizen(citizenState);
 
-        if (!object && !constructionSite)
+        if (!object && !constructionSite && !citizen)
         {
             clearLayout();
             return;
         }
 
-        const std::string_view objectTypeId = object
-            ? std::string_view(object->objectTypeId)
-            : std::string_view(constructionSite->objectTypeId);
-        const SettlementObjectDefinition* definition =
-            SettlementObjectCatalog::definition(objectTypeId);
-
-        if (!definition)
+        const SettlementObjectDefinition* definition = nullptr;
+        if (!citizen)
         {
-            clearLayout();
-            return;
+            const std::string_view objectTypeId = object
+                ? std::string_view(object->objectTypeId)
+                : std::string_view(constructionSite->objectTypeId);
+            definition = SettlementObjectCatalog::definition(objectTypeId);
+
+            if (!definition)
+            {
+                clearLayout();
+                return;
+            }
         }
 
-        const SettlementObjectFootprint& footprint = object
-            ? object->footprint
-            : constructionSite->footprint;
+        const SettlementObjectFootprint footprint = citizen
+            ? SettlementObjectFootprint{citizen->tilePosition, 1, 1}
+            : object
+                ? object->footprint
+                : constructionSite->footprint;
 
         float constructionPanelHeight = 0.0F;
 
@@ -125,9 +133,7 @@ namespace Paladin
         }
 
         const float totalHeight = objectPanelHeight
-            + (constructionSite
-                ? panelGap + constructionPanelHeight
-                : 0.0F);
+            + constructionPanelHeight;
 
         renderedBounds_ = anchoredBounds(
             footprint,
@@ -140,25 +146,22 @@ namespace Paladin
         );
         hasRenderedBounds_ = true;
 
-        const UiRectangle objectBounds{
-            renderedBounds_.x,
-            renderedBounds_.y,
-            renderedBounds_.width,
-            objectPanelHeight
-        };
-        grayUiRenderer.drawPanel(renderer, objectBounds);
+        grayUiRenderer.drawPanel(renderer, renderedBounds_);
 
         constexpr float objectNamePixelSize = 3.0F;
+        const std::string_view title = citizen
+            ? std::string_view(citizen->name)
+            : definition->displayName;
         const float objectNameWidth = retroFontRenderer_.measureWidth(
-            definition->displayName,
+            title,
             objectNamePixelSize
         );
         retroFontRenderer_.drawText(
             renderer,
-            definition->displayName,
-            objectBounds.x
-                + (objectBounds.width - objectNameWidth) * 0.5F,
-            objectBounds.y + 14.0F,
+            title,
+            renderedBounds_.x
+                + (renderedBounds_.width - objectNameWidth) * 0.5F,
+            renderedBounds_.y + 14.0F,
             objectNamePixelSize,
             {242, 242, 244, 255}
         );
@@ -170,11 +173,10 @@ namespace Paladin
 
         const UiRectangle constructionBounds{
             renderedBounds_.x,
-            renderedBounds_.y + objectPanelHeight + panelGap,
+            renderedBounds_.y + objectPanelHeight,
             renderedBounds_.width,
             constructionPanelHeight
         };
-        grayUiRenderer.drawPanel(renderer, constructionBounds);
 
         float textY = constructionBounds.y
             + constructionVerticalPadding;

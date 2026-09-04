@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 
 namespace Paladin
 {
@@ -12,7 +12,7 @@ namespace Paladin
     public:
         Army(
             ArmyId id,
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept
             : id_(id),
               position_(position)
@@ -26,7 +26,7 @@ namespace Paladin
         }
 
         [[nodiscard]]
-        WorldPosition position() const noexcept
+        WorldTilePosition position() const noexcept
         {
             return position_;
         }
@@ -47,7 +47,7 @@ namespace Paladin
         friend class World;
 
         void setPosition(
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept
         {
             position_ = position;
@@ -62,7 +62,7 @@ namespace Paladin
 
         ArmyId id_;
 
-        WorldPosition position_;
+        WorldTilePosition position_;
 
         PolityId ownerPolityId_;
     };

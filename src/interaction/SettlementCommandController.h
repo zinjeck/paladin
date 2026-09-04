@@ -26,16 +26,16 @@ namespace Paladin
         bool isCancelMode() const noexcept;
 
         void pointerMoved(
-            std::optional<WorldTilePosition> position
+            std::optional<SettlementTilePosition> position
         ) noexcept;
 
         void pointerPressed(
-            std::optional<WorldTilePosition> position
+            std::optional<SettlementTilePosition> position
         ) noexcept;
 
         [[nodiscard]]
         bool pointerReleased(
-            std::optional<WorldTilePosition> position,
+            std::optional<SettlementTilePosition> position,
             SettlementMap& settlementMap,
             SettlementCitizenState& citizens
         );
@@ -46,7 +46,7 @@ namespace Paladin
 
     private:
         std::string commandTypeId_;
-        std::optional<WorldTilePosition> dragStart_;
-        std::optional<WorldTilePosition> hoveredPosition_;
+        std::optional<SettlementTilePosition> dragStart_;
+        std::optional<SettlementTilePosition> hoveredPosition_;
     };
 }

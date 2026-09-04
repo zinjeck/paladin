@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 
 #include <optional>
 
@@ -25,11 +25,11 @@ namespace Paladin
         bool isActive() const noexcept;
 
         void setHoveredPosition(
-            std::optional<WorldPosition> position
+            std::optional<WorldTilePosition> position
         ) noexcept;
 
         [[nodiscard]]
-        std::optional<WorldPosition> hoveredPosition() const noexcept;
+        std::optional<WorldTilePosition> hoveredPosition() const noexcept;
 
         [[nodiscard]]
         bool hasValidPlacement(
@@ -42,12 +42,12 @@ namespace Paladin
         ) noexcept;
 
         [[nodiscard]]
-        std::optional<WorldPosition> lockedPosition() const noexcept;
+        std::optional<WorldTilePosition> lockedPosition() const noexcept;
 
     private:
         bool selecting_ = false;
-        std::optional<WorldPosition> hoveredPosition_;
-        std::optional<WorldPosition> lockedPosition_;
+        std::optional<WorldTilePosition> hoveredPosition_;
+        std::optional<WorldTilePosition> lockedPosition_;
         PolityId ownerPolityId_;
     };
 }

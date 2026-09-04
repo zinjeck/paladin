@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "world/SettlementGrid.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 
 #include <cstddef>
@@ -13,7 +14,6 @@
 namespace Paladin
 {
     class SettlementCitizenState;
-    class WorldGrid;
 
     struct SettlementCommand
     {
@@ -28,7 +28,7 @@ namespace Paladin
     public:
         [[nodiscard]]
         bool add(
-            const WorldGrid& grid,
+            const SettlementGrid& grid,
             std::string_view commandTypeId,
             const SettlementObjectFootprint& footprint,
             SettlementCitizenState& citizens

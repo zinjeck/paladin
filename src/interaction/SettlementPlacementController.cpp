@@ -37,13 +37,13 @@ namespace Paladin
     }
 
     void SettlementPlacementController::setHoveredPosition(
-        std::optional<WorldPosition> position
+        std::optional<WorldTilePosition> position
     ) noexcept
     {
         hoveredPosition_ = position;
     }
 
-    std::optional<WorldPosition>
+    std::optional<WorldTilePosition>
     SettlementPlacementController::hoveredPosition() const noexcept
     {
         return hoveredPosition_;
@@ -77,7 +77,7 @@ namespace Paladin
         return true;
     }
 
-    std::optional<WorldPosition>
+    std::optional<WorldTilePosition>
     SettlementPlacementController::lockedPosition() const noexcept
     {
         return lockedPosition_;

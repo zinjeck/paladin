@@ -54,7 +54,6 @@ add_executable(Paladin
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/world/World.cpp
     src/world/WorldTime.cpp
-    src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
     src/world/generation/SettlementMapGenerator.cpp
     src/world/generation/LandmassGenerationTemplate.cpp
@@ -128,7 +127,6 @@ add_executable(PaladinTests
 
     src/world/World.cpp
     src/world/WorldTime.cpp
-    src/world/WorldGrid.cpp
     src/world/generation/GenerationNoise.cpp
     src/world/generation/SettlementMapGenerator.cpp
     src/world/generation/LandmassGenerationTemplate.cpp

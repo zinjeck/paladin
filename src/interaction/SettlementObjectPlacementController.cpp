@@ -61,7 +61,7 @@ namespace Paladin
 
 
     void SettlementObjectPlacementController::pointerMoved(
-        std::optional<WorldTilePosition> position
+        std::optional<SettlementTilePosition> position
     ) noexcept
     {
         if (!isActive() || lockedFootprint_)
@@ -75,7 +75,7 @@ namespace Paladin
 
     SettlementPlacementCommitResult
     SettlementObjectPlacementController::pointerPressed(
-        std::optional<WorldTilePosition> position,
+        std::optional<SettlementTilePosition> position,
         SettlementMap& settlementMap
     )
     {
@@ -126,7 +126,7 @@ namespace Paladin
 
 
     bool SettlementObjectPlacementController::pointerReleased(
-        std::optional<WorldTilePosition> position,
+        std::optional<SettlementTilePosition> position,
         const SettlementMap& settlementMap
     ) noexcept
     {

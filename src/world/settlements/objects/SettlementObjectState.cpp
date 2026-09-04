@@ -1,7 +1,7 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 
 #include "world/TerrainType.h"
-#include "world/WorldGrid.h"
+#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 
@@ -56,7 +56,7 @@ namespace Paladin
 
 
     bool SettlementObjectFootprint::contains(
-        WorldTilePosition position
+        SettlementTilePosition position
     ) const noexcept
     {
         return
@@ -106,7 +106,7 @@ namespace Paladin
 
 
     bool SettlementObjectState::canPlace(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         const SettlementObjectDefinition& definition,
         const SettlementObjectFootprint& footprint
     ) const noexcept
@@ -126,7 +126,7 @@ namespace Paladin
 
     SettlementPlacementAreaEvaluation
     SettlementObjectState::evaluatePlacementArea(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         const SettlementObjectDefinition& definition,
         const SettlementObjectFootprint& footprint
     ) const noexcept
@@ -144,7 +144,7 @@ namespace Paladin
             return {};
         }
 
-        const WorldTilePosition bottomRight{
+        const SettlementTilePosition bottomRight{
             footprint.topLeft.x + footprint.width - 1,
             footprint.topLeft.y + footprint.height - 1
         };
@@ -177,9 +177,9 @@ namespace Paladin
 
     SettlementTilePlacementStatus
     SettlementObjectState::placementStatusAt(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         const SettlementObjectDefinition& definition,
-        WorldTilePosition position
+        SettlementTilePosition position
     ) const noexcept
     {
         const WorldTile* tile = grid.tile(position);
@@ -216,7 +216,7 @@ namespace Paladin
 
 
     bool SettlementObjectState::placeCompletedObject(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         const SettlementObjectDefinition& definition,
         const SettlementObjectFootprint& footprint
     )
@@ -250,7 +250,7 @@ namespace Paladin
 
 
     bool SettlementObjectState::createConstructionSites(
-        const WorldGrid& grid,
+        const SettlementGrid& grid,
         const SettlementObjectDefinition& definition,
         const SettlementObjectFootprint& footprint
     )
@@ -286,7 +286,7 @@ namespace Paladin
                     ++x
                 )
                 {
-                    const WorldTilePosition position{x, y};
+                    const SettlementTilePosition position{x, y};
                     const bool buildable =
                         x < footprint.topLeft.x + footprint.width &&
                         placementStatusAt(
@@ -393,7 +393,7 @@ namespace Paladin
 
     const CompletedSettlementObject*
     SettlementObjectState::completedObjectAt(
-        WorldTilePosition position
+        SettlementTilePosition position
     ) const noexcept
     {
         const auto iterator = std::find_if(
@@ -413,7 +413,7 @@ namespace Paladin
 
     const SettlementConstructionSite*
     SettlementObjectState::constructionSiteAt(
-        WorldTilePosition position
+        SettlementTilePosition position
     ) const noexcept
     {
         const auto iterator = std::find_if(
@@ -648,7 +648,7 @@ namespace Paladin
 
 
     std::size_t SettlementObjectState::tileIndex(
-        WorldTilePosition position
+        SettlementTilePosition position
     ) const noexcept
     {
         return
@@ -659,7 +659,7 @@ namespace Paladin
 
 
     void SettlementObjectState::rebuildPlacementPrefixCache(
-        const WorldGrid& grid
+        const SettlementGrid& grid
     ) const noexcept
     {
         if (

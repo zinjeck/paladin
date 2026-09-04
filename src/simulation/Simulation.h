@@ -2,7 +2,7 @@
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 #include "world/generation/SettlementMapGenerator.h"
 
 #include <cstdint>
@@ -113,7 +113,7 @@ namespace Paladin
 
         [[nodiscard]]
         SettlementId foundPlayerCapital(
-            WorldPosition position,
+            WorldTilePosition position,
             const FoundingIdentity& identity
         );
 
@@ -124,7 +124,7 @@ namespace Paladin
         bool editPlayerPolity(const FoundingIdentity& identity);
 
         [[nodiscard]]
-        bool movePlayerCapital(WorldPosition position);
+        bool movePlayerCapital(WorldTilePosition position);
 
     private:
         [[nodiscard]]

@@ -5,8 +5,8 @@
 namespace Paladin
 {
     SettlementMap::SettlementMap(
-        WorldGrid grid,
-        WorldPosition sourceRegionCenter,
+        SettlementGrid grid,
+        WorldTilePosition sourceRegionCenter,
         std::int32_t sourceRegionWidth,
         std::int32_t sourceRegionHeight,
         std::int32_t localTilesPerWorldTile,
@@ -23,19 +23,19 @@ namespace Paladin
     }
 
 
-    WorldGrid& SettlementMap::grid() noexcept
+    SettlementGrid& SettlementMap::grid() noexcept
     {
         return grid_;
     }
 
 
-    const WorldGrid& SettlementMap::grid() const noexcept
+    const SettlementGrid& SettlementMap::grid() const noexcept
     {
         return grid_;
     }
 
 
-    WorldPosition SettlementMap::sourceRegionCenter() const noexcept
+    WorldTilePosition SettlementMap::sourceRegionCenter() const noexcept
     {
         return sourceRegionCenter_;
     }

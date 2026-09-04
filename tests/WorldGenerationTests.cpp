@@ -19,8 +19,18 @@
 
 namespace
 {
+    static_assert(!std::is_same_v<
+        Paladin::WorldTilePosition,
+        Paladin::SettlementTilePosition
+    >);
+    static_assert(!std::is_convertible_v<
+        Paladin::WorldTilePosition,
+        Paladin::SettlementTilePosition
+    >);
+
+    template<typename Grid>
     std::uint64_t worldHash(
-        const Paladin::WorldGrid& grid
+        const Grid& grid
     )
     {
         std::uint64_t hash =
@@ -238,7 +248,7 @@ namespace
         settings.localTilesPerWorldTile = 4;
 
         const Paladin::SettlementMapGenerator generator;
-        const Paladin::WorldPosition selectedCenter{4, 4};
+        const Paladin::WorldTilePosition selectedCenter{4, 4};
 
         const std::unique_ptr<Paladin::SettlementMap> first =
             generator.generate(

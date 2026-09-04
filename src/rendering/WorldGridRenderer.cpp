@@ -7,6 +7,7 @@
 #include "world/BiomeType.h"
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
+#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 
 #include <cstddef>
@@ -76,6 +77,29 @@ namespace Paladin
     void WorldGridRenderer::render(
         Renderer& renderer,
         const WorldGrid& grid,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics
+    ) const
+    {
+        renderGrid(renderer, grid, camera, metrics);
+    }
+
+
+    void WorldGridRenderer::render(
+        Renderer& renderer,
+        const SettlementGrid& grid,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics
+    ) const
+    {
+        renderGrid(renderer, grid, camera, metrics);
+    }
+
+
+    template<typename Grid>
+    void WorldGridRenderer::renderGrid(
+        Renderer& renderer,
+        const Grid& grid,
         const Camera2D& camera,
         const TileRenderMetrics& metrics
     ) const

@@ -54,7 +54,7 @@ namespace Paladin
 
         std::uint32_t borderlandIrregularityCost(
             WorldTilePosition position,
-            WorldPosition settlementPosition,
+            WorldTilePosition settlementPosition,
             PolityId polityId,
             const TerritoryFoundationPolicy& policy
         ) noexcept
@@ -100,7 +100,7 @@ namespace Paladin
     TerritoryFoundationSystem::establishSettlementTerritory(
         const WorldGrid& grid,
         TerritoryMap& territory,
-        WorldPosition settlementPosition,
+        WorldTilePosition settlementPosition,
         PolityId polityId,
         const TerritoryFoundationPolicy& policy,
         std::uint32_t borderlandTraversalBudget

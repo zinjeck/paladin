@@ -1,7 +1,7 @@
 #pragma once
 
-#include "world/WorldGrid.h"
-#include "world/WorldPosition.h"
+#include "world/SettlementGrid.h"
+#include "world/WorldTilePosition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 #include "world/settlements/commands/SettlementCommandState.h"
 
@@ -13,8 +13,8 @@ namespace Paladin
     {
     public:
         SettlementMap(
-            WorldGrid grid,
-            WorldPosition sourceRegionCenter,
+            SettlementGrid grid,
+            WorldTilePosition sourceRegionCenter,
             std::int32_t sourceRegionWidth,
             std::int32_t sourceRegionHeight,
             std::int32_t localTilesPerWorldTile,
@@ -22,13 +22,13 @@ namespace Paladin
         ) noexcept;
 
         [[nodiscard]]
-        WorldGrid& grid() noexcept;
+        SettlementGrid& grid() noexcept;
 
         [[nodiscard]]
-        const WorldGrid& grid() const noexcept;
+        const SettlementGrid& grid() const noexcept;
 
         [[nodiscard]]
-        WorldPosition sourceRegionCenter() const noexcept;
+        WorldTilePosition sourceRegionCenter() const noexcept;
 
         [[nodiscard]]
         std::int32_t sourceRegionWidth() const noexcept;
@@ -55,10 +55,10 @@ namespace Paladin
         const SettlementCommandState& commandState() const noexcept;
 
     private:
-        WorldGrid grid_;
+        SettlementGrid grid_;
         SettlementObjectState objectState_;
         SettlementCommandState commandState_;
-        WorldPosition sourceRegionCenter_;
+        WorldTilePosition sourceRegionCenter_;
         std::int32_t sourceRegionWidth_ = 0;
         std::int32_t sourceRegionHeight_ = 0;
         std::int32_t localTilesPerWorldTile_ = 0;

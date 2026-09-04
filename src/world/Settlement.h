@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/settlements/SettlementSimulationState.h"
 
@@ -19,7 +19,7 @@ namespace Paladin
     public:
         Settlement(
             SettlementId id,
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept
             : id_(id),
               position_(position)
@@ -28,7 +28,7 @@ namespace Paladin
 
         Settlement(
             SettlementId id,
-            WorldPosition position,
+            WorldTilePosition position,
             std::string name,
             PolityId ownerPolityId,
             CultureId primaryCultureId,
@@ -55,7 +55,7 @@ namespace Paladin
         }
 
         [[nodiscard]]
-        WorldPosition position() const noexcept
+        WorldTilePosition position() const noexcept
         {
             return position_;
         }
@@ -100,7 +100,7 @@ namespace Paladin
         friend class World;
 
         void setPosition(
-            WorldPosition position
+            WorldTilePosition position
         ) noexcept
         {
             position_ = position;
@@ -120,7 +120,7 @@ namespace Paladin
 
         SettlementId id_;
 
-        WorldPosition position_;
+        WorldTilePosition position_;
 
         std::string name_;
 

@@ -7,6 +7,7 @@ namespace Paladin
     class Renderer;
     class Texture;
     class WorldGrid;
+    class SettlementGrid;
     class Camera2D;
 
     struct TileRenderMetrics;
@@ -29,8 +30,23 @@ namespace Paladin
             const TileRenderMetrics& metrics
         ) const;
 
+        void render(
+            Renderer& renderer,
+            const SettlementGrid& grid,
+            const Camera2D& camera,
+            const TileRenderMetrics& metrics
+        ) const;
+
     private:
-        mutable const WorldGrid* cachedGrid_ = nullptr;
+        template<typename Grid>
+        void renderGrid(
+            Renderer& renderer,
+            const Grid& grid,
+            const Camera2D& camera,
+            const TileRenderMetrics& metrics
+        ) const;
+
+        mutable const void* cachedGrid_ = nullptr;
         mutable std::unique_ptr<Texture> cachedTerrainTexture_;
         mutable bool cacheBuildAttempted_ = false;
     };

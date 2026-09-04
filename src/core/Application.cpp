@@ -480,15 +480,26 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_LEFT
                     )
                     {
-                        cityHudCapturedPointer_ =
+                        const bool inspectionPanelCapturedPointer =
                             settlementInspectionPanel_->containsPoint(
                                 event.button.x,
                                 event.button.y
-                            ) ||
+                            );
+
+                        cityHudCapturedPointer_ =
+                            inspectionPanelCapturedPointer ||
                             cityHud_->pointerPressed(
                                 event.button.x,
                                 event.button.y
                             );
+
+                        if (
+                            cityHudCapturedPointer_ &&
+                            !inspectionPanelCapturedPointer
+                        )
+                        {
+                            settlementInspectionController_->clear();
+                        }
 
                         SettlementMap* settlementMap =
                             simulation_->settlementMap(
@@ -519,24 +530,56 @@ namespace Paladin
                                     ->isActive()
                             )
                             {
-                                static_cast<void>(
+                                const SettlementPlacementCommitResult result =
                                     settlementObjectPlacementController_
                                         ->pointerPressed(tile, *settlementMap)
-                                );
+                                ;
+
+                                if (
+                                    result ==
+                                        SettlementPlacementCommitResult::
+                                            CompletedObject
+                                )
+                                {
+                                    Settlement* settlement =
+                                        simulation_->world().settlement(
+                                            activeCitySettlementId_
+                                        );
+
+                                    if (settlement)
+                                    {
+                                        settlement->simulationState()
+                                            .citizens()
+                                            .placeUnpositionedCitizens(
+                                                *settlementMap
+                                            );
+                                    }
+                                }
                             }
                             else if (tile)
                             {
-                                static_cast<void>(
-                                    settlementInspectionController_
-                                        ->selectAt(
-                                            *tile,
-                                            settlementMap->objectState(),
-                                            event.button.x <
-                                                static_cast<float>(
-                                                    renderer_->outputWidth()
-                                                ) * 0.5F
-                                        )
-                                );
+                                const Settlement* settlement =
+                                    simulation_->world().settlement(
+                                        activeCitySettlementId_
+                                    );
+
+                                if (settlement)
+                                {
+                                    static_cast<void>(
+                                        settlementInspectionController_
+                                            ->selectAt(
+                                                *tile,
+                                                settlementMap->objectState(),
+                                                settlement->simulationState()
+                                                    .citizens(),
+                                                event.button.x <
+                                                    static_cast<float>(
+                                                        renderer_
+                                                            ->outputWidth()
+                                                    ) * 0.5F
+                                            )
+                                    );
+                                }
                             }
                             else
                             {
@@ -1044,16 +1087,21 @@ namespace Paladin
                             *settlementCommandController_,
                             renderedSettlement->simulationState().citizens()
                         );
-                    }
 
-                    settlementInspectionPanel_->render(
-                        *renderer_,
-                        *grayUiRenderer_,
-                        *settlementInspectionController_,
-                        *settlementMap,
-                        *camera_,
-                        *tileRenderMetrics_
-                    );
+                        settlementInspectionPanel_->render(
+                            *renderer_,
+                            *grayUiRenderer_,
+                            *settlementInspectionController_,
+                            *settlementMap,
+                            renderedSettlement->simulationState().citizens(),
+                            *camera_,
+                            *tileRenderMetrics_
+                        );
+                    }
+                    else
+                    {
+                        settlementInspectionPanel_->clearLayout();
+                    }
                 }
 
                 const Settlement* citySettlement =
@@ -1127,10 +1175,10 @@ namespace Paladin
             std::size_t overlayCount = 0;
             std::size_t outlineCount = 0;
 
-            const std::optional<WorldPosition> hoveredPosition =
+            const std::optional<WorldTilePosition> hoveredPosition =
                 settlementPlacementController_->hoveredPosition();
 
-            const std::optional<WorldPosition> lockedPosition =
+            const std::optional<WorldTilePosition> lockedPosition =
                 settlementPlacementController_->lockedPosition();
 
             if (
@@ -1528,7 +1576,7 @@ namespace Paladin
 
         if (mode == FoundingPanelMode::Founding)
         {
-            const std::optional<WorldPosition> lockedPosition =
+            const std::optional<WorldTilePosition> lockedPosition =
                 settlementPlacementController_->lockedPosition();
 
             if (!lockedPosition)
@@ -1839,7 +1887,7 @@ namespace Paladin
             + (screenY - viewportHeight * 0.5)
                 / tilePixels;
 
-        const WorldPosition position{
+        const WorldTilePosition position{
             static_cast<std::int32_t>(std::floor(worldTileX)),
             static_cast<std::int32_t>(std::floor(worldTileY))
         };
@@ -1945,16 +1993,25 @@ namespace Paladin
             return;
         }
 
-        const WorldGrid* grid = activeGrid();
+        std::int32_t gridWidth = simulation_->world().grid().width();
+        std::int32_t gridHeight = simulation_->world().grid().height();
 
-        if (!grid)
+        if (screen_ == Screen::City)
         {
-            return;
+            const SettlementMap* settlementMap =
+                simulation_->settlementMap(activeCitySettlementId_);
+
+            if (!settlementMap)
+            {
+                return;
+            }
+
+            gridWidth = settlementMap->grid().width();
+            gridHeight = settlementMap->grid().height();
         }
 
-        const double worldWidth = static_cast<double>(grid->width());
-
-        const double worldHeight = static_cast<double>(grid->height());
+        const double worldWidth = static_cast<double>(gridWidth);
+        const double worldHeight = static_cast<double>(gridHeight);
 
         const double halfVisibleWidth =
             static_cast<double>(renderer_->outputWidth())
@@ -1996,26 +2053,6 @@ namespace Paladin
         );
     }
 
-    const WorldGrid* Application::activeGrid() const noexcept
-    {
-        if (!simulation_)
-        {
-            return nullptr;
-        }
-
-        if (screen_ == Screen::City)
-        {
-            const SettlementMap* settlementMap =
-                simulation_->settlementMap(
-                    activeCitySettlementId_
-                );
-
-            return settlementMap ? &settlementMap->grid() : nullptr;
-        }
-
-        return &simulation_->world().grid();
-    }
-
     bool Application::activeHudContainsPoint(
         float x,
         float y
@@ -2045,7 +2082,7 @@ namespace Paladin
         return worldHud_->containsInteractivePoint(x, y);
     }
 
-    std::optional<WorldTilePosition> Application::cityTileAtScreen(
+    std::optional<SettlementTilePosition> Application::cityTileAtScreen(
         double screenX,
         double screenY
     ) const noexcept
@@ -2091,13 +2128,13 @@ namespace Paladin
                 - static_cast<double>(renderer_->outputHeight()) * 0.5
             ) / tilePixels;
 
-        const WorldTilePosition position{
+        const SettlementTilePosition position{
             static_cast<std::int32_t>(std::floor(tileX)),
             static_cast<std::int32_t>(std::floor(tileY))
         };
 
         return settlementMap->grid().isValidPosition(position)
-            ? std::optional<WorldTilePosition>(position)
+            ? std::optional<SettlementTilePosition>(position)
             : std::nullopt;
     }
 }

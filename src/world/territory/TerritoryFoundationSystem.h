@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
-#include "world/WorldPosition.h"
+#include "world/WorldTilePosition.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -20,7 +20,7 @@ namespace Paladin
         std::size_t establishSettlementTerritory(
             const WorldGrid& grid,
             TerritoryMap& territory,
-            WorldPosition settlementPosition,
+            WorldTilePosition settlementPosition,
             PolityId polityId,
             const TerritoryFoundationPolicy& policy,
             std::uint32_t borderlandTraversalBudget

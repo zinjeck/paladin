@@ -3,6 +3,7 @@
 #include "world/BiomeType.h"
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
+#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
@@ -28,7 +29,7 @@ namespace Paladin
 
         std::uint64_t citySeed(
             std::uint64_t worldSeed,
-            WorldPosition center,
+            WorldTilePosition center,
             std::int32_t width,
             std::int32_t height
         ) noexcept
@@ -117,7 +118,7 @@ namespace Paladin
 
     std::unique_ptr<SettlementMap> SettlementMapGenerator::generate(
         const WorldGrid& sourceGrid,
-        WorldPosition sourceRegionCenter,
+        WorldTilePosition sourceRegionCenter,
         std::int32_t sourceRegionWidth,
         std::int32_t sourceRegionHeight,
         std::uint64_t worldSeed,
@@ -157,7 +158,7 @@ namespace Paladin
         const std::int32_t cityHeight =
             sourceRegionHeight * settings.localTilesPerWorldTile;
 
-        WorldGrid cityGrid(cityWidth, cityHeight);
+        SettlementGrid cityGrid(cityWidth, cityHeight);
 
         const std::uint64_t seed = citySeed(
             worldSeed,
