@@ -5,6 +5,7 @@
 #include <span>
 
 struct SDL_Renderer;
+struct SDL_Surface;
 
 struct SDL_Window;
 
@@ -86,6 +87,12 @@ namespace Paladin
             int width,
             int height,
             std::span<const RenderColor> pixels
+        );
+
+        [[nodiscard]]
+        std::unique_ptr<Texture> createTextureFromSurface(
+            SDL_Surface* surface,
+            bool smoothScaling
         );
 
         [[nodiscard]]

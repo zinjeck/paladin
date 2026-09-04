@@ -1,4 +1,5 @@
 #include "world/settlements/SettlementFoundationProfile.h"
+#include "world/settlements/SettlementResourceDefinition.h"
 
 namespace Paladin
 {
@@ -7,6 +8,7 @@ namespace Paladin
         SettlementFoundationProfile profile;
 
         profile.initialPopulation = 100;
+        profile.initialDetailedCitizenCount = 8;
         profile.demographicRates =
             {
                 0.025,
@@ -18,20 +20,22 @@ namespace Paladin
 
         profile.initialResources =
             {
-                {"food", 600.0},
-                {"materials", 120.0}
+                {std::string(SettlementResourceTypes::Food), 600.0},
+                {std::string(SettlementResourceTypes::Materials), 120.0},
+                {std::string(SettlementResourceTypes::Stone), 0.0},
+                {std::string(SettlementResourceTypes::Lumber), 0.0}
             };
 
         profile.resourceFlowRates =
             {
                 {
-                    "food",
+                    std::string(SettlementResourceTypes::Food),
                     1.05,
                     1.0,
                     1.0
                 },
                 {
-                    "materials",
+                    std::string(SettlementResourceTypes::Materials),
                     0.08,
                     0.02,
                     0.0

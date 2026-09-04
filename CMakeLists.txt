@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(Paladin LANGUAGES CXX)
+project(Paladin LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,11 +16,23 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(SDL3)
 
+set(SDLTTF_VENDORED ON CACHE BOOL "" FORCE)
+set(SDLTTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
+set(SDLTTF_PLUTOSVG OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    SDL3_ttf
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+    GIT_TAG release-3.2.2
+)
+FetchContent_MakeAvailable(SDL3_ttf)
+
 add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
     src/core/SimulationClock.cpp
     src/interaction/CameraNavigationPolicy.cpp
+    src/interaction/SettlementCommandController.cpp
+    src/interaction/SettlementInspectionController.cpp
     src/interaction/SettlementObjectPlacementController.cpp
     src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
@@ -31,6 +43,8 @@ add_executable(Paladin
     src/rendering/OverlayRenderer.cpp
     src/rendering/WorldRenderer.cpp
     src/rendering/SettlementMarkerRenderer.cpp
+    src/rendering/SettlementCitizenRenderer.cpp
+    src/rendering/SettlementCommandRenderer.cpp
     src/rendering/SettlementObjectRenderer.cpp
     src/rendering/TerritoryPresentationPolicy.cpp
     src/rendering/TerritoryRenderer.cpp
@@ -53,9 +67,13 @@ add_executable(Paladin
     src/world/settlements/SettlementMap.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
+    src/world/settlements/SettlementResourceDefinition.cpp
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/settlements/citizens/SettlementCitizenState.cpp
+    src/world/settlements/commands/SettlementCommandDefinition.cpp
+    src/world/settlements/commands/SettlementCommandState.cpp
     src/world/settlements/objects/SettlementObjectDefinition.cpp
     src/world/settlements/objects/SettlementObjectState.cpp
     src/world/territory/TerritoryFoundationPolicy.cpp
@@ -69,6 +87,8 @@ add_executable(Paladin
     src/ui/UiButton.cpp
     src/ui/UiTextField.cpp
     src/ui/MainMenu.cpp
+    src/ui/NormalFontRenderer.cpp
+    src/ui/SettlementInspectionPanel.cpp
     src/ui/SimulationSpeedControls.cpp
     src/ui/WorldHud.cpp
 )
@@ -77,13 +97,21 @@ target_include_directories(Paladin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(Paladin PRIVATE SDL3::SDL3)
+target_link_libraries(Paladin PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
 
 add_custom_command(
     TARGET Paladin POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:SDL3::SDL3>
         $<TARGET_FILE_DIR:Paladin>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3_ttf::SDL3_ttf>
+        $<TARGET_FILE_DIR:Paladin>
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:Paladin>/assets/fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Arimo-Regular.ttf
+        $<TARGET_FILE_DIR:Paladin>/assets/fonts/Arimo-Regular.ttf
 )
 
 # ============================================================
@@ -113,9 +141,13 @@ add_executable(PaladinTests
     src/world/settlements/SettlementMap.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
+    src/world/settlements/SettlementResourceDefinition.cpp
     src/world/settlements/SettlementPopulation.cpp
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
+    src/world/settlements/citizens/SettlementCitizenState.cpp
+    src/world/settlements/commands/SettlementCommandDefinition.cpp
+    src/world/settlements/commands/SettlementCommandState.cpp
     src/world/settlements/objects/SettlementObjectDefinition.cpp
     src/world/settlements/objects/SettlementObjectState.cpp
     src/world/territory/TerritoryFoundationPolicy.cpp
@@ -125,6 +157,8 @@ add_executable(PaladinTests
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/interaction/SettlementObjectPlacementController.cpp
+    src/interaction/SettlementCommandController.cpp
+    src/interaction/SettlementInspectionController.cpp
 )
 
 target_include_directories(PaladinTests PRIVATE

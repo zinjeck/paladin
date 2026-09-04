@@ -7,6 +7,7 @@
 #include "world/settlements/SettlementPopulation.h"
 #include "world/settlements/SettlementSimulationPolicy.h"
 #include "world/settlements/SettlementSimulationTier.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 
 #include <cstdint>
 #include <memory>
@@ -22,7 +23,8 @@ namespace Paladin
         Resources = 1 << 1,
         Economy = 1 << 2,
         Scheduling = 1 << 3,
-        LocalMap = 1 << 4
+        LocalMap = 1 << 4,
+        Citizens = 1 << 5
     };
 
     [[nodiscard]]
@@ -44,6 +46,7 @@ namespace Paladin
         std::uint64_t economy = 0;
         std::uint64_t scheduling = 0;
         std::uint64_t localMap = 0;
+        std::uint64_t citizens = 0;
 
         bool operator==(const SettlementStateVersions&) const = default;
     };
@@ -99,6 +102,12 @@ namespace Paladin
         const SettlementEconomy& economy() const noexcept;
 
         [[nodiscard]]
+        SettlementCitizenState& citizens() noexcept;
+
+        [[nodiscard]]
+        const SettlementCitizenState& citizens() const noexcept;
+
+        [[nodiscard]]
         SettlementSimulationTier simulationTier() const noexcept;
 
         [[nodiscard]]
@@ -151,6 +160,7 @@ namespace Paladin
         SettlementPopulation population_;
         ResourceStockpile stockpile_;
         SettlementEconomy economy_;
+        SettlementCitizenState citizens_;
         SettlementSimulationTier simulationTier_ =
             SettlementSimulationTier::Inactive;
         std::uint64_t pendingSimulationMinutes_ = 0;

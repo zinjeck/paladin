@@ -2,10 +2,14 @@
 
 #include "simulation/WorldSimulationPipeline.h"
 #include "interaction/SettlementObjectPlacementController.h"
+#include "interaction/SettlementInspectionController.h"
 #include "world/TerrainType.h"
 #include "world/World.h"
 #include "world/generation/WorldGenerationSettings.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/commands/SettlementCommandDefinition.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 
 #include <array>
@@ -267,6 +271,19 @@ void runWorldTests()
 
     Paladin::SettlementFoundationProfile aiFoundationProfile =
         Paladin::defaultSettlementFoundationProfile();
+
+    bool hasStone = false;
+    bool hasLumber = false;
+    for (const Paladin::StockpileEntry& resource :
+        aiFoundationProfile.initialResources)
+    {
+        hasStone = hasStone ||
+            resource.resourceId == Paladin::SettlementResourceTypes::Stone;
+        hasLumber = hasLumber ||
+            resource.resourceId == Paladin::SettlementResourceTypes::Lumber;
+    }
+    PALADIN_CHECK(hasStone);
+    PALADIN_CHECK(hasLumber);
 
     aiFoundationProfile.initialSimulationTier =
         Paladin::SettlementSimulationTier::Strategic;
@@ -855,7 +872,34 @@ void runWorldTests()
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 1);
+    PALADIN_CHECK(
+        localMap.objectState().constructionSites().front().phase ==
+            Paladin::ConstructionSitePhase::AwaitingMaterials
+    );
     PALADIN_CHECK(localMap.objectState().completedObjects().empty());
+
+    const Paladin::SettlementObjectDefinition* stockpileDefinition =
+        Paladin::SettlementObjectCatalog::definition(
+            Paladin::SettlementObjectTypes::Stockpile
+        );
+
+    PALADIN_CHECK(stockpileDefinition != nullptr);
+    Paladin::WorldGrid unrestrictedSizeGrid(30, 2);
+    for (std::int32_t x = 0; x < unrestrictedSizeGrid.width(); ++x)
+    {
+        unrestrictedSizeGrid.tile({x, 0})->terrain =
+            Paladin::TerrainType::Land;
+        unrestrictedSizeGrid.tile({x, 1})->terrain =
+            Paladin::TerrainType::Land;
+    }
+    const Paladin::SettlementObjectState unrestrictedSizeState(30, 2);
+    PALADIN_CHECK(
+        unrestrictedSizeState.canPlace(
+            unrestrictedSizeGrid,
+            *stockpileDefinition,
+            {{0, 0}, 30, 2}
+        )
+    );
 
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::House
@@ -867,6 +911,32 @@ void runWorldTests()
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 2);
+
+    const Paladin::SettlementConstructionSite* houseSite =
+        localMap.objectState().constructionSiteAt({8, 8});
+    PALADIN_CHECK(houseSite != nullptr);
+    PALADIN_CHECK(houseSite->progressPermille == 0);
+    PALADIN_CHECK(houseSite->resourceDeliveries.size() == 2);
+    PALADIN_CHECK(
+        houseSite->resourceDeliveries[0].resourceId ==
+            Paladin::SettlementResourceTypes::Lumber
+    );
+    PALADIN_CHECK(houseSite->resourceDeliveries[0].requiredAmount == 0);
+    PALADIN_CHECK(
+        houseSite->resourceDeliveries[1].resourceId ==
+            Paladin::SettlementResourceTypes::Stone
+    );
+
+    Paladin::SettlementInspectionController inspection;
+    PALADIN_CHECK(inspection.selectAt(
+        {8, 8},
+        localMap.objectState(),
+        true
+    ));
+    PALADIN_CHECK(
+        inspection.selectedConstructionSite(localMap.objectState()) ==
+            houseSite
+    );
 
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::Stockpile
@@ -894,7 +964,7 @@ void runWorldTests()
         objectPlacement.pointerPressed(std::nullopt, localMap)
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
-    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 7);
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 3);
 
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::Road
@@ -930,7 +1000,7 @@ void runWorldTests()
         objectPlacement.pointerPressed({{0, 0}}, localMap)
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
-    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 8);
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 4);
 
     PALADIN_CHECK(objectPlacement.beginPlacement(
         Paladin::SettlementObjectTypes::House
@@ -953,4 +1023,41 @@ void runWorldTests()
     );
     PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 6);
+    PALADIN_CHECK(inspection.selectAt(
+        {19, 10},
+        localMap.objectState(),
+        false
+    ));
+    PALADIN_CHECK(
+        inspection.selectedObject(localMap.objectState()) != nullptr
+    );
+
+    Paladin::SettlementCitizenState citizens;
+    PALADIN_CHECK(citizens.initialize(8, 42));
+    citizens.placeUnpositionedCitizens(localMap);
+    PALADIN_CHECK(citizens.citizens().size() == 8);
+    PALADIN_CHECK(!citizens.citizens().front().name.empty());
+    PALADIN_CHECK(
+        localMap.commandState().add(
+            localMap.grid(),
+            Paladin::SettlementCommandTypes::Gather,
+            {{0, 0}, 24, 24},
+            citizens
+        )
+    );
+    PALADIN_CHECK(localMap.commandState().commands().size() == 1);
+    PALADIN_CHECK(
+        citizens.citizens().front().activity ==
+            Paladin::CitizenActivity::AssignedToCommand
+    );
+    PALADIN_CHECK(
+        localMap.commandState().cancelIntersecting(
+            {{0, 0}, 1, 1},
+            citizens
+        ) == 1
+    );
+    PALADIN_CHECK(
+        citizens.citizens().front().activity ==
+            Paladin::CitizenActivity::Idle
+    );
 }

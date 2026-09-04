@@ -241,6 +241,45 @@ namespace Paladin
     }
 
 
+    std::unique_ptr<Texture> Renderer::createTextureFromSurface(
+        SDL_Surface* surface,
+        bool smoothScaling
+    )
+    {
+        if (!surface)
+        {
+            return nullptr;
+        }
+
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(
+            renderer_,
+            surface
+        );
+
+        if (!texture)
+        {
+            SDL_Log(
+                "SDL_CreateTextureFromSurface failed: %s",
+                SDL_GetError()
+            );
+            return nullptr;
+        }
+
+        SDL_SetTextureScaleMode(
+            texture,
+            smoothScaling
+                ? SDL_SCALEMODE_LINEAR
+                : SDL_SCALEMODE_NEAREST
+        );
+
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
+        return std::unique_ptr<Texture>(
+            new Texture(texture, surface->w, surface->h)
+        );
+    }
+
+
     bool Renderer::updateTexturePixels(
         Texture& texture,
         std::span<const RenderColor> pixels

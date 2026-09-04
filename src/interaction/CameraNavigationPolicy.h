@@ -4,8 +4,8 @@ namespace Paladin
 {
     struct CameraNavigationPolicy
     {
-        double keyboardPanSpeedTilesPerSecondAtZoomOne = 162.5;
-        double edgePanSpeedTilesPerSecondAtZoomOne = 150.0;
+        double keyboardPanSpeedScreenPixelsPerSecond = 650.0;
+        double edgePanSpeedScreenPixelsPerSecond = 650.0;
         float edgeActivationWidthPixels = 42.0F;
         double edgeActivationDelaySeconds = 0.10;
         double edgeResponseExponent = 1.65;

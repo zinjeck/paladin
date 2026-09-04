@@ -36,6 +36,12 @@ namespace Paladin
         float iconHeight = 1.0F;
     };
 
+    struct SettlementConstructionResourceCost
+    {
+        std::string_view resourceId;
+        std::uint32_t requiredAmount = 0;
+    };
+
     struct SettlementObjectDefinition
     {
         std::string_view id;
@@ -49,8 +55,6 @@ namespace Paladin
         std::int32_t previewHeight = 1;
         std::int32_t minimumWidth = 1;
         std::int32_t minimumHeight = 1;
-        std::int32_t maximumWidth = 1;
-        std::int32_t maximumHeight = 1;
         bool bypassesConstruction = false;
         bool uniquePerSettlement = false;
         bool separateConstructionSitePerTile = false;
@@ -58,6 +62,8 @@ namespace Paladin
         SettlementObjectPlacementLayer placementLayer =
             SettlementObjectPlacementLayer::Structure;
         SettlementObjectVisualStyle visual;
+        std::span<const SettlementConstructionResourceCost>
+            constructionResourceCosts;
     };
 
     namespace SettlementObjectTypes

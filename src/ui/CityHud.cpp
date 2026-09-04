@@ -3,6 +3,7 @@
 #include "rendering/Renderer.h"
 #include "ui/GrayUiRenderer.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/commands/SettlementCommandDefinition.h"
 
 #include <algorithm>
 #include <array>
@@ -23,6 +24,7 @@ namespace Paladin
         {
             std::size_t category = 0;
             std::string_view objectTypeId;
+            std::string_view commandTypeId;
             std::string_view commandLabel;
             std::string_view firstLine;
             std::string_view secondLine;
@@ -30,35 +32,35 @@ namespace Paladin
 
         constexpr std::array<MenuOptionDefinition, 14> menuOptions{{
             {
-                0, SettlementObjectTypes::CityKeep, "", "City", "Keep"
+                0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"
             },
             {
-                1, SettlementObjectTypes::Road, "", "Road", ""
+                1, SettlementObjectTypes::Road, "", "", "Road", ""
             },
             {
-                2, SettlementObjectTypes::House, "", "House", ""
+                2, SettlementObjectTypes::House, "", "", "House", ""
             },
             {
-                3, SettlementObjectTypes::Stockpile, "", "Stockpile", ""
+                3, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""
             },
             {
-                4, SettlementObjectTypes::FishingGrounds, "", "Fishing", "Grounds"
+                4, SettlementObjectTypes::FishingGrounds, "", "", "Fishing", "Grounds"
             },
             {
-                4, SettlementObjectTypes::WheatFarm, "", "Wheat", "Farm"
+                4, SettlementObjectTypes::WheatFarm, "", "", "Wheat", "Farm"
             },
             {
-                4, SettlementObjectTypes::Pastureland, "", "Pastureland", ""
+                4, SettlementObjectTypes::Pastureland, "", "", "Pastureland", ""
             },
             {
-                4, SettlementObjectTypes::Bakery, "", "Bakery", ""
+                4, SettlementObjectTypes::Bakery, "", "", "Bakery", ""
             },
-            {5, "", "Cancel Task", "", ""},
-            {5, "", "Demolish", "", ""},
-            {5, "", "Hunt", "", ""},
-            {5, "", "Gather", "", ""},
-            {5, "", "Chop Trees", "", ""},
-            {5, "", "Collect Rocks", "", ""}
+            {5, "", SettlementCommandTypes::Cancel, "Cancel Task", "", ""},
+            {5, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
+            {5, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
+            {5, "", SettlementCommandTypes::Gather, "Gather", "", ""},
+            {5, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
+            {5, "", SettlementCommandTypes::CollectRock, "Collect Rocks", "", ""}
         }};
 
         float centeredLabelX(
@@ -294,6 +296,7 @@ namespace Paladin
         }
 
         selectedObjectTypeId_.clear();
+        selectedCommandTypeId_.clear();
 
         for (std::size_t index = 0; index < optionButtons_.size(); ++index)
         {
@@ -309,6 +312,14 @@ namespace Paladin
                 {
                     selectedObjectTypeId_ =
                         menuOptions[index].objectTypeId;
+                }
+                else if (
+                    clicked &&
+                    !menuOptions[index].commandTypeId.empty()
+                )
+                {
+                    selectedCommandTypeId_ =
+                        menuOptions[index].commandTypeId;
                 }
             }
             else
@@ -330,6 +341,12 @@ namespace Paladin
             return CityHudAction::BeginObjectPlacement;
         }
 
+        if (!selectedCommandTypeId_.empty())
+        {
+            closeCategoryMenus();
+            return CityHudAction::BeginCommand;
+        }
+
         return CityHudAction::None;
     }
 
@@ -337,6 +354,12 @@ namespace Paladin
     std::string_view CityHud::selectedObjectTypeId() const noexcept
     {
         return selectedObjectTypeId_;
+    }
+
+
+    std::string_view CityHud::selectedCommandTypeId() const noexcept
+    {
+        return selectedCommandTypeId_;
     }
 
 

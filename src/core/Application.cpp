@@ -3,6 +3,8 @@
 #include "core/SimulationClock.h"
 #include "interaction/SettlementPlacementController.h"
 #include "interaction/SettlementObjectPlacementController.h"
+#include "interaction/SettlementCommandController.h"
+#include "interaction/SettlementInspectionController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
@@ -16,6 +18,7 @@
 #include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/SimulationSpeedControls.h"
+#include "ui/SettlementInspectionPanel.h"
 #include "ui/WorldHud.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
@@ -88,6 +91,12 @@ namespace Paladin
 
         foundingPanel_ =
             std::make_unique<FoundingPanel>();
+
+        settlementInspectionController_ =
+            std::make_unique<SettlementInspectionController>();
+
+        settlementInspectionPanel_ =
+            std::make_unique<SettlementInspectionPanel>();
     }
 
     Application::~Application()
@@ -102,6 +111,8 @@ namespace Paladin
         worldRenderer_.reset();
         settlementPlacementController_.reset();
         settlementObjectPlacementController_.reset();
+        settlementInspectionPanel_.reset();
+        settlementInspectionController_.reset();
         camera_.reset();
         savedWorldCamera_.reset();
         simulation_.reset();
@@ -134,7 +145,9 @@ namespace Paladin
             !worldHud_ ||
             !cityHud_ ||
             !simulationSpeedControls_ ||
-            !foundingPanel_
+            !foundingPanel_ ||
+            !settlementInspectionController_ ||
+            !settlementInspectionPanel_
         )
         {
             return 1;
@@ -378,6 +391,17 @@ namespace Paladin
                                     event.motion.y
                                 )
                         );
+                        settlementCommandController_->pointerMoved(
+                            activeHudContainsPoint(
+                                event.motion.x,
+                                event.motion.y
+                            )
+                                ? std::nullopt
+                                : cityTileAtScreen(
+                                    event.motion.x,
+                                    event.motion.y
+                                )
+                        );
                     }
 
                     if (
@@ -396,6 +420,8 @@ namespace Paladin
                     {
                         settlementObjectPlacementController_
                             ->cancelPlacement();
+                        settlementCommandController_->cancel();
+                        settlementInspectionController_->clear();
                         continue;
                     }
 
@@ -455,6 +481,10 @@ namespace Paladin
                     )
                     {
                         cityHudCapturedPointer_ =
+                            settlementInspectionPanel_->containsPoint(
+                                event.button.x,
+                                event.button.y
+                            ) ||
                             cityHud_->pointerPressed(
                                 event.button.x,
                                 event.button.y
@@ -467,19 +497,51 @@ namespace Paladin
 
                         if (
                             !cityHudCapturedPointer_ &&
+                            !activeHudContainsPoint(
+                                event.button.x,
+                                event.button.y
+                            ) &&
                             settlementMap
                         )
                         {
-                            static_cast<void>(
-                                settlementObjectPlacementController_
-                                    ->pointerPressed(
-                                        cityTileAtScreen(
-                                            event.button.x,
-                                            event.button.y
-                                        ),
-                                        *settlementMap
-                                    )
+                            const auto tile = cityTileAtScreen(
+                                event.button.x,
+                                event.button.y
                             );
+                            if (settlementCommandController_->isActive())
+                            {
+                                settlementCommandController_->pointerPressed(
+                                    tile
+                                );
+                            }
+                            else if (
+                                settlementObjectPlacementController_
+                                    ->isActive()
+                            )
+                            {
+                                static_cast<void>(
+                                    settlementObjectPlacementController_
+                                        ->pointerPressed(tile, *settlementMap)
+                                );
+                            }
+                            else if (tile)
+                            {
+                                static_cast<void>(
+                                    settlementInspectionController_
+                                        ->selectAt(
+                                            *tile,
+                                            settlementMap->objectState(),
+                                            event.button.x <
+                                                static_cast<float>(
+                                                    renderer_->outputWidth()
+                                                ) * 0.5F
+                                        )
+                                );
+                            }
+                            else
+                            {
+                                settlementInspectionController_->clear();
+                            }
                         }
                     }
 
@@ -503,6 +565,8 @@ namespace Paladin
                                 CityHudAction::BeginObjectPlacement
                         )
                         {
+                            settlementInspectionController_->clear();
+                            settlementCommandController_->cancel();
                             static_cast<void>(
                                 settlementObjectPlacementController_
                                     ->beginPlacement(
@@ -510,25 +574,62 @@ namespace Paladin
                                     )
                             );
                         }
+                        else if (action == CityHudAction::BeginCommand)
+                        {
+                            settlementInspectionController_->clear();
+                            settlementObjectPlacementController_
+                                ->cancelPlacement();
+                            static_cast<void>(
+                                settlementCommandController_->begin(
+                                    cityHud_->selectedCommandTypeId()
+                                )
+                            );
+                        }
                         else if (!cityHudCapturedPointer_)
                         {
-                            const SettlementMap* settlementMap =
+                            SettlementMap* settlementMap =
                                 simulation_->settlementMap(
                                     activeCitySettlementId_
                                 );
 
                             if (settlementMap)
                             {
-                                static_cast<void>(
-                                    settlementObjectPlacementController_
-                                        ->pointerReleased(
-                                            cityTileAtScreen(
-                                                event.button.x,
-                                                event.button.y
-                                            ),
-                                            *settlementMap
-                                        )
+                                const auto tile = cityTileAtScreen(
+                                    event.button.x,
+                                    event.button.y
                                 );
+                                Settlement* settlement =
+                                    simulation_->world().settlement(
+                                        activeCitySettlementId_
+                                    );
+                                if (
+                                    settlementCommandController_->isActive() &&
+                                    settlement
+                                )
+                                {
+                                    static_cast<void>(
+                                        settlementCommandController_
+                                            ->pointerReleased(
+                                                tile,
+                                                *settlementMap,
+                                                settlement->simulationState()
+                                                    .citizens()
+                                            )
+                                    );
+                                }
+                                else if (
+                                    settlementObjectPlacementController_
+                                        ->isActive()
+                                )
+                                {
+                                    static_cast<void>(
+                                        settlementObjectPlacementController_
+                                            ->pointerReleased(
+                                                tile,
+                                                *settlementMap
+                                            )
+                                    );
+                                }
                             }
                         }
 
@@ -898,6 +999,18 @@ namespace Paladin
                     );
                 }
 
+                if (settlementCommandController_->isActive())
+                {
+                    float mouseX = 0.0F;
+                    float mouseY = 0.0F;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+                    settlementCommandController_->pointerMoved(
+                        cityHud_->containsInteractivePoint(mouseX, mouseY)
+                            ? std::nullopt
+                            : cityTileAtScreen(mouseX, mouseY)
+                    );
+                }
+
                 while (simulationClock_->shouldTick())
                 {
                     simulation_->tick(
@@ -916,12 +1029,30 @@ namespace Paladin
 
                 if (settlementMap)
                 {
-                    cityRenderer_->render(
+                    const Settlement* renderedSettlement =
+                        simulation_->world().settlement(
+                            activeCitySettlementId_
+                        );
+                    if (renderedSettlement)
+                    {
+                        cityRenderer_->render(
+                            *renderer_,
+                            *settlementMap,
+                            *camera_,
+                            *tileRenderMetrics_,
+                            *settlementObjectPlacementController_,
+                            *settlementCommandController_,
+                            renderedSettlement->simulationState().citizens()
+                        );
+                    }
+
+                    settlementInspectionPanel_->render(
                         *renderer_,
+                        *grayUiRenderer_,
+                        *settlementInspectionController_,
                         *settlementMap,
                         *camera_,
-                        *tileRenderMetrics_,
-                        *settlementObjectPlacementController_
+                        *tileRenderMetrics_
                     );
                 }
 
@@ -1187,6 +1318,9 @@ namespace Paladin
         settlementObjectPlacementController_ =
             std::make_unique<SettlementObjectPlacementController>();
 
+        settlementCommandController_ =
+            std::make_unique<SettlementCommandController>();
+
         worldRenderer_ =
             std::make_unique<WorldRenderer>();
 
@@ -1205,6 +1339,8 @@ namespace Paladin
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
         simulationControlsCapturedPointer_ = false;
+        settlementInspectionController_->clear();
+        settlementInspectionPanel_->clearLayout();
         simulationClock_->reset();
         screen_ = Screen::World;
     }
@@ -1219,6 +1355,9 @@ namespace Paladin
         worldRenderer_.reset();
         settlementPlacementController_.reset();
         settlementObjectPlacementController_.reset();
+        settlementCommandController_.reset();
+        settlementInspectionController_->clear();
+        settlementInspectionPanel_->clearLayout();
         camera_.reset();
         savedWorldCamera_.reset();
         simulation_.reset();
@@ -1296,6 +1435,9 @@ namespace Paladin
         edgeScrollDwellSeconds_ = 0.0;
         settlementPlacementController_->cancelSelection();
         settlementObjectPlacementController_->cancelPlacement();
+        settlementCommandController_->cancel();
+        settlementInspectionController_->clear();
+        settlementInspectionPanel_->clearLayout();
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = true;
         simulationControlsCapturedPointer_ = false;
@@ -1319,6 +1461,9 @@ namespace Paladin
         }
 
         settlementObjectPlacementController_->cancelPlacement();
+        settlementCommandController_->cancel();
+        settlementInspectionController_->clear();
+        settlementInspectionPanel_->clearLayout();
         cityHudCapturedPointer_ = false;
         simulationControlsCapturedPointer_ = false;
 
@@ -1454,9 +1599,15 @@ namespace Paladin
             directionY += 1.0;
         }
 
+        const double baseTilePixels =
+            tileRenderMetrics_
+                ? std::max(tileRenderMetrics_->tilePixels, 0.001)
+                : 1.0;
+
         double panSpeedTilesPerSecondAtZoomOne =
             cameraNavigationPolicy_
-                .keyboardPanSpeedTilesPerSecondAtZoomOne;
+                .keyboardPanSpeedScreenPixelsPerSecond
+            / baseTilePixels;
 
         const bool keyboardMoving =
             directionX != 0.0 || directionY != 0.0;
@@ -1559,7 +1710,8 @@ namespace Paladin
 
                 panSpeedTilesPerSecondAtZoomOne =
                     cameraNavigationPolicy_
-                        .edgePanSpeedTilesPerSecondAtZoomOne;
+                        .edgePanSpeedScreenPixelsPerSecond
+                    / baseTilePixels;
             }
             else
             {
@@ -1885,7 +2037,9 @@ namespace Paladin
 
         if (screen_ == Screen::City)
         {
-            return cityHud_->containsInteractivePoint(x, y);
+            return
+                cityHud_->containsInteractivePoint(x, y) ||
+                settlementInspectionPanel_->containsPoint(x, y);
         }
 
         return worldHud_->containsInteractivePoint(x, y);

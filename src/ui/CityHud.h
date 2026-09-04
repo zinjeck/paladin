@@ -18,6 +18,7 @@ namespace Paladin
     {
         None,
         BeginObjectPlacement,
+        BeginCommand,
         Back
     };
 
@@ -52,6 +53,9 @@ namespace Paladin
         [[nodiscard]]
         std::string_view selectedObjectTypeId() const noexcept;
 
+        [[nodiscard]]
+        std::string_view selectedCommandTypeId() const noexcept;
+
         void render(
             Renderer& renderer,
             const GrayUiRenderer& uiRenderer
@@ -75,6 +79,7 @@ namespace Paladin
         UiRectangle reservedPanel_;
         std::string cityName_;
         std::string selectedObjectTypeId_;
+        std::string selectedCommandTypeId_;
         std::uint64_t day_ = 1;
         int hour_ = 6;
         int minute_ = 0;

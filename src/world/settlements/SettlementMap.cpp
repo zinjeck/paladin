@@ -76,4 +76,17 @@ namespace Paladin
     {
         return objectState_;
     }
+
+
+    SettlementCommandState& SettlementMap::commandState() noexcept
+    {
+        return commandState_;
+    }
+
+
+    const SettlementCommandState&
+    SettlementMap::commandState() const noexcept
+    {
+        return commandState_;
+    }
 }

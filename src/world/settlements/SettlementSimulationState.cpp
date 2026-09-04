@@ -61,6 +61,17 @@ namespace Paladin
             profile.demographicRates
         );
 
+        if (
+            profile.initialDetailedCitizenCount > 0 &&
+            !citizens_.initialize(
+                profile.initialDetailedCitizenCount,
+                profile.initialPopulation
+            )
+        )
+        {
+            return false;
+        }
+
         stockpile_ = std::move(initialStockpile);
         economy_ = std::move(initialEconomy);
         simulationTier_ = profile.initialSimulationTier;
@@ -113,6 +124,20 @@ namespace Paladin
         return economy_;
     }
 
+
+    SettlementCitizenState&
+    SettlementSimulationState::citizens() noexcept
+    {
+        return citizens_;
+    }
+
+
+    const SettlementCitizenState&
+    SettlementSimulationState::citizens() const noexcept
+    {
+        return citizens_;
+    }
+
     void SettlementSimulationState::setSimulationTier(
         SettlementSimulationTier tier
     ) noexcept
@@ -162,7 +187,8 @@ namespace Paladin
             stockpile_.version(),
             economy_.version(),
             schedulingVersion_,
-            localMapVersion_
+            localMapVersion_,
+            citizens_.version()
         };
     }
 
@@ -197,6 +223,11 @@ namespace Paladin
         if (current.localMap != previousVersions.localMap)
         {
             domains = domains | SettlementStateDomain::LocalMap;
+        }
+
+        if (current.citizens != previousVersions.citizens)
+        {
+            domains = domains | SettlementStateDomain::Citizens;
         }
 
         return {domains, current};
@@ -306,6 +337,7 @@ namespace Paladin
         }
 
         localMap_ = std::move(localMap);
+        citizens_.placeUnpositionedCitizens(*localMap_);
         ++localMapVersion_;
     }
 

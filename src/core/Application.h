@@ -18,6 +18,9 @@ namespace Paladin
     class Renderer;
     class SettlementPlacementController;
     class SettlementObjectPlacementController;
+    class SettlementCommandController;
+    class SettlementInspectionController;
+    class SettlementInspectionPanel;
     class Simulation;
     class SimulationClock;
     class SimulationSpeedControls;
@@ -103,6 +106,12 @@ namespace Paladin
             settlementPlacementController_;
         std::unique_ptr<SettlementObjectPlacementController>
             settlementObjectPlacementController_;
+        std::unique_ptr<SettlementCommandController>
+            settlementCommandController_;
+        std::unique_ptr<SettlementInspectionController>
+            settlementInspectionController_;
+        std::unique_ptr<SettlementInspectionPanel>
+            settlementInspectionPanel_;
         std::unique_ptr<WorldRenderer> worldRenderer_;
         std::unique_ptr<CityRenderer> cityRenderer_;
         std::unique_ptr<TileRenderMetrics>

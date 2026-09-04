@@ -37,7 +37,16 @@ namespace Paladin
 
     enum class ConstructionSitePhase : std::uint8_t
     {
-        AwaitingConstruction
+        AwaitingMaterials,
+        ReadyToBuild,
+        UnderConstruction
+    };
+
+    struct ConstructionResourceDelivery
+    {
+        std::string resourceId;
+        std::uint32_t deliveredAmount = 0;
+        std::uint32_t requiredAmount = 0;
     };
 
     struct SettlementConstructionSite
@@ -46,7 +55,9 @@ namespace Paladin
         std::string objectTypeId;
         SettlementObjectFootprint footprint;
         ConstructionSitePhase phase =
-            ConstructionSitePhase::AwaitingConstruction;
+            ConstructionSitePhase::AwaitingMaterials;
+        std::uint16_t progressPermille = 0;
+        std::vector<ConstructionResourceDelivery> resourceDeliveries;
     };
 
     enum class SettlementTilePlacementStatus : std::uint8_t
@@ -54,6 +65,19 @@ namespace Paladin
         Buildable,
         InvalidTerrain,
         Occupied
+    };
+
+    struct SettlementPlacementAreaEvaluation
+    {
+        std::size_t buildableTileCount = 0;
+        std::size_t blockedTileCount = 0;
+        bool footprintAllowed = false;
+
+        [[nodiscard]]
+        bool hasObstructions() const noexcept
+        {
+            return blockedTileCount > 0;
+        }
     };
 
     class SettlementObjectState
@@ -66,6 +90,13 @@ namespace Paladin
 
         [[nodiscard]]
         bool canPlace(
+            const WorldGrid& grid,
+            const SettlementObjectDefinition& definition,
+            const SettlementObjectFootprint& footprint
+        ) const noexcept;
+
+        [[nodiscard]]
+        SettlementPlacementAreaEvaluation evaluatePlacementArea(
             const WorldGrid& grid,
             const SettlementObjectDefinition& definition,
             const SettlementObjectFootprint& footprint
@@ -101,6 +132,26 @@ namespace Paladin
         constructionSites() const noexcept;
 
         [[nodiscard]]
+        const CompletedSettlementObject* completedObject(
+            SettlementObjectId id
+        ) const noexcept;
+
+        [[nodiscard]]
+        const SettlementConstructionSite* constructionSite(
+            ConstructionSiteId id
+        ) const noexcept;
+
+        [[nodiscard]]
+        const CompletedSettlementObject* completedObjectAt(
+            WorldTilePosition position
+        ) const noexcept;
+
+        [[nodiscard]]
+        const SettlementConstructionSite* constructionSiteAt(
+            WorldTilePosition position
+        ) const noexcept;
+
+        [[nodiscard]]
         std::uint64_t presentationVersion() const noexcept;
 
     private:
@@ -129,6 +180,16 @@ namespace Paladin
         [[nodiscard]]
         std::size_t tileIndex(WorldTilePosition position) const noexcept;
 
+        void rebuildPlacementPrefixCache(
+            const WorldGrid& grid
+        ) const noexcept;
+
+        [[nodiscard]]
+        std::uint32_t blockedTileCountIn(
+            const std::vector<std::uint32_t>& prefix,
+            const SettlementObjectFootprint& footprint
+        ) const noexcept;
+
         std::int32_t mapWidth_ = 0;
         std::int32_t mapHeight_ = 0;
         std::vector<std::uint8_t> structureOccupiedTiles_;
@@ -138,5 +199,10 @@ namespace Paladin
         IdGenerator<SettlementObjectId> objectIds_;
         IdGenerator<ConstructionSiteId> constructionSiteIds_;
         std::uint64_t presentationVersion_ = 0;
+        mutable const WorldGrid* cachedPlacementGrid_ = nullptr;
+        mutable std::uint64_t cachedPlacementVersion_ =
+            static_cast<std::uint64_t>(-1);
+        mutable std::vector<std::uint32_t> structureBlockedPrefix_;
+        mutable std::vector<std::uint32_t> infrastructureBlockedPrefix_;
     };
 }
