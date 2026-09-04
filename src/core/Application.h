@@ -9,6 +9,7 @@ namespace Paladin
     class SimulationClock;
     class Simulation;
     class Camera2D;
+    class SettlementPlacementController;
     class WorldRenderer;
 
     struct TileRenderMetrics;
@@ -26,6 +27,10 @@ namespace Paladin
     private:
         void updateCameraMovement(double frameDeltaSeconds);
         void updateCameraZoom(double frameDeltaSeconds);
+        void updateSettlementPlacementHover(
+            double screenX,
+            double screenY
+        );
         void applyCameraZoom(
             double multiplier,
             double screenX,
@@ -39,6 +44,8 @@ namespace Paladin
         std::unique_ptr<SimulationClock> simulationClock_;
         std::unique_ptr<Simulation> simulation_;
         std::unique_ptr<Camera2D> camera_;
+        std::unique_ptr<SettlementPlacementController>
+            settlementPlacementController_;
         
         std::unique_ptr<WorldRenderer>
             worldRenderer_;

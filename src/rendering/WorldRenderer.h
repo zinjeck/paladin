@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/OverlayRenderer.h"
+#include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/WorldGridRenderer.h"
 
@@ -29,6 +30,7 @@ namespace Paladin
     private:
         WorldGridRenderer gridRenderer_;
         SpriteRenderer spriteRenderer_;
+        SettlementMarkerRenderer settlementMarkerRenderer_;
         OverlayRenderer overlayRenderer_;
     };
 }

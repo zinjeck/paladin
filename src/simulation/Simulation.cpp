@@ -9,6 +9,7 @@ namespace Paladin
     Simulation::Simulation()
         : world_(std::make_unique<World>())
     {
+        playerPolityId_ = world_->createPolity();
     }
 
 
@@ -72,6 +73,12 @@ namespace Paladin
     std::uint64_t Simulation::tickCount() const noexcept
     {
         return tickCount_;
+    }
+
+
+    PolityId Simulation::playerPolityId() const noexcept
+    {
+        return playerPolityId_;
     }
 
 

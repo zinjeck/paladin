@@ -1,7 +1,9 @@
 #include "core/Application.h"
 
 #include "core/SimulationClock.h"
+#include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
+#include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "simulation/Simulation.h"
 #include "rendering/Camera2D.h"
@@ -11,8 +13,11 @@
 #include "world/World.h"
 #include <SDL3/SDL.h>
 
+#include <array>
 #include <cmath>
 #include <memory>
+#include <optional>
+#include <span>
 
 namespace Paladin
 {
@@ -61,9 +66,16 @@ namespace Paladin
 
         camera_ =
             std::make_unique<Camera2D>(
-                128.0,
-                128.0
+                static_cast<double>(
+                    simulation_->world().grid().width()
+                ) * 0.5,
+                static_cast<double>(
+                    simulation_->world().grid().height()
+                ) * 0.5
             );
+
+        settlementPlacementController_ =
+            std::make_unique<SettlementPlacementController>();
         
         worldRenderer_ =
             std::make_unique<WorldRenderer>();
@@ -76,6 +88,7 @@ namespace Paladin
     {
         tileRenderMetrics_.reset();
         worldRenderer_.reset();
+        settlementPlacementController_.reset();
         camera_.reset();
 
         simulation_.reset();
@@ -98,6 +111,7 @@ namespace Paladin
             !simulationClock_ ||
             !simulation_ ||
             !camera_ ||
+            !settlementPlacementController_ ||
             !worldRenderer_ ||
             !tileRenderMetrics_
         )
@@ -153,6 +167,34 @@ namespace Paladin
                         static_cast<double>(event.wheel.mouse_y)
                     );
                 }
+
+                if (
+                    event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                    event.button.button == SDL_BUTTON_LEFT
+                )
+                {
+                    updateSettlementPlacementHover(
+                        static_cast<double>(event.button.x),
+                        static_cast<double>(event.button.y)
+                    );
+
+                    const SettlementId foundedSettlementId =
+                        settlementPlacementController_
+                            ->tryFoundSettlement(
+                                simulation_->world(),
+                                simulation_->playerPolityId()
+                            );
+
+                    if (foundedSettlementId.isValid())
+                    {
+                        SDL_Log(
+                            "Founded settlement %llu.",
+                            static_cast<unsigned long long>(
+                                foundedSettlementId.value()
+                            )
+                        );
+                    }
+                }
             }
 
             updateCameraMovement(
@@ -161,6 +203,16 @@ namespace Paladin
 
             updateCameraZoom(
                 simulationClock_->frameDeltaSeconds()
+            );
+
+            float mouseX = 0.0F;
+            float mouseY = 0.0F;
+
+            SDL_GetMouseState(&mouseX, &mouseY);
+
+            updateSettlementPlacementHover(
+                static_cast<double>(mouseX),
+                static_cast<double>(mouseY)
             );
 
             while (simulationClock_->shouldTick())
@@ -174,11 +226,43 @@ namespace Paladin
 
             renderer_->beginFrame();
 
+            std::array<TileOverlayRenderItem, 1> overlays{};
+            std::size_t overlayCount = 0;
+
+            const std::optional<WorldPosition> hoveredPosition =
+                settlementPlacementController_->hoveredPosition();
+
+            if (hoveredPosition)
+            {
+                const bool validPlacement =
+                    settlementPlacementController_
+                        ->hasValidPlacement(
+                            simulation_->world()
+                        );
+
+                overlays[0] = {
+                    static_cast<double>(hoveredPosition->x),
+                    static_cast<double>(hoveredPosition->y),
+                    1.0,
+                    1.0,
+                    validPlacement
+                        ? RenderColor{72, 220, 112, 110}
+                        : RenderColor{232, 70, 70, 120}
+                };
+
+                overlayCount = 1;
+            }
+
             worldRenderer_->render(
                 *renderer_,
                 simulation_->world(),
                 *camera_,
-                *tileRenderMetrics_
+                *tileRenderMetrics_,
+                {},
+                std::span<const TileOverlayRenderItem>(
+                    overlays.data(),
+                    overlayCount
+                )
             );
 
             renderer_->endFrame();
@@ -290,6 +374,69 @@ namespace Paladin
             static_cast<double>(mouseX),
             static_cast<double>(mouseY)
         );
+    }
+
+    void Application::updateSettlementPlacementHover(
+        double screenX,
+        double screenY
+    )
+    {
+        const double tilePixels =
+            tileRenderMetrics_->scaledTilePixels(
+                camera_->zoom()
+            );
+
+        const double viewportWidth =
+            static_cast<double>(renderer_->outputWidth());
+
+        const double viewportHeight =
+            static_cast<double>(renderer_->outputHeight());
+
+        if (
+            tilePixels <= 0.0 ||
+            screenX < 0.0 ||
+            screenY < 0.0 ||
+            screenX >= viewportWidth ||
+            screenY >= viewportHeight
+        )
+        {
+            settlementPlacementController_->setHoveredPosition(
+                std::nullopt
+            );
+
+            return;
+        }
+
+        const double worldTileX =
+            camera_->tileX()
+            + (screenX - viewportWidth * 0.5)
+                / tilePixels;
+
+        const double worldTileY =
+            camera_->tileY()
+            + (screenY - viewportHeight * 0.5)
+                / tilePixels;
+
+        const WorldPosition position{
+            static_cast<std::int32_t>(std::floor(worldTileX)),
+            static_cast<std::int32_t>(std::floor(worldTileY))
+        };
+
+        if (
+            !simulation_->world().grid().isValidPosition({
+                position.x,
+                position.y
+            })
+        )
+        {
+            settlementPlacementController_->setHoveredPosition(
+                std::nullopt
+            );
+
+            return;
+        }
+
+        settlementPlacementController_->setHoveredPosition(position);
     }
 
     void Application::applyCameraZoom(

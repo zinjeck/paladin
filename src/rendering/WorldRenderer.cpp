@@ -27,6 +27,13 @@ namespace Paladin
             metrics
         );
 
+        settlementMarkerRenderer_.render(
+            renderer,
+            world.settlements(),
+            camera,
+            metrics
+        );
+
         overlayRenderer_.render(
             renderer,
             overlays,

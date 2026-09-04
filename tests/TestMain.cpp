@@ -3,6 +3,7 @@
 
 void runCoreTests();
 void runWorldTests();
+void runWorldGenerationTests();
 
 int main()
 {
@@ -10,6 +11,7 @@ int main()
     {
         runCoreTests();
         runWorldTests();
+        runWorldGenerationTests();
     }
     catch (const std::exception& exception)
     {

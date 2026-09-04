@@ -1,60 +1,28 @@
 #include "world/World.h"
-#include "world/BiomeType.h"
 #include "world/TerrainType.h"
+#include "world/generation/WorldGenerator.h"
 
 namespace Paladin
 {
     World::World()
-        : grid_(256, 256)
+        : World(WorldGenerationSettings{})
     {
-        // Temporary bootstrap terrain.
-        //
-        // This is NOT world generation.
-        // It only exists so we can prove rendering works.
-    
-        for (std::int32_t y = 64; y < 192; ++y)
-        {
-            for (std::int32_t x = 64; x < 192; ++x)
-            {
-                WorldTile* tile =
-                    grid_.tile(
-                        WorldTilePosition{
-                            x,
-                            y
-                        }
-                    );
-    
-                if (tile)
-                {
-                    tile->terrain =
-                        TerrainType::Land;
+    }
 
-                    tile->biome =
-                        BiomeType::Plain;
-                }
-            }
-        }
-    
-    
-        for (std::int32_t y = 80; y < 176; ++y)
-        {
-            WorldTile* tile =
-                grid_.tile(
-                    WorldTilePosition{
-                        128,
-                        y
-                    }
-                );
-    
-            if (tile)
-            {
-                tile->terrain =
-                    TerrainType::Mountain;
 
-                tile->biome =
-                    BiomeType::Plain;
-            }
-        }
+    World::World(
+        const WorldGenerationSettings& generationSettings
+    )
+        : generationSeed_(generationSettings.seed),
+          grid_(
+              generationSettings.width,
+              generationSettings.height
+          )
+    {
+        WorldGenerator{}.generate(
+            grid_,
+            generationSettings
+        );
     }
 
     World::~World() = default;
@@ -89,6 +57,18 @@ namespace Paladin
         return grid_;
     }
 
+
+    std::uint64_t World::generationSeed() const noexcept
+    {
+        return generationSeed_;
+    }
+
+
+    std::span<const Settlement> World::settlements() const noexcept
+    {
+        return settlements_.entities();
+    }
+
     // ========================================================
     // Creation
     // ========================================================
@@ -112,6 +92,58 @@ namespace Paladin
     )
     {
         return armies_.create(position);
+    }
+
+
+    bool World::canFoundSettlementAt(
+        WorldPosition position
+    ) const noexcept
+    {
+        const WorldTile* tile =
+            grid_.tile({
+                position.x,
+                position.y
+            });
+
+        if (!tile || tile->terrain != TerrainType::Land)
+        {
+            return false;
+        }
+
+        for (const Settlement& settlement : settlements_.entities())
+        {
+            if (settlement.position() == position)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    SettlementId World::foundSettlement(
+        WorldPosition position,
+        PolityId ownerPolityId
+    )
+    {
+        if (
+            !canFoundSettlementAt(position) ||
+            !polities_.contains(ownerPolityId)
+        )
+        {
+            return {};
+        }
+
+        const SettlementId settlementId =
+            settlements_.create(position);
+
+        Settlement* foundedSettlement =
+            settlements_.find(settlementId);
+
+        foundedSettlement->setOwnerPolity(ownerPolityId);
+
+        return settlementId;
     }
 
 

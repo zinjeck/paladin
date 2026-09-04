@@ -9,8 +9,11 @@
 #include "world/WorldPosition.h"
 #include "world/WorldTime.h"
 #include "world/WorldGrid.h"
+#include "world/generation/WorldGenerationSettings.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <span>
 
 namespace Paladin
 {
@@ -18,6 +21,9 @@ namespace Paladin
     {
     public:
         World();
+        explicit World(
+            const WorldGenerationSettings& generationSettings
+        );
         ~World();
 
         World(const World&) = delete;
@@ -41,6 +47,17 @@ namespace Paladin
         [[nodiscard]]
         ArmyId createArmy(
             WorldPosition position = {}
+        );
+
+        [[nodiscard]]
+        bool canFoundSettlementAt(
+            WorldPosition position
+        ) const noexcept;
+
+        [[nodiscard]]
+        SettlementId foundSettlement(
+            WorldPosition position,
+            PolityId ownerPolityId
         );
 
 
@@ -91,6 +108,12 @@ namespace Paladin
         
         [[nodiscard]]
         const WorldGrid& grid() const noexcept;
+
+        [[nodiscard]]
+        std::uint64_t generationSeed() const noexcept;
+
+        [[nodiscard]]
+        std::span<const Settlement> settlements() const noexcept;
 
         // ====================================================
         // Settlement relationships
@@ -146,6 +169,7 @@ namespace Paladin
 
     private:
         WorldTime time_;
+        std::uint64_t generationSeed_ = 0;
         WorldGrid grid_;
     
         EntityRegistry<

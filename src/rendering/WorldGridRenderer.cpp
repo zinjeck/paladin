@@ -4,6 +4,7 @@
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 
+#include "world/BiomeType.h"
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
 #include "world/WorldTile.h"
@@ -17,33 +18,65 @@ namespace Paladin
 {
     namespace
     {
-        RenderColor terrainColor(
-            TerrainType terrain
+        RenderColor biomeColor(
+            BiomeType biome
         ) noexcept
         {
-            switch (terrain)
+            switch (biome)
             {
-                case TerrainType::Land:
+                case BiomeType::Plain:
                     return {
-                        78,
-                        118,
-                        70,
+                        92,
+                        166,
+                        64,
                         255
                     };
 
-                case TerrainType::Mountain:
+                case BiomeType::Forest:
                     return {
-                        112,
-                        108,
-                        102,
+                        26,
+                        107,
+                        41,
                         255
                     };
 
-                case TerrainType::Water:
+                case BiomeType::Jungle:
                     return {
-                        46,
-                        83,
-                        122,
+                        5,
+                        92,
+                        23,
+                        255
+                    };
+
+                case BiomeType::Desert:
+                    return {
+                        219,
+                        184,
+                        92,
+                        255
+                    };
+
+                case BiomeType::Tundra:
+                    return {
+                        163,
+                        184,
+                        173,
+                        255
+                    };
+
+                case BiomeType::Taiga:
+                    return {
+                        51,
+                        97,
+                        82,
+                        255
+                    };
+
+                case BiomeType::Ocean:
+                    return {
+                        13,
+                        41,
+                        92,
                         255
                     };
             }
@@ -54,6 +87,28 @@ namespace Paladin
                 255,
                 255
             };
+        }
+
+        RenderColor tileColor(
+            const WorldTile& tile
+        ) noexcept
+        {
+            if (tile.terrain == TerrainType::Water)
+            {
+                return biomeColor(BiomeType::Ocean);
+            }
+
+            if (tile.terrain == TerrainType::Mountain)
+            {
+                return {
+                    115,
+                    107,
+                    97,
+                    255
+                };
+            }
+
+            return biomeColor(tile.biome);
         }
     }
 
@@ -193,7 +248,7 @@ namespace Paladin
                     screenY,
                     static_cast<float>(tilePixels + 0.5),
                     static_cast<float>(tilePixels + 0.5),
-                    terrainColor(tile->terrain)
+                    tileColor(*tile)
                 );
             }
         }

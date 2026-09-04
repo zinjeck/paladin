@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/BiomeType.h"
+#include "world/EnvironmentalValues.h"
 #include "world/TerrainType.h"
 
 namespace Paladin
@@ -12,5 +13,9 @@ namespace Paladin
 
         BiomeType biome =
             BiomeType::Ocean;
+
+        Elevation elevation{};
+        Temperature temperature{};
+        Rainfall rainfall{};
     };
 }

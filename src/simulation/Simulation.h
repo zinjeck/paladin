@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/StrongId.h"
+
 #include <cstdint>
 #include <memory>
 
@@ -46,11 +48,16 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t tickCount() const noexcept;
 
+        [[nodiscard]]
+        PolityId playerPolityId() const noexcept;
+
     private:
         [[nodiscard]]
         double speedMultiplier() const noexcept;
 
         std::unique_ptr<World> world_;
+
+        PolityId playerPolityId_;
 
         SimulationSpeed speed_ =
             SimulationSpeed::Normal;

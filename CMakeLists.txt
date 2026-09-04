@@ -20,16 +20,23 @@ add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
     src/core/SimulationClock.cpp
+    src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
     src/rendering/Texture.cpp
     src/rendering/SpriteRenderer.cpp
     src/rendering/OverlayRenderer.cpp
     src/rendering/WorldRenderer.cpp
+    src/rendering/SettlementMarkerRenderer.cpp
     src/simulation/Simulation.cpp
     src/world/World.cpp
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
+    src/world/generation/GenerationNoise.cpp
+    src/world/generation/LandmassGenerator.cpp
+    src/world/generation/ClimateGenerator.cpp
+    src/world/generation/TerrainBiomeClassifier.cpp
+    src/world/generation/WorldGenerator.cpp
     src/rendering/WorldGridRenderer.cpp
 )
 
@@ -56,10 +63,16 @@ add_executable(PaladinTests
     tests/TestMain.cpp
     tests/CoreTests.cpp
     tests/WorldTests.cpp
+    tests/WorldGenerationTests.cpp
 
     src/world/World.cpp
     src/world/WorldTime.cpp
     src/world/WorldGrid.cpp
+    src/world/generation/GenerationNoise.cpp
+    src/world/generation/LandmassGenerator.cpp
+    src/world/generation/ClimateGenerator.cpp
+    src/world/generation/TerrainBiomeClassifier.cpp
+    src/world/generation/WorldGenerator.cpp
 )
 
 target_include_directories(PaladinTests PRIVATE
