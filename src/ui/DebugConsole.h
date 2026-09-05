@@ -8,6 +8,7 @@ namespace Paladin
 {
 // Session-wide presentation; commands operate on explicit settlement IDs
 // elsewhere.
+class GrayUiRenderer;
 class DebugConsole
 {
   public:
@@ -38,7 +39,11 @@ class DebugConsole
     bool contains(float x, float y) const noexcept;
     std::string takeCommand();
     void print(std::string_view text);
-    void render(Renderer& renderer, std::string_view stats);
+    void render(
+        Renderer& renderer,
+        std::string_view stats,
+        const GrayUiRenderer& ui
+    );
 
   private:
     struct Line
@@ -53,7 +58,8 @@ class DebugConsole
     NormalFontRenderer font_;
     bool open_ = false, focused_ = false, inputFocus_ = true, dragging_ = false;
     bool statsOpen_ = false, minimized_ = false;
-    UiRectangle panel_, inputBox_, statsBox_;
+    UiRectangle panel_, inputBox_, statsBox_, spawnBounds_;
+    UiButton spawnButton_{""};
     std::string input_, output_, command_, draft_;
     std::vector<std::string> history_;
     std::size_t historyIndex_ = 0, cursor_ = 0, anchor_ = 0, inputStart_ = 0;

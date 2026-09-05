@@ -3,7 +3,6 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/commands/SettlementCommandDefinition.h"
 #include <algorithm>
-#include <unordered_set>
 
 namespace Paladin
 {
@@ -39,17 +38,37 @@ bool SettlementCommandState::add(
         ))
         return false;
     pruneInvalid(map, citizens);
-    std::unordered_set<std::uint64_t> existing;
-    for (const auto& command : commands_)
-        if (command.commandTypeId == type)
-            for (const auto& target : command.targets)
-                existing.insert(key(target.footprint.topLeft));
     SettlementCommand command;
     command.commandTypeId = type;
+    const auto expectedTargets =
+        definition->targetKind == CommandTargetKind::Object
+            ? map.objectState().completedObjects().size() +
+                  map.objectState().constructionSites().size()
+            : map.naturalFeatures().countIn(area);
+    command.targets.reserve(expectedTargets);
+    command.targetIndex.reserve(expectedTargets);
     const auto append = [&](SettlementCommandTarget target)
     {
-        if (existing.insert(key(target.footprint.topLeft)).second)
-            command.targets.push_back(target);
+        const auto tileKey = key(target.footprint.topLeft);
+        const bool exists = std::any_of(
+            commands_.begin(),
+            commands_.end(),
+            [&](const auto& prior)
+            {
+                return prior.commandTypeId == type &&
+                       prior.targetIndex.contains(tileKey);
+            }
+        );
+        if (!exists)
+        {
+            if (command.targetIndex
+                    .emplace(
+                        key(target.footprint.topLeft),
+                        command.targets.size()
+                    )
+                    .second)
+                command.targets.push_back(target);
+        }
     };
     if (definition->targetKind == CommandTargetKind::Object)
     {
@@ -84,6 +103,8 @@ bool SettlementCommandState::add(
     // them.
     commands_.push_back(std::move(command));
     ++version_;
+    ++selectionVersion_;
+    pruning_ = false;
     return true;
 }
 std::size_t SettlementCommandState::cancelIntersecting(
@@ -95,7 +116,8 @@ std::size_t SettlementCommandState::cancelIntersecting(
     std::size_t removed = map.objectState().cancelConstructionWithin(area);
     if (removed)
         map.logistics.synchronize(map.objectState(), 0);
-    if (removed) map.employment().synchronize(map.objectState(), citizens);
+    if (removed)
+        map.employment().synchronize(map.objectState(), citizens);
     for (auto& command : commands_)
     {
         std::erase_if(
@@ -110,6 +132,12 @@ std::size_t SettlementCommandState::cancelIntersecting(
                 return true;
             }
         );
+        command.targetIndex.clear();
+        for (std::size_t i = 0; i < command.targets.size(); ++i)
+            command.targetIndex.emplace(
+                key(command.targets[i].footprint.topLeft),
+                i
+            );
     }
     std::erase_if(
         commands_,
@@ -122,7 +150,11 @@ std::size_t SettlementCommandState::cancelIntersecting(
         }
     );
     if (removed)
+    {
         ++version_;
+        ++selectionVersion_;
+        pruning_ = false;
+    }
     return removed;
 }
 void SettlementCommandState::pruneInvalid(
@@ -130,20 +162,30 @@ void SettlementCommandState::pruneInvalid(
     SettlementCitizenState& citizens
 )
 {
-    if (prunedObjects_ == map.objectState().presentationVersion() &&
+    if (!pruning_ && prunedObjects_ == map.objectState().navigationVersion() &&
         prunedFeatures_ == map.naturalFeatures().version())
         return;
-    prunedObjects_ = map.objectState().presentationVersion();
-    prunedFeatures_ = map.naturalFeatures().version();
-    bool changed = false;
-    for (auto& command : commands_)
+    if (!pruning_)
     {
+        prunedObjects_ = map.objectState().navigationVersion();
+        prunedFeatures_ = map.naturalFeatures().version();
+        pruneCommand_ = 0;
+        pruneTarget_ = 0;
+        pruning_ = true;
+    }
+    bool changed = false;
+    std::size_t budget = 1024;
+    while (pruneCommand_ < commands_.size() && budget > 0)
+    {
+        auto& command = commands_[pruneCommand_];
         const auto kind =
             SettlementCommandCatalog::definition(command.commandTypeId)
                 ->targetKind;
-        const auto count = std::erase_if(
-            command.targets,
-            [&](const auto& target)
+        while (pruneTarget_ < command.targets.size() && budget > 0)
+        {
+            --budget;
+            const auto& target = command.targets[pruneTarget_];
+            const bool invalid = [&]()
             {
                 if (target.objectId)
                     return !map.objectState().completedObject(target.objectId);
@@ -157,22 +199,69 @@ void SettlementCommandState::pruneInvalid(
                 return map.naturalFeatures()
                            .at(target.footprint.topLeft)
                            .kind != expected;
+            }();
+            if (!invalid)
+            {
+                ++pruneTarget_;
+                continue;
             }
-        );
-        changed = changed || count > 0;
-    }
-    std::erase_if(
-        commands_,
-        [&](const auto& command)
-        {
-            if (!command.targets.empty())
-                return false;
-            citizens.releaseCommand(command.id);
-            return true;
+            command.targetIndex.erase(key(target.footprint.topLeft));
+            if (pruneTarget_ + 1 < command.targets.size())
+            {
+                command.targets[pruneTarget_] =
+                    std::move(command.targets.back());
+                command.targetIndex[key(command.targets[pruneTarget_]
+                                            .footprint.topLeft)] = pruneTarget_;
+            }
+            command.targets.pop_back();
+            changed = true;
         }
-    );
+        if (command.targets.empty())
+        {
+            citizens.releaseCommand(command.id);
+            commands_.erase(commands_.begin() + pruneCommand_);
+            pruneTarget_ = 0;
+        }
+        else if (pruneTarget_ >= command.targets.size())
+        {
+            ++pruneCommand_;
+            pruneTarget_ = 0;
+        }
+    }
+    if (pruneCommand_ >= commands_.size())
+        pruning_ = false;
     if (changed)
         ++version_;
+}
+bool SettlementCommandState::contains(
+    const SettlementMap& map,
+    SettlementCommandId id,
+    SettlementTilePosition tile,
+    SettlementObjectId object,
+    ConstructionSiteId site
+) const
+{
+    for (const auto& command : commands_)
+    {
+        if (command.id != id)
+            continue;
+        const auto found = command.targetIndex.find(key(tile));
+        if (found == command.targetIndex.end())
+            return false;
+        const auto& target = command.targets[found->second];
+        if (target.objectId != object || target.constructionId != site)
+            return false;
+        if (object)
+            return map.objectState().completedObject(object) != nullptr;
+        if (site)
+            return map.objectState().constructionSite(site) != nullptr;
+        const auto expected =
+            command.commandTypeId == SettlementCommandTypes::ChopTree
+                ? NaturalFeatureKind::Tree
+                : NaturalFeatureKind::Rock;
+        return map.naturalFeatures().at(tile).kind == expected;
+    }
+    return false;
 }
 std::span<const SettlementCommand> SettlementCommandState::
     commands() const noexcept

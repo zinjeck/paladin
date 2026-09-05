@@ -11,106 +11,119 @@
 
 namespace Paladin
 {
-    class GrayUiRenderer;
-    class Renderer;
+class GrayUiRenderer;
+class Renderer;
 
-    enum class CityHudAction
+enum class CityHudAction
+{
+    None,
+    BeginObjectPlacement,
+    BeginCommand,
+    Population,
+    Laws,
+    Employment,
+    Technology,
+    Military,
+    Economy,
+    Back
+};
+
+class CityHud
+{
+  public:
+    CityHud();
+    void setWorldMode(bool enabled) noexcept
     {
-        None,
-        BeginObjectPlacement,
-        BeginCommand,
-        Employment,
-        Technology,
-        Military,
-        Economy,
-        Back
-    };
-
-    class CityHud
+        worldMode_ = enabled;
+        if (enabled)
+            closeCategoryMenus();
+    }
+    void setActiveSettlementName(std::string name)
     {
-    public:
-        CityHud();
+        activeSettlementName_ = std::move(name);
+    }
 
-        void layout(
-            int viewportWidth,
-            int viewportHeight
-        ) noexcept;
+    void closeCategoryMenus() noexcept;
 
-        [[nodiscard]]
-        const UiRectangle& minimapBounds() const noexcept
-        {
-            return minimapPanel_;
-        }
+    void layout(int viewportWidth, int viewportHeight) noexcept;
 
-        void setSettlementStatus(bool hasKeep, std::size_t population) noexcept;
-        void setGoodsAmounts(double stone, double lumber, double fish) noexcept
-        {
-            stoneAmount_ = stone;
-            lumberAmount_ = lumber;
-            fishAmount_ = fish;
-        }
+    [[nodiscard]]
+    const UiRectangle& minimapBounds() const noexcept
+    {
+        return minimapPanel_;
+    }
 
-        void pointerMoved(float x, float y) noexcept;
+    void setSettlementStatus(bool hasKeep, std::size_t population) noexcept;
+    void setGoodsAmounts(double stone, double lumber, double fish) noexcept
+    {
+        stoneAmount_ = stone;
+        lumberAmount_ = lumber;
+        fishAmount_ = fish;
+    }
 
-        void setCityInformation(
-            std::string cityName,
-            std::uint64_t day,
-            int hour,
-            int minute
-        );
+    void pointerMoved(float x, float y) noexcept;
+    std::string tooltipAt(float x, float y) const;
 
-        [[nodiscard]]
-        bool pointerPressed(float x, float y) noexcept;
+    void setCityInformation(
+        std::string cityName,
+        std::uint64_t day,
+        int hour,
+        int minute
+    );
 
-        [[nodiscard]]
-        bool containsInteractivePoint(float x, float y) const noexcept;
+    [[nodiscard]]
+    bool pointerPressed(float x, float y) noexcept;
 
-        [[nodiscard]]
-        CityHudAction pointerReleased(float x, float y) noexcept;
+    [[nodiscard]]
+    bool containsInteractivePoint(float x, float y) const noexcept;
 
-        [[nodiscard]]
-        std::string_view selectedObjectTypeId() const noexcept;
+    [[nodiscard]]
+    CityHudAction pointerReleased(float x, float y) noexcept;
 
-        [[nodiscard]]
-        std::string_view selectedCommandTypeId() const noexcept;
+    [[nodiscard]]
+    std::string_view selectedObjectTypeId() const noexcept;
 
-        void render(
-            Renderer& renderer,
-            const GrayUiRenderer& uiRenderer
-        ) const;
+    [[nodiscard]]
+    std::string_view selectedCommandTypeId() const noexcept;
 
-    private:
-        static constexpr std::size_t CategoryCount = 6;
+    void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
-        [[nodiscard]]
-        bool optionIsVisible(std::size_t optionIndex) const noexcept;
+  private:
+    bool worldMode_ = false;
+    std::string activeSettlementName_;
+    UiRectangle activeSettlementPanel_;
 
-        void closeCategoryMenus() noexcept;
+    static constexpr std::size_t CategoryCount = 6;
 
-        UiButton backButton_;
-        std::array<UiButton, 4> topButtons_;
-        UiRectangle minimapPanel_;
-        UiButton goodsButton_{"Goods"};
-        std::array<UiRectangle, 6> goodsCells_{};
-        bool goodsOpen_ = false;
-        bool hasKeep_ = false;
-        std::size_t population_ = 8;
-        double stoneAmount_ = 0;
-        double lumberAmount_ = 0;
-        double fishAmount_ = 0;
-        std::array<UiButton, CategoryCount> bottomButtons_;
-        UiRectangle toolbarBounds_;
-        std::vector<UiButton> optionButtons_;
-        std::vector<UiRectangle> optionBounds_;
-        std::size_t openCategory_ = CategoryCount;
-        UiRectangle cityNamePanel_;
-        UiRectangle dayTimePanel_;
-        UiRectangle reservedPanel_;
-        std::string cityName_;
-        std::string selectedObjectTypeId_;
-        std::string selectedCommandTypeId_;
-        std::uint64_t day_ = 1;
-        int hour_ = 6;
-        int minute_ = 0;
-    };
-}
+    [[nodiscard]]
+    bool optionIsVisible(std::size_t optionIndex) const noexcept;
+
+    UiButton backButton_;
+    UiButton populationButton_{""};
+    std::array<UiButton, 5> topButtons_;
+    UiRectangle minimapPanel_;
+    UiButton goodsButton_{"Goods"};
+    std::array<UiRectangle, 6> goodsCells_{};
+    bool goodsOpen_ = false;
+    bool hasKeep_ = false;
+    std::size_t population_ = 8;
+    double stoneAmount_ = 0;
+    double lumberAmount_ = 0;
+    double fishAmount_ = 0;
+    std::array<UiButton, CategoryCount> bottomButtons_;
+    UiRectangle toolbarBounds_;
+    std::vector<UiButton> optionButtons_;
+    std::vector<UiRectangle> optionBounds_;
+    std::size_t openCategory_ = CategoryCount;
+    UiRectangle cityNamePanel_;
+    UiRectangle seasonBounds_;
+    UiRectangle dayTimePanel_;
+    UiRectangle reservedPanel_;
+    std::string cityName_;
+    std::string selectedObjectTypeId_;
+    std::string selectedCommandTypeId_;
+    std::uint64_t day_ = 1;
+    int hour_ = 6;
+    int minute_ = 0;
+};
+} // namespace Paladin

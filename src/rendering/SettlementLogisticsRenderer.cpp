@@ -75,19 +75,21 @@ void SettlementLogisticsRenderer::render(
             );
         }
     }
+    if (placement.choosingDoor())
+        return;
     const auto* definition = placement.activeDefinition();
     const auto footprint = placement.visibleFootprint();
     if (definition && definition->id == SettlementObjectTypes::FishingGrounds &&
-        footprint)
+        footprint && !placement.choosingDoor())
     {
         if (mapId_ != map.instanceId() ||
-            version_ != map.objectState().presentationVersion() ||
+            version_ != map.objectState().navigationVersion() ||
             footprint_ != footprint)
         {
             preview_ =
                 fisheryZonePreview(map.grid(), map.objectState(), *footprint);
             mapId_ = map.instanceId();
-            version_ = map.objectState().presentationVersion();
+            version_ = map.objectState().navigationVersion();
             footprint_ = footprint;
         }
         const auto& f = preview_.bounds;

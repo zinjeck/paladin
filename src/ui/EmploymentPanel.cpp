@@ -4,6 +4,7 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -54,6 +55,96 @@ void fitLabel(
     );
     ui.drawLabel(renderer, label, bounds.x + 4, bounds.y + 7, size);
 }
+UiRectangle reformSection(
+    Renderer& renderer,
+    const GrayUiRenderer& ui,
+    const UiRectangle& bounds,
+    std::string_view title,
+    std::string_view scope,
+    int workHours,
+    bool realm
+)
+{
+    const RenderColor edge =
+        realm ? RenderColor{153, 78, 80, 255} : RenderColor{88, 88, 95, 255};
+    const RenderColor shadow =
+        realm ? RenderColor{85, 47, 51, 255} : RenderColor{49, 49, 54, 255};
+    renderer
+        .fillRectangle(bounds.x, bounds.y, bounds.width, bounds.height, shadow);
+    renderer.fillRectangle(
+        bounds.x,
+        bounds.y,
+        bounds.width - 2,
+        bounds.height - 2,
+        edge
+    );
+    renderer.fillRectangle(
+        bounds.x + 4,
+        bounds.y + 4,
+        bounds.width - 8,
+        bounds.height - 8,
+        {64, 64, 69, 255}
+    );
+    const BitmapFontRenderer font;
+    const float titleScale =
+        std::min(2.2F, (bounds.width - 24) / font.measureWidth(title, 1));
+    ui.drawLabel(
+        renderer,
+        title,
+        bounds.x + (bounds.width - font.measureWidth(title, titleScale)) * .5F,
+        bounds.y + 18,
+        titleScale
+    );
+    const float scopeScale =
+        std::min(1.2F, (bounds.width - 24) / font.measureWidth(scope, 1));
+    ui.drawLabel(
+        renderer,
+        scope,
+        bounds.x + (bounds.width - font.measureWidth(scope, scopeScale)) * .5F,
+        bounds.y + 45,
+        scopeScale,
+        {185, 185, 192, 255}
+    );
+    renderer.fillRectangle(
+        bounds.x + 12,
+        bounds.y + 65,
+        bounds.width - 24,
+        2,
+        edge
+    );
+    constexpr float gap = 6;
+    const float cellWidth = (bounds.width - 24 - gap) / 2;
+    const float cellHeight = (bounds.height - 90 - 2 * gap) / 3;
+    UiRectangle workDayCell;
+    for (int i = 0; i < 6; ++i)
+    {
+        const UiRectangle cell{
+            bounds.x + 12 + (i % 2) * (cellWidth + gap),
+            bounds.y + 78 + (i / 2) * (cellHeight + gap),
+            cellWidth,
+            cellHeight
+        };
+        renderer.fillRectangle(cell.x, cell.y, cell.width, cell.height, edge);
+        renderer.fillRectangle(
+            cell.x + 3,
+            cell.y + 3,
+            cell.width - 6,
+            cell.height - 6,
+            {64, 64, 69, 255}
+        );
+        if (i == 0)
+        {
+            workDayCell = cell;
+            fitLabel(
+                renderer,
+                ui,
+                "Work Day: " + std::to_string(workHours) + " Hours",
+                {cell.x + 4, cell.y + 5, cell.width - 8, cell.height - 10}
+            );
+        }
+    }
+    return workDayCell;
+}
 } // namespace
 bool EmploymentPanel::containsPoint(float x, float y) const noexcept
 {
@@ -71,6 +162,30 @@ bool EmploymentPanel::pointerPressed(float x, float y)
             pressed_ = int(i);
             break;
         }
+    dragCandidate_ = true;
+    pressX_ = x;
+    pressY_ = y;
+    dragX_ = x - positionX_;
+    dragY_ = y - positionY_;
+    return true;
+}
+bool EmploymentPanel::pointerMoved(float x, float y)
+{
+    if (!dragging_ && dragCandidate_ &&
+        std::hypot(x - pressX_, y - pressY_) >= 4)
+    {
+        dragging_ = true;
+        pressed_ = -1;
+    }
+    if (!dragging_)
+        return false;
+    positionX_ = std::clamp(
+        x - dragX_,
+        64 - bounds_.width,
+        std::max(64.0F, viewportWidth_ - 64)
+    );
+    positionY_ =
+        std::clamp(y - dragY_, 0.0F, std::max(0.0F, viewportHeight_ - 40));
     return true;
 }
 void EmploymentPanel::pointerReleased(
@@ -81,6 +196,13 @@ void EmploymentPanel::pointerReleased(
     double minute
 )
 {
+    dragCandidate_ = false;
+    if (dragging_)
+    {
+        dragging_ = false;
+        pressed_ = -1;
+        return;
+    }
     if (!open_ || pressed_ < 0 || std::size_t(pressed_) >= hits_.size())
     {
         pressed_ = -1;
@@ -93,6 +215,19 @@ void EmploymentPanel::pointerReleased(
     if (hit.type == "close")
     {
         close();
+        return;
+    }
+    if (hit.type == "foundSettlement")
+    {
+        foundSettlement_ = true;
+        close();
+        return;
+    }
+    if (worldMode_)
+        return;
+    if (hit.type == "realmWorkDay" || hit.type == "cityWorkDay")
+    {
+        workDayChange_ = WorkDayChange{hit.type == "realmWorkDay", hit.delta};
         return;
     }
     if (hit.icon)
@@ -140,51 +275,307 @@ void EmploymentPanel::render(
     if (!open_)
         return;
     hits_.clear();
+    const bool laws = section_ == "Laws";
     const float width = std::min(730.0F, float(renderer.outputWidth()) * .62F);
     const float height = std::min(540.0F, float(renderer.outputHeight()) - 150);
-    const float left =
-        std::max(8.0F, (float(renderer.outputWidth()) - width - 292) * .5F);
-    bounds_ = {left, 110, width, height};
+    viewportWidth_ = float(renderer.outputWidth());
+    viewportHeight_ = float(renderer.outputHeight());
+    if (!positioned_)
+    {
+        positionX_ = std::max(8.0F, (viewportWidth_ - width - 292) * .5F);
+        positionY_ = 110;
+        positioned_ = true;
+    }
+    if (!dragging_)
+    {
+        // Ease back inside the viewport after release or a window resize.
+        const float x = std::clamp(
+            positionX_,
+            8.0F,
+            std::max(8.0F, viewportWidth_ - width - 8)
+        );
+        const float y = std::clamp(
+            positionY_,
+            8.0F,
+            std::max(8.0F, viewportHeight_ - height - 8)
+        );
+        positionX_ = std::abs(x - positionX_) < 1
+                         ? x
+                         : positionX_ + (x - positionX_) * .35F;
+        positionY_ = std::abs(y - positionY_) < 1
+                         ? y
+                         : positionY_ + (y - positionY_) * .35F;
+    }
+    const float left = positionX_;
+    const float top = positionY_;
+    bounds_ = {left, top, width, height};
+    const float listWidth = std::min(284.0F, viewportWidth_ - 16);
+    const float listX = left + width + 8 + listWidth <= viewportWidth_ - 8
+                            ? left + width + 8
+                            : std::max(8.0F, left - listWidth - 8);
     listBounds_ = {
-        left + width + 8,
-        110,
-        std::min(284.0F, float(renderer.outputWidth()) - left - width - 16),
+        listX,
+        std::clamp(top, 8.0F, std::max(8.0F, viewportHeight_ - height - 8)),
+        listWidth,
         height
     };
     ui.drawPanel(renderer, bounds_);
     const auto button =
         [&](UiRectangle b, std::string_view text, Hit hit, bool enabled = true)
     {
-        ui.drawButton(renderer, b, text, false, false, false, enabled);
+        ui.drawButton(
+            renderer,
+            b,
+            text,
+            false,
+            false,
+            false,
+            enabled,
+            hit.type + (hit.delta < 0   ? "-decrease"
+                        : hit.delta > 0 ? "-increase"
+                                        : "")
+        );
         if (enabled)
         {
             hit.bounds = b;
             hits_.push_back(std::move(hit));
         }
     };
-    ui.drawLabel(renderer, section_, left + 18, 126, 2.4F);
-    button({left + width - 38, 116, 30, 28}, "X", {{}, "close"});
-    if (section_ != "Employment")
+    const BitmapFontRenderer titleFont;
+    const float titleScale =
+        std::min(3.0F, (width - 100) / titleFont.measureWidth(section_, 1));
+    ui.drawLabel(
+        renderer,
+        section_,
+        left + (width - titleFont.measureWidth(section_, titleScale)) * .5F,
+        top + 13,
+        titleScale
+    );
+    button({left + width - 38, top + 6, 30, 28}, "X", {{}, "close"});
+    if (worldMode_)
+    {
+        const float informationHeight = (height - 90) * .62F;
+        ui.drawPanel(
+            renderer,
+            {left + 18, top + 54, width - 36, informationHeight}
+        );
+        const float rowY = top + 66 + informationHeight;
+        const float cellWidth = (width - 52) / 5;
+        for (int i = 0; i < 5; ++i)
+        {
+            const bool founding = section_ == "Economy" && i == 0;
+            const UiRectangle cell{
+                left + 18 + i * (cellWidth + 4),
+                rowY,
+                cellWidth,
+                top + height - rowY - 18
+            };
+            button(
+                cell,
+                "",
+                {{}, founding ? "foundSettlement" : "emptyDecision"},
+                founding
+            );
+            if (founding)
+            {
+                const float scale = std::min(
+                    1.6F,
+                    (cellWidth - 12) / titleFont.measureWidth("Settlement", 1)
+                );
+                const std::array lines{"Found a", "New", "Settlement"};
+                for (int line = 0; line < 3; ++line)
+                    ui.drawLabel(
+                        renderer,
+                        lines[line],
+                        cell.x + (cell.width -
+                                  titleFont.measureWidth(lines[line], scale)) *
+                                     .5F,
+                        cell.y + cell.height * .5F + (line - 1) * 16 - 5,
+                        scale
+                    );
+            }
+        }
         return;
-    const auto& history = map.employment().history();
+    }
+    if (laws)
+    {
+        const float sideWidth = (width - 54) * .5F;
+        const UiRectangle
+            realm{left + 18, bounds_.y + 60, sideWidth, height - 78};
+        const UiRectangle
+            city{realm.x + sideWidth + 18, realm.y, sideWidth, realm.height};
+        const auto hours = [](const CitizenSimulationPolicy& policy)
+        { return (policy.shiftEndMinute - policy.shiftStartMinute) / 60; };
+        const auto realmCell = reformSection(
+            renderer,
+            ui,
+            realm,
+            "REALM REFORMS",
+            "ALL CONTROLLED SETTLEMENTS",
+            realmWorkDayHours_,
+            true
+        );
+        const auto cityCell = reformSection(
+            renderer,
+            ui,
+            city,
+            "CITY REFORMS",
+            "THIS SETTLEMENT",
+            hours(map.activities.policy),
+            false
+        );
+        const auto controls =
+            [&](const UiRectangle& cell, const std::string& type, int workHours)
+        {
+            const float side = std::min(28.0F, (cell.width - 24) / 2);
+            const float y = cell.y + 34;
+            button(
+                {cell.x + 8, y, side, 24},
+                "<",
+                {{}, type, {}, -1},
+                workHours > 0
+            );
+            button(
+                {cell.x + 12 + side, y, side, 24},
+                ">",
+                {{}, type, {}, 1},
+                workHours < 14
+            );
+        };
+        controls(realmCell, "realmWorkDay", realmWorkDayHours_);
+        controls(cityCell, "cityWorkDay", hours(map.activities.policy));
+        return;
+    }
+    const bool population = section_ == "Population";
+    if (section_ != "Employment" && !population)
+        return;
+    struct GraphSample
+    {
+        double gameMinute;
+        double value;
+    };
+    std::vector<GraphSample> history;
+    if (population)
+    {
+        for (const auto& sample : citizens.populationHistory())
+            history.push_back({sample.gameMinute, double(sample.population)});
+    }
+    else
+    {
+        for (const auto& sample : map.employment().history())
+            history.push_back({sample.gameMinute, sample.unemployedPercent});
+    }
     const double percent = citizens.citizens().empty()
                                ? 0
                                : 100.0 * map.employment().unemployed(citizens) /
                                      citizens.citizens().size();
     font_.drawText(
         renderer,
-        "Unemployed: " + std::to_string(map.employment().unemployed(citizens)) +
-            " / " + std::to_string(citizens.citizens().size()) + "  (" +
-            percentage(percent) + ")",
+        population
+            ? "Population: " +
+                  std::to_string(
+                      map.logistics.founded() ? citizens.citizens().size() : 0
+                  ) +
+                  "  |  Every 4 hours"
+            : "Unemployed: " +
+                  std::to_string(map.employment().unemployed(citizens)) +
+                  " / " + std::to_string(citizens.citizens().size()) + "  (" +
+                  percentage(percent) + ")",
         left + 18,
-        157
+        top + 47
     );
+    const float summaryWidth = (width - 112) / 3;
     const UiRectangle graph{
-        left + 58,
-        208,
-        width - 82,
+        left + 88 + summaryWidth,
+        top + 98,
+        summaryWidth * 2,
         std::clamp(height - 350.0F, 90.0F, 200.0F)
     };
+    if (population)
+    {
+        double happiness = 0, health = 0, hunger = 0;
+        std::size_t count = 0;
+        for (const auto& citizen : citizens.citizens())
+        {
+            if (citizen.health <= 0 || !map.logistics.founded())
+                continue;
+            happiness += citizen.happiness;
+            health += citizen.health;
+            hunger += citizen.hunger;
+            ++count;
+        }
+        const std::array values{happiness, health, hunger};
+        const std::array labels{"Happiness:", "Health:", "Hunger:"};
+        for (int i = 0; i < 3; ++i)
+        {
+            const float rowHeight = graph.height / 3;
+            const UiRectangle row{
+                left + 18,
+                graph.y + i * rowHeight,
+                summaryWidth,
+                rowHeight - 6
+            };
+            ui.drawPanel(renderer, row);
+            const float labelSize =
+                std::min(1.35F, (row.width * .48F - 8) / 59);
+            const float labelY = row.y + (row.height - 7 * labelSize) * .5F;
+            ui.drawLabel(renderer, labels[i], row.x + 6, labelY, labelSize);
+            const double value = count ? values[i] / count : 0;
+            const double good =
+                i == 2 ? (value < 50 ? 100 : 100 - (value - 50) * 2) : value;
+            const RenderColor color =
+                good >= 75   ? RenderColor{100, 188, 100, 255}
+                : good >= 50 ? RenderColor{214, 190, 71, 255}
+                : good >= 25 ? RenderColor{225, 141, 54, 255}
+                             : RenderColor{205, 77, 72, 255};
+            const UiRectangle meter{
+                row.x + row.width * .5F,
+                row.y + (row.height - 22) * .5F,
+                row.width * .5F - 8,
+                22
+            };
+            renderer.fillRectangle(
+                meter.x,
+                meter.y,
+                meter.width,
+                meter.height,
+                {std::uint8_t(color.red / 3),
+                 std::uint8_t(color.green / 3),
+                 std::uint8_t(color.blue / 3),
+                 255}
+            );
+            const float fill =
+                meter.width * float(std::clamp(value / 100, 0.0, 1.0));
+            renderer.fillRectangle(
+                i == 2 ? meter.x : meter.x + meter.width - fill,
+                meter.y,
+                fill,
+                meter.height,
+                color
+            );
+            const std::string text = count ? percentage(value) : "--";
+            const float scale = std::min(
+                1.2F,
+                (meter.width - 4) / titleFont.measureWidth(text, 1)
+            );
+            ui.drawLabel(
+                renderer,
+                text,
+                meter.x +
+                    (meter.width - titleFont.measureWidth(text, scale)) * .5F,
+                meter.y + (meter.height - 7 * scale) * .5F,
+                scale
+            );
+        }
+    }
+    double maximum = 100;
+    if (population)
+    {
+        maximum = 1;
+        for (const auto& sample : history)
+            maximum = std::max(maximum, sample.value);
+        maximum = std::max(10.0, std::ceil(maximum / 10) * 10);
+    }
     renderer.fillRectangle(
         graph.x,
         graph.y,
@@ -208,7 +599,8 @@ void EmploymentPanel::render(
         if (i % 2 == 0)
             ui.drawLabel(
                 renderer,
-                std::to_string(100 - i * 10) + "%",
+                population ? std::to_string(int(maximum * (10 - i) / 10))
+                           : std::to_string(100 - i * 10) + "%",
                 graph.x - 46,
                 y - 6,
                 2.0F,
@@ -236,7 +628,7 @@ void EmploymentPanel::render(
         graph.y + graph.height + 30,
         1.5F
     );
-    const auto point = [&](const UnemploymentSample& sample)
+    const auto point = [&](const GraphSample& sample)
     {
         return std::pair{
             graph.x + float(std::clamp(
@@ -244,7 +636,7 @@ void EmploymentPanel::render(
                           0.0,
                           1.0
                       )) * graph.width,
-            graph.y + float(1 - sample.unemployedPercent / 100) * graph.height
+            graph.y + float(1 - sample.value / maximum) * graph.height
         };
     };
     for (std::size_t i = 1; i < history.size(); ++i)
@@ -266,7 +658,10 @@ void EmploymentPanel::render(
     }
     if (!history.empty())
     {
-        const auto a = point(history.back()), b = point({minute, percent});
+        const auto a = point(history.back()),
+                   b = point(
+                       {minute, population ? history.back().value : percent}
+                   );
         renderer
             .drawLine(a.first, a.second, b.first, b.second, {240, 65, 72, 255});
         renderer.fillRectangle(
@@ -276,6 +671,17 @@ void EmploymentPanel::render(
             4,
             {255, 107, 111, 255}
         );
+    }
+    if (population)
+    {
+        for (const auto& sample : history)
+        {
+            if (sample.gameMinute / 1440 + 1 < startDay)
+                continue;
+            const auto [x, y] = point(sample);
+            renderer.fillRectangle(x - 1, y - 1, 3, 3, {255, 107, 111, 255});
+        }
+        return;
     }
     const float cardsTop = graph.y + graph.height + 53;
     const float cardWidth = (width - 48) / 3;
@@ -290,7 +696,15 @@ void EmploymentPanel::render(
             cardWidth,
             cardHeight - 6
         };
-        ui.drawButton(renderer, card, "", false, false, selectedType_ == d.objectTypeId, true);
+        ui.drawButton(
+            renderer,
+            card,
+            "",
+            false,
+            false,
+            selectedType_ == d.objectTypeId,
+            true
+        );
         const UiRectangle iconBox{card.x + 8, card.y + 5, 43, 40};
         if (selectedType_ == d.objectTypeId)
             renderer.fillRectangle(
@@ -336,11 +750,19 @@ void EmploymentPanel::render(
         return;
     ui.drawPanel(renderer, listBounds_);
     const auto* d = SettlementObjectCatalog::definition(selectedType_);
-    fitLabel(
+    const std::string_view listTitle = d ? d->displayName : selectedType_;
+    const float listTitleSize = std::min(
+        2.2F,
+        (listBounds_.width - 24) / titleFont.measureWidth(listTitle, 1)
+    );
+    ui.drawLabel(
         renderer,
-        ui,
-        d ? d->displayName : selectedType_,
-        {listBounds_.x + 8, listBounds_.y + 9, listBounds_.width - 16, 30}
+        listTitle,
+        listBounds_.x + (listBounds_.width -
+                         titleFont.measureWidth(listTitle, listTitleSize)) *
+                            .5F,
+        listBounds_.y + 15,
+        listTitleSize
     );
     std::vector<const Workplace*> locations;
     for (const auto& w : map.employment().workplaces())
@@ -398,5 +820,39 @@ void EmploymentPanel::render(
         {{}, "next"},
         scrollOffset_ + visible < locations.size()
     );
+}
+} // namespace Paladin
+
+namespace Paladin
+{
+std::string EmploymentPanel::tooltipAt(float x, float y) const
+{
+    if (!open_ || dragging_)
+        return {};
+    for (const auto& hit : hits_)
+    {
+        if (!hit.bounds.contains(x, y))
+            continue;
+        if (hit.type == "close")
+            return "Close panel";
+        if (hit.type == "foundSettlement")
+            return "Choose a region for a new settlement";
+        if (hit.type == "realmWorkDay")
+            return "Change workday in all controlled cities (0-14 hours)";
+        if (hit.type == "cityWorkDay")
+            return "Change this city's workday (0-14 hours)";
+        if (hit.icon)
+        {
+            if (const auto* d = SettlementObjectCatalog::definition(hit.type))
+                return std::string(d->displayName);
+        }
+        if (hit.workplace)
+            return "Show workplace";
+        if (hit.delta)
+            return hit.delta > 0 ? "Employ one citizen" : "Release one worker";
+    }
+    if (bounds_.contains(x, y))
+        return "Drag to move this panel";
+    return {};
 }
 } // namespace Paladin

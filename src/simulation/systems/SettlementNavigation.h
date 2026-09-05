@@ -9,7 +9,7 @@ namespace Paladin
 class SettlementMap;
 struct CitizenMovementPolicy
 {
-    double tilesPerGameMinute = .5;
+    double tilesPerGameMinute = .75;
     double roadSpeedMultiplier = 2;
     double diagonalCost = 1.4142135623730951;
     std::size_t maximumExpandedNodes = 2048;

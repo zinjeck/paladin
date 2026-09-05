@@ -53,6 +53,7 @@ namespace Paladin
         Simulation& operator=(const Simulation&) = delete;
 
         void tick(double realDeltaSeconds);
+        void changeWorkDay(SettlementId settlementId, bool realm, int delta);
         TimingSamples tickTiming, citizenTiming, aggregateTiming;
         std::string systemTimingText() const;
         double gameMinutesPerTick(double seconds) const noexcept
@@ -120,6 +121,8 @@ namespace Paladin
         ) const noexcept;
 
         [[nodiscard]]
+        SettlementId foundPlayerSettlement(WorldTilePosition position, std::string name);
+
         SettlementId foundPlayerCapital(
             WorldTilePosition position,
             const FoundingIdentity& identity

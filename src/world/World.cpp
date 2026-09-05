@@ -251,6 +251,32 @@ namespace Paladin
     }
 
 
+    bool World::canFoundAdditionalSettlementAt(WorldTilePosition position, PolityId owner) const noexcept
+    {
+        if (!canFoundSettlementAt(position,owner)) return false;
+        const auto* polity=polities_.find(owner);
+        const auto* capital=polity ? settlements_.find(polity->capitalSettlementId()) : nullptr;
+        if (!capital) return false;
+        const auto dx=std::int64_t(position.x)-capital->position().x;
+        const auto dy=std::int64_t(position.y)-capital->position().y;
+        if (dx*dx+dy*dy>48*48) return false;
+        const int width=territoryFoundationPolicy_.settlementRegionWidth;
+        const int height=territoryFoundationPolicy_.settlementRegionHeight;
+        for (const auto& settlement:settlements_.entities())
+        {
+            if (std::abs(position.x-settlement.position().x)<width && std::abs(position.y-settlement.position().y)<height) return false;
+        }
+        int water=0;
+        for (int y=position.y-height/2;y<position.y-height/2+height;++y)
+        for (int x=position.x-width/2;x<position.x-width/2+width;++x)
+        {
+            const auto controller=territory_.controllerAt({x,y});
+            if (controller && controller!=owner) return false;
+            if (grid_.tile({x,y})->terrain==TerrainType::Water) ++water;
+        }
+        return water*2<width*height;
+    }
+
     SettlementId World::foundSettlement(
         WorldTilePosition position,
         PolityId ownerPolityId
@@ -282,7 +308,7 @@ namespace Paladin
             position,
             std::string{},
             ownerPolityId,
-            CultureId{},
+            polities_.find(ownerPolityId)->primaryCultureId(),
             foundationProfile
         );
 

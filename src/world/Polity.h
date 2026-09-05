@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -61,7 +62,17 @@ namespace Paladin
             return flag_;
         }
 
-    private:
+        int workDayHours() const noexcept
+        {
+            return workDayHours_;
+        }
+        void setWorkDayHours(int hours) noexcept
+        {
+            workDayHours_ = std::clamp(hours, 0, 14);
+        }
+
+      private:
+        int workDayHours_ = 12;
         friend class World;
 
         void establishCapital(

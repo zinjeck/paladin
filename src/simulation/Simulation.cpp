@@ -310,6 +310,12 @@ namespace Paladin
             return false;
         }
 
+        if (const auto* polity = world_->polity(settlement->ownerPolityId()))
+        {
+            generatedMap->activities.policy.setWorkDayHours(
+                polity->workDayHours()
+            );
+        }
         state.setLocalMap(std::move(generatedMap));
         return true;
     }
@@ -363,6 +369,23 @@ namespace Paladin
         return settlementId;
     }
 
+
+    SettlementId Simulation::foundPlayerSettlement(WorldTilePosition position, std::string name)
+    {
+        if (!isValidFoundingName(name) || !world_->canFoundAdditionalSettlementAt(position,playerPolityId_)) return {};
+        const auto& policy=world_->territoryFoundationPolicy();
+        auto map=settlementMapGenerator_.generate(world_->grid(),position,policy.settlementRegionWidth,
+            policy.settlementRegionHeight,world_->generationSeed(),SettlementMapGenerationSettings{});
+        if (!map) return {};
+        map->activities.policy.setWorkDayHours(world_->polity(playerPolityId_)->workDayHours());
+        auto profile=playerSettlementFoundationProfile(world_->generationSeed() ^ (std::uint64_t(position.x)<<32) ^ std::uint32_t(position.y));
+        const auto id=world_->foundSettlement(position,playerPolityId_,profile);
+        if (!id) return {};
+        world_->settlement(id)->simulationState().setLocalMap(std::move(map));
+        static_cast<void>(world_->renameSettlement(id,std::move(name)));
+        static_cast<void>(setPresentedSettlement(id));
+        return id;
+    }
 
     bool Simulation::renamePlayerCapital(std::string name)
     {
@@ -490,5 +513,46 @@ std::string Simulation::systemTimingText() const
                 worldSimulationPipeline_->systemTimings[i].text() + "\n";
     }
     return text;
+}
+} // namespace Paladin
+
+namespace Paladin
+{
+void Simulation::changeWorkDay(SettlementId id, bool realm, int delta)
+{
+    const auto* settlement = world_->settlement(id);
+    if (!settlement || settlement->ownerPolityId() != playerPolityId_)
+    {
+        return;
+    }
+    if (realm)
+    {
+        auto* polity = world_->polity(playerPolityId_);
+        if (!polity)
+        {
+            return;
+        }
+        const int hours = std::clamp(polity->workDayHours() + delta, 0, 14);
+        polity->setWorkDayHours(hours);
+        // A realm enactment applies to every controlled city, including
+        // future maps through the polity's persistent default.
+        for (const auto& city : world_->settlements())
+        {
+            if (city.ownerPolityId() == playerPolityId_)
+            {
+                if (auto* map = settlementMap(city.id()))
+                {
+                    map->activities.policy.setWorkDayHours(hours);
+                }
+            }
+        }
+    }
+    else if (auto* map = settlementMap(id))
+    {
+        const auto& policy = map->activities.policy;
+        map->activities.policy.setWorkDayHours(
+            (policy.shiftEndMinute - policy.shiftStartMinute) / 60 + delta
+        );
+    }
 }
 } // namespace Paladin

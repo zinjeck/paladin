@@ -1,7 +1,9 @@
 #include "simulation/systems/SettlementActivitySystem.h"
+#include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <algorithm>
 #include <cmath>
@@ -9,14 +11,6 @@
 
 namespace Paladin
 {
-namespace
-{
-bool workingHours(double minute, const CitizenSimulationPolicy& policy)
-{
-    const double time = std::fmod(minute, 1440.0);
-    return time >= policy.shiftStartMinute && time < policy.shiftEndMinute;
-}
-} // namespace
 void SettlementActivitySystem::finish(
     SettlementMap& map,
     SettlementCitizen& c,
@@ -31,6 +25,7 @@ void SettlementActivitySystem::finish(
             .drop(c.tilePosition, c.carriedResource, c.carriedAmount, minute);
     }
     map.logistics.release(c.id);
+    releaseClaim(c.task);
     c.carriedAmount = 0;
     c.carriedResource.clear();
     c.task = {};
@@ -59,6 +54,7 @@ void SettlementActivitySystem::tick(
     {
         return;
     }
+    citizens.recordPopulation(minute);
     citizens.placeUnpositionedCitizens(map);
     // Equal substeps preserve needs, schedules and physical deliveries in
     // every presented/unpresented settlement. Presentation never runs AI.
@@ -81,12 +77,19 @@ void SettlementActivitySystem::step(
     map.logistics.synchronize(map.objectState(), minute);
     map.employment().synchronize(map.objectState(), citizens);
     assignHomes(map, citizens);
-    map.commandState().pruneInvalid(map, citizens);
+    if (refreshCommandBoard(map))
+    {
+        map.commandState().pruneInvalid(map, citizens);
+    }
     pathCredit_ = std::min(
         double(policy.pathsPerMinute),
         pathCredit_ + elapsed * policy.pathsPerMinute
     );
-    pathsRemaining_ = std::size_t(pathCredit_);
+    // Accumulated time credit must not become a burst of expensive searches
+    // when many workers finish together. Long advances still make progress
+    // through the same bounded simulation substeps.
+    pathsRemaining_ =
+        std::min(std::size_t(pathCredit_), policy.maximumPathsPerStep);
     const auto initialPaths = pathsRemaining_;
     for (auto& c : citizens.citizens_)
     {
@@ -97,15 +100,20 @@ void SettlementActivitySystem::step(
             finish(map, c, minute);
             continue;
         }
+        if (c.foodSeekHunger < policy.foodSeekThreshold)
+            planMeal(c, map);
+        planSleep(map, c, minute);
+        planBreak(map, c, minute);
         needs(c, elapsed);
         const auto* cargoDefinition =
             SettlementResourceCatalog::definition(c.carriedResource);
-        if (c.health > 0 && c.hunger >= policy.foodSeekThreshold &&
+        if (c.health > 0 && c.hunger >= c.foodSeekHunger &&
             c.carriedAmount > 0 && cargoDefinition && cargoDefinition->edible &&
             map.logistics.consumeCarriedUnit(c.id))
         {
             --c.carriedAmount;
             c.hunger = std::max(0.0, c.hunger - policy.mealRestoration);
+            planMeal(c, map);
             if (c.carriedAmount == 0)
             {
                 finish(map, c, minute);
@@ -118,7 +126,7 @@ void SettlementActivitySystem::step(
             finish(map, c, minute);
             continue;
         }
-        const bool shift = workingHours(minute, policy);
+        const bool shift = policy.isWorkTime(minute);
         const auto* w = map.employment().workplace(c.workplaceId);
         bool valid = true;
         if (c.task.kind == CitizenTaskKind::Work)
@@ -126,15 +134,36 @@ void SettlementActivitySystem::step(
             valid =
                 shift && w && w->operational && w->objectId == c.task.object;
         }
+        if (c.task.kind == CitizenTaskKind::Sleep)
+        {
+            valid = c.sleptMinutes < policy.requiredSleepMinutes &&
+                    !(c.workplaceId && shift) && c.task.object == c.homeId;
+        }
+        if (c.task.kind == CitizenTaskKind::Break)
+            valid = c.breakUntil > 0 && c.workplaceId == c.breakEmployer;
+        if (c.task.kind == CitizenTaskKind::Talk)
+        {
+            const auto* other = citizens.citizen(c.task.partner);
+            valid = other && other->task.kind == CitizenTaskKind::Talk &&
+                    other->task.partner == c.id &&
+                    (!c.workplaceId || !shift || c.breakUntil > minute) &&
+                    (c.workplaceId ||
+                     (map.commandState().commands().empty() &&
+                      map.objectState().constructionSites().empty()));
+        }
         if (c.task.kind == CitizenTaskKind::Home)
         {
-            valid = !shift && c.homeId == c.task.object &&
-                    map.objectState().completedObject(c.homeId);
+            valid = (!c.workplaceId || !shift) && c.homeId == c.task.object &&
+                    map.objectState().completedObject(c.homeId) &&
+                    (c.workplaceId ||
+                     (map.commandState().commands().empty() &&
+                      map.objectState().constructionSites().empty() &&
+                      c.observedLogisticsVersion == map.logistics.version()));
         }
         if (c.task.kind == CitizenTaskKind::Build)
         {
             const auto* site = map.objectState().constructionSite(c.task.site);
-            valid = shift && !c.workplaceId && site &&
+            valid = !c.workplaceId && site &&
                     site->footprint.contains(c.task.workTile);
         }
         if (c.task.kind == CitizenTaskKind::Haul)
@@ -147,9 +176,9 @@ void SettlementActivitySystem::step(
                 map.logistics.inventory(c.task.destination);
             if (!c.task.delivering)
             {
-                valid = valid && shift &&
+                valid = valid &&
                         (!c.workplaceId ||
-                         (w && destination &&
+                         (shift && w && destination &&
                           w->objectTypeId == SettlementObjectTypes::Stockpile &&
                           w->objectId == destination->objectId));
             }
@@ -157,29 +186,20 @@ void SettlementActivitySystem::step(
         if (c.task.kind == CitizenTaskKind::Gather ||
             c.task.kind == CitizenTaskKind::Demolish)
         {
-            valid = shift && !c.workplaceId;
+            valid = !c.workplaceId;
             bool designated = c.task.kind == CitizenTaskKind::Gather &&
                               !c.task.command && c.task.site &&
                               map.objectState().constructionSite(c.task.site) &&
                               map.objectState()
                                   .constructionSite(c.task.site)
                                   ->footprint.contains(c.task.workTile);
-            for (const auto& command : map.commandState().commands())
-            {
-                if (command.id != c.task.command)
-                {
-                    continue;
-                }
-                for (const auto& target : command.targets)
-                {
-                    if (target.footprint.contains(c.task.workTile) &&
-                        target.objectId == c.task.object)
-                    {
-                        designated = true;
-                        break;
-                    }
-                }
-            }
+            designated = designated || map.commandState().contains(
+                                           map,
+                                           c.task.command,
+                                           c.task.workTile,
+                                           c.task.object,
+                                           c.task.site
+                                       );
             valid = valid && designated;
         }
         if (!valid)
@@ -191,6 +211,13 @@ void SettlementActivitySystem::step(
         citizens.citizens_,
         [](const auto& c) { return c.health <= 1e-7; }
     );
+    gatheringClaims_.clear();
+    demolitionClaims_.clear();
+    siteDemolitionClaims_.clear();
+    for (const auto& citizen : citizens.citizens_)
+    {
+        claim(citizen.task);
+    }
     decisionCredit_ = std::min(
         double(policy.decisionsPerMinute),
         decisionCredit_ + elapsed * policy.decisionsPerMinute
@@ -206,9 +233,18 @@ void SettlementActivitySystem::step(
         {
             continue;
         }
+        startBreak(map, c, minute);
+        const bool preSleepMeal =
+            shouldSleep(c, minute) && c.task.kind != CitizenTaskKind::Sleep &&
+            c.hunger + policy.hungerPerDay *
+                           (policy.requiredSleepMinutes - c.sleptMinutes) /
+                           1440 >=
+                policy.urgentFoodThreshold;
         if (c.task.kind != CitizenTaskKind::Eat &&
-            c.hunger >= policy.foodSeekThreshold &&
-            (c.carriedAmount == 0 || c.hunger > policy.starvationThreshold) &&
+            (c.hunger >= c.foodSeekHunger || preSleepMeal) &&
+            (c.carriedAmount == 0 || c.hunger >= policy.urgentFoodThreshold) &&
+            (c.task.kind != CitizenTaskKind::Sleep ||
+             c.hunger >= policy.urgentFoodThreshold) &&
             (minute >= c.nextDecisionMinute ||
              c.observedLogisticsVersion != map.logistics.version()))
         {
@@ -219,6 +255,12 @@ void SettlementActivitySystem::step(
             c.observedLogisticsVersion = map.logistics.version();
             c.nextDecisionMinute = minute + policy.retryMinutes;
         }
+        if (manageBreak(map, citizens, c, minute))
+            continue;
+        if (chooseSleep(map, citizens, c, minute))
+            continue;
+        if (c.task.kind == CitizenTaskKind::Home && c.path.empty())
+            chooseSocial(map, citizens, c, minute);
         if (c.task.kind == CitizenTaskKind::None)
         {
             decide(map, citizens, c, minute);
@@ -229,8 +271,10 @@ void SettlementActivitySystem::step(
     {
         execute(map, citizens, c, minute, elapsed);
     }
+    assignHomes(map, citizens);
     produce(map, citizens, minute, elapsed);
     pathCredit_ -= double(initialPaths - pathsRemaining_);
+    citizens.recordPopulation(minute + elapsed);
     map.employment().record(minute, citizens);
     ++citizens.version_;
 }
@@ -246,7 +290,16 @@ void SettlementActivitySystem::decide(
         return;
     }
     c.nextWorkCheckMinutes = minute + policy.retryMinutes;
-    if (workingHours(minute, policy))
+    if (!c.workplaceId)
+    {
+        if (chooseConstruction(map, citizens, c, minute) ||
+            chooseCommand(map, citizens, c, minute) ||
+            chooseHaul(map, citizens, c, minute))
+        {
+            return;
+        }
+    }
+    else if (policy.isWorkTime(minute))
     {
         if (const auto* w = map.employment().workplace(c.workplaceId))
         {
@@ -266,29 +319,23 @@ void SettlementActivitySystem::decide(
             {
                 return;
             }
-            if (route(map, citizens, c, workplace.footprint, true))
-            {
-                c.task.kind = CitizenTaskKind::Work;
-                c.task.object = workplace.objectId;
-                c.task.startedMinute = minute;
-                c.activity = CitizenActivity::TravelingToWork;
-            }
-            return;
-        }
-        if (chooseConstruction(map, citizens, c, minute) ||
-            chooseCommand(map, citizens, c, minute) ||
-            chooseHaul(map, citizens, c, minute))
-        {
+            chooseWork(map, citizens, c, minute);
             return;
         }
     }
-    else if (const auto* home = map.objectState().completedObject(c.homeId))
+    if (chooseSocial(map, citizens, c, minute))
+        return;
+    if (!c.workplaceId || !policy.isWorkTime(minute))
     {
-        if (route(map, citizens, c, home->footprint, false))
+        if (const auto* home = map.objectState().completedObject(c.homeId))
         {
-            c.task.kind = CitizenTaskKind::Home;
-            c.task.object = c.homeId;
-            c.activity = CitizenActivity::ReturningHome;
+            if (route(map, citizens, c, home->footprint, false))
+            {
+                c.observedLogisticsVersion = map.logistics.version();
+                c.task.kind = CitizenTaskKind::Home;
+                c.task.object = c.homeId;
+                c.activity = CitizenActivity::ReturningHome;
+            }
         }
     }
 }
@@ -314,6 +361,7 @@ void SettlementActivitySystem::execute(
         if (map.logistics.pickUp(c.id))
         {
             c.hunger = std::max(0.0, c.hunger - policy.mealRestoration);
+            planMeal(c, map);
         }
         finish(map, c, minute);
     }
@@ -383,8 +431,8 @@ void SettlementActivitySystem::execute(
             finish(map, c, minute);
             return;
         }
-        const auto copy = *site;
-        const bool road = copy.objectTypeId == SettlementObjectTypes::Road;
+        const auto footprint = site->footprint;
+        const bool road = site->objectTypeId == SettlementObjectTypes::Road;
         const auto object = map.objectState().build(
             c.task.site,
             elapsed,
@@ -404,11 +452,9 @@ void SettlementActivitySystem::execute(
             c.task.laborMinutes = 0;
             ++c.choiceSequence;
             const auto p = SettlementTilePosition{
-                copy.footprint.topLeft.x +
-                    int(c.choiceSequence % copy.footprint.width),
-                copy.footprint.topLeft.y +
-                    int((c.choiceSequence / copy.footprint.width) %
-                        copy.footprint.height)
+                footprint.topLeft.x + int(c.choiceSequence % footprint.width),
+                footprint.topLeft.y +
+                    int((c.choiceSequence / footprint.width) % footprint.height)
             };
             route(map, citizens, c, {p, 1, 1}, true);
         }
@@ -491,9 +537,97 @@ void SettlementActivitySystem::execute(
         }
         finish(map, c, minute);
     }
+    else if (c.task.kind == CitizenTaskKind::Sleep)
+    {
+        if (!enterHome(map, c))
+        {
+            if (!map.objectState().completedObject(c.homeId))
+                finish(map, c, minute);
+            return;
+        }
+        c.activity = CitizenActivity::Sleeping;
+        c.sleptMinutes =
+            std::min(policy.requiredSleepMinutes, c.sleptMinutes + elapsed);
+        if (c.sleptMinutes >= policy.requiredSleepMinutes)
+        {
+            c.task = {};
+            c.task.kind = CitizenTaskKind::Home;
+            c.task.object = c.homeId;
+            c.activity = CitizenActivity::AtHome;
+            c.observedLogisticsVersion = map.logistics.version();
+        }
+    }
     else if (c.task.kind == CitizenTaskKind::Home)
     {
+        if (c.task.endMinute > minute)
+            return;
+        if (c.task.endMinute > 0)
+        {
+            const auto* home = map.objectState().completedObject(c.homeId);
+            if (home && route(map, citizens, c, home->footprint, false))
+                c.task.endMinute = 0;
+            return;
+        }
+        if (!enterHome(map, c))
+            return;
         c.activity = CitizenActivity::AtHome;
+        if (minute >= c.nextHomeWander)
+        {
+            const auto* home = map.objectState().completedObject(c.homeId);
+            const auto random =
+                GenerationNoise::mix(c.id.value() ^ ++c.choiceSequence);
+            c.nextHomeWander = minute + 3 + random % 7;
+            if (home && home->door && random % 8 == 0)
+            {
+                const auto outside = outsideDoor(home->footprint, *home->door);
+                if (route(map, citizens, c, {outside, 1, 1}, true))
+                {
+                    c.task.endMinute = minute + 10 + random % 11;
+                    return;
+                }
+            }
+            const SettlementTilePosition target{
+                c.tilePosition.x + int(random % 3) - 1,
+                c.tilePosition.y + int((random >> 8) % 3) - 1
+            };
+            if (home && home->footprint.contains(target) &&
+                target != c.tilePosition)
+            {
+                c.path = {target};
+                c.pathIndex = 0;
+                c.stepProgress = 0;
+                c.destination = target;
+                c.explicitMovement = true;
+            }
+        }
+    }
+    else if (c.task.kind == CitizenTaskKind::Break)
+    {
+        c.activity = CitizenActivity::OnBreak;
+    }
+    else if (c.task.kind == CitizenTaskKind::Talk)
+    {
+        auto other = std::find_if(
+            citizens.citizens_.begin(),
+            citizens.citizens_.end(),
+            [&](const auto& person) { return person.id == c.task.partner; }
+        );
+        if (other == citizens.citizens_.end() || other->task.partner != c.id ||
+            (c.task.endMinute == 0 && minute - c.task.startedMinute > 12))
+        {
+            finish(map, c, minute);
+            return;
+        }
+        if (other->path.empty() && c.task.endMinute == 0 &&
+            std::abs(other->tilePosition.x - c.tilePosition.x) <= 1 &&
+            std::abs(other->tilePosition.y - c.tilePosition.y) <= 1)
+        {
+            c.task.endMinute = other->task.endMinute =
+                minute + c.task.laborMinutes;
+        }
+        c.activity = CitizenActivity::Talking;
+        if (c.task.endMinute > 0 && minute >= c.task.endMinute)
+            finish(map, c, minute);
     }
     else if (c.task.kind == CitizenTaskKind::Work)
     {
@@ -503,6 +637,10 @@ void SettlementActivitySystem::execute(
         {
             finish(map, c, minute);
             return;
+        }
+        if (object->objectTypeId == SettlementObjectTypes::FishingGrounds)
+        {
+            c.activity = CitizenActivity::Fishing;
         }
         if (object->objectTypeId == SettlementObjectTypes::Stockpile)
         {
@@ -526,8 +664,15 @@ void SettlementActivitySystem::produce(
     std::unordered_map<SettlementObjectId, int, StrongIdHash> attendance;
     for (const auto& c : citizens.citizens())
     {
-        if (c.task.kind == CitizenTaskKind::Work && c.path.empty() &&
-            c.tilePosition == c.destination)
+        if (c.breakUntil > minute && c.workplaceId == c.breakEmployer &&
+            policy.isWorkTime(minute))
+        {
+            ++attendance[c.breakObject];
+        }
+        else if (
+            c.task.kind == CitizenTaskKind::Work && c.path.empty() &&
+            c.tilePosition == c.destination
+        )
         {
             ++attendance[c.task.object];
         }

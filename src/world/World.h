@@ -77,6 +77,8 @@ namespace Paladin
         ) const noexcept;
 
         [[nodiscard]]
+        bool canFoundAdditionalSettlementAt(WorldTilePosition position, PolityId owner) const noexcept;
+
         SettlementId foundSettlement(
             WorldTilePosition position,
             PolityId ownerPolityId

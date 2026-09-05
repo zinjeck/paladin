@@ -52,7 +52,9 @@ bool SettlementNavigation::canStep(
 ) const
 {
     const int dx = std::abs(a.x - b.x), dy = std::abs(a.y - b.y);
-    const auto* enclosing = map.objectState().completedObjectAt(a);
+    const auto* enclosing = map.objectState().blocksMovement(a)
+                                ? map.objectState().completedObjectAt(a)
+                                : nullptr;
     const bool exiting = map.objectState().blocksMovement(a) && enclosing &&
                          enclosing->footprint.contains(b) &&
                          map.grid().tile(b) &&

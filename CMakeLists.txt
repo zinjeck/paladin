@@ -72,6 +72,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementCitizenMovement.cpp
     src/simulation/systems/SettlementActivitySystem.cpp
     src/simulation/systems/SettlementActivitySelection.cpp
+    src/simulation/systems/SettlementLeisure.cpp
     src/simulation/systems/SettlementCitizenNeeds.cpp
     src/world/settlements/SettlementLogistics.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
@@ -160,6 +161,7 @@ add_executable(PaladinTests
     src/simulation/systems/SettlementCitizenMovement.cpp
     src/simulation/systems/SettlementActivitySystem.cpp
     src/simulation/systems/SettlementActivitySelection.cpp
+    src/simulation/systems/SettlementLeisure.cpp
     src/simulation/systems/SettlementCitizenNeeds.cpp
     src/world/settlements/SettlementLogistics.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp

@@ -8,21 +8,21 @@
 using namespace Paladin;
 namespace
 {
-    SettlementMap makeMap(int side)
-    {
-        SettlementGrid grid(side, side);
-        for (int y = 0; y < side; ++y)
-            for (int x = 0; x < side; ++x)
-            {
-                auto& tile = *grid.tile({x, y});
-                tile.terrain = TerrainType::Land;
-                tile.biome = BiomeType::Forest;
-                tile.temperature = Temperature(.5F);
-                tile.rainfall = Rainfall(.7F);
-            }
-        return SettlementMap(std::move(grid), {0, 0}, 1, 1, side, 789);
-    }
+SettlementMap makeMap(int side)
+{
+    SettlementGrid grid(side, side);
+    for (int y = 0; y < side; ++y)
+        for (int x = 0; x < side; ++x)
+        {
+            auto& tile = *grid.tile({x, y});
+            tile.terrain = TerrainType::Land;
+            tile.biome = BiomeType::Forest;
+            tile.temperature = Temperature(.5F);
+            tile.rainfall = Rainfall(.7F);
+        }
+    return SettlementMap(std::move(grid), {0, 0}, 1, 1, side, 789);
 }
+} // namespace
 void runSettlementActivityTests()
 {
     auto map = makeMap(96);
@@ -39,9 +39,26 @@ void runSettlementActivityTests()
             rocks += kind == NaturalFeatureKind::Rock;
         }
     PALADIN_CHECK(trees > 100 && rocks > 0);
+    PALADIN_CHECK(
+        map.naturalFeatures().countIn({{0, 0}, 96, 96}) == trees + rocks
+    );
+    {
+        SettlementNaturalFeatures sparse(1024, 1024);
+        sparse.set({1023, 1023}, NaturalFeatureKind::Rock);
+        sparse.mark({1023, 1023}, true);
+        PALADIN_CHECK(sparse.countIn({{0, 0}, 1024, 1024}) == 1);
+        PALADIN_CHECK(sparse.countIn({{0, 0}, 1023, 1023}) == 0);
+        std::size_t cursor = 0, budget = 2048;
+        const auto next = sparse.nextIn({{0, 0}, 1024, 1024}, cursor, budget);
+        PALADIN_CHECK((next == SettlementTilePosition{1023, 1023}));
+        sparse.clear({{1023, 1023}, 1, 1});
+        PALADIN_CHECK(sparse.countIn({{0, 0}, 1024, 1024}) == 0);
+    }
     map.grid().tile({0, 0})->terrain = TerrainType::Water;
     map.naturalFeatures().generate(map.grid(), 789);
-    PALADIN_CHECK(map.naturalFeatures().at({0, 0}).kind == NaturalFeatureKind::None);
+    PALADIN_CHECK(
+        map.naturalFeatures().at({0, 0}).kind == NaturalFeatureKind::None
+    );
 
     auto commandsMap = makeMap(24);
     SettlementCitizenState citizens;
@@ -50,17 +67,45 @@ void runSettlementActivityTests()
     commandsMap.naturalFeatures().set({3, 3}, NaturalFeatureKind::Tree);
     commandsMap.naturalFeatures().set({5, 5}, NaturalFeatureKind::Rock);
     auto& commands = commandsMap.commandState();
-    PALADIN_CHECK(!commands.add(commandsMap, SettlementCommandTypes::ChopTree, {{8, 8}, 2, 2}, citizens));
-    PALADIN_CHECK(!commands.add(commandsMap, SettlementCommandTypes::Gather, {{0, 0}, 24, 24}, citizens));
-    PALADIN_CHECK(commands.add(commandsMap, SettlementCommandTypes::ChopTree, {{0, 0}, 24, 24}, citizens));
+    PALADIN_CHECK(!commands.add(
+        commandsMap,
+        SettlementCommandTypes::ChopTree,
+        {{8, 8}, 2, 2},
+        citizens
+    ));
+    PALADIN_CHECK(!commands.add(
+        commandsMap,
+        SettlementCommandTypes::Gather,
+        {{0, 0}, 24, 24},
+        citizens
+    ));
+    PALADIN_CHECK(commands.add(
+        commandsMap,
+        SettlementCommandTypes::ChopTree,
+        {{0, 0}, 24, 24},
+        citizens
+    ));
     PALADIN_CHECK(commands.commands().front().targets.size() == 2);
+    const auto commandId = commands.commands().front().id;
+    PALADIN_CHECK(commands.contains(commandsMap, commandId, {1, 1}, {}, {}));
     PALADIN_CHECK(commandsMap.naturalFeatures().at({1, 1}).marked);
     PALADIN_CHECK(!commandsMap.naturalFeatures().at({5, 5}).marked);
-    PALADIN_CHECK(!commands.add(commandsMap, SettlementCommandTypes::ChopTree, {{0, 0}, 24, 24}, citizens));
-    PALADIN_CHECK(commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens) == 1);
+    PALADIN_CHECK(!commands.add(
+        commandsMap,
+        SettlementCommandTypes::ChopTree,
+        {{0, 0}, 24, 24},
+        citizens
+    ));
+    PALADIN_CHECK(
+        commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens) == 1
+    );
     PALADIN_CHECK(!commandsMap.naturalFeatures().at({1, 1}).marked);
+    PALADIN_CHECK(!commands.contains(commandsMap, commandId, {1, 1}, {}, {}));
+    PALADIN_CHECK(commands.contains(commandsMap, commandId, {3, 3}, {}, {}));
     PALADIN_CHECK(commandsMap.naturalFeatures().at({3, 3}).marked);
     commandsMap.naturalFeatures().clear({{3, 3}, 1, 1});
+    // Stale work is rejected immediately, even before deferred cleanup.
+    PALADIN_CHECK(!commands.contains(commandsMap, commandId, {3, 3}, {}, {}));
     commands.pruneInvalid(commandsMap, citizens);
     PALADIN_CHECK(commands.commands().empty());
 
@@ -77,17 +122,31 @@ void runSettlementActivityTests()
     PALADIN_CHECK((detour.front() == SettlementTilePosition{0, 1}));
     CitizenMovementPolicy bounded;
     bounded.maximumExpandedNodes = 1;
-    PALADIN_CHECK(navigation.findPath(movementMap, {0, 0}, {20, 20}, bounded).empty());
+    PALADIN_CHECK(
+        navigation.findPath(movementMap, {0, 0}, {20, 20}, bounded).empty()
+    );
 
-    auto completedRoad = *SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
+    auto completedRoad =
+        *SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
     completedRoad.bypassesConstruction = true;
     const auto* road = &completedRoad;
-    PALADIN_CHECK(movementMap.objectState().placeCompletedObject(movementMap.grid(), *road, {{4, 4}, 1, 1}));
+    PALADIN_CHECK(movementMap.objectState().placeCompletedObject(
+        movementMap.grid(),
+        *road,
+        {{4, 4}, 1, 1}
+    ));
     navigation.synchronize(movementMap);
-    PALADIN_CHECK(std::abs(navigation.stepCost(movementMap, {3, 4}, {4, 4}, {}) - .5) < 1e-9);
-    const auto* keep = SettlementObjectCatalog::definition(SettlementObjectTypes::CityKeep);
-    PALADIN_CHECK(movementMap.objectState().placeCompletedObject(movementMap.grid(), *keep,
-        {{10, 10}, keep->previewWidth, keep->previewHeight}));
+    PALADIN_CHECK(
+        std::abs(navigation.stepCost(movementMap, {3, 4}, {4, 4}, {}) - .5) <
+        1e-9
+    );
+    const auto* keep =
+        SettlementObjectCatalog::definition(SettlementObjectTypes::CityKeep);
+    PALADIN_CHECK(movementMap.objectState().placeCompletedObject(
+        movementMap.grid(),
+        *keep,
+        {{10, 10}, keep->previewWidth, keep->previewHeight}
+    ));
     citizens.placeUnpositionedCitizens(movementMap);
     citizens.idlePolicy.standProbability = 1;
     const auto id = citizens.citizens().front().id;
@@ -97,12 +156,18 @@ void runSettlementActivityTests()
     PALADIN_CHECK(citizens.citizen(id)->visualX() == initial.x);
     citizens.tickMovement(movementMap, .1);
     PALADIN_CHECK(citizens.citizen(id)->tilePosition == initial);
-    PALADIN_CHECK(citizens.citizen(id)->visualX() != initial.x
-        || citizens.citizen(id)->visualY() != initial.y);
-    for (int i = 0; i < 400; ++i) citizens.tickMovement(movementMap, .1);
-    PALADIN_CHECK((citizens.citizen(id)->tilePosition == SettlementTilePosition{2, 10}));
+    PALADIN_CHECK(
+        citizens.citizen(id)->visualX() != initial.x ||
+        citizens.citizen(id)->visualY() != initial.y
+    );
+    for (int i = 0; i < 400; ++i)
+        citizens.tickMovement(movementMap, .1);
+    PALADIN_CHECK(
+        (citizens.citizen(id)->tilePosition == SettlementTilePosition{2, 10})
+    );
     PALADIN_CHECK(citizens.moveTo(id, movementMap, {8, 10}));
-    auto obstacle = *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
+    auto obstacle =
+        *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
     obstacle.previewWidth = obstacle.previewHeight = 1;
     obstacle.minimumWidth = obstacle.minimumHeight = 1;
     const auto blocked = citizens.citizen(id)->path.front();
@@ -117,15 +182,19 @@ void runSettlementActivityTests()
         citizens.tickMovement(movementMap, .1);
         PALADIN_CHECK(citizens.citizen(id)->tilePosition != blocked);
     }
-    PALADIN_CHECK((citizens.citizen(id)->tilePosition == SettlementTilePosition{8, 10}));
+    PALADIN_CHECK(
+        (citizens.citizen(id)->tilePosition == SettlementTilePosition{8, 10})
+    );
 
     SettlementCitizenState idleA, idleB;
     PALADIN_CHECK(idleA.initialize(4, 921));
     PALADIN_CHECK(idleB.initialize(4, 921));
     idleA.placeUnpositionedCitizens(movementMap);
     idleB.placeUnpositionedCitizens(movementMap);
-    idleA.idlePolicy.minimumWaitMinutes = idleB.idlePolicy.minimumWaitMinutes = .1;
-    idleA.idlePolicy.maximumWaitMinutes = idleB.idlePolicy.maximumWaitMinutes = .1;
+    idleA.idlePolicy.minimumWaitMinutes = idleB.idlePolicy.minimumWaitMinutes =
+        .1;
+    idleA.idlePolicy.maximumWaitMinutes = idleB.idlePolicy.maximumWaitMinutes =
+        .1;
     idleA.idlePolicy.standProbability = idleB.idlePolicy.standProbability = 0;
     bool moved = false;
     const auto first = idleA.citizens().front().tilePosition;
@@ -138,7 +207,9 @@ void runSettlementActivityTests()
             const auto& a = idleA.citizens()[j];
             const auto& b = idleB.citizens()[j];
             PALADIN_CHECK(a.tilePosition == b.tilePosition);
-            PALADIN_CHECK(a.visualX() == b.visualX() && a.visualY() == b.visualY());
+            PALADIN_CHECK(
+                a.visualX() == b.visualX() && a.visualY() == b.visualY()
+            );
             PALADIN_CHECK(navigation.walkable(movementMap, a.tilePosition));
         }
         moved = moved || idleA.citizens().front().tilePosition != first;

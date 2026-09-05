@@ -873,10 +873,18 @@ void runWorldTests()
         objectPlacement.pointerPressed({{2, 2}}, localMap)
         == Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{3, 3});
-    PALADIN_CHECK(objectPlacement.pointerReleased({{3, 3}}, localMap));
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{4, 4});
+    PALADIN_CHECK(objectPlacement.pointerReleased({{4, 4}}, localMap));
     PALADIN_CHECK(objectPlacement.hasLockedFootprint());
 
+    PALADIN_CHECK(objectPlacement.choosingDoor());
+    PALADIN_CHECK(objectPlacement.pointerPressed({{2, 2}}, localMap) == Paladin::SettlementPlacementCommitResult::None);
+    PALADIN_CHECK(objectPlacement.choosingDoor());
+    PALADIN_CHECK(objectPlacement.pointerPressed({{3, 4}}, localMap) == Paladin::SettlementPlacementCommitResult::None);
+    PALADIN_CHECK(!objectPlacement.choosingDoor());
+    PALADIN_CHECK(objectPlacement.stepBack());
+    PALADIN_CHECK(objectPlacement.choosingDoor());
+    PALADIN_CHECK(objectPlacement.pointerPressed({{3, 4}}, localMap) == Paladin::SettlementPlacementCommitResult::None);
     PALADIN_CHECK(
         objectPlacement.pointerPressed({{23, 23}}, localMap)
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
@@ -916,6 +924,11 @@ void runWorldTests()
     ));
     objectPlacement.pointerMoved(Paladin::SettlementTilePosition{8, 8});
     PALADIN_CHECK(objectPlacement.visibleFootprintIsValid(localMap));
+    const auto originalDoor = objectPlacement.visibleDoor();
+    objectPlacement.rotateDoor(-1);
+    PALADIN_CHECK(objectPlacement.visibleDoor() != originalDoor);
+    objectPlacement.rotateDoor(1);
+    PALADIN_CHECK(objectPlacement.visibleDoor() == originalDoor);
     PALADIN_CHECK(
         objectPlacement.pointerPressed({{8, 8}}, localMap)
         == Paladin::SettlementPlacementCommitResult::ConstructionSites
@@ -926,12 +939,12 @@ void runWorldTests()
         localMap.objectState().constructionSiteAt({8, 8});
     PALADIN_CHECK(houseSite != nullptr);
     PALADIN_CHECK(houseSite->progressPermille == 0);
-    PALADIN_CHECK(houseSite->resourceDeliveries.size() == 1);
+    PALADIN_CHECK(houseSite->resourceDeliveries.size() == 2);
     PALADIN_CHECK(
         houseSite->resourceDeliveries[0].resourceId ==
             Paladin::SettlementResourceTypes::Lumber
     );
-    PALADIN_CHECK(houseSite->resourceDeliveries[0].requiredAmount == 4);
+    PALADIN_CHECK(houseSite->resourceDeliveries[0].requiredAmount == 16);
 
     Paladin::SettlementCitizenState citizens;
     Paladin::SettlementInspectionController inspection;

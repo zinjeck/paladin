@@ -15,6 +15,7 @@ namespace Paladin
         explicit UiButton(std::string text);
 
         void setText(std::string text);
+        void setSkinId(std::string id);
         void setBounds(UiRectangle bounds) noexcept;
         void setSelected(bool selected) noexcept;
         void setEnabled(bool enabled) noexcept;
@@ -39,6 +40,7 @@ namespace Paladin
 
     private:
         std::string text_;
+        std::string skinId_;
         UiRectangle bounds_;
         bool hovered_ = false;
         bool pressed_ = false;

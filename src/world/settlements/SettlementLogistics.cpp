@@ -26,49 +26,48 @@ int SettlementInventory::used() const
     }
     return result;
 }
+void SettlementLogistics::synchronizeIndexes() const
+{
+    if (indexedSize_ > inventories_.size())
+    {
+        indexedSize_ = 0;
+        inventoryIndex_.clear();
+        objectIndex_.clear();
+        siteIndex_.clear();
+    }
+    while (indexedSize_ < inventories_.size())
+    {
+        const auto& entry = inventories_[indexedSize_];
+        inventoryIndex_[entry.id] = indexedSize_++;
+        if (entry.objectId)
+            objectIndex_[entry.objectId] = entry.id;
+        if (entry.siteId)
+            siteIndex_[entry.siteId] = entry.id;
+    }
+}
 const SettlementInventory* SettlementLogistics::inventory(InventoryId id) const
 {
-    for (const auto& entry : inventories_)
-    {
-        if (entry.id == id)
-        {
-            return &entry;
-        }
-    }
-    return nullptr;
+    synchronizeIndexes();
+    const auto it = inventoryIndex_.find(id);
+    return it == inventoryIndex_.end() ? nullptr : &inventories_[it->second];
 }
 SettlementInventory* SettlementLogistics::edit(InventoryId id)
 {
-    for (auto& entry : inventories_)
-    {
-        if (entry.id == id)
-        {
-            return &entry;
-        }
-    }
-    return nullptr;
+    synchronizeIndexes();
+    const auto it = inventoryIndex_.find(id);
+    return it == inventoryIndex_.end() ? nullptr : &inventories_[it->second];
 }
 InventoryId SettlementLogistics::forObject(SettlementObjectId id) const
 {
-    for (const auto& entry : inventories_)
-    {
-        if (id && entry.objectId == id)
-        {
-            return entry.id;
-        }
-    }
-    return {};
+    synchronizeIndexes();
+    const auto it = objectIndex_.find(id);
+    return it == objectIndex_.end() ? InventoryId{} : it->second;
 }
 InventoryId SettlementLogistics::forSite(ConstructionSiteId id) const
 {
-    for (const auto& entry : inventories_)
-    {
-        if (id && entry.siteId == id)
-        {
-            return entry.id;
-        }
-    }
-    return {};
+    synchronizeIndexes();
+    const auto it = siteIndex_.find(id);
+    return it == siteIndex_.end() ? InventoryId{} : it->second;
 }
 void SettlementLogistics::change(
     SettlementInventory& entry,
@@ -117,6 +116,28 @@ int SettlementLogistics::freeSpace(InventoryId id) const
     }
     return std::max(0, amount);
 }
+int SettlementLogistics::receivable(
+    InventoryId id,
+    std::string_view resource
+) const
+{
+    const auto* entry = inventory(id);
+    if (!entry)
+        return 0;
+    if (entry->resourceLimits.empty())
+        return freeSpace(id);
+    for (const auto& limit : entry->resourceLimits)
+    {
+        if (limit.resource != resource)
+            continue;
+        int remaining = limit.amount - entry->amount(resource);
+        for (const auto& claim : reservations_)
+            if (claim.destination == id && claim.resource == resource)
+                remaining -= claim.amount;
+        return std::max(0, std::min(remaining, freeSpace(id)));
+    }
+    return 0;
+}
 bool SettlementLogistics::add(
     InventoryId id,
     std::string_view resource,
@@ -125,7 +146,7 @@ bool SettlementLogistics::add(
 )
 {
     if (amount <= 0 || !SettlementResourceCatalog::definition(resource) ||
-        freeSpace(id) < amount)
+        receivable(id, resource) < amount)
     {
         return false;
     }
@@ -213,7 +234,7 @@ bool SettlementLogistics::reserve(
 {
     if (!citizen || reservation(citizen) || amount <= 0 ||
         source == destination || available(source, resource) < amount ||
-        (destination && freeSpace(destination) < amount))
+        (destination && receivable(destination, resource) < amount))
     {
         return false;
     }
@@ -241,6 +262,7 @@ bool SettlementLogistics::pickUp(CitizenId citizen)
         if (entry->kind == InventoryKind::Groundpile && entry->used() == 0)
         {
             const auto id = entry->id;
+            indexedSize_ = std::size_t(-1);
             std::erase_if(
                 inventories_,
                 [id](const auto& i) { return i.id == id; }
@@ -326,6 +348,7 @@ void SettlementLogistics::synchronize(
     }
     objectVersion_ = objects.navigationVersion();
     std::vector<SettlementInventory> removed;
+    indexedSize_ = std::size_t(-1);
     std::erase_if(
         inventories_,
         [&](const auto& entry)
@@ -348,6 +371,9 @@ void SettlementLogistics::synchronize(
     }
     for (const auto& object : objects.completedObjects())
     {
+        if (object.objectTypeId == SettlementObjectTypes::Road ||
+            object.objectTypeId == SettlementObjectTypes::House)
+            continue;
         if (forObject(object.id))
         {
             continue;
@@ -382,15 +408,19 @@ void SettlementLogistics::synchronize(
     }
     for (const auto& site : objects.constructionSites())
     {
+        if (site.resourceDeliveries.empty())
+            continue;
         if (forSite(site.id))
         {
             continue;
         }
         int capacity = 0;
         std::vector<ResourceAmount> goods;
+        std::vector<ResourceAmount> limits;
         for (const auto& cost : site.resourceDeliveries)
         {
             capacity += int(cost.requiredAmount);
+            limits.push_back({cost.resourceId, int(cost.requiredAmount)});
             goods.push_back({cost.resourceId, int(cost.deliveredAmount)});
         }
         inventories_.push_back(
@@ -401,7 +431,8 @@ void SettlementLogistics::synchronize(
              site.footprint,
              capacity,
              minute,
-             std::move(goods)}
+             std::move(goods),
+             std::move(limits)}
         );
     }
     ++version_;

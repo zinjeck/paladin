@@ -19,6 +19,12 @@ double fisheryProductionPerMinute(
     int attendingWorkers,
     const FisheryJobPolicy& policy
 );
+struct FishingSpot
+{
+    SettlementTilePosition land;
+    SettlementTilePosition water;
+};
+std::vector<FishingSpot> fisheryShoreline(const SettlementGrid&, const CompletedSettlementObject&);
 struct FisheryZonePreview
 {
     std::vector<SettlementTilePosition> availableWater;

@@ -57,35 +57,31 @@ bool SettlementObjectState::deliverMaterials(
     int amount
 )
 {
-    for (auto& site : constructionSites_)
+    synchronizeIdIndexes();
+    const auto found = siteIndex_.find(id);
+    if (found == siteIndex_.end())
+        return false;
+    auto& site = constructionSites_[found->second];
+    for (auto& delivery : site.resourceDeliveries)
     {
-        if (site.id != id)
+        if (delivery.resourceId == resource)
         {
-            continue;
+            delivery.deliveredAmount = std::min(
+                delivery.requiredAmount,
+                std::uint32_t(std::max(0, amount))
+            );
         }
-        for (auto& delivery : site.resourceDeliveries)
-        {
-            if (delivery.resourceId == resource)
-            {
-                delivery.deliveredAmount = std::min(
-                    delivery.requiredAmount,
-                    std::uint32_t(std::max(0, amount))
-                );
-            }
-        }
-        if (std::all_of(
-                site.resourceDeliveries.begin(),
-                site.resourceDeliveries.end(),
-                [](const auto& d)
-                { return d.deliveredAmount >= d.requiredAmount; }
-            ))
-        {
-            site.phase = ConstructionSitePhase::ReadyToBuild;
-        }
-        ++presentationVersion_;
-        return true;
     }
-    return false;
+    if (std::all_of(
+            site.resourceDeliveries.begin(),
+            site.resourceDeliveries.end(),
+            [](const auto& d) { return d.deliveredAmount >= d.requiredAmount; }
+        ))
+    {
+        site.phase = ConstructionSitePhase::ReadyToBuild;
+    }
+    ++presentationVersion_;
+    return true;
 }
 SettlementObjectId SettlementObjectState::build(
     ConstructionSiteId id,
@@ -94,61 +90,94 @@ SettlementObjectId SettlementObjectState::build(
     SettlementTilePosition workerTile
 )
 {
-    for (auto& site : constructionSites_)
+    synchronizeIdIndexes();
+    const auto found = siteIndex_.find(id);
+    if (found == siteIndex_.end())
+        return {};
+    auto& site = constructionSites_[found->second];
+    if (!site.footprint.contains(workerTile) || labor <= 0 || required <= 0)
+        return {};
+    if (!std::all_of(
+            site.resourceDeliveries.begin(),
+            site.resourceDeliveries.end(),
+            [](const auto& d) { return d.deliveredAmount >= d.requiredAmount; }
+        ))
     {
-        if (site.id != id || !site.footprint.contains(workerTile) ||
-            labor <= 0 || required <= 0)
+        return {};
+    }
+    site.phase = ConstructionSitePhase::UnderConstruction;
+    site.laborMinutes += labor;
+    site.progressPermille = std::uint16_t(
+        std::clamp(site.laborMinutes / required * 1000, 0.0, 1000.0)
+    );
+    ++presentationVersion_;
+    if (site.laborMinutes + 1e-8 < required)
+    {
+        return {};
+    }
+    auto completed = CompletedSettlementObject{
+        objectIds_.generate(),
+        site.objectTypeId,
+        site.footprint,
+        site.productionWater
+    };
+    completed.door = site.door;
+    if (site.objectTypeId == SettlementObjectTypes::Road)
+    {
+        completed.footprint = {workerTile, 1, 1};
+        // Complete exactly one tile; retain the other run tiles in place.
+        // No full occupancy rebuild or copy of every outstanding site.
+        site.laborMinutes = 0;
+        site.progressPermille = 0;
+        site.phase = ConstructionSitePhase::ReadyToBuild;
+        const auto f = site.footprint;
+        const int left = workerTile.x - f.topLeft.x;
+        const int right = f.topLeft.x + f.width - workerTile.x - 1;
+        if (left > 0 && right > 0)
         {
-            continue;
+            auto remainder = site;
+            remainder.id = constructionSiteIds_.generate();
+            remainder.footprint = {{workerTile.x + 1, workerTile.y}, right, 1};
+            site.footprint.width = left;
+            siteIndex_[remainder.id] = constructionSites_.size();
+            constructionSites_.push_back(std::move(remainder));
         }
-        if (!std::all_of(
-                site.resourceDeliveries.begin(),
-                site.resourceDeliveries.end(),
-                [](const auto& d)
-                { return d.deliveredAmount >= d.requiredAmount; }
-            ))
-        {
-            return {};
-        }
-        site.phase = ConstructionSitePhase::UnderConstruction;
-        site.laborMinutes += labor;
-        site.progressPermille = std::uint16_t(
-            std::clamp(site.laborMinutes / required * 1000, 0.0, 1000.0)
-        );
-        ++presentationVersion_;
-        if (site.laborMinutes + 1e-8 < required)
-        {
-            return {};
-        }
-        auto completed = CompletedSettlementObject{
-            objectIds_.generate(),
-            site.objectTypeId,
-            site.footprint,
-            site.productionWater
-        };
-        if (site.objectTypeId == SettlementObjectTypes::Road)
-        {
-            completed.footprint = {workerTile, 1, 1};
-            // A road run is only a compact designation; each tile needs its own
-            // labor.
-            site.laborMinutes = 0;
-            site.progressPermille = 0;
-            cancelConstructionWithin(completed.footprint);
-        }
+        else if (left > 0)
+            site.footprint.width = left;
+        else if (right > 0)
+            site.footprint = {{workerTile.x + 1, workerTile.y}, right, 1};
         else
         {
-            std::erase_if(
-                constructionSites_,
-                [id](const auto& s) { return s.id == id; }
-            );
+            const auto index = std::size_t(&site - constructionSites_.data());
+            siteIndex_.erase(id);
+            if (index + 1 < constructionSites_.size())
+            {
+                siteIndex_[constructionSites_.back().id] = index;
+                constructionSites_[index] =
+                    std::move(constructionSites_.back());
+            }
+            constructionSites_.pop_back();
         }
         const auto objectId = completed.id;
+        objectIndex_[objectId] = completedObjects_.size();
         completedObjects_.push_back(std::move(completed));
-        rebuildOccupancy();
+        ++navigationVersion_;
+        indexedVersion_ = navigationVersion_;
         ++presentationVersion_;
         return objectId;
     }
-    return {};
+    else
+    {
+        std::erase_if(
+            constructionSites_,
+            [id](const auto& s) { return s.id == id; }
+        );
+    }
+    const auto objectId = completed.id;
+    completedObjects_.push_back(std::move(completed));
+    rebuildOccupancy();
+    ++presentationVersion_;
+    return objectId;
 }
 bool SettlementObjectState::demolish(
     SettlementObjectId id,

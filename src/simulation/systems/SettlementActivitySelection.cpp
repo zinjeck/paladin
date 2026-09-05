@@ -2,10 +2,12 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 
 namespace Paladin
 {
@@ -87,6 +89,47 @@ bool SettlementActivitySystem::route(
     bool inside
 )
 {
+    const auto original = c.tilePosition;
+    std::vector<SettlementTilePosition> exitPath;
+    if (const auto* home = map.objectState().completedObject(c.homeId);
+        home && home->door && home->footprint.contains(original))
+    {
+        auto p = original;
+        while (p != *home->door)
+        {
+            if (p.x != home->door->x)
+                p.x += p.x < home->door->x ? 1 : -1;
+            else
+                p.y += p.y < home->door->y ? 1 : -1;
+            exitPath.push_back(p);
+        }
+        p = outsideDoor(home->footprint, *home->door);
+        const auto* tile = map.grid().tile(p);
+        if (!tile || tile->terrain == TerrainType::Water ||
+            tile->terrain == TerrainType::Mountain ||
+            map.objectState().blocksMovement(p))
+            return false;
+        exitPath.push_back(p);
+        c.tilePosition = p;
+    }
+    bool successful = false;
+    struct RestorePosition
+    {
+        SettlementCitizen& citizen;
+        SettlementTilePosition original;
+        std::vector<SettlementTilePosition>& exit;
+        bool& successful;
+        ~RestorePosition()
+        {
+            citizen.tilePosition = original;
+            if (successful && !exit.empty())
+            {
+                citizen.path
+                    .insert(citizen.path.begin(), exit.begin(), exit.end());
+                citizen.explicitMovement = true;
+            }
+        }
+    } restore{c, original, exitPath, successful};
     routeBudgetLimited_ = false;
     auto& navigation = citizens.navigation_;
     navigation.synchronize(map);
@@ -98,6 +141,13 @@ bool SettlementActivitySystem::route(
             candidates.push_back(p);
         }
     };
+    const auto* targetObject = map.objectState().completedObjectAt(f.topLeft);
+    const bool doorAccess = !inside && targetObject &&
+                            targetObject->footprint == f && targetObject->door;
+    if (doorAccess)
+    {
+        append(outsideDoor(f, *targetObject->door));
+    }
     if (inside)
     {
         append(
@@ -114,7 +164,7 @@ bool SettlementActivitySystem::route(
         );
     }
     const bool interiorAvailable = !candidates.empty();
-    if (!interiorAvailable)
+    if (!interiorAvailable && !doorAccess)
     {
         for (int x = f.topLeft.x - 1; x <= f.topLeft.x + f.width; ++x)
         {
@@ -153,6 +203,7 @@ bool SettlementActivitySystem::route(
             c.stepProgress = 0;
             c.destination = goal;
             c.explicitMovement = false;
+            successful = true;
             return true;
         }
         if (pathsRemaining_ == 0)
@@ -179,6 +230,7 @@ bool SettlementActivitySystem::route(
         );
         c.destination = goal;
         c.explicitMovement = true;
+        successful = true;
         return true;
     }
     return false;
@@ -246,6 +298,9 @@ bool SettlementActivitySystem::chooseFood(
             rememberFailure(c, food.id, c.tilePosition, map, minute);
             continue;
         }
+        if (c.breakUntil > 0 &&
+            !breakTripFits(map, citizens, c, planned, minute, 1))
+            continue;
         finish(map, c, minute);
         if (!map.logistics.reserve(c.id, food.id, {}, food.resource, 1))
         {
@@ -349,7 +404,7 @@ bool SettlementActivitySystem::chooseHaul(
             continue;
         }
         bool covered = false;
-        if (!assignedDestination &&
+        if (!assignedDestination && policy.isWorkTime(minute) &&
             minute - source.createdMinute <
                 policy.stockpile.employeePreferenceMinutes)
         {
@@ -357,7 +412,19 @@ bool SettlementActivitySystem::chooseHaul(
             {
                 if (w.operational &&
                     w.objectTypeId == SettlementObjectTypes::Stockpile &&
-                    map.employment().employed(w.id, citizens) > 0 &&
+                    std::any_of(
+                        citizens.citizens().begin(),
+                        citizens.citizens().end(),
+                        [&](const auto& employee)
+                        {
+                            return employee.workplaceId == w.id &&
+                                   employee.health > 0 &&
+                                   (employee.task.kind ==
+                                        CitizenTaskKind::Work ||
+                                    employee.task.kind ==
+                                        CitizenTaskKind::Haul);
+                        }
+                    ) &&
                     distance(source.footprint.topLeft, w.footprint) <=
                         policy.stockpile.collectionRadius &&
                     map.logistics.freeSpace(
@@ -434,23 +501,74 @@ bool SettlementActivitySystem::chooseHaul(
     }
     return false;
 }
-bool SettlementActivitySystem::claimed(
-    const SettlementCitizenState& citizens,
-    const CitizenTask& task
-) const
+bool SettlementActivitySystem::claimed(const CitizenTask& task) const
 {
-    for (const auto& other : citizens.citizens())
-    {
-        if (other.task.kind == task.kind &&
-            ((task.site && task.site == other.task.site) ||
-             (task.object && task.object == other.task.object) ||
-             (task.command && task.command == other.task.command &&
-              task.workTile == other.task.workTile)))
-        {
-            return true;
-        }
-    }
+    if (task.kind == CitizenTaskKind::Gather)
+        return gatheringClaims_.contains(
+            (std::uint64_t(std::uint32_t(task.workTile.y)) << 32) |
+            std::uint32_t(task.workTile.x)
+        );
+    if (task.kind == CitizenTaskKind::Demolish)
+        return task.object ? demolitionClaims_.contains(task.object)
+                           : siteDemolitionClaims_.contains(task.site);
     return false;
+}
+void SettlementActivitySystem::claim(const CitizenTask& task)
+{
+    if (task.kind == CitizenTaskKind::Gather)
+        gatheringClaims_.insert(
+            (std::uint64_t(std::uint32_t(task.workTile.y)) << 32) |
+            std::uint32_t(task.workTile.x)
+        );
+    else if (task.kind == CitizenTaskKind::Demolish)
+    {
+        if (task.object)
+            demolitionClaims_.insert(task.object);
+        else if (task.site)
+            siteDemolitionClaims_.insert(task.site);
+    }
+}
+void SettlementActivitySystem::releaseClaim(const CitizenTask& task)
+{
+    if (task.kind == CitizenTaskKind::Gather)
+        gatheringClaims_.erase(
+            (std::uint64_t(std::uint32_t(task.workTile.y)) << 32) |
+            std::uint32_t(task.workTile.x)
+        );
+    else if (task.kind == CitizenTaskKind::Demolish)
+    {
+        if (task.object)
+            demolitionClaims_.erase(task.object);
+        else if (task.site)
+            siteDemolitionClaims_.erase(task.site);
+    }
+}
+void SettlementActivitySystem::refreshConstructionBoard(
+    const SettlementMap& map
+)
+{
+    const auto version = map.objectState().navigationVersion();
+    if (boardVersion_ == version)
+        return;
+    constructionBuckets_.clear();
+    for (const auto& site : map.objectState().constructionSites())
+    {
+        const auto& f = site.footprint;
+        for (int y = f.topLeft.y / 32; y <= (f.topLeft.y + f.height - 1) / 32;
+             ++y)
+            for (int x = f.topLeft.x / 32;
+                 x <= (f.topLeft.x + f.width - 1) / 32;
+                 ++x)
+                constructionBuckets_
+                    [(std::uint64_t(y) << 32) | std::uint32_t(x)]
+                        .push_back(site.id);
+    }
+    std::erase_if(
+        clearingCursors_,
+        [&](const auto& entry)
+        { return !map.objectState().constructionSite(entry.first); }
+    );
+    boardVersion_ = version;
 }
 bool SettlementActivitySystem::chooseConstruction(
     SettlementMap& map,
@@ -459,67 +577,93 @@ bool SettlementActivitySystem::chooseConstruction(
     double minute
 )
 {
-    std::vector<ConstructionSiteId> sites;
-    for (const auto& site : map.objectState().constructionSites())
+    refreshConstructionBoard(map);
+    struct Choice
     {
-        sites.push_back(site.id);
-    }
-    std::stable_sort(
-        sites.begin(),
-        sites.end(),
-        [&](auto a, auto b)
+        ConstructionSiteId id;
+        int score;
+    };
+    std::vector<Choice> choices;
+    std::unordered_set<ConstructionSiteId, StrongIdHash> seen;
+    const auto append = [&](ConstructionSiteId id)
+    {
+        if (!seen.insert(id).second)
+            return;
+        if (const auto* site = map.objectState().constructionSite(id))
+            choices.push_back({id, distance(c.tilePosition, site->footprint)});
+    };
+    // A local job board bounds each worker's query independently of all queued
+    // tiles.
+    constexpr int chunk = 32;
+    std::size_t examined = 0;
+    for (int dy = -1; dy <= 1 && examined < 384; ++dy)
+        for (int dx = -1; dx <= 1 && examined < 384; ++dx)
         {
-            return distance(
-                       c.tilePosition,
-                       map.objectState().constructionSite(a)->footprint
-                   ) <
-                   distance(
-                       c.tilePosition,
-                       map.objectState().constructionSite(b)->footprint
-                   );
+            const int x = c.tilePosition.x / chunk + dx,
+                      y = c.tilePosition.y / chunk + dy;
+            if (x < 0 || y < 0)
+                continue;
+            const auto found = constructionBuckets_.find(
+                (std::uint64_t(y) << 32) | std::uint32_t(x)
+            );
+            if (found == constructionBuckets_.end())
+                continue;
+            const auto& bucket = found->second;
+            for (std::size_t i = 0;
+                 i < std::min<std::size_t>(bucket.size(), 48);
+                 ++i, ++examined)
+                append(
+                    bucket[(c.constructionSearchCursor + i) % bucket.size()]
+                );
         }
+    const auto& all = map.objectState().constructionSites();
+    for (std::size_t i = 0; i < std::min<std::size_t>(all.size(), 64); ++i)
+        append(all[(c.constructionSearchCursor + i) % all.size()].id);
+    c.constructionSearchCursor += 64;
+    std::stable_sort(
+        choices.begin(),
+        choices.end(),
+        [](const auto& a, const auto& b) { return a.score < b.score; }
     );
-    for (std::size_t attempt = 0; attempt < sites.size(); ++attempt)
+    std::size_t clearingBudget = 512;
+    for (const auto& choice : choices)
     {
-        const auto id = sites[c.constructionSearchCursor++ % sites.size()];
-        const auto site = *map.objectState().constructionSite(id);
-        bool obstructed = false;
-        for (int y = site.footprint.topLeft.y;
-             y < site.footprint.topLeft.y + site.footprint.height;
-             ++y)
+        const auto id = choice.id;
+        const auto& site = *map.objectState().constructionSite(id);
+        if (map.naturalFeatures().countIn(site.footprint) > 0)
         {
-            for (int x = site.footprint.topLeft.x;
-                 x < site.footprint.topLeft.x + site.footprint.width;
-                 ++x)
+            auto& cursor = clearingCursors_[id];
+            while (clearingBudget > 0)
             {
-                const SettlementTilePosition tile{x, y};
-                if (map.naturalFeatures().at(tile).kind ==
-                    NaturalFeatureKind::None)
-                {
-                    continue;
-                }
-                obstructed = true;
+                const auto next = map.naturalFeatures().nextIn(
+                    site.footprint,
+                    cursor,
+                    clearingBudget
+                );
+                if (!next)
+                    break;
+                const auto tile = *next;
                 CitizenTask clearing;
                 clearing.kind = CitizenTaskKind::Gather;
                 clearing.site = id;
                 clearing.workTile = tile;
                 clearing.startedMinute = minute;
-                if (!claimed(citizens, clearing) &&
+                if (!claimed(clearing) &&
                     route(map, citizens, c, {tile, 1, 1}, true))
                 {
                     c.task = clearing;
+                    claim(c.task);
                     c.activity = CitizenActivity::AssignedToCommand;
                     return true;
                 }
+                if (!pathsRemaining_)
+                    return false;
             }
-        }
-        if (obstructed)
-        {
             continue;
         }
         const auto destination = map.logistics.forSite(id);
         const auto* inventory = map.logistics.inventory(destination);
-        if (!inventory)
+        if (!inventory && !site.resourceDeliveries.empty())
         {
             continue;
         }
@@ -560,7 +704,7 @@ bool SettlementActivitySystem::chooseConstruction(
                 const int amount = std::min(
                     {policy.carryingCapacity,
                      map.logistics.available(source.id, cost.resourceId),
-                     map.logistics.freeSpace(destination),
+                     map.logistics.receivable(destination, cost.resourceId),
                      int(cost.requiredAmount) -
                          inventory->amount(cost.resourceId)}
                 );
@@ -590,12 +734,9 @@ bool SettlementActivitySystem::chooseConstruction(
         CitizenTask task;
         task.kind = CitizenTaskKind::Build;
         task.site = id;
-        if (claimed(citizens, task))
-        {
-            continue;
-        }
-        // Route to a real interior work tile, not merely an access tile.
-        const SettlementTilePosition goal{
+        // Construction is shared work: each attending citizen contributes
+        // labor to the site rather than reserving the whole building.
+        SettlementTilePosition goal{
             std::clamp(
                 c.tilePosition.x,
                 site.footprint.topLeft.x,
@@ -607,6 +748,20 @@ bool SettlementActivitySystem::chooseConstruction(
                 site.footprint.topLeft.y + site.footprint.height - 1
             )
         };
+        if (site.objectTypeId == SettlementObjectTypes::Road)
+        {
+            // A compact road run has one current tile of shared progress.
+            // Join that tile so labor never transfers between distant tiles.
+            for (const auto& worker : citizens.citizens())
+            {
+                if (worker.task.kind == CitizenTaskKind::Build &&
+                    worker.task.site == id)
+                {
+                    goal = worker.task.workTile;
+                    break;
+                }
+            }
+        }
         auto planned = c;
         if (!route(map, citizens, planned, {goal, 1, 1}, true) ||
             !site.footprint.contains(planned.destination))
@@ -622,6 +777,96 @@ bool SettlementActivitySystem::chooseConstruction(
     }
     return false;
 }
+CitizenTask SettlementActivitySystem::CommandWork::task() const
+{
+    CitizenTask result;
+    result.kind =
+        object || site ? CitizenTaskKind::Demolish : CitizenTaskKind::Gather;
+    result.command = command;
+    result.object = object;
+    result.site = site;
+    result.workTile = footprint.topLeft;
+    return result;
+}
+bool SettlementActivitySystem::refreshCommandBoard(const SettlementMap& map)
+{
+    const auto& state = map.commandState();
+    if (commandBoardVersion_ != state.selectionVersion() ||
+        (!commandBoardReady_ && commandSourceVersion_ != state.version()))
+    {
+        commandJobs_.clear();
+        commandBuckets_.clear();
+        availableCommandJobs_.clear();
+        commandBuildCommand_ = commandBuildTarget_ = commandSweep_ = 0;
+        commandBoardReady_ = false;
+        commandBoardVersion_ = state.selectionVersion();
+        commandSourceVersion_ = state.version();
+    }
+    // Build and retire opportunities incrementally. A map-wide designation
+    // must never become a map-wide burst of AI work on the following frame.
+    std::size_t budget = 2048;
+    const auto commands = state.commands();
+    while (!commandBoardReady_ && commandBuildCommand_ < commands.size() &&
+           budget > 0)
+    {
+        const auto& command = commands[commandBuildCommand_];
+        while (commandBuildTarget_ < command.targets.size() && budget > 0)
+        {
+            --budget;
+            const auto& target = command.targets[commandBuildTarget_++];
+            const auto p = target.footprint.topLeft;
+            auto& bucket = commandBuckets_
+                [(std::uint64_t(p.y / 32) << 32) | std::uint32_t(p.x / 32)];
+            const auto index = commandJobs_.size();
+            commandJobs_.push_back(
+                {command.id,
+                 target.objectId,
+                 target.constructionId,
+                 target.footprint,
+                 availableCommandJobs_.size(),
+                 bucket.size()}
+            );
+            bucket.push_back(index);
+            availableCommandJobs_.push_back(index);
+        }
+        if (commandBuildTarget_ >= command.targets.size())
+        {
+            ++commandBuildCommand_;
+            commandBuildTarget_ = 0;
+        }
+    }
+    if (commandBuildCommand_ >= commands.size())
+        commandBoardReady_ = true;
+    budget = std::min<std::size_t>(1024, availableCommandJobs_.size());
+    while (commandBoardReady_ && !availableCommandJobs_.empty() && budget-- > 0)
+    {
+        commandSweep_ %= availableCommandJobs_.size();
+        const auto index = availableCommandJobs_[commandSweep_];
+        auto& job = commandJobs_[index];
+        if (state.contains(
+                map,
+                job.command,
+                job.footprint.topLeft,
+                job.object,
+                job.site
+            ))
+        {
+            ++commandSweep_;
+            continue;
+        }
+        const auto p = job.footprint.topLeft;
+        auto& bucket = commandBuckets_
+            [(std::uint64_t(p.y / 32) << 32) | std::uint32_t(p.x / 32)];
+        bucket[job.bucketSlot] = bucket.back();
+        commandJobs_[bucket.back()].bucketSlot = job.bucketSlot;
+        bucket.pop_back();
+        availableCommandJobs_[job.globalSlot] = availableCommandJobs_.back();
+        commandJobs_[availableCommandJobs_.back()].globalSlot = job.globalSlot;
+        availableCommandJobs_.pop_back();
+        job.available = false;
+    }
+    return commandBoardReady_;
+}
 bool SettlementActivitySystem::chooseCommand(
     SettlementMap& map,
     SettlementCitizenState& citizens,
@@ -629,66 +874,148 @@ bool SettlementActivitySystem::chooseCommand(
     double minute
 )
 {
-    struct CommandChoice
+    struct Choice
     {
-        CitizenTask task;
-        SettlementObjectFootprint footprint;
+        std::size_t index;
         int score;
     };
-    std::vector<CommandChoice> choices;
-    for (const auto& command : map.commandState().commands())
+    std::vector<Choice> choices;
+    std::unordered_set<std::size_t> seen;
+    const auto append = [&](std::size_t index)
     {
-        for (const auto& target : command.targets)
+        if (!seen.insert(index).second)
+            return;
+        const auto& job = commandJobs_[index];
+        if (!map.commandState().contains(
+                map,
+                job.command,
+                job.footprint.topLeft,
+                job.object,
+                job.site
+            ))
+            return;
+        if (!claimed(job.task()))
+            choices.push_back({index, distance(c.tilePosition, job.footprint)});
+    };
+    for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
         {
-            if (target.objectId)
-            {
-                const auto* object =
-                    map.objectState().completedObject(target.objectId);
-                if (!object)
-                {
-                    continue;
-                }
-            }
-            CitizenTask task;
-            task.kind = target.objectId || target.constructionId
-                            ? CitizenTaskKind::Demolish
-                            : CitizenTaskKind::Gather;
-            task.site = target.constructionId;
-            task.command = command.id;
-            task.object = target.objectId;
-            task.workTile = target.footprint.topLeft;
-            task.startedMinute = minute;
-            if (claimed(citizens, task))
-            {
+            const int x = c.tilePosition.x / 32 + dx,
+                      y = c.tilePosition.y / 32 + dy;
+            if (x < 0 || y < 0)
                 continue;
-            }
-            choices.push_back(
-                {task,
-                 target.footprint,
-                 distance(c.tilePosition, target.footprint)}
+            const auto found = commandBuckets_.find(
+                (std::uint64_t(y) << 32) | std::uint32_t(x)
             );
+            if (found == commandBuckets_.end())
+                continue;
+            const auto& bucket = found->second;
+            for (std::size_t i = 0;
+                 i < std::min<std::size_t>(bucket.size(), 32);
+                 ++i)
+                append(bucket[(c.commandSearchCursor + i) % bucket.size()]);
         }
-    }
+    for (std::size_t i = 0;
+         i < std::min<std::size_t>(availableCommandJobs_.size(), 64);
+         ++i)
+        append(
+            availableCommandJobs_
+                [(c.commandSearchCursor + i) % availableCommandJobs_.size()]
+        );
+    c.commandSearchCursor += 64;
     std::stable_sort(
         choices.begin(),
         choices.end(),
         [](const auto& a, const auto& b) { return a.score < b.score; }
     );
-    for (std::size_t attempt = 0; attempt < choices.size(); ++attempt)
+    for (const auto& choice : choices)
     {
-        const auto& choice = choices[c.commandSearchCursor++ % choices.size()];
-        if (route(map, citizens, c, choice.footprint, true))
+        const auto& job = commandJobs_[choice.index];
+        if (route(map, citizens, c, job.footprint, true))
         {
-            c.task = choice.task;
-            c.assignedCommandId = choice.task.command;
+            c.task = job.task();
+            claim(c.task);
+            c.task.startedMinute = minute;
+            c.assignedCommandId = c.task.command;
             c.activity = CitizenActivity::AssignedToCommand;
             return true;
         }
-        if (pathsRemaining_ == 0)
-        {
+        if (!pathsRemaining_)
             break;
-        }
     }
     return false;
+}
+} // namespace Paladin
+
+namespace Paladin
+{
+bool SettlementActivitySystem::chooseWork(
+    SettlementMap& map,
+    SettlementCitizenState& citizens,
+    SettlementCitizen& c,
+    double minute
+)
+{
+    const auto* job = map.employment().workplace(c.workplaceId);
+    if (!job || !job->operational)
+        return false;
+    const auto workplace = *job;
+    if (workplace.objectTypeId == SettlementObjectTypes::FishingGrounds)
+    {
+        const auto* object =
+            map.objectState().completedObject(workplace.objectId);
+        if (!object)
+            return false;
+        auto spots = fisheryShoreline(map.grid(), *object);
+        std::stable_sort(
+            spots.begin(),
+            spots.end(),
+            [&](const auto& a, const auto& b)
+            {
+                return distance(c.tilePosition, {a.land, 1, 1}) <
+                       distance(c.tilePosition, {b.land, 1, 1});
+            }
+        );
+        for (const auto& spot : spots)
+        {
+            if (std::any_of(
+                    citizens.citizens().begin(),
+                    citizens.citizens().end(),
+                    [&](const auto& other)
+                    {
+                        return other.id != c.id &&
+                               other.task.kind == CitizenTaskKind::Work &&
+                               other.task.workTile == spot.land;
+                    }
+                ))
+                continue;
+            auto planned = c;
+            if (!route(map, citizens, planned, {spot.land, 1, 1}, true) ||
+                planned.destination != spot.land)
+            {
+                if (!pathsRemaining_)
+                    break;
+                continue;
+            }
+            copyRoute(c, planned);
+            c.task = {};
+            c.task.kind = CitizenTaskKind::Work;
+            c.task.object = workplace.objectId;
+            c.task.workTile = spot.land;
+            c.task.target = spot.water;
+            c.task.startedMinute = minute;
+            c.activity = CitizenActivity::TravelingToWork;
+            return true;
+        }
+        return false;
+    }
+    if (!route(map, citizens, c, workplace.footprint, true))
+        return false;
+    c.task = {};
+    c.task.kind = CitizenTaskKind::Work;
+    c.task.object = workplace.objectId;
+    c.task.startedMinute = minute;
+    c.activity = CitizenActivity::TravelingToWork;
+    return true;
 }
 } // namespace Paladin

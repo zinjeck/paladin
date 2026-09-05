@@ -2,6 +2,7 @@
 #include "core/StrongId.h"
 #include "ui/NormalFontRenderer.h"
 #include "ui/UiButton.h"
+#include <optional>
 #include <string>
 #include <vector>
 namespace Paladin
@@ -19,11 +20,15 @@ class EmploymentPanel
         if (section_ != "Employment")
             selectedType_.clear();
         pressed_ = -1;
+        dragging_ = false;
+        dragCandidate_ = false;
     }
     void close() noexcept
     {
         open_ = false;
         pressed_ = -1;
+        dragging_ = false;
+        dragCandidate_ = false;
     }
     bool isOpen() const noexcept
     {
@@ -31,6 +36,8 @@ class EmploymentPanel
     }
     bool containsPoint(float, float) const noexcept;
     bool pointerPressed(float, float);
+    bool pointerMoved(float, float);
+    std::string tooltipAt(float, float) const;
     void pointerReleased(
         float,
         float,
@@ -44,6 +51,31 @@ class EmploymentPanel
         focusedWorkplace_ = {};
         return id;
     }
+    struct WorkDayChange
+    {
+        bool realm;
+        int delta;
+    };
+    std::optional<WorkDayChange> takeWorkDayChange()
+    {
+        const auto change = workDayChange_;
+        workDayChange_.reset();
+        return change;
+    }
+    void setWorldMode(bool world)
+    {
+        worldMode_ = world;
+    }
+    bool takeFoundSettlement()
+    {
+        const bool result = foundSettlement_;
+        foundSettlement_ = false;
+        return result;
+    }
+    void setRealmWorkDayHours(int hours)
+    {
+        realmWorkDayHours_ = hours;
+    }
     void scroll(float amount);
     void render(
         Renderer&,
@@ -54,6 +86,16 @@ class EmploymentPanel
     );
 
   private:
+    bool worldMode_ = false, foundSettlement_ = false;
+    bool dragCandidate_ = false;
+    float pressX_ = 0, pressY_ = 0;
+    bool dragging_ = false;
+    bool positioned_ = false;
+    float positionX_ = 0, positionY_ = 110;
+    float dragX_ = 0, dragY_ = 0;
+    float viewportWidth_ = 0, viewportHeight_ = 0;
+    int realmWorkDayHours_ = 12;
+    std::optional<WorkDayChange> workDayChange_;
     struct Hit
     {
         UiRectangle bounds;

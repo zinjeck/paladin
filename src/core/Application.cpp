@@ -21,6 +21,7 @@
 #include "ui/GrayUiRenderer.h"
 #include "ui/CityHud.h"
 #include "ui/EmploymentPanel.h"
+#include "world/settlements/SettlementResourceDefinition.h"
 #include "ui/FoundingPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/SimulationSpeedControls.h"
@@ -461,6 +462,11 @@ namespace Paladin
                         }
                         if (employmentPanel_->isOpen())
                         {
+                            if (event.type == SDL_EVENT_MOUSE_MOTION &&
+                                employmentPanel_->pointerMoved(event.motion.x, event.motion.y))
+                            {
+                                continue;
+                            }
                             if ((event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
                                 || (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT))
                             {
@@ -484,6 +490,10 @@ namespace Paladin
                             {
                                 employmentPanel_->pointerReleased(event.button.x, event.button.y, *currentMap, citizens,
                                     simulation_->world().time().totalGameMinutes());
+                                if (const auto change = employmentPanel_->takeWorkDayChange())
+                                {
+                                    simulation_->changeWorkDay(activeCitySettlementId_, change->realm, change->delta);
+                                }
                                 employmentCapturedPointer_ = false;
                                 if (const auto* workplace = currentMap->employment().workplace(employmentPanel_->takeFocusedWorkplace()))
                                 {
@@ -529,6 +539,14 @@ namespace Paladin
                         );
                     }
 
+                    if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+                        settlementObjectPlacementController_->isActive() &&
+                        (event.key.scancode == SDL_SCANCODE_E || event.key.scancode == SDL_SCANCODE_R))
+                    {
+                        settlementObjectPlacementController_->rotateDoor(event.key.scancode == SDL_SCANCODE_E ? -1 : 1);
+                        continue;
+                    }
+
                     if (
                         event.type == SDL_EVENT_KEY_DOWN &&
                         event.key.scancode == SDL_SCANCODE_ESCAPE
@@ -543,10 +561,12 @@ namespace Paladin
                         event.button.button == SDL_BUTTON_RIGHT
                     )
                     {
-                        settlementObjectPlacementController_
-                            ->cancelPlacement();
-                        settlementCommandController_->cancel();
-                        settlementInspectionController_->clear();
+                        if (!settlementObjectPlacementController_->stepBack())
+                        {
+                            cityHud_->closeCategoryMenus();
+                            settlementCommandController_->cancel();
+                            settlementInspectionController_->clear();
+                        }
                         continue;
                     }
 
@@ -732,10 +752,12 @@ namespace Paladin
                                 event.button.y
                             );
 
-                        if (action == CityHudAction::Employment || action == CityHudAction::Technology
+                        if (action == CityHudAction::Population || action == CityHudAction::Laws || action == CityHudAction::Employment || action == CityHudAction::Technology
                             || action == CityHudAction::Military || action == CityHudAction::Economy)
                         {
-                            const auto section = action == CityHudAction::Technology ? "Technology"
+                            const auto section = action == CityHudAction::Population ? "Population"
+                                : action == CityHudAction::Laws ? "Laws"
+                                : action == CityHudAction::Technology ? "Technology"
                                 : action == CityHudAction::Military ? "Military"
                                 : action == CityHudAction::Economy ? "Economy" : "Employment";
                             employmentPanel_->toggle(section);
@@ -827,6 +849,8 @@ namespace Paladin
 
                     continue;
                 }
+
+                if (handleWorldManagement(event)) continue;
 
                 if (foundingPanel_->isOpen())
                 {
@@ -948,6 +972,9 @@ namespace Paladin
                     settlementPlacementController_
                         ->cancelSelection();
                     movingCapital_ = false;
+                    foundingAdditionalSettlement_ = false;
+                    worldHud_->setAdditionalSelection(false);
+                    employmentPanel_->close();
                 }
 
                 if (
@@ -1018,6 +1045,8 @@ namespace Paladin
                     settlementPlacementController_
                         ->cancelSelection();
                     movingCapital_ = false;
+                    foundingAdditionalSettlement_ = false;
+                    worldHud_->setAdditionalSelection(false);
                 }
 
                 if (
@@ -1063,7 +1092,8 @@ namespace Paladin
                             }
                             else
                             {
-                                foundingPanel_->open();
+                                if (foundingAdditionalSettlement_) foundingPanel_->openForSettlement();
+                                else foundingPanel_->open();
                                 SDL_StartTextInput(
                                     window_->nativeHandle()
                                 );
@@ -1087,12 +1117,12 @@ namespace Paladin
                     {
                         movingCapital_ = false;
                         settlementPlacementController_
-                            ->beginSelection();
+                            ->beginSelection(simulation_->playerPolityId(),foundingAdditionalSettlement_);
                     }
                     else if (action == WorldHudAction::MoveCapital)
                     {
                         movingCapital_ = true;
-                        settlementPlacementController_->beginSelection();
+                        settlementPlacementController_->beginSelection(simulation_->playerPolityId());
                     }
                     else if (
                         action == WorldHudAction::RenameCapital ||
@@ -1282,30 +1312,44 @@ namespace Paladin
                     worldTime.minute()
                 );
 
-                const auto goodsAmount = [&](std::string_view resource)
+                std::array<double, 3> goodsAmounts{};
+                const auto addGoods =
+                    [&](std::string_view resource, double amount)
                 {
-                    double amount =
-                        settlementMap ? settlementMap->logistics.total(resource)
-                                      : 0;
-                    if (citySettlement)
+                    if (resource == "stone")
                     {
-                        for (const auto& citizen :
-                             citySettlement->simulationState()
-                                 .citizens()
-                                 .citizens())
+                        goodsAmounts[0] += amount;
+                    }
+                    else if (resource == "lumber")
+                    {
+                        goodsAmounts[1] += amount;
+                    }
+                    else if (resource == "fish")
+                    {
+                        goodsAmounts[2] += amount;
+                    }
+                };
+                if (settlementMap)
+                {
+                    for (const auto& inventory :
+                         settlementMap->logistics.inventories())
+                    {
+                        for (const auto& goods : inventory.goods)
                         {
-                            if (citizen.carriedResource == resource)
-                            {
-                                amount += citizen.carriedAmount;
-                            }
+                            addGoods(goods.resource, goods.amount);
                         }
                     }
-                    return amount;
-                };
+                }
+                if (citySettlement)
+                {
+                    for (const auto& citizen :
+                         citySettlement->simulationState().citizens().citizens())
+                    {
+                        addGoods(citizen.carriedResource, citizen.carriedAmount);
+                    }
+                }
                 cityHud_->setGoodsAmounts(
-                    goodsAmount("stone"),
-                    goodsAmount("lumber"),
-                    goodsAmount("fish")
+                    goodsAmounts[0], goodsAmounts[1], goodsAmounts[2]
                 );
                 cityHud_->render(
                     *renderer_,
@@ -1323,9 +1367,12 @@ namespace Paladin
                     *renderer_,
                     *grayUiRenderer_
                 );
+                if (const auto* polity = simulation_->world().polity(simulation_->playerPolityId()))
+                    employmentPanel_->setRealmWorkDayHours(polity->workDayHours());
                 if (settlementMap && citySettlement)
                     employmentPanel_->render(*renderer_, *grayUiRenderer_, *settlementMap,
                         citySettlement->simulationState().citizens(), worldTime.totalGameMinutes());
+                renderCityTooltip();
 
                 if (screen_ != Screen::MainMenu && simulation_)
                 {
@@ -1520,6 +1567,8 @@ namespace Paladin
                 )
             );
 
+            renderWorldManagement();
+
             worldHud_->render(
                 *renderer_,
                 *grayUiRenderer_,
@@ -1590,11 +1639,15 @@ namespace Paladin
         activeCitySettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
+        foundingAdditionalSettlement_ = false;
+        worldHud_->setAdditionalSelection(false);
         simulationControlsCapturedPointer_ = false;
         settlementInspectionController_->clear();
         settlementInspectionPanel_->clearLayout();
         simulationClock_->reset();
         screen_ = Screen::World;
+        cityHud_->setWorldMode(simulationControlsUnlocked_);
+        employmentPanel_->setWorldMode(true);
     }
 
     void Application::endWorldSession()
@@ -1623,6 +1676,8 @@ namespace Paladin
         activeCitySettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
+        foundingAdditionalSettlement_ = false;
+        worldHud_->setAdditionalSelection(false);
         simulationControlsCapturedPointer_ = false;
         simulationClock_->reset();
         screen_ = Screen::MainMenu;
@@ -1705,6 +1760,8 @@ namespace Paladin
             }
         }
         activeCitySettlementId_ = capitalId;
+        cityHud_->setWorldMode(false);
+        employmentPanel_->setWorldMode(false);
         edgeScrollDwellSeconds_ = 0.0;
         settlementPlacementController_->cancelSelection();
         settlementObjectPlacementController_->cancelPlacement();
@@ -1794,6 +1851,8 @@ namespace Paladin
         activeCitySettlementId_ = {};
         edgeScrollDwellSeconds_ = 0.0;
         screen_ = Screen::World;
+        cityHud_->setWorldMode(simulationControlsUnlocked_);
+        employmentPanel_->setWorldMode(true);
 
         worldHud_->setSimulationControlsUnlocked(true);
         worldHud_->layout(
@@ -1806,6 +1865,8 @@ namespace Paladin
 
     void Application::cancelFoundingFlow()
     {
+        foundingAdditionalSettlement_ = false;
+        worldHud_->setAdditionalSelection(false);
         foundingPanel_->close();
         SDL_StopTextInput(window_->nativeHandle());
         settlementPlacementController_->cancelSelection();
@@ -1845,6 +1906,13 @@ namespace Paladin
             );
             completed = settlementId.isValid();
         }
+        else if (mode == FoundingPanelMode::NewSettlement)
+        {
+            const auto position = settlementPlacementController_->lockedPosition();
+            if (!position) return;
+            settlementId = simulation_->foundPlayerSettlement(*position,identity.capitalName);
+            completed = bool(settlementId);
+        }
         else if (mode == FoundingPanelMode::RenameCapital)
         {
             completed = simulation_->renamePlayerCapital(
@@ -1862,6 +1930,12 @@ namespace Paladin
         SDL_StopTextInput(window_->nativeHandle());
         settlementPlacementController_->cancelSelection();
 
+        foundingAdditionalSettlement_ = false;
+        worldHud_->setAdditionalSelection(false);
+        if (mode == FoundingPanelMode::NewSettlement && settlementId)
+        {
+            enterPlayerCapitalCity();
+        }
         if (settlementId.isValid())
         {
             SDL_Log(
@@ -2346,7 +2420,9 @@ namespace Paladin
                 settlementInspectionPanel_->containsPoint(x, y);
         }
 
-        return worldHud_->containsInteractivePoint(x, y);
+        return worldHud_->containsInteractivePoint(x, y) ||
+            (simulationControlsUnlocked_ && !settlementPlacementController_->isActive() &&
+             (cityHud_->containsInteractivePoint(x,y) || employmentPanel_->containsPoint(x,y)));
     }
 
     std::optional<SettlementTilePosition> Application::cityTileAtScreen(
@@ -2479,6 +2555,7 @@ void Application::executeConsoleCommand(std::string_view text)
             settlement->simulationState().citizens().placeUnpositionedCitizens(
                 *map
             );
+            map->activities.synchronizeHomes(*map, settlement->simulationState().citizens());
         }
         catch (const std::bad_alloc&)
         {
@@ -2672,6 +2749,169 @@ void Application::renderDebug()
         cachedStats_ = s.str();
     }
     debugConsole_->layout(renderer_->outputWidth(), renderer_->outputHeight());
-    debugConsole_->render(*renderer_, cachedStats_);
+    debugConsole_->render(*renderer_, cachedStats_, *grayUiRenderer_);
 }
 } // namespace Paladin
+
+namespace Paladin
+{
+void Application::renderCityTooltip()
+{
+    float x = 0, y = 0;
+    SDL_GetMouseState(&x, &y);
+    std::string text, key;
+    if (employmentPanel_->containsPoint(x, y))
+        text = employmentPanel_->tooltipAt(x, y);
+    else text = cityHud_->tooltipAt(x, y);
+    key = text;
+    if (text.empty() && !activeHudContainsPoint(x, y))
+    {
+        const auto* map = simulation_->settlementMap(activeCitySettlementId_);
+        const auto* settlement = simulation_->world().settlement(activeCitySettlementId_);
+        const auto tile = cityTileAtScreen(x, y);
+        if (map && settlement && tile)
+        {
+            key = std::to_string(tile->x) + ":" + std::to_string(tile->y);
+            const auto& citizens = settlement->simulationState().citizens();
+            if (const auto* citizen = citizens.citizenAt(*tile))
+            {
+                text = citizen->name + " - " + SettlementActivitySystem::activityLabel(*citizen);
+                key = "citizen:" + std::to_string(citizen->id.value());
+            }
+            else if (const auto* site = map->objectState().constructionSiteAt(*tile))
+            {
+                if (const auto* d = SettlementObjectCatalog::definition(site->objectTypeId))
+                    text = std::string(d->displayName) + " - construction " +
+                        std::to_string(site->progressPermille / 10) + "%";
+            }
+            else if (const auto* object = map->objectState().completedObjectAt(*tile))
+            {
+                if (const auto* d = SettlementObjectCatalog::definition(object->objectTypeId))
+                    text = std::string(d->displayName);
+                if (const auto* job = map->employment().workplace(map->employment().forObject(object->id)))
+                    text = job->name + " - " + std::to_string(map->employment().employed(job->id, citizens)) +
+                        "/" + std::to_string(job->capacity) + " workers";
+            }
+            if (text.empty())
+            {
+                for (const auto& inventory : map->logistics.inventories())
+                {
+                    if (inventory.kind != InventoryKind::Groundpile || !inventory.footprint.contains(*tile)) continue;
+                    for (const auto& goods : inventory.goods)
+                    {
+                        if (!text.empty()) text += ", ";
+                        const auto* d = SettlementResourceCatalog::definition(goods.resource);
+                        text += std::to_string(goods.amount) + " " + (d ? std::string(d->displayName) : goods.resource);
+                    }
+                }
+            }
+            if (text.empty())
+            {
+                const auto feature = map->naturalFeatures().at(*tile).kind;
+                if (feature == NaturalFeatureKind::Tree) text = "Tree - 4 lumber";
+                if (feature == NaturalFeatureKind::Rock) text = "Rock - 4 stone";
+            }
+        }
+    }
+    tooltip_.render(*renderer_, *grayUiRenderer_, text, key, x, y);
+}
+}
+
+namespace Paladin
+{
+bool Application::handleWorldManagement(const SDL_Event& event)
+{
+    if (screen_ != Screen::World || !simulationControlsUnlocked_ || foundingPanel_->isOpen() ||
+        settlementPlacementController_->isActive()) return false;
+    auto* settlement=simulation_->world().settlement(simulation_->presentedSettlementId());
+    auto* map=simulation_->settlementMap(simulation_->presentedSettlementId());
+    if (!settlement || !map) return false;
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT && employmentPanel_->isOpen())
+    {
+        employmentPanel_->close(); employmentCapturedPointer_=false; return true;
+    }
+    if (event.type == SDL_EVENT_MOUSE_MOTION)
+    {
+        cityHud_->pointerMoved(event.motion.x,event.motion.y);
+        if (employmentPanel_->pointerMoved(event.motion.x,event.motion.y)) return true;
+    }
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
+    {
+        employmentCapturedPointer_=employmentPanel_->pointerPressed(event.button.x,event.button.y);
+        if (employmentCapturedPointer_) return true;
+        cityHudCapturedPointer_=cityHud_->pointerPressed(event.button.x,event.button.y);
+        return cityHudCapturedPointer_;
+    }
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+    {
+        if (employmentCapturedPointer_)
+        {
+            employmentPanel_->pointerReleased(event.button.x,event.button.y,*map,settlement->simulationState().citizens(),
+                simulation_->world().time().totalGameMinutes());
+            employmentCapturedPointer_=false;
+            if (employmentPanel_->takeFoundSettlement())
+            {
+                foundingAdditionalSettlement_=true;
+                movingCapital_=false;
+                worldHud_->setAdditionalSelection(true);
+                settlementPlacementController_->beginSelection(simulation_->playerPolityId(),true);
+            }
+            return true;
+        }
+        if (cityHudCapturedPointer_)
+        {
+            const auto action=cityHud_->pointerReleased(event.button.x,event.button.y);
+            cityHudCapturedPointer_=false;
+            if (action != CityHudAction::None)
+            {
+                const auto* section= action == CityHudAction::Laws ? "Laws" : action == CityHudAction::Employment ? "Employment" :
+                    action == CityHudAction::Technology ? "Technology" : action == CityHudAction::Military ? "Military" :
+                    action == CityHudAction::Economy ? "Economy" : "Population";
+                employmentPanel_->toggle(section);
+            }
+            return true;
+        }
+        // Selecting an owned settlement changes the active context; double-click enters it.
+        if (!activeHudContainsPoint(event.button.x,event.button.y))
+        {
+            const double pixels=tileRenderMetrics_->scaledTilePixels(camera_->zoom());
+            const double x=camera_->tileX()+(event.button.x-renderer_->outputWidth()*.5)/pixels;
+            const double y=camera_->tileY()+(event.button.y-renderer_->outputHeight()*.5)/pixels;
+            SettlementId nearest;
+            double best=std::max(1.5,8/pixels);
+            for (const auto& city:simulation_->world().settlements())
+            {
+                if (city.ownerPolityId()!=simulation_->playerPolityId()) continue;
+                const double distance=std::hypot(x-city.position().x-.5,y-city.position().y-.5);
+                if (distance<best) { best=distance; nearest=city.id(); }
+            }
+            if (nearest && simulation_->setPresentedSettlement(nearest))
+            {
+                if (event.button.clicks>=2) enterPlayerCapitalCity();
+                return true;
+            }
+        }
+    }
+    if (event.type == SDL_EVENT_MOUSE_WHEEL && employmentPanel_->containsPoint(event.wheel.mouse_x,event.wheel.mouse_y)) return true;
+    return false;
+}
+void Application::renderWorldManagement()
+{
+    if (!simulationControlsUnlocked_ || settlementPlacementController_->isActive()) return;
+    cityHud_->setWorldMode(true);
+    employmentPanel_->setWorldMode(true);
+    cityHud_->layout(renderer_->outputWidth(),renderer_->outputHeight());
+    const auto& world=simulation_->world();
+    const auto* polity=world.polity(simulation_->playerPolityId());
+    const auto* active=world.settlement(simulation_->presentedSettlementId());
+    std::size_t population=0;
+    for (const auto& city:world.settlements()) if (city.ownerPolityId()==simulation_->playerPolityId())
+        population+=city.simulationState().citizens().citizens().size();
+    cityHud_->setSettlementStatus(true,population);
+    cityHud_->setCityInformation(polity ? std::string(polity->name()) : "",world.time().day(),world.time().hour(),world.time().minute());
+    cityHud_->setActiveSettlementName(active ? std::string(active->name()) : "");
+    cityHud_->render(*renderer_,*grayUiRenderer_);
+    if (const auto* map=simulation_->settlementMap(simulation_->presentedSettlementId()); map && active)
+        employmentPanel_->render(*renderer_,*grayUiRenderer_,*map,active->simulationState().citizens(),world.time().totalGameMinutes());
+}
+}

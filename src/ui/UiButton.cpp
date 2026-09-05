@@ -11,6 +11,11 @@ namespace Paladin
     {
     }
 
+    void UiButton::setSkinId(std::string id)
+    {
+        skinId_ = std::move(id);
+    }
+
     void UiButton::setText(std::string text)
     {
         text_ = std::move(text);
@@ -79,7 +84,8 @@ namespace Paladin
             hovered_,
             pressed_,
             selected_,
-            enabled_
+            enabled_,
+            skinId_
         );
     }
 }

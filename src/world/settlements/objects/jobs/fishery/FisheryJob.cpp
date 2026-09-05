@@ -77,3 +77,34 @@ FisheryZonePreview fisheryZonePreview(
     return result;
 }
 } // namespace Paladin
+
+namespace Paladin
+{
+std::vector<FishingSpot> fisheryShoreline(
+    const SettlementGrid& grid,
+    const CompletedSettlementObject& fishery
+)
+{
+    std::vector<FishingSpot> spots;
+    std::unordered_set<std::uint64_t> seen;
+    for (const auto water : fishery.productionWater)
+    {
+        for (const auto delta :
+             {SettlementTilePosition{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+        {
+            const SettlementTilePosition land{
+                water.x + delta.x,
+                water.y + delta.y
+            };
+            const auto* tile = grid.tile(land);
+            if (!tile || tile->terrain == TerrainType::Water)
+                continue;
+            const auto key = (std::uint64_t(std::uint32_t(land.x)) << 32) |
+                             std::uint32_t(land.y);
+            if (seen.insert(key).second)
+                spots.push_back({land, water});
+        }
+    }
+    return spots;
+}
+} // namespace Paladin

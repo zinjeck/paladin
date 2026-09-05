@@ -1,4 +1,6 @@
 #include "rendering/SettlementObjectRenderer.h"
+#include "world/settlements/objects/SettlementDoor.h"
+#include <SDL3/SDL.h>
 
 #include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/Camera2D.h"
@@ -20,477 +22,646 @@
 
 namespace Paladin
 {
-    namespace
+namespace
+{
+RenderColor renderColor(
+    const std::array<std::uint8_t, 3>& color,
+    std::uint8_t alpha
+) noexcept
+{
+    return {color[0], color[1], color[2], alpha};
+}
+
+void paintFootprint(
+    std::vector<RenderColor>& pixels,
+    std::int32_t mapWidth,
+    const SettlementObjectFootprint& footprint,
+    RenderColor fillColor
+)
+{
+    for (std::int32_t y = footprint.topLeft.y;
+         y < footprint.topLeft.y + footprint.height;
+         ++y)
     {
-        RenderColor renderColor(
-            const std::array<std::uint8_t, 3>& color,
-            std::uint8_t alpha
-        ) noexcept
+        for (std::int32_t x = footprint.topLeft.x;
+             x < footprint.topLeft.x + footprint.width;
+             ++x)
         {
-            return {color[0], color[1], color[2], alpha};
-        }
-
-        void paintFootprint(
-            std::vector<RenderColor>& pixels,
-            std::int32_t mapWidth,
-            const SettlementObjectFootprint& footprint,
-            RenderColor fillColor
-        )
-        {
-            for (
-                std::int32_t y = footprint.topLeft.y;
-                y < footprint.topLeft.y + footprint.height;
-                ++y
-            )
-            {
-                for (
-                    std::int32_t x = footprint.topLeft.x;
-                    x < footprint.topLeft.x + footprint.width;
-                    ++x
-                )
-                {
-                    pixels[
-                        static_cast<std::size_t>(y)
-                            * static_cast<std::size_t>(mapWidth)
-                        + static_cast<std::size_t>(x)
-                    ] = fillColor;
-                }
-            }
-        }
-
-        TileOutlineRenderItem footprintOutline(
-            const SettlementObjectFootprint& footprint,
-            RenderColor color
-        ) noexcept
-        {
-            return {
-                static_cast<double>(footprint.topLeft.x),
-                static_cast<double>(footprint.topLeft.y),
-                static_cast<double>(footprint.width),
-                static_cast<double>(footprint.height),
-                2.5F,
-                color
-            };
-        }
-
-        bool appendConstructionGrid(
-            std::vector<RenderRectangle>& lines,
-            const SettlementObjectFootprint& footprint,
-            const Camera2D& camera,
-            const TileRenderMetrics& metrics,
-            const Renderer& renderer,
-            std::size_t lineBudget
-        )
-        {
-            const double tilePixels =
-                metrics.scaledTilePixels(camera.zoom());
-            const float lineWidth = static_cast<float>(
-                std::min(1.0, std::max(0.5, tilePixels * 0.25))
-            );
-            const double left =
-                static_cast<double>(renderer.outputWidth()) * 0.5 +
-                (static_cast<double>(footprint.topLeft.x) - camera.tileX())
-                    * tilePixels;
-            const double top =
-                static_cast<double>(renderer.outputHeight()) * 0.5 +
-                (static_cast<double>(footprint.topLeft.y) - camera.tileY())
-                    * tilePixels;
-            const double width = footprint.width * tilePixels;
-            const double height = footprint.height * tilePixels;
-
-            if (
-                left + width < 0.0 || top + height < 0.0 ||
-                left > renderer.outputWidth() ||
-                top > renderer.outputHeight()
-            )
-            {
-                return true;
-            }
-
-            // Below two screen pixels per tile, individual grid lines cannot
-            // be distinguished. The retained fill still presents the site,
-            // while skipping thousands of sub-pixel rectangles at far zoom.
-            if (tilePixels < 2.0)
-            {
-                return false;
-            }
-
-            const std::int32_t firstColumn = std::clamp(
-                static_cast<std::int32_t>(
-                    std::floor(-left / tilePixels)
-                ),
-                0,
-                footprint.width
-            );
-            const std::int32_t lastColumn = std::clamp(
-                static_cast<std::int32_t>(
-                    std::ceil(
-                        (renderer.outputWidth() - left) / tilePixels
-                    )
-                ),
-                0,
-                footprint.width
-            );
-            const std::int32_t firstRow = std::clamp(
-                static_cast<std::int32_t>(
-                    std::floor(-top / tilePixels)
-                ),
-                0,
-                footprint.height
-            );
-            const std::int32_t lastRow = std::clamp(
-                static_cast<std::int32_t>(
-                    std::ceil(
-                        (renderer.outputHeight() - top) / tilePixels
-                    )
-                ),
-                0,
-                footprint.height
-            );
-            const std::size_t newLineCount =
-                static_cast<std::size_t>(lastColumn - firstColumn + 1) +
-                static_cast<std::size_t>(lastRow - firstRow + 1);
-            if (lines.size() + newLineCount > lineBudget)
-            {
-                return false;
-            }
-
-            for (std::int32_t x = firstColumn; x <= lastColumn; ++x)
-            {
-                lines.push_back({
-                    static_cast<float>(left + x * tilePixels) -
-                        lineWidth * 0.5F,
-                    static_cast<float>(top),
-                    lineWidth,
-                    static_cast<float>(height)
-                });
-            }
-
-            for (std::int32_t y = firstRow; y <= lastRow; ++y)
-            {
-                lines.push_back({
-                    static_cast<float>(left),
-                    static_cast<float>(top + y * tilePixels) -
-                        lineWidth * 0.5F,
-                    static_cast<float>(width),
-                    lineWidth
-                });
-            }
-
-            return true;
-        }
-
-        void appendConstructionOuterOutline(
-            std::vector<RenderRectangle>& lines,
-            const SettlementObjectFootprint& footprint,
-            const Camera2D& camera,
-            const TileRenderMetrics& metrics,
-            const Renderer& renderer
-        )
-        {
-            const double tilePixels = metrics.scaledTilePixels(camera.zoom());
-            const float lineWidth = 1.0F;
-            const float left = static_cast<float>(
-                renderer.outputWidth() * 0.5 +
-                (footprint.topLeft.x - camera.tileX()) * tilePixels
-            );
-            const float top = static_cast<float>(
-                renderer.outputHeight() * 0.5 +
-                (footprint.topLeft.y - camera.tileY()) * tilePixels
-            );
-            const float width = static_cast<float>(footprint.width * tilePixels);
-            const float height = static_cast<float>(footprint.height * tilePixels);
-
-            if (
-                left + width < 0.0F || top + height < 0.0F ||
-                left > renderer.outputWidth() || top > renderer.outputHeight()
-            )
-            {
-                return;
-            }
-
-            lines.push_back({left, top, width, lineWidth});
-            lines.push_back({left, top + height - lineWidth, width, lineWidth});
-            lines.push_back({left, top, lineWidth, height});
-            lines.push_back({left + width - lineWidth, top, lineWidth, height});
+            pixels
+                [static_cast<std::size_t>(y) *
+                     static_cast<std::size_t>(mapWidth) +
+                 static_cast<std::size_t>(x)] = fillColor;
         }
     }
+}
 
+TileOutlineRenderItem footprintOutline(
+    const SettlementObjectFootprint& footprint,
+    RenderColor color
+) noexcept
+{
+    return {
+        static_cast<double>(footprint.topLeft.x),
+        static_cast<double>(footprint.topLeft.y),
+        static_cast<double>(footprint.width),
+        static_cast<double>(footprint.height),
+        2.5F,
+        color
+    };
+}
 
-    SettlementObjectRenderer::SettlementObjectRenderer() = default;
+bool appendConstructionGrid(
+    std::vector<RenderRectangle>& lines,
+    const SettlementObjectFootprint& footprint,
+    const Camera2D& camera,
+    const TileRenderMetrics& metrics,
+    const Renderer& renderer,
+    std::size_t lineBudget
+)
+{
+    const double tilePixels = metrics.scaledTilePixels(camera.zoom());
+    const float lineWidth =
+        static_cast<float>(std::min(1.0, std::max(0.5, tilePixels * 0.25)));
+    const double left =
+        static_cast<double>(renderer.outputWidth()) * 0.5 +
+        (static_cast<double>(footprint.topLeft.x) - camera.tileX()) *
+            tilePixels;
+    const double top =
+        static_cast<double>(renderer.outputHeight()) * 0.5 +
+        (static_cast<double>(footprint.topLeft.y) - camera.tileY()) *
+            tilePixels;
+    const double width = footprint.width * tilePixels;
+    const double height = footprint.height * tilePixels;
 
-
-    SettlementObjectRenderer::~SettlementObjectRenderer() = default;
-
-
-    void SettlementObjectRenderer::render(
-        Renderer& renderer,
-        const SettlementMap& settlementMap,
-        const Camera2D& camera,
-        const TileRenderMetrics& metrics,
-        const SettlementObjectPlacementController& placementController
-    ) const
+    if (left + width < 0.0 || top + height < 0.0 ||
+        left > renderer.outputWidth() || top > renderer.outputHeight())
     {
-        const SettlementObjectState& state = settlementMap.objectState();
+        return true;
+    }
 
-        if (cachedState_ != &state ||
-            cachedVersion_ != state.navigationVersion())
-        {
-            cachedState_ = &state;
-            cachedVersion_ = state.navigationVersion();
+    // Below two screen pixels per tile, individual grid lines cannot
+    // be distinguished. The retained fill still presents the site,
+    // while skipping thousands of sub-pixel rectangles at far zoom.
+    if (tilePixels < 2.0)
+    {
+        return false;
+    }
 
-            std::vector<RenderColor> pixels(
-                settlementMap.grid().tileCount(),
-                RenderColor{0, 0, 0, 0}
-            );
+    const std::int32_t firstColumn = std::clamp(
+        static_cast<std::int32_t>(std::floor(-left / tilePixels)),
+        0,
+        footprint.width
+    );
+    const std::int32_t lastColumn = std::clamp(
+        static_cast<std::int32_t>(
+            std::ceil((renderer.outputWidth() - left) / tilePixels)
+        ),
+        0,
+        footprint.width
+    );
+    const std::int32_t firstRow = std::clamp(
+        static_cast<std::int32_t>(std::floor(-top / tilePixels)),
+        0,
+        footprint.height
+    );
+    const std::int32_t lastRow = std::clamp(
+        static_cast<std::int32_t>(
+            std::ceil((renderer.outputHeight() - top) / tilePixels)
+        ),
+        0,
+        footprint.height
+    );
+    const std::size_t newLineCount =
+        static_cast<std::size_t>(lastColumn - firstColumn + 1) +
+        static_cast<std::size_t>(lastRow - firstRow + 1);
+    if (lines.size() + newLineCount > lineBudget)
+    {
+        return false;
+    }
 
-            cachedInfrastructureOutlines_.clear();
-            cachedInfrastructureOutlines_.reserve(
-                state.completedObjects().size()
-            );
+    for (std::int32_t x = firstColumn; x <= lastColumn; ++x)
+    {
+        lines.push_back(
+            {static_cast<float>(left + x * tilePixels) - lineWidth * 0.5F,
+             static_cast<float>(top),
+             lineWidth,
+             static_cast<float>(height)}
+        );
+    }
 
-            for (const SettlementConstructionSite& site : state.constructionSites())
-            {
-                const SettlementObjectDefinition* definition =
-                    SettlementObjectCatalog::definition(site.objectTypeId);
+    for (std::int32_t y = firstRow; y <= lastRow; ++y)
+    {
+        lines.push_back(
+            {static_cast<float>(left),
+             static_cast<float>(top + y * tilePixels) - lineWidth * 0.5F,
+             static_cast<float>(width),
+             lineWidth}
+        );
+    }
 
-                if (!definition)
-                {
-                    continue;
-                }
+    return true;
+}
 
-                paintFootprint(
-                    pixels,
-                    settlementMap.grid().width(),
-                    site.footprint,
-                    renderColor(definition->visual.fillColor, 105)
-                );
-                if (definition->id != SettlementObjectTypes::Road)
-                    cachedInfrastructureOutlines_.push_back(footprintOutline(
-                        site.footprint, settlementPlacementOutlineColor(
-                            site.phase == ConstructionSitePhase::ReadyToBuild
-                                ? SettlementPlacementVisualState::ReadyToBuild
-                                : SettlementPlacementVisualState::AwaitingMaterials)));
+void appendConstructionOuterOutline(
+    std::vector<RenderRectangle>& lines,
+    const SettlementObjectFootprint& footprint,
+    const Camera2D& camera,
+    const TileRenderMetrics& metrics,
+    const Renderer& renderer
+)
+{
+    const double tilePixels = metrics.scaledTilePixels(camera.zoom());
+    const float lineWidth = 1.0F;
+    const float left = static_cast<float>(
+        renderer.outputWidth() * 0.5 +
+        (footprint.topLeft.x - camera.tileX()) * tilePixels
+    );
+    const float top = static_cast<float>(
+        renderer.outputHeight() * 0.5 +
+        (footprint.topLeft.y - camera.tileY()) * tilePixels
+    );
+    const float width = static_cast<float>(footprint.width * tilePixels);
+    const float height = static_cast<float>(footprint.height * tilePixels);
 
-            }
+    if (left + width < 0.0F || top + height < 0.0F ||
+        left > renderer.outputWidth() || top > renderer.outputHeight())
+    {
+        return;
+    }
 
-            for (const CompletedSettlementObject& object : state.completedObjects())
-            {
-                const SettlementObjectDefinition* definition =
-                    SettlementObjectCatalog::definition(object.objectTypeId);
+    lines.push_back({left, top, width, lineWidth});
+    lines.push_back({left, top + height - lineWidth, width, lineWidth});
+    lines.push_back({left, top, lineWidth, height});
+    lines.push_back({left + width - lineWidth, top, lineWidth, height});
+}
+} // namespace
 
-                if (!definition)
-                {
-                    continue;
-                }
+SettlementObjectRenderer::SettlementObjectRenderer() = default;
 
-                paintFootprint(
-                    pixels,
-                    settlementMap.grid().width(),
-                    object.footprint,
-                    renderColor(definition->visual.fillColor, 255)
-                );
+SettlementObjectRenderer::~SettlementObjectRenderer() = default;
 
-                if (definition->id != SettlementObjectTypes::Road)
-                {
-                    cachedInfrastructureOutlines_.push_back(
-                        footprintOutline(
-                            object.footprint,
-                            renderColor(
-                                definition->visual.frameColor,
-                                255
-                            )
-                        )
-                    );
-                }
-            }
+void SettlementObjectRenderer::render(
+    Renderer& renderer,
+    const SettlementMap& settlementMap,
+    const Camera2D& camera,
+    const TileRenderMetrics& metrics,
+    const SettlementObjectPlacementController& placementController
+) const
+{
+    const SettlementObjectState& state = settlementMap.objectState();
 
-            cachedInfrastructureTexture_ =
-                renderer.createTextureFromPixels(
-                    settlementMap.grid().width(),
-                    settlementMap.grid().height(),
-                    pixels
-                );
-        }
+    if (cachedMapInstance_ != settlementMap.instanceId() ||
+        cachedVersion_ != state.navigationVersion())
+    {
+        cachedMapInstance_ = settlementMap.instanceId();
+        cachedVersion_ = state.navigationVersion();
 
-        if (cachedInfrastructureTexture_)
-        {
-            const double tilePixels =
-                metrics.scaledTilePixels(camera.zoom());
-
-            const double viewportWidth =
-                static_cast<double>(renderer.outputWidth());
-
-            const double viewportHeight =
-                static_cast<double>(renderer.outputHeight());
-
-            renderer.drawTexture(
-                *cachedInfrastructureTexture_,
-                0.0F,
-                0.0F,
-                static_cast<float>(settlementMap.grid().width()),
-                static_cast<float>(settlementMap.grid().height()),
-                static_cast<float>(
-                    viewportWidth * 0.5 - camera.tileX() * tilePixels
-                ),
-                static_cast<float>(
-                    viewportHeight * 0.5 - camera.tileY() * tilePixels
-                ),
-                static_cast<float>(
-                    static_cast<double>(settlementMap.grid().width())
-                        * tilePixels
-                ),
-                static_cast<float>(
-                    static_cast<double>(settlementMap.grid().height())
-                        * tilePixels
-                )
-            );
-        }
-
-        overlayRenderer_.renderOutlines(
-            renderer,
-            cachedInfrastructureOutlines_,
-            camera,
-            metrics
+        auto& pixels = infrastructurePixels_;
+        pixels.assign(
+            settlementMap.grid().tileCount(),
+            RenderColor{0, 0, 0, 0}
         );
 
-        std::vector<RenderRectangle> awaitingMaterialLines;
-        std::vector<RenderRectangle> readyToBuildLines;
-        constexpr std::size_t constructionGridLineBudget = 20'000;
-        bool awaitingDetailedGrid = true;
-        bool readyDetailedGrid = true;
+        cachedInfrastructureOutlines_.clear();
+        cachedInfrastructureOutlines_.reserve(state.completedObjects().size());
 
         for (const SettlementConstructionSite& site : state.constructionSites())
         {
-            std::vector<RenderRectangle>& lines =
-                site.phase == ConstructionSitePhase::ReadyToBuild
-                    ? readyToBuildLines
-                    : awaitingMaterialLines;
+            const SettlementObjectDefinition* definition =
+                SettlementObjectCatalog::definition(site.objectTypeId);
 
-            bool& detailedGrid =
-                site.phase == ConstructionSitePhase::ReadyToBuild
-                    ? readyDetailedGrid
-                    : awaitingDetailedGrid;
-            if (!detailedGrid)
+            if (!definition)
             {
                 continue;
             }
 
-            detailedGrid = appendConstructionGrid(
-                lines,
+            paintFootprint(
+                pixels,
+                settlementMap.grid().width(),
+                site.footprint,
+                renderColor(definition->visual.fillColor, 105)
+            );
+            if (site.door && site.footprint.contains(*site.door))
+            {
+                auto color = renderColor(definition->visual.fillColor, 105);
+                color = {108, 66, 31, color.alpha};
+                paintFootprint(
+                    pixels,
+                    settlementMap.grid().width(),
+                    {site.door.value(), 1, 1},
+                    color
+                );
+            }
+            if (definition->id != SettlementObjectTypes::Road)
+                cachedInfrastructureOutlines_.push_back(footprintOutline(
+                    site.footprint,
+                    settlementPlacementOutlineColor(
+                        site.phase == ConstructionSitePhase::ReadyToBuild
+                            ? SettlementPlacementVisualState::ReadyToBuild
+                            : SettlementPlacementVisualState::AwaitingMaterials
+                    )
+                ));
+        }
+
+        for (const CompletedSettlementObject& object : state.completedObjects())
+        {
+            const SettlementObjectDefinition* definition =
+                SettlementObjectCatalog::definition(object.objectTypeId);
+
+            if (!definition)
+            {
+                continue;
+            }
+
+            paintFootprint(
+                pixels,
+                settlementMap.grid().width(),
+                object.footprint,
+                renderColor(definition->visual.fillColor, 255)
+            );
+            if (object.door && object.footprint.contains(*object.door))
+            {
+                auto color = renderColor(definition->visual.fillColor, 255);
+                color = {108, 66, 31, color.alpha};
+                paintFootprint(
+                    pixels,
+                    settlementMap.grid().width(),
+                    {object.door.value(), 1, 1},
+                    color
+                );
+            }
+
+            if (definition->id != SettlementObjectTypes::Road)
+            {
+                cachedInfrastructureOutlines_.push_back(footprintOutline(
+                    object.footprint,
+                    renderColor(definition->visual.frameColor, 255)
+                ));
+            }
+        }
+
+        const int width = settlementMap.grid().width(),
+                  height = settlementMap.grid().height();
+        if (!cachedInfrastructureTexture_ ||
+            cachedInfrastructureTexture_->width() != width ||
+            cachedInfrastructureTexture_->height() != height ||
+            !renderer
+                 .updateTexturePixels(*cachedInfrastructureTexture_, pixels))
+        {
+            cachedInfrastructureTexture_ =
+                renderer.createTextureFromPixels(width, height, pixels);
+        }
+    }
+
+    if (cachedInfrastructureTexture_)
+    {
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
+
+        const double viewportWidth =
+            static_cast<double>(renderer.outputWidth());
+
+        const double viewportHeight =
+            static_cast<double>(renderer.outputHeight());
+
+        renderer.drawTexture(
+            *cachedInfrastructureTexture_,
+            0.0F,
+            0.0F,
+            static_cast<float>(settlementMap.grid().width()),
+            static_cast<float>(settlementMap.grid().height()),
+            static_cast<float>(
+                viewportWidth * 0.5 - camera.tileX() * tilePixels
+            ),
+            static_cast<float>(
+                viewportHeight * 0.5 - camera.tileY() * tilePixels
+            ),
+            static_cast<float>(
+                static_cast<double>(settlementMap.grid().width()) * tilePixels
+            ),
+            static_cast<float>(
+                static_cast<double>(settlementMap.grid().height()) * tilePixels
+            )
+        );
+    }
+
+    overlayRenderer_.renderOutlines(
+        renderer,
+        cachedInfrastructureOutlines_,
+        camera,
+        metrics
+    );
+
+    auto& awaitingMaterialLines = awaitingMaterialLines_;
+    auto& readyToBuildLines = readyToBuildLines_;
+    awaitingMaterialLines.clear();
+    readyToBuildLines.clear();
+    constexpr std::size_t constructionGridLineBudget = 20'000;
+    bool awaitingDetailedGrid = true;
+    bool readyDetailedGrid = true;
+
+    for (const SettlementConstructionSite& site : state.constructionSites())
+    {
+        std::vector<RenderRectangle>& lines =
+            site.phase == ConstructionSitePhase::ReadyToBuild
+                ? readyToBuildLines
+                : awaitingMaterialLines;
+
+        bool& detailedGrid = site.phase == ConstructionSitePhase::ReadyToBuild
+                                 ? readyDetailedGrid
+                                 : awaitingDetailedGrid;
+        if (!detailedGrid)
+        {
+            continue;
+        }
+
+        detailedGrid = appendConstructionGrid(
+            lines,
+            site.footprint,
+            camera,
+            metrics,
+            renderer,
+            constructionGridLineBudget
+        );
+    }
+
+    if (!awaitingDetailedGrid || !readyDetailedGrid)
+    {
+        if (!awaitingDetailedGrid)
+        {
+            awaitingMaterialLines.clear();
+        }
+        if (!readyDetailedGrid)
+        {
+            readyToBuildLines.clear();
+        }
+
+        for (const SettlementConstructionSite& site : state.constructionSites())
+        {
+            const bool ready =
+                site.phase == ConstructionSitePhase::ReadyToBuild;
+            if ((ready && readyDetailedGrid) ||
+                (!ready && awaitingDetailedGrid))
+            {
+                continue;
+            }
+
+            appendConstructionOuterOutline(
+                ready ? readyToBuildLines : awaitingMaterialLines,
                 site.footprint,
                 camera,
                 metrics,
-                renderer,
-                constructionGridLineBudget
+                renderer
             );
         }
+    }
 
-        if (!awaitingDetailedGrid || !readyDetailedGrid)
+    renderer.fillRectangles(
+        awaitingMaterialLines,
+        settlementPlacementOutlineColor(
+            SettlementPlacementVisualState::AwaitingMaterials
+        )
+    );
+    renderer.fillRectangles(
+        readyToBuildLines,
+        settlementPlacementOutlineColor(
+            SettlementPlacementVisualState::ReadyToBuild
+        )
+    );
+
+    const double doorPixels = metrics.scaledTilePixels(camera.zoom());
+    const auto paintDoor = [&](SettlementTilePosition p)
+    {
+        const float x = float(
+            renderer.outputWidth() * .5 + (p.x - camera.tileX()) * doorPixels
+        );
+        const float y = float(
+            renderer.outputHeight() * .5 + (p.y - camera.tileY()) * doorPixels
+        );
+        if (x + doorPixels < 0 || y + doorPixels < 0 ||
+            x > renderer.outputWidth() || y > renderer.outputHeight())
+            return;
+        const float border = std::clamp(float(doorPixels) * .09F, 1.0F, 3.0F);
+        renderer.fillRectangle(
+            x,
+            y,
+            float(doorPixels),
+            float(doorPixels),
+            {62, 35, 17, 255}
+        );
+        if (doorPixels > border * 2)
+            renderer.fillRectangle(
+                x + border,
+                y + border,
+                float(doorPixels) - border * 2,
+                float(doorPixels) - border * 2,
+                {127, 79, 36, 255}
+            );
+    };
+    for (const auto& object : settlementMap.objectState().completedObjects())
+        if (object.door)
+            paintDoor(*object.door);
+    for (const auto& site : settlementMap.objectState().constructionSites())
+        if (site.door)
+            paintDoor(*site.door);
+    const auto drawDoor = [&]()
+    {
+        const auto footprint = placementController.visibleFootprint();
+        if (!footprint)
+            return;
+        const auto door = placementController.visibleDoor();
+        const double pixels = metrics.scaledTilePixels(camera.zoom());
+        if (door)
         {
-            if (!awaitingDetailedGrid)
+            const float x = float(
+                renderer.outputWidth() * .5 +
+                (door->x - camera.tileX()) * pixels
+            );
+            const float y = float(
+                renderer.outputHeight() * .5 +
+                (door->y - camera.tileY()) * pixels
+            );
+            renderer.fillRectangle(
+                x,
+                y,
+                float(pixels),
+                float(pixels),
+                {62, 35, 17, 255}
+            );
+            paintDoor(*door);
+            const auto outside = outsideDoor(*footprint, *door);
+            const float dx = float(outside.x - door->x),
+                        dy = float(outside.y - door->y);
+            for (float offset : {0.0F, .28F})
             {
-                awaitingMaterialLines.clear();
-            }
-            if (!readyDetailedGrid)
-            {
-                readyToBuildLines.clear();
-            }
-
-            for (const SettlementConstructionSite& site : state.constructionSites())
-            {
-                const bool ready =
-                    site.phase == ConstructionSitePhase::ReadyToBuild;
-                if ((ready && readyDetailedGrid) || (!ready && awaitingDetailedGrid))
-                {
-                    continue;
-                }
-
-                appendConstructionOuterOutline(
-                    ready ? readyToBuildLines : awaitingMaterialLines,
-                    site.footprint,
-                    camera,
-                    metrics,
-                    renderer
+                const float cx = x + float(pixels) * (.5F + dx * offset),
+                            cy = y + float(pixels) * (.5F + dy * offset);
+                const float size = float(pixels) * .22F;
+                renderer.drawLine(
+                    cx - dx * size - dy * size,
+                    cy - dy * size + dx * size,
+                    cx + dx * size,
+                    cy + dy * size,
+                    {220, 245, 220, 255}
+                );
+                renderer.drawLine(
+                    cx - dx * size + dy * size,
+                    cy - dy * size - dx * size,
+                    cx + dx * size,
+                    cy + dy * size,
+                    {220, 245, 220, 255}
                 );
             }
         }
-
-        renderer.fillRectangles(
-            awaitingMaterialLines,
-            settlementPlacementOutlineColor(
-                SettlementPlacementVisualState::AwaitingMaterials
-            )
-        );
-        renderer.fillRectangles(
-            readyToBuildLines,
-            settlementPlacementOutlineColor(
-                SettlementPlacementVisualState::ReadyToBuild
-            )
-        );
-
-        const std::optional<SettlementObjectFootprint> preview =
-            placementController.visibleFootprint();
-
-        const SettlementObjectDefinition* definition =
-            placementController.activeDefinition();
-
-        if (!preview || !definition)
+        if (placementController.choosingDoor())
         {
-            return;
+            float x = 0, y = 0;
+            SDL_GetMouseState(&x, &y);
+            renderer.fillRectangle(x + 12, y + 12, 12, 17, {127, 79, 36, 255});
+            renderer
+                .drawLine(x + 12, y + 12, x + 24, y + 12, {62, 35, 17, 255});
+            renderer
+                .drawLine(x + 12, y + 12, x + 12, y + 29, {62, 35, 17, 255});
+            renderer
+                .drawLine(x + 24, y + 12, x + 24, y + 29, {62, 35, 17, 255});
+            renderer.fillRectangle(x + 20, y + 21, 2, 2, {225, 196, 100, 255});
         }
+    };
+    const std::optional<SettlementObjectFootprint> preview =
+        placementController.visibleFootprint();
 
-        if (definition->allowsPartialPlacement)
+    const SettlementObjectDefinition* definition =
+        placementController.activeDefinition();
+
+    if (!preview || !definition)
+    {
+        return;
+    }
+
+    if (placementController.choosingDoor())
+    {
+        std::vector<TileOverlayRenderItem> tiles;
+        const auto left = std::max(
+            preview->topLeft.x,
+            int(std::floor(
+                camera.tileX() - renderer.outputWidth() * .5 / doorPixels
+            ))
+        );
+        const auto right = std::min(
+            preview->topLeft.x + preview->width,
+            int(std::ceil(
+                camera.tileX() + renderer.outputWidth() * .5 / doorPixels
+            ))
+        );
+        const auto top = std::max(
+            preview->topLeft.y,
+            int(std::floor(
+                camera.tileY() - renderer.outputHeight() * .5 / doorPixels
+            ))
+        );
+        const auto bottom = std::min(
+            preview->topLeft.y + preview->height,
+            int(std::ceil(
+                camera.tileY() + renderer.outputHeight() * .5 / doorPixels
+            ))
+        );
+        for (int y = top; y < bottom; ++y)
         {
-            const double tilePixels =
-                metrics.scaledTilePixels(camera.zoom());
-            const std::int32_t visibleLeft = std::max(
-                preview->topLeft.x,
-                static_cast<std::int32_t>(std::floor(
-                    camera.tileX() -
-                    renderer.outputWidth() * 0.5 / tilePixels
-                )) - 1
-            );
-            const std::int32_t visibleTop = std::max(
-                preview->topLeft.y,
-                static_cast<std::int32_t>(std::floor(
-                    camera.tileY() -
-                    renderer.outputHeight() * 0.5 / tilePixels
-                )) - 1
-            );
-            const std::int32_t visibleRight = std::min(
-                preview->topLeft.x + preview->width,
-                static_cast<std::int32_t>(std::ceil(
-                    camera.tileX() +
-                    renderer.outputWidth() * 0.5 / tilePixels
-                )) + 1
-            );
-            const std::int32_t visibleBottom = std::min(
-                preview->topLeft.y + preview->height,
-                static_cast<std::int32_t>(std::ceil(
-                    camera.tileY() +
-                    renderer.outputHeight() * 0.5 / tilePixels
-                )) + 1
-            );
-            std::vector<TileOverlayRenderItem> tileOverlays;
+            int start = left;
+            bool previous = false;
+            for (int x = left; x <= right; ++x)
+            {
+                const bool valid =
+                    x < right &&
+                    placementController.doorTileIsValid({x, y}, settlementMap);
+                if (x == left)
+                    previous = valid;
+                if (x == right || valid != previous ||
+                    (doorPixels >= 6 && x > start))
+                {
+                    tiles.push_back(
+                        {double(start) + .025,
+                         double(y) + .025,
+                         double(x - start) - .05,
+                         .95,
+                         previous ? RenderColor{45, 130, 235, 240}
+                                  : RenderColor{196, 56, 52, 240}}
+                    );
+                    start = x;
+                    previous = valid;
+                }
+            }
+        }
+        overlayRenderer_.render(renderer, tiles, camera, metrics);
+        drawDoor();
+        return;
+    }
+    if (definition->allowsPartialPlacement)
+    {
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
+        const std::int32_t visibleLeft = std::max(
+            preview->topLeft.x,
+            static_cast<std::int32_t>(std::floor(
+                camera.tileX() - renderer.outputWidth() * 0.5 / tilePixels
+            )) - 1
+        );
+        const std::int32_t visibleTop = std::max(
+            preview->topLeft.y,
+            static_cast<std::int32_t>(std::floor(
+                camera.tileY() - renderer.outputHeight() * 0.5 / tilePixels
+            )) - 1
+        );
+        const std::int32_t visibleRight = std::min(
+            preview->topLeft.x + preview->width,
+            static_cast<std::int32_t>(std::ceil(
+                camera.tileX() + renderer.outputWidth() * 0.5 / tilePixels
+            )) + 1
+        );
+        const std::int32_t visibleBottom = std::min(
+            preview->topLeft.y + preview->height,
+            static_cast<std::int32_t>(std::ceil(
+                camera.tileY() + renderer.outputHeight() * 0.5 / tilePixels
+            )) + 1
+        );
+        auto& tileOverlays = previewOverlays_;
+        const std::array<int, 9> bounds{
+            preview->topLeft.x,
+            preview->topLeft.y,
+            preview->width,
+            preview->height,
+            visibleLeft,
+            visibleTop,
+            visibleRight,
+            visibleBottom,
+            tilePixels >= 2.0
+        };
+        if (previewMapInstance_ != settlementMap.instanceId() ||
+            previewVersion_ != state.navigationVersion() ||
+            previewBounds_ != bounds || previewType_ != definition->id)
+        {
+            previewMapInstance_ = settlementMap.instanceId();
+            previewVersion_ = state.navigationVersion();
+            previewBounds_ = bounds;
+            previewType_ = definition->id;
+            tileOverlays.clear();
             tileOverlays.reserve(
                 static_cast<std::size_t>(
                     std::max(0, visibleBottom - visibleTop)
-                ) + 1U
+                ) +
+                1U
             );
 
             // Paint the selectable area once, then cover only contiguous
             // blocked runs. This keeps a large road drag independent of its
             // valid tile count instead of issuing one draw per tile.
-            tileOverlays.push_back({
-                static_cast<double>(preview->topLeft.x),
-                static_cast<double>(preview->topLeft.y),
-                static_cast<double>(preview->width),
-                static_cast<double>(preview->height),
-                settlementPlacementFillColor(
-                    SettlementPlacementVisualState::Valid
-                )
-            });
+            tileOverlays.push_back(
+                {static_cast<double>(preview->topLeft.x),
+                 static_cast<double>(preview->topLeft.y),
+                 static_cast<double>(preview->width),
+                 static_cast<double>(preview->height),
+                 settlementPlacementFillColor(
+                     SettlementPlacementVisualState::Valid
+                 )}
+            );
 
             const std::size_t visibleTileCount =
                 static_cast<std::size_t>(
@@ -501,19 +672,11 @@ namespace Paladin
                 );
             if (tilePixels >= 2.0 && visibleTileCount <= 50'000U)
             {
-                for (
-                    std::int32_t y = visibleTop;
-                    y < visibleBottom;
-                    ++y
-                )
+                for (std::int32_t y = visibleTop; y < visibleBottom; ++y)
                 {
                     std::optional<std::int32_t> blockedRunStart;
 
-                    for (
-                        std::int32_t x = visibleLeft;
-                        x <= visibleRight;
-                        ++x
-                    )
+                    for (std::int32_t x = visibleLeft; x <= visibleRight; ++x)
                     {
                         const bool inFootprint = x < visibleRight;
                         const bool blocked =
@@ -530,97 +693,83 @@ namespace Paladin
                         }
                         else if (!blocked && blockedRunStart)
                         {
-                            tileOverlays.push_back({
-                                static_cast<double>(*blockedRunStart),
-                                static_cast<double>(y),
-                                static_cast<double>(x - *blockedRunStart),
-                                1.0,
-                                settlementPlacementFillColor(
-                                    SettlementPlacementVisualState::Invalid
-                                )
-                            });
+                            tileOverlays.push_back(
+                                {static_cast<double>(*blockedRunStart),
+                                 static_cast<double>(y),
+                                 static_cast<double>(x - *blockedRunStart),
+                                 1.0,
+                                 settlementPlacementFillColor(
+                                     SettlementPlacementVisualState::Invalid
+                                 )}
+                            );
                             blockedRunStart.reset();
                         }
                     }
                 }
             }
-
-            const SettlementPlacementAreaEvaluation evaluation =
-                settlementMap.objectState().evaluatePlacementArea(
-                    settlementMap.grid(),
-                    *definition,
-                    *preview
-                );
-
-            const std::array<TileOutlineRenderItem, 1> selectionOutline{{
-                {
-                    static_cast<double>(preview->topLeft.x),
-                    static_cast<double>(preview->topLeft.y),
-                    static_cast<double>(preview->width),
-                    static_cast<double>(preview->height),
-                    2.0F,
-                    settlementPlacementOutlineColor(
-                        placementController.hasLockedFootprint()
-                            ? SettlementPlacementVisualState::Valid
-                            : (
-                                evaluation.footprintAllowed &&
-                                !evaluation.hasObstructions()
-                                    ? SettlementPlacementVisualState::Valid
-                                    : SettlementPlacementVisualState::Invalid
-                            )
-                    )
-                }
-            }};
-
-            overlayRenderer_.render(
-                renderer,
-                tileOverlays,
-                camera,
-                metrics
-            );
-
-            overlayRenderer_.renderOutlines(
-                renderer,
-                selectionOutline,
-                camera,
-                metrics
-            );
-
-            return;
         }
-
-        const bool valid =
-            placementController.visibleFootprintIsValid(settlementMap);
-
-        const RenderColor outlineColor =
-            settlementPlacementOutlineColor(
-                valid
-                    ? SettlementPlacementVisualState::Valid
-                    : SettlementPlacementVisualState::Invalid
+        const SettlementPlacementAreaEvaluation evaluation =
+            settlementMap.objectState().evaluatePlacementArea(
+                settlementMap.grid(),
+                *definition,
+                *preview
             );
 
-        const std::array<TileOverlayRenderItem, 1> overlays{{
-            {
-                static_cast<double>(preview->topLeft.x),
-                static_cast<double>(preview->topLeft.y),
-                static_cast<double>(preview->width),
-                static_cast<double>(preview->height),
-                renderColor(definition->visual.fillColor, 100)
-            }
-        }};
+        const std::array<TileOutlineRenderItem, 1> selectionOutline{
+            {{static_cast<double>(preview->topLeft.x),
+              static_cast<double>(preview->topLeft.y),
+              static_cast<double>(preview->width),
+              static_cast<double>(preview->height),
+              2.0F,
+              settlementPlacementOutlineColor(
+                  placementController.hasLockedFootprint()
+                      ? SettlementPlacementVisualState::Valid
+                      : (evaluation.footprintAllowed &&
+                                 !evaluation.hasObstructions()
+                             ? SettlementPlacementVisualState::Valid
+                             : SettlementPlacementVisualState::Invalid)
+              )}}
+        };
 
-        const std::array<TileOutlineRenderItem, 1> outlines{{
-            {
-                static_cast<double>(preview->topLeft.x),
-                static_cast<double>(preview->topLeft.y),
-                static_cast<double>(preview->width),
-                static_cast<double>(preview->height),
-                2.0F,
-                outlineColor
-            }
-        }};
+        overlayRenderer_.render(renderer, tileOverlays, camera, metrics);
 
-        overlayRenderer_.render(renderer, overlays, camera, metrics);
-        overlayRenderer_.renderOutlines(renderer, outlines, camera, metrics);
+        overlayRenderer_
+            .renderOutlines(renderer, selectionOutline, camera, metrics);
+
+        drawDoor();
+        return;
     }
+
+    const bool valid =
+        placementController.visibleFootprintIsValid(settlementMap);
+
+    const RenderColor outlineColor = settlementPlacementOutlineColor(
+        valid ? SettlementPlacementVisualState::Valid
+              : SettlementPlacementVisualState::Invalid
+    );
+
+    const std::array<TileOverlayRenderItem, 1> overlays{
+        {{static_cast<double>(preview->topLeft.x),
+          static_cast<double>(preview->topLeft.y),
+          static_cast<double>(preview->width),
+          static_cast<double>(preview->height),
+          settlementPlacementFillColor(
+              valid ? SettlementPlacementVisualState::Valid
+                    : SettlementPlacementVisualState::Invalid
+          )}}
+    };
+
+    const std::array<TileOutlineRenderItem, 1> outlines{
+        {{static_cast<double>(preview->topLeft.x),
+          static_cast<double>(preview->topLeft.y),
+          static_cast<double>(preview->width),
+          static_cast<double>(preview->height),
+          2.0F,
+          outlineColor}}
+    };
+
+    overlayRenderer_.render(renderer, overlays, camera, metrics);
+    overlayRenderer_.renderOutlines(renderer, outlines, camera, metrics);
+    drawDoor();
 }
+} // namespace Paladin

@@ -1,11 +1,14 @@
 #include "TestFramework.h"
+#include "world/Season.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/SettlementSimulationState.h"
 #include "world/settlements/commands/SettlementCommandDefinition.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/jobs/fishery/FisheryJob.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <set>
@@ -100,6 +103,175 @@ double allGoods(
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        CitizenSimulationPolicy policy;
+        for (const auto [hours, start, end] :
+             {std::array{10, 420, 1020},
+              std::array{9, 450, 990},
+              std::array{8, 480, 960},
+              std::array{0, 720, 720},
+              std::array{24, 300, 1140}})
+        {
+            policy.setWorkDayHours(hours);
+            PALADIN_CHECK(policy.shiftStartMinute == start);
+            PALADIN_CHECK(policy.shiftEndMinute == end);
+            PALADIN_CHECK(policy.isWorkTime(720) == (hours > 0));
+        }
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        advance(map, citizens, 0, 239);
+        PALADIN_CHECK(citizens.populationHistory().size() == 1);
+        PALADIN_CHECK(citizens.spawn(1));
+        advance(map, citizens, 239, 1);
+        PALADIN_CHECK(citizens.populationHistory().size() == 2);
+        PALADIN_CHECK(citizens.populationHistory().back().gameMinute == 240);
+        PALADIN_CHECK(citizens.populationHistory().back().population == 3);
+        advance(map, citizens, 240, 240);
+        PALADIN_CHECK(citizens.populationHistory().size() == 3);
+        PALADIN_CHECK(citizens.populationHistory().back().gameMinute == 480);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 8);
+        advance(map, citizens, 0, 1);
+        std::set<double> thresholds;
+        for (const auto& c : citizens.citizens())
+        {
+            PALADIN_CHECK(c.foodSeekHunger >= 50 && c.foodSeekHunger < 70);
+            PALADIN_CHECK(c.activity != CitizenActivity::Sleeping);
+            thresholds.insert(c.foodSeekHunger);
+        }
+        PALADIN_CHECK(thresholds.size() > 1);
+        advance(map, citizens, 1, 299);
+        for (const auto& c : citizens.citizens())
+        {
+            PALADIN_CHECK(c.sleptMinutes == 0);
+            PALADIN_CHECK(c.activity != CitizenActivity::Sleeping);
+        }
+        PALADIN_CHECK(seasonAtMinute(0) == Season::Summer);
+        PALADIN_CHECK(seasonAtMinute(4320) == Season::Spring);
+        PALADIN_CHECK(seasonAtMinute(8640) == Season::Autumn);
+        PALADIN_CHECK(seasonAtMinute(12960) == Season::Winter);
+        PALADIN_CHECK(seasonAtMinute(17280) == Season::Summer);
+        PALADIN_CHECK(isNight(60));
+        PALADIN_CHECK(!isNight(720));
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        const auto stockpile =
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+        map.employment().synchronize(map.objectState(), citizens);
+        PALADIN_CHECK(map.employment().adjust(
+            map.employment().forObject(stockpile),
+            1,
+            citizens
+        ));
+        map.activities.policy.setWorkDayHours(14);
+        advance(map, citizens, 9 * 1440 + 1080, 1);
+        PALADIN_CHECK(
+            citizens.citizens().front().task.kind == CitizenTaskKind::Work
+        );
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        advance(map, citizens, 9 * 1440 + 1140, 600);
+        PALADIN_CHECK(citizens.citizens().front().sleptMinutes == 300);
+    }
+    {
+        std::array<double, 4> happiness{};
+        for (int index = 0; index < 4; ++index)
+        {
+            auto map = land();
+            SettlementCitizenState citizens;
+            found(map, citizens, 1);
+            const auto stockpile = completed(
+                map,
+                SettlementObjectTypes::Stockpile,
+                {{12, 12}, 2, 2}
+            );
+            map.employment().synchronize(map.objectState(), citizens);
+            PALADIN_CHECK(map.employment().adjust(
+                map.employment().forObject(stockpile),
+                1,
+                citizens
+            ));
+            SettlementActivityTestFixture::resident(citizens).happiness = 50;
+            map.activities.policy.setWorkDayHours(11 + index);
+            advance(map, citizens, 720, 1);
+            happiness[index] = citizens.citizens().front().happiness;
+        }
+        for (int i = 0; i < 3; ++i)
+            PALADIN_CHECK(
+                std::abs(happiness[i] - happiness[i + 1] - 1.0 / 1440) < 1e-8
+            );
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 8);
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{12, 8}, 3, 3});
+        advance(map, citizens, 720, 1);
+        std::set<double> starts;
+        for (const auto& c : citizens.citizens())
+        {
+            starts.insert(c.sleepStartMinute);
+            PALADIN_CHECK(c.homeId);
+        }
+        PALADIN_CHECK(starts.size() > 1);
+        bool indoorWander = false;
+        bool sleptInside = false;
+        for (int minute = 721; minute < 1740; ++minute)
+        {
+            std::vector<SettlementTilePosition> before;
+            for (const auto& c : citizens.citizens())
+                before.push_back(c.tilePosition);
+            advance(map, citizens, minute, 1);
+            for (std::size_t i = 0; i < citizens.citizens().size(); ++i)
+            {
+                const auto& c = citizens.citizens()[i];
+                PALADIN_CHECK(std::abs(before[i].x - c.tilePosition.x) <= 1);
+                PALADIN_CHECK(std::abs(before[i].y - c.tilePosition.y) <= 1);
+                const auto* home = map.objectState().completedObject(c.homeId);
+                if (home && home->footprint.contains(before[i]) !=
+                                home->footprint.contains(c.tilePosition))
+                {
+                    PALADIN_CHECK(
+                        before[i] == *home->door ||
+                        c.tilePosition == *home->door
+                    );
+                    PALADIN_CHECK(
+                        before[i] ==
+                            outsideDoor(home->footprint, *home->door) ||
+                        c.tilePosition ==
+                            outsideDoor(home->footprint, *home->door)
+                    );
+                }
+            }
+            for (const auto& c : citizens.citizens())
+            {
+                if (c.activity == CitizenActivity::Sleeping)
+                {
+                    PALADIN_CHECK(c.insideHome);
+                    PALADIN_CHECK(map.objectState()
+                                      .completedObject(c.homeId)
+                                      ->footprint.contains(c.tilePosition));
+                    sleptInside = true;
+                }
+                indoorWander |= c.insideHome &&
+                                c.activity == CitizenActivity::AtHome &&
+                                !c.path.empty();
+            }
+        }
+        PALADIN_CHECK(indoorWander);
+        PALADIN_CHECK(sleptInside);
+        for (const auto& c : citizens.citizens())
+            PALADIN_CHECK(c.sleptMinutes == 300);
+    }
     std::cout << "Checking physical storage and exclusive reservations...\n";
     {
         auto map = land();
@@ -151,7 +323,7 @@ void runSettlementSimulationLoopTests()
             {{8, 6}, 1, 1},
             citizens
         ));
-        advance(map, citizens, 480, 120);
+        advance(map, citizens, 360, 120);
         PALADIN_CHECK(
             map.naturalFeatures().at({8, 5}).kind == NaturalFeatureKind::None
         );
@@ -165,7 +337,12 @@ void runSettlementSimulationLoopTests()
             *SettlementObjectCatalog::definition(SettlementObjectTypes::Road),
             {{7, 12}, 3, 1}
         ));
-        advance(map, citizens, 600, 100);
+        map.logistics.synchronize(map.objectState(), 480);
+        for (const auto& site : map.objectState().constructionSites())
+        {
+            PALADIN_CHECK(!map.logistics.forSite(site.id));
+        }
+        advance(map, citizens, 480, 100);
         PALADIN_CHECK(map.objectState().constructionSites().empty());
         for (int x = 7; x < 10; ++x)
         {
@@ -177,10 +354,11 @@ void runSettlementSimulationLoopTests()
             *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
             {{12, 5}, 3, 3}
         ));
-        advance(map, citizens, 700, 240);
+        advance(map, citizens, 580, 240);
         PALADIN_CHECK(map.objectState().constructionSites().empty());
         PALADIN_CHECK(map.objectState().completedObjectAt({12, 5}));
-        PALADIN_CHECK(allGoods(map, citizens, "lumber") == 40);
+        PALADIN_CHECK(allGoods(map, citizens, "lumber") == 28);
+        PALADIN_CHECK(allGoods(map, citizens, "stone") == 36);
         PALADIN_CHECK(
             std::count_if(
                 citizens.citizens().begin(),
@@ -188,12 +366,15 @@ void runSettlementSimulationLoopTests()
                 [](const auto& c) { return bool(c.homeId); }
             ) == 4
         );
-        advance(map, citizens, 960, 160);
+        advance(map, citizens, 1080, 160);
         for (const auto& c : citizens.citizens())
         {
             if (c.homeId)
             {
-                PALADIN_CHECK(c.activity == CitizenActivity::AtHome);
+                PALADIN_CHECK(c.insideHome);
+                PALADIN_CHECK(map.objectState()
+                                  .completedObject(c.homeId)
+                                  ->footprint.contains(c.tilePosition));
             }
         }
         const auto lumber = allGoods(map, citizens, "lumber");
@@ -203,9 +384,50 @@ void runSettlementSimulationLoopTests()
             {{7, 12}, 1, 1},
             citizens
         ));
-        advance(map, citizens, 1920, 80);
+        advance(map, citizens, 1240, 480);
         PALADIN_CHECK(!map.objectState().completedObjectAt({7, 12}));
         PALADIN_CHECK(allGoods(map, citizens, "lumber") == lumber);
+    }
+    // Equal on-site time must contribute equal labor for every builder.
+    for (int workers : {1, 4})
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, workers);
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(),
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
+            {{12, 12}, 3, 3}
+        ));
+        const auto site = map.objectState().constructionSites().front().id;
+        PALADIN_CHECK(map.objectState().deliverMaterials(site, "lumber", 16));
+        PALADIN_CHECK(map.objectState().deliverMaterials(site, "stone", 8));
+        map.logistics.synchronize(map.objectState(), 0);
+        for (int i = 0; i < workers; ++i)
+        {
+            SettlementActivityTestFixture::resident(citizens, i)
+                .tilePosition = {12, 12};
+        }
+        advance(map, citizens, 360, 5);
+        PALADIN_CHECK(
+            std::abs(
+                map.objectState().constructionSite(site)->laborMinutes -
+                workers * 5.0
+            ) < 0.001
+        );
+        PALADIN_CHECK(
+            std::count_if(
+                citizens.citizens().begin(),
+                citizens.citizens().end(),
+                [](const auto& citizen)
+                { return citizen.task.kind == CitizenTaskKind::Build; }
+            ) == workers
+        );
+        advance(map, citizens, 365, 20);
+        PALADIN_CHECK(
+            bool(map.objectState().completedObjectAt({12, 12})) ==
+            (workers == 4)
+        );
     }
     std::cout
         << "Checking hunger, physical pickup, starvation and recovery...\n";
@@ -216,23 +438,24 @@ void runSettlementSimulationLoopTests()
         auto& c = SettlementActivityTestFixture::resident(citizens);
         c.tilePosition = {25, 25};
         c.hunger = 50;
+        c.foodSeekHunger = 50;
         advance(map, citizens, 480, 1);
         PALADIN_CHECK(c.hunger >= 50);
         PALADIN_CHECK(map.logistics.total("fish") == 20);
         advance(map, citizens, 481, 180);
-        PALADIN_CHECK(c.hunger < 10);
+        PALADIN_CHECK(c.hunger < 20);
         PALADIN_CHECK(map.logistics.total("fish") == 19);
         emptyFood(map);
         c.hunger = 75;
         c.health = 100;
-        advance(map, citizens, 700, 360);
+        advance(map, citizens, 700, 180);
         PALADIN_CHECK(std::abs(c.hunger - 87.5) < 1e-6);
         PALADIN_CHECK(std::abs(c.health - 75) < 1e-6);
         PALADIN_CHECK(c.happiness < 100);
         c.carriedResource = "lumber";
         c.carriedAmount = 4;
         const double lumber = allGoods(map, citizens, "lumber");
-        advance(map, citizens, 1060, 361);
+        advance(map, citizens, 880, 181);
         PALADIN_CHECK(citizens.citizens().empty());
         PALADIN_CHECK(map.logistics.total("lumber") == lumber);
         PALADIN_CHECK(!map.logistics.reservation(CitizenId{1}));
@@ -287,7 +510,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(worker.hunger < 50);
         PALADIN_CHECK(worker.task.kind == CitizenTaskKind::Work);
         PALADIN_CHECK(map.logistics.total("fish") > 0);
-        advance(map, citizens, 960, 2);
+        advance(map, citizens, 1080, 2);
         PALADIN_CHECK(worker.task.kind != CitizenTaskKind::Work);
     }
     std::cout << "Checking cancellation preserves delivered and carried "
@@ -363,6 +586,33 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.inventory(store)->amount("lumber") == 4);
         PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 44);
     }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        const auto object =
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+        map.employment().synchronize(map.objectState(), citizens);
+        const auto job = map.employment().forObject(object);
+        PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
+        auto& laborer = SettlementActivityTestFixture::resident(citizens, 1);
+        laborer.tilePosition = {11, 12};
+        const auto pile = map.logistics.drop({11, 12}, "lumber", 4, 1200);
+        advance(map, citizens, 1200, 20);
+        PALADIN_CHECK(!map.logistics.inventory(pile));
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(object))
+                ->amount("lumber") == 4
+        );
+        PALADIN_CHECK(
+            SettlementActivityTestFixture::resident(citizens).task.kind !=
+            CitizenTaskKind::Work
+        );
+        PALADIN_CHECK(!map.activities.policy.isWorkTime(359));
+        PALADIN_CHECK(map.activities.policy.isWorkTime(360));
+        PALADIN_CHECK(map.activities.policy.isWorkTime(1079));
+        PALADIN_CHECK(!map.activities.policy.isWorkTime(1080));
+    }
     std::cout
         << "Checking distant construction materials and fed recovery...\n";
     {
@@ -382,7 +632,9 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.inventory(pile)->amount("lumber") == 4);
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
-            *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
+            *SettlementObjectCatalog::definition(
+                SettlementObjectTypes::Stockpile
+            ),
             {{51, 12}, 3, 3}
         ));
         advance(map, citizens, 570, 370);

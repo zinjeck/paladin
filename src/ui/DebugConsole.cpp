@@ -1,4 +1,5 @@
 #include "ui/DebugConsole.h"
+#include "ui/GrayUiRenderer.h"
 #include <algorithm>
 #include <cmath>
 namespace Paladin
@@ -40,14 +41,17 @@ void DebugConsole::reset()
 }
 void DebugConsole::layout(int width, int height)
 {
-    const float w = std::min(560.f, float(width) * .46f),
-                h = std::max(100.f, float(height) - 210);
+    const float w = std::min(360.f, float(width) * .32f),
+                h = std::clamp(float(height) - 210, 140.f, 420.f);
     if (panel_.width != w)
     {
         dirty_ = true;
     }
     panel_ = {0, 110, w, h};
-    inputBox_ = {8, 110 + h - 38, w - 16, 30};
+    inputBox_ = {8, 110 + h - 72, w - 16, 30};
+    spawnBounds_ = {8, inputBox_.y + 36, w - 16, 28};
+    spawnButton_.setBounds(spawnBounds_);
+    spawnButton_.setSkinId("debug-spawn-citizen");
     statsBox_ = {
         float(width) - std::min(420.f, float(width) * .36f),
         110,
@@ -192,6 +196,24 @@ bool DebugConsole::handle(const SDL_Event& e)
             dragging_ = false;
         }
         return true;
+    }
+    if (open_ && e.type == SDL_EVENT_MOUSE_MOTION)
+        spawnButton_.pointerMoved(e.motion.x, e.motion.y);
+    if (open_ && e.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+        e.button.button == SDL_BUTTON_LEFT &&
+        spawnButton_.pointerPressed(e.button.x, e.button.y))
+    {
+        dragging_ = false;
+        return true;
+    }
+    if (open_ && e.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+        e.button.button == SDL_BUTTON_LEFT)
+    {
+        if (spawnButton_.pointerReleased(e.button.x, e.button.y))
+        {
+            command_ = "spawncitizens 1";
+            return true;
+        }
     }
     if (e.type == SDL_EVENT_MOUSE_WHEEL)
     {
@@ -396,7 +418,11 @@ bool DebugConsole::handle(const SDL_Event& e)
     }
     return true;
 }
-void DebugConsole::render(Renderer& r, std::string_view stats)
+void DebugConsole::render(
+    Renderer& r,
+    std::string_view stats,
+    const GrayUiRenderer& ui
+)
 {
     const auto box = [&](UiRectangle b, RenderColor c)
     { r.fillRectangle(b.x, b.y, b.width, b.height, c); };
@@ -410,7 +436,7 @@ void DebugConsole::render(Renderer& r, std::string_view stats)
             outputLines_ = wrap(output_, panel_.width - 20);
             dirty_ = false;
         }
-        const int visible = std::max(1, int((panel_.height - 54) / 24));
+        const int visible = std::max(1, int((panel_.height - 88) / 24));
         scroll_ = std::clamp(
             scroll_,
             0,
@@ -450,6 +476,15 @@ void DebugConsole::render(Renderer& r, std::string_view stats)
                 y
             );
         }
+        spawnButton_.render(r, ui);
+        const std::string_view spawnText = "Spawn citizen";
+        font_.drawText(
+            r,
+            spawnText,
+            spawnBounds_.x +
+                (spawnBounds_.width - font_.measureWidth(spawnText)) * .5F,
+            spawnBounds_.y + 3
+        );
         box(inputBox_, {27, 28, 32, 255});
         if (inputFocus_)
         {
@@ -519,8 +554,26 @@ void DebugConsole::render(Renderer& r, std::string_view stats)
             statsBox_.y,
             {30, 145, 230, 180}
         );
-        box({statsBox_.x + 2, statsBox_.y + 2, 28, 26}, {10, 40, 65, 220});
-        box({statsBox_.x + 34, statsBox_.y + 2, 28, 26}, {10, 40, 65, 220});
+        if (!ui.drawButtonSprite(
+                r,
+                {statsBox_.x + 2, statsBox_.y + 2, 28, 26},
+                "debug-minimize",
+                false,
+                false,
+                minimized_,
+                true
+            ))
+            box({statsBox_.x + 2, statsBox_.y + 2, 28, 26}, {10, 40, 65, 220});
+        if (!ui.drawButtonSprite(
+                r,
+                {statsBox_.x + 34, statsBox_.y + 2, 28, 26},
+                "debug-close",
+                false,
+                false,
+                false,
+                true
+            ))
+            box({statsBox_.x + 34, statsBox_.y + 2, 28, 26}, {10, 40, 65, 220});
         font_.drawText(
             r,
             minimized_ ? "+" : "-",

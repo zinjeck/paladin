@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 
 #include "core/StrongId.h"
 #include "simulation/systems/SettlementActivitySystem.h"
@@ -31,7 +32,11 @@ namespace Paladin
         Hauling,
         Constructing,
         ReturningHome,
-        AtHome
+        AtHome,
+        Sleeping,
+        OnBreak,
+        Talking,
+        Fishing
     };
 
     struct CitizenIdlePolicy
@@ -78,6 +83,24 @@ namespace Paladin
         std::vector<CitizenRouteFailure> routeFailures;
         double health = 100;
         double hunger = 0;
+        double foodSeekHunger = -1;
+        std::uint64_t mealSequence = 0;
+        double sleptMinutes = 0;
+        std::int64_t sleepCycle = -1;
+        double sleepStartMinute = 0;
+        double nextHomeWander = 0;
+        std::int64_t breakDay = -1;
+        double breakDue = 0;
+        double breakUntil = 0;
+        bool breakTaken = false;
+        bool breakReturning = false;
+        WorkplaceId breakEmployer;
+        SettlementObjectId breakObject;
+        SettlementTilePosition breakAnchor{-1, -1};
+        double nextBreakWander = 0;
+        double nextSocialMinute = 0;
+        bool insideHome = false;
+        SettlementTilePosition homeEntrance{-1, -1};
         double happiness = 100;
         double homelessMinutes = 0;
         SettlementObjectId homeId;
@@ -91,6 +114,12 @@ namespace Paladin
         double visualY() const noexcept;
     };
 
+    struct PopulationSample
+    {
+        double gameMinute = 0;
+        std::size_t population = 0;
+    };
+
     class SettlementCitizenState
     {
     public:
@@ -101,6 +130,11 @@ namespace Paladin
         );
 
         bool spawn(std::uint64_t count);
+        void recordPopulation(double minute);
+        const std::deque<PopulationSample>& populationHistory() const noexcept
+        {
+            return populationHistory_;
+        }
         const SettlementNavigation& navigationDiagnostics() const noexcept
         {
             return navigation_;
@@ -143,6 +177,7 @@ namespace Paladin
         friend class SettlementEmploymentState;
         friend class SettlementActivitySystem;
         friend struct SettlementActivityTestFixture;
+        std::deque<PopulationSample> populationHistory_;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;

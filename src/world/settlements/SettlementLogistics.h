@@ -4,6 +4,7 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Paladin
@@ -35,6 +36,7 @@ struct SettlementInventory
     int capacity = 0;
     double createdMinute = 0;
     std::vector<ResourceAmount> goods;
+    std::vector<ResourceAmount> resourceLimits;
     int amount(std::string_view resource) const;
     int used() const;
 };
@@ -70,6 +72,7 @@ class SettlementLogistics
     );
     int available(InventoryId id, std::string_view resource) const;
     int freeSpace(InventoryId id) const;
+    int receivable(InventoryId id, std::string_view resource) const;
     bool add(
         InventoryId id,
         std::string_view resource,
@@ -100,6 +103,14 @@ class SettlementLogistics
     }
 
   private:
+    void synchronizeIndexes() const;
+    mutable std::size_t indexedSize_ = 0;
+    mutable std::unordered_map<InventoryId, std::size_t, StrongIdHash>
+        inventoryIndex_;
+    mutable std::unordered_map<SettlementObjectId, InventoryId, StrongIdHash>
+        objectIndex_;
+    mutable std::unordered_map<ConstructionSiteId, InventoryId, StrongIdHash>
+        siteIndex_;
     SettlementInventory* edit(InventoryId id);
     void change(
         SettlementInventory& inventory,

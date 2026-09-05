@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/UiTooltip.h"
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,6 +11,8 @@
 
 #include <memory>
 #include <optional>
+
+union SDL_Event;
 
 namespace Paladin
 {
@@ -60,6 +63,8 @@ namespace Paladin
         void enterPlayerCapitalCity();
         void executeConsoleCommand(std::string_view text);
         void renderDebug();
+        void renderCityTooltip();
+        UiTooltip tooltip_;
         void returnToWorldFromCity();
 
         void cancelFoundingFlow();
@@ -132,6 +137,9 @@ namespace Paladin
             defaultCameraNavigationPolicy();
         double edgeScrollDwellSeconds_ = 0.0;
         bool movingCapital_ = false;
+        bool foundingAdditionalSettlement_ = false;
+        bool handleWorldManagement(const SDL_Event& event);
+        void renderWorldManagement();
         std::unique_ptr<Camera2D> savedWorldCamera_;
         SettlementId activeCitySettlementId_;
         bool cityHudCapturedPointer_ = false;
