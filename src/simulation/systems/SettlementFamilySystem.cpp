@@ -160,8 +160,14 @@ namespace Paladin
             }
         }
         std::vector<std::pair<CitizenId, CitizenId>> births;
-        const double chance = std::clamp(policy.dailyBirthChance, 0.0, 1.0);
-        const double hazard = chance >= 1 ? 1 : -std::log1p(-chance) / 1440;
+        const double chance =
+            std::isfinite(policy.dailyBirthChance)
+                ? std::clamp(policy.dailyBirthChance, 0.0, 1.0)
+                : 0;
+        // Convert daily probability to a timestep-independent hazard.
+        const double hazard = chance >= 1
+                                  ? std::numeric_limits<double>::infinity()
+                                  : -std::log1p(-chance) / 1440;
         for (auto& mother : people)
         {
             if (mother.child || mother.sex != CitizenSex::Female ||
@@ -211,8 +217,8 @@ namespace Paladin
                 mother.fertilityTarget = -std::log(u);
             }
             mother.fertilityExposure += hazard * dt;
-            if (chance > 0 && (chance >= 1 || mother.fertilityExposure >=
-                                                  mother.fertilityTarget))
+            if (hazard > 0 &&
+                mother.fertilityExposure >= mother.fertilityTarget)
             {
                 births.emplace_back(mother.id, father.id);
                 mother.fertilityExposure = 0;

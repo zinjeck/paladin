@@ -50,7 +50,8 @@ namespace Paladin
     };
     struct CitizenSimulationPolicy
     {
-        double dailyBirthChance = .03;
+        // Probability per full day of eligible time for each mother.
+        double dailyBirthChance = .05;
         double childMaturationMinutes = 3 * 1440;
         double adultYearMinutes = 12 * 1440;
         std::uint16_t adulthoodAge = 18;
