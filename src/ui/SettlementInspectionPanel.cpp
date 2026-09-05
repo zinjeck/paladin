@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <string>
 
 namespace Paladin
@@ -89,14 +90,20 @@ namespace Paladin
         const SettlementCitizen* citizen =
             controller.selectedCitizen(citizenState);
 
-        if (!object && !constructionSite && !citizen)
+        const auto* pile =
+            controller.selectedInventory(settlementMap.logistics);
+        if (pile && pile->used() <= 0)
+        {
+            pile = nullptr;
+        }
+        if (!object && !constructionSite && !citizen && !pile)
         {
             clearLayout();
             return;
         }
 
         const SettlementObjectDefinition* definition = nullptr;
-        if (!citizen)
+        if (!citizen && !pile)
         {
             const std::string_view objectTypeId = object
                 ? std::string_view(object->objectTypeId)
@@ -110,11 +117,11 @@ namespace Paladin
             }
         }
 
-        const SettlementObjectFootprint footprint = citizen
-            ? SettlementObjectFootprint{citizen->tilePosition, 1, 1}
-            : object
-                ? object->footprint
-                : constructionSite->footprint;
+        const SettlementObjectFootprint footprint =
+            citizen  ? SettlementObjectFootprint{citizen->tilePosition, 1, 1}
+            : pile   ? pile->footprint
+            : object ? object->footprint
+                     : constructionSite->footprint;
 
         float constructionPanelHeight = 0.0F;
 
@@ -142,7 +149,20 @@ namespace Paladin
             workplaceId_ = selectedWorkplace;
         }
         const auto* workplace = settlementMap.employment().workplace(workplaceId_);
-        const float detailsHeight = citizen ? 92.0F : workplace ? 78.0F : 0.0F;
+        const auto* inventory =
+            pile     ? pile
+            : object ? settlementMap.logistics.inventory(
+                           settlementMap.logistics.forObject(object->id)
+                       )
+                     : nullptr;
+        const bool house =
+            object && object->objectTypeId == SettlementObjectTypes::House;
+        const float storageHeight =
+            inventory ? 34.0F + float(inventory->goods.size()) * 22
+            : house   ? 36.0F
+                      : 0;
+        const float detailsHeight =
+            citizen ? 300.0F : (workplace ? 78.0F : 0.0F) + storageHeight;
         const float totalHeight = objectPanelHeight
             + constructionPanelHeight + detailsHeight;
 
@@ -166,9 +186,11 @@ namespace Paladin
         grayUiRenderer.drawPanel(renderer, renderedBounds_);
 
         constexpr float preferredNamePixelSize = 3.0F;
-        const std::string_view title = citizen
-            ? std::string_view(citizen->name)
-            : workplace ? std::string_view(workplace->name) : definition->displayName;
+        const std::string_view title = citizen ? std::string_view(citizen->name)
+                                       : pile  ? std::string_view("Groundpile")
+                                       : workplace
+                                           ? std::string_view(workplace->name)
+                                           : definition->displayName;
         const float objectNamePixelSize = std::min(preferredNamePixelSize,
             (renderedBounds_.width - 24) / std::max(1.0F, float(title.size()) * 6 - 1));
         const float objectNameWidth = retroFontRenderer_.measureWidth(
@@ -198,17 +220,109 @@ namespace Paladin
         if (citizen)
         {
             const auto* job = settlementMap.employment().workplace(citizen->workplaceId);
-            const std::array<std::string, 3> rows{
-                "Age: " + std::to_string(citizen->ageYears),
-                std::string("Sex: ") + (citizen->sex == CitizenSex::Male ? "Male" : "Female"),
-                "Job: " + (job ? job->name : std::string("Unemployed"))
-            };
-            for (std::size_t i = 0; i < rows.size(); ++i)
+            const auto label = [&](const std::string& text, float y)
             {
-                const float scale = std::min(2.0F, (renderedBounds_.width - 26) /
-                    std::max(1.0F, float(rows[i].size()) * 6 - 1));
-                grayUiRenderer.drawLabel(renderer, rows[i], renderedBounds_.x + 13,
-                    renderedBounds_.y + 56 + float(i) * 27, scale);
+                const float scale = std::min(
+                    1.7F,
+                    (renderedBounds_.width - 26) /
+                        std::max(1.0F, float(text.size()) * 6 - 1)
+                );
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    text,
+                    renderedBounds_.x + 13,
+                    renderedBounds_.y + y,
+                    scale
+                );
+            };
+            label("Age: " + std::to_string(citizen->ageYears), 56);
+            const auto meter =
+                [&](const char* name, double value, float y, bool hunger)
+            {
+                const float fraction = float(std::clamp(value / 100, 0.0, 1.0));
+                const float severity = hunger ? fraction : 1 - fraction;
+                constexpr std::array<RenderColor, 4> colors{
+                    {{75, 191, 84, 255},
+                     {226, 200, 61, 255},
+                     {235, 138, 44, 255},
+                     {220, 53, 49, 255}}
+                };
+                const float progress = severity * 3;
+                const int index = std::min(2, int(progress));
+                const float t = progress - index;
+                const auto blend = [&](std::uint8_t a, std::uint8_t b)
+                { return std::uint8_t(float(a) + (float(b) - a) * t); };
+                const RenderColor color{
+                    blend(colors[index].red, colors[index + 1].red),
+                    blend(colors[index].green, colors[index + 1].green),
+                    blend(colors[index].blue, colors[index + 1].blue),
+                    255
+                };
+                const float x = renderedBounds_.x + 13;
+                const float top = renderedBounds_.y + y;
+                const float width = renderedBounds_.width - 26;
+                renderer.fillRectangle(
+                    x - 1,
+                    top - 1,
+                    width + 2,
+                    24,
+                    {30, 30, 31, 255}
+                );
+                renderer.fillRectangle(
+                    x,
+                    top,
+                    width,
+                    22,
+                    {std::uint8_t(color.red * .32F),
+                     std::uint8_t(color.green * .32F),
+                     std::uint8_t(color.blue * .32F),
+                     255}
+                );
+                renderer.fillRectangle(
+                    x + (hunger ? 0 : width * (1 - fraction)),
+                    top,
+                    width * fraction,
+                    22,
+                    color
+                );
+                const auto text = std::string(name) + ": " +
+                                  std::to_string(int(std::round(value))) + "%";
+                retroFontRenderer_.drawText(
+                    renderer,
+                    text,
+                    x + 7,
+                    top + 5,
+                    1.5F,
+                    {245, 245, 245, 255}
+                );
+            };
+            meter("Health", citizen->health, 83, false);
+            meter("Hunger", citizen->hunger, 113, true);
+            meter("Happiness", citizen->happiness, 143, false);
+            label(
+                std::string("Sex: ") +
+                    (citizen->sex == CitizenSex::Male ? "Male" : "Female"),
+                180
+            );
+            label("Job: " + (job ? job->name : std::string("Unemployed")), 208);
+            label(citizen->homeId ? "Home: House" : "Home: Homeless", 236);
+            label(
+                std::string("Activity: ") +
+                    SettlementActivitySystem::activityLabel(*citizen),
+                264
+            );
+            if (citizen->carriedAmount > 0)
+            {
+                const auto* definition = SettlementResourceCatalog::definition(
+                    citizen->carriedResource
+                );
+                label(
+                    "Carrying: " + std::to_string(citizen->carriedAmount) +
+                        " " +
+                        (definition ? std::string(definition->displayName)
+                                    : citizen->carriedResource),
+                    292
+                );
             }
         }
         if (workplace)
@@ -229,6 +343,48 @@ namespace Paladin
                 nameField_.focused() ? "Enter saves / Escape cancels"
                     : workplace->operational ? "Workplace ready" : "Awaiting construction",
                 renderedBounds_.x + 13, renderedBounds_.y + 98, 1.25F);
+        }
+        if (inventory)
+        {
+            float y = renderedBounds_.y + (workplace ? 138 : 60);
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Storage: " + std::to_string(inventory->used()) + "/" +
+                    std::to_string(inventory->capacity),
+                renderedBounds_.x + 13,
+                y,
+                1.5F
+            );
+            for (const auto& goods : inventory->goods)
+            {
+                y += 22;
+                const auto* resource =
+                    SettlementResourceCatalog::definition(goods.resource);
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    (resource ? std::string(resource->displayName)
+                              : goods.resource) +
+                        ": " + std::to_string(goods.amount),
+                    renderedBounds_.x + 13,
+                    y,
+                    1.5F
+                );
+            }
+        }
+        else if (house)
+        {
+            const auto count = std::count_if(
+                citizenState.citizens().begin(),
+                citizenState.citizens().end(),
+                [&](const auto& c) { return c.homeId == object->id; }
+            );
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Residents: " + std::to_string(count) + "/4",
+                renderedBounds_.x + 13,
+                renderedBounds_.y + 60,
+                1.5F
+            );
         }
         if (!constructionSite) return;
 

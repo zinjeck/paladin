@@ -6,13 +6,13 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::array<SettlementResourceDefinition, 4>
-            resourceDefinitions{{
-                {SettlementResourceTypes::Food, "Food"},
-                {SettlementResourceTypes::Materials, "Materials"},
-                {SettlementResourceTypes::Stone, "Stone"},
-                {SettlementResourceTypes::Lumber, "Lumber"}
-            }};
+    constexpr std::array<SettlementResourceDefinition, 5> resourceDefinitions{
+        {{SettlementResourceTypes::Fish, "Fish", true},
+         {SettlementResourceTypes::Food, "Food", true},
+         {SettlementResourceTypes::Materials, "Materials"},
+         {SettlementResourceTypes::Stone, "Stone"},
+         {SettlementResourceTypes::Lumber, "Lumber"}}
+    };
     }
 
 

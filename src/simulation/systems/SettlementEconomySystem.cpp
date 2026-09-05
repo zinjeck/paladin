@@ -29,6 +29,11 @@ namespace Paladin
             SettlementSimulationState& state =
                 settlement->simulationState();
 
+            if (state.hasLocalMap())
+            {
+                continue;
+            }
+
             state.economy().simulate(
                 state.stockpile(),
                 state.population().residents(),

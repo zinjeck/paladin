@@ -93,6 +93,8 @@ std::size_t SettlementCommandState::cancelIntersecting(
 )
 {
     std::size_t removed = map.objectState().cancelConstructionWithin(area);
+    if (removed)
+        map.logistics.synchronize(map.objectState(), 0);
     if (removed) map.employment().synchronize(map.objectState(), citizens);
     for (auto& command : commands_)
     {

@@ -233,13 +233,11 @@ namespace Paladin
     {
         const SettlementObjectState& state = settlementMap.objectState();
 
-        if (
-            cachedState_ != &state ||
-            cachedVersion_ != state.presentationVersion()
-        )
+        if (cachedState_ != &state ||
+            cachedVersion_ != state.navigationVersion())
         {
             cachedState_ = &state;
-            cachedVersion_ = state.presentationVersion();
+            cachedVersion_ = state.navigationVersion();
 
             std::vector<RenderColor> pixels(
                 settlementMap.grid().tileCount(),

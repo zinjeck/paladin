@@ -113,8 +113,11 @@ namespace Paladin
         for (std::size_t scan = 0; scan < count; ++scan)
         {
             auto& citizen = citizens_[decisionCursor_++ % citizens_.size()];
-            if (!map.grid().isValidPosition(citizen.tilePosition)
-                || citizen.activity != CitizenActivity::Idle || !citizen.path.empty()) continue;
+            if (!map.grid().isValidPosition(citizen.tilePosition) ||
+                citizen.activity != CitizenActivity::Idle ||
+                citizen.task.kind != CitizenTaskKind::None ||
+                !citizen.path.empty())
+                continue;
             const auto random = [&](std::uint64_t salt)
             {
                 return (GenerationNoise::mix(behaviorSeed_ ^ (citizen.id.value() * 104729)

@@ -11,6 +11,7 @@ namespace Paladin
         // Player goods will come from concrete tasks/production, not passive
         // per-resident placeholder flows.
         profile.resourceFlowRates.clear();
+        profile.initialResources.clear();
         // Aggregate births/deaths would invent residents without citizen records.
         // A later lifecycle system will create/remove both together.
         profile.demographicRates = {0, 0, 0, 0, 0};

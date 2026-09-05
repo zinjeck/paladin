@@ -2,6 +2,7 @@
 
 #include "core/StrongId.h"
 #include "world/SettlementTilePosition.h"
+#include "world/settlements/SettlementLogistics.h"
 
 namespace Paladin
 {
@@ -16,20 +17,30 @@ namespace Paladin
         None,
         CompletedObject,
         ConstructionSite,
-        Citizen
+        Citizen,
+        Groundpile
     };
 
     class SettlementInspectionController
     {
     public:
-        [[nodiscard]]
-        bool selectAt(
-            SettlementTilePosition position,
-            const SettlementObjectState& objectState,
-            const SettlementCitizenState& citizenState,
-            bool placePanelOnRight
-        ) noexcept;
+      [[nodiscard]]
+      bool selectAt(
+          SettlementTilePosition position,
+          const SettlementObjectState& objectState,
+          const SettlementCitizenState& citizenState,
+          bool placePanelOnRight,
+          const SettlementLogistics* logistics = nullptr
+      ) noexcept;
 
+      const SettlementInventory* selectedInventory(
+          const SettlementLogistics& logistics
+      ) const
+      {
+          return kind_ == SettlementInspectionKind::Groundpile
+                     ? logistics.inventory(inventoryId_)
+                     : nullptr;
+      }
         void clear() noexcept;
         void selectWorkplace(SettlementObjectId object, ConstructionSiteId site) noexcept
         {
@@ -67,6 +78,7 @@ namespace Paladin
         SettlementObjectId objectId_;
         ConstructionSiteId constructionSiteId_;
         CitizenId citizenId_;
+        InventoryId inventoryId_;
         bool placePanelOnRight_ = true;
     };
 }

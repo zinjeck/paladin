@@ -1,6 +1,7 @@
 #pragma once
 #include "core/StrongId.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/objects/jobs/WorkplaceDefinition.h"
 #include <deque>
 #include <span>
 #include <string>
@@ -9,15 +10,6 @@ namespace Paladin
 {
 class SettlementMap;
 class SettlementCitizenState;
-struct WorkplaceDefinition
-{
-    std::string_view objectTypeId;
-    std::uint32_t minimumCapacity;
-    std::uint32_t workersPerReferenceArea;
-    std::uint32_t referenceArea;
-};
-std::span<const WorkplaceDefinition> workplaceDefinitions() noexcept;
-const WorkplaceDefinition* workplaceDefinition(std::string_view type) noexcept;
 struct Workplace
 {
     WorkplaceId id;
@@ -36,14 +28,6 @@ struct UnemploymentSample
     double gameMinute = 0;
     double unemployedPercent = 100;
 };
-struct WorkplaceBehaviorPolicy
-{
-    int shiftStartMinute = 8 * 60;
-    int shiftEndMinute = 17 * 60;
-    double retryMinutes = 5;
-    std::size_t attendanceChecksPerTick = 32;
-    std::size_t pathRequestsPerTick = 1;
-};
 class SettlementEmploymentState
 {
   public:
@@ -61,6 +45,7 @@ class SettlementEmploymentState
     ) const noexcept;
     std::size_t unemployed(const SettlementCitizenState&) const noexcept;
     bool adjust(WorkplaceId, int delta, SettlementCitizenState&);
+    void citizenDeparted(WorkplaceId);
     bool adjustType(std::string_view, int delta, SettlementCitizenState&);
     bool rename(WorkplaceId, std::string_view);
     void record(double minute, const SettlementCitizenState&);
@@ -68,18 +53,11 @@ class SettlementEmploymentState
     {
         return history_;
     }
-    void tickAttendance(
-        const SettlementMap&,
-        SettlementCitizenState&,
-        double minute
-    );
-    WorkplaceBehaviorPolicy behaviorPolicy;
 
   private:
     std::vector<Workplace> workplaces_;
     IdGenerator<WorkplaceId> ids_;
     std::uint64_t objectVersion_ = ~std::uint64_t(0);
     std::deque<UnemploymentSample> history_;
-    std::size_t attendanceCursor_ = 0;
 };
 } // namespace Paladin

@@ -84,6 +84,13 @@ namespace Paladin
         bool isInitialized() const noexcept;
 
         bool spawnCitizens(std::uint64_t count);
+        void synchronizeCitizenPopulation()
+        {
+            population_.applyNetChange(
+                double(citizens_.citizens().size()) -
+                double(population_.residents())
+            );
+        }
 
         [[nodiscard]]
         SettlementPopulation& population() noexcept;

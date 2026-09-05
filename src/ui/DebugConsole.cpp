@@ -49,9 +49,9 @@ void DebugConsole::layout(int width, int height)
     panel_ = {0, 110, w, h};
     inputBox_ = {8, 110 + h - 38, w - 16, 30};
     statsBox_ = {
-        float(width) - std::min(650.f, float(width) * .51f),
+        float(width) - std::min(420.f, float(width) * .36f),
         110,
-        std::min(650.f, float(width) * .51f),
+        std::min(420.f, float(width) * .36f),
         minimized_ ? 32.f : h
     };
 }

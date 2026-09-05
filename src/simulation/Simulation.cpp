@@ -80,18 +80,24 @@ namespace Paladin
             return;
         }
 
-        if (Settlement* settlement = world_->settlement(detailedSimulationSettlementId_))
         {
             ScopedTiming citizenTimer{citizenTiming};
-            auto& state = settlement->simulationState();
-            if (auto* map = settlementMap(detailedSimulationSettlementId_))
+            for (auto& settlement : world_->settlements())
             {
-                map->employment().synchronize(map->objectState(), state.citizens());
-                map->employment().tickAttendance(*map, state.citizens(),
-                    world_->time().totalGameMinutes() + pendingGameMinutes_);
-                state.citizens().tickMovement(*map, gameDeltaMinutes);
-                map->employment().record(world_->time().totalGameMinutes(), state.citizens());
-                map->commandState().pruneInvalid(*map, state.citizens());
+                auto& state = settlement.simulationState();
+                if (auto* map = settlementMap(settlement.id()))
+                {
+                    map->activities.tick(
+                        *map,
+                        state.citizens(),
+                        world_->time().totalGameMinutes() + pendingGameMinutes_,
+                        gameDeltaMinutes
+                    );
+                    if (map->logistics.founded())
+                    {
+                        state.synchronizeCitizenPopulation();
+                    }
+                }
             }
         }
 

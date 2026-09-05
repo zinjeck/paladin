@@ -1,11 +1,13 @@
 #pragma once
 
+#include "simulation/systems/SettlementActivitySystem.h"
 #include "world/SettlementGrid.h"
-#include "world/settlements/SettlementEmploymentState.h"
-#include "world/settlements/SettlementNaturalFeatures.h"
 #include "world/WorldTilePosition.h"
-#include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/SettlementEmploymentState.h"
+#include "world/settlements/SettlementLogistics.h"
+#include "world/settlements/SettlementNaturalFeatures.h"
 #include "world/settlements/commands/SettlementCommandState.h"
+#include "world/settlements/objects/SettlementObjectState.h"
 
 #include <cstdint>
 
@@ -75,17 +77,20 @@ namespace Paladin
         SettlementEmploymentState& employment() noexcept { return employment_; }
         const SettlementEmploymentState& employment() const noexcept { return employment_; }
 
-    private:
-      const std::uint64_t instanceId_;
-      SettlementEmploymentState employment_;
-      SettlementGrid grid_;
-      SettlementNaturalFeatures naturalFeatures_;
-      SettlementObjectState objectState_;
-      SettlementCommandState commandState_;
-      WorldTilePosition sourceRegionCenter_;
-      std::int32_t sourceRegionWidth_ = 0;
-      std::int32_t sourceRegionHeight_ = 0;
-      std::int32_t localTilesPerWorldTile_ = 0;
-      std::uint64_t generationSeed_ = 0;
+        SettlementLogistics logistics;
+        SettlementActivitySystem activities;
+
+      private:
+        const std::uint64_t instanceId_;
+        SettlementEmploymentState employment_;
+        SettlementGrid grid_;
+        SettlementNaturalFeatures naturalFeatures_;
+        SettlementObjectState objectState_;
+        SettlementCommandState commandState_;
+        WorldTilePosition sourceRegionCenter_;
+        std::int32_t sourceRegionWidth_ = 0;
+        std::int32_t sourceRegionHeight_ = 0;
+        std::int32_t localTilesPerWorldTile_ = 0;
+        std::uint64_t generationSeed_ = 0;
     };
 }

@@ -29,9 +29,9 @@ namespace Paladin
         constexpr int textureSide = side * pixelsPerTile + padding * 2;
         const int columns = (map.grid().width() + side - 1) / side;
         const int rows = (map.grid().height() + side - 1) / side;
-        if (source_ != &map)
+        if (sourceInstance_ != map.instanceId())
         {
-            source_ = &map;
+            sourceInstance_ = map.instanceId();
             chunks_.clear();
             chunks_.resize(std::size_t(columns) * rows);
         }
@@ -70,10 +70,14 @@ namespace Paladin
                             fill.red = std::uint8_t(fill.red * shade);
                             fill.green = std::uint8_t(fill.green * shade);
                             fill.blue = std::uint8_t(fill.blue * shade);
-                            const int rockX = feature.kind == NaturalFeatureKind::Rock
-                                ? int((variation >> 8) % 7) - 3 : 0;
-                            const int rockY = feature.kind == NaturalFeatureKind::Rock
-                                ? int((variation >> 16) % 7) - 3 : 0;
+                            const int rockX =
+                                feature.kind == NaturalFeatureKind::Rock
+                                    ? int((variation >> 8) % 3) - 1
+                                    : 0;
+                            const int rockY =
+                                feature.kind == NaturalFeatureKind::Rock
+                                    ? int((variation >> 16) % 3) - 1
+                                    : 0;
                             const RenderColor border = feature.marked
                                 ? RenderColor{255, 215, 50, 255}
                                 : feature.kind == NaturalFeatureKind::Rock
@@ -85,9 +89,47 @@ namespace Paladin
                                 {
                                     const auto shape = [&](int px, int py)
                                     {
-                                        return feature.kind == NaturalFeatureKind::Tree
-                                            ? canopy(px, py)
-                                            : px >= 5 && px <= 7 && py >= 5 && py <= 7;
+                                        return feature.kind ==
+                                                       NaturalFeatureKind::Tree
+                                                   ? canopy(px, py)
+                                                   : [&]()
+                                        {
+                                            constexpr unsigned masks[4][7] = {
+                                                {0x0C,
+                                                 0x3E,
+                                                 0x7E,
+                                                 0x7F,
+                                                 0x7F,
+                                                 0x3F,
+                                                 0x1C},
+                                                {0x18,
+                                                 0x3C,
+                                                 0x7E,
+                                                 0x7F,
+                                                 0x3F,
+                                                 0x3E,
+                                                 0x0C},
+                                                {0x1C,
+                                                 0x3E,
+                                                 0x7F,
+                                                 0x7F,
+                                                 0x7E,
+                                                 0x3C,
+                                                 0x18},
+                                                {0x08,
+                                                 0x1C,
+                                                 0x3E,
+                                                 0x7F,
+                                                 0x7F,
+                                                 0x3E,
+                                                 0x1E}
+                                            };
+                                            const int rx = px - 3, ry = py - 3;
+                                            return rx >= 0 && rx < 7 &&
+                                                   ry >= 0 && ry < 7 &&
+                                                   (masks[variation % 4][ry] &
+                                                    (1u << rx));
+                                        }();
                                     };
                                     if (!shape(sx, sy)) continue;
                                     const bool edge = !shape(sx - 1, sy) || !shape(sx + 1, sy)

@@ -436,7 +436,10 @@ namespace Paladin
                         auto& citizens = currentSettlement->simulationState().citizens();
                         currentMap->employment().synchronize(currentMap->objectState(), citizens);
                         currentMap->employment().record(simulation_->world().time().totalGameMinutes(), citizens);
-                        cityHud_->setSettlementStatus(currentMap->objectState().hasCityKeep(), citizens.citizens().size());
+                        cityHud_->setSettlementStatus(
+                            currentMap->logistics.founded(),
+                            citizens.citizens().size()
+                        );
                         if (settlementInspectionPanel_->editingName())
                         {
                             if (event.type == SDL_EVENT_TEXT_INPUT)
@@ -696,9 +699,9 @@ namespace Paladin
                                                     .citizens(),
                                                 event.button.x <
                                                     static_cast<float>(
-                                                        renderer_
-                                                            ->outputWidth()
-                                                    ) * 0.5F
+                                                        renderer_->outputWidth()
+                                                    ) * 0.5F,
+                                                &settlementMap->logistics
                                             )
                                     );
                                 }
@@ -1220,7 +1223,10 @@ namespace Paladin
                         auto& citizens = owner->simulationState().citizens();
                         settlementMap->employment().synchronize(settlementMap->objectState(), citizens);
                         settlementMap->employment().record(simulation_->world().time().totalGameMinutes(), citizens);
-                        cityHud_->setSettlementStatus(settlementMap->objectState().hasCityKeep(), citizens.citizens().size());
+                        cityHud_->setSettlementStatus(
+                            settlementMap->logistics.founded(),
+                            citizens.citizens().size()
+                        );
                     }
                 }
 
@@ -1239,7 +1245,8 @@ namespace Paladin
                             *tileRenderMetrics_,
                             *settlementObjectPlacementController_,
                             *settlementCommandController_,
-                            renderedSettlement->simulationState().citizens()
+                            renderedSettlement->simulationState().citizens(),
+                            *settlementInspectionController_
                         );
 
                         settlementInspectionPanel_->render(
@@ -1275,9 +1282,30 @@ namespace Paladin
                     worldTime.minute()
                 );
 
+                const auto goodsAmount = [&](std::string_view resource)
+                {
+                    double amount =
+                        settlementMap ? settlementMap->logistics.total(resource)
+                                      : 0;
+                    if (citySettlement)
+                    {
+                        for (const auto& citizen :
+                             citySettlement->simulationState()
+                                 .citizens()
+                                 .citizens())
+                        {
+                            if (citizen.carriedResource == resource)
+                            {
+                                amount += citizen.carriedAmount;
+                            }
+                        }
+                    }
+                    return amount;
+                };
                 cityHud_->setGoodsAmounts(
-                    citySettlement ? citySettlement->simulationState().stockpile().amount("stone") : 0,
-                    citySettlement ? citySettlement->simulationState().stockpile().amount("lumber") : 0
+                    goodsAmount("stone"),
+                    goodsAmount("lumber"),
+                    goodsAmount("fish")
                 );
                 cityHud_->render(
                     *renderer_,
@@ -1689,8 +1717,15 @@ namespace Paladin
         movingCapital_ = false;
         employmentPanel_->close();
         employmentCapturedPointer_ = false;
-        cityHud_->setSettlementStatus(settlementMap->objectState().hasCityKeep(),
-            simulation_->world().settlement(capitalId)->simulationState().citizens().citizens().size());
+        cityHud_->setSettlementStatus(
+            settlementMap->logistics.founded(),
+            simulation_->world()
+                .settlement(capitalId)
+                ->simulationState()
+                .citizens()
+                .citizens()
+                .size()
+        );
         screen_ = Screen::City;
 
         simulationSpeedControls_->layout(renderer_->outputWidth());

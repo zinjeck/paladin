@@ -3,6 +3,11 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/bakery/BakeryJob.h"
+#include "world/settlements/objects/jobs/fishery/FisheryJob.h"
+#include "world/settlements/objects/jobs/pastureland/PasturelandJob.h"
+#include "world/settlements/objects/jobs/stockpile/StockpileJob.h"
+#include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -13,11 +18,11 @@ namespace
 {
 // Reference-area capacities follow Godot; stockpile staffing is new.
 constexpr std::array<WorkplaceDefinition, 5> definitions{
-    {{SettlementObjectTypes::Stockpile, 2, 2, 4},
-     {SettlementObjectTypes::FishingGrounds, 4, 4, 9},
-     {SettlementObjectTypes::WheatFarm, 1, 1, 25},
-     {SettlementObjectTypes::Pastureland, 1, 1, 12},
-     {SettlementObjectTypes::Bakery, 1, 1, 6}}
+    StockpileWorkplace,
+    FisheryWorkplace,
+    WheatFarmWorkplace,
+    PasturelandWorkplace,
+    BakeryWorkplace
 };
 } // namespace
 std::span<const WorkplaceDefinition> workplaceDefinitions() noexcept
@@ -63,9 +68,9 @@ void SettlementEmploymentState::synchronize(
     SettlementCitizenState& citizens
 )
 {
-    if (objectVersion_ == objects.presentationVersion())
+    if (objectVersion_ == objects.navigationVersion())
         return;
-    objectVersion_ = objects.presentationVersion();
+    objectVersion_ = objects.navigationVersion();
     std::vector<WorkplaceId> retained;
     const auto add = [&](std::string_view type,
                          const SettlementObjectFootprint& footprint,
@@ -153,14 +158,6 @@ void SettlementEmploymentState::synchronize(
         if (citizen.workplaceId && !workplace(citizen.workplaceId))
         {
             citizen.workplaceId = {};
-            if (citizen.activity == CitizenActivity::TravelingToWork ||
-                citizen.activity == CitizenActivity::AtWork)
-            {
-                citizen.activity = CitizenActivity::Idle;
-                citizen.path.clear();
-                citizen.stepProgress = 0;
-                citizen.idleWait = -1;
-            }
             ++citizens.version_;
         }
     }
@@ -191,6 +188,17 @@ std::size_t SettlementEmploymentState::unemployed(
         [](const auto& c) { return !c.workplaceId; }
     );
 }
+void SettlementEmploymentState::citizenDeparted(WorkplaceId id)
+{
+    for (auto& workplace : workplaces_)
+    {
+        if (workplace.id == id && workplace.capacity > 0)
+        {
+            --workplace.capacity;
+            return;
+        }
+    }
+}
 bool SettlementEmploymentState::adjust(
     WorkplaceId id,
     int delta,
@@ -219,14 +227,6 @@ bool SettlementEmploymentState::adjust(
             w->capacity =
                 std::min(w->capacity, std::uint32_t(employed(id, citizens)));
         citizen.nextWorkCheckMinutes = 0;
-        if (citizen.activity != CitizenActivity::AssignedToCommand)
-        {
-            citizen.path.clear();
-            citizen.pathIndex = 0;
-            citizen.stepProgress = 0;
-            citizen.activity = CitizenActivity::Idle;
-            citizen.idleWait = -1;
-        }
         ++citizens.version_;
         return true;
     }
@@ -293,101 +293,5 @@ void SettlementEmploymentState::record(
     const double oldest = minute - 16 * 1440;
     while (history_.size() > 2 && history_[1].gameMinute < oldest)
         history_.pop_front();
-}
-void SettlementEmploymentState::tickAttendance(
-    const SettlementMap& map,
-    SettlementCitizenState& citizens,
-    double minute
-)
-{
-    if (citizens.citizens_.empty() || !std::isfinite(minute) ||
-        !std::isfinite(behaviorPolicy.retryMinutes) ||
-        behaviorPolicy.retryMinutes <= 0)
-        return;
-    const int clock = int(std::fmod(minute, 1440));
-    const bool onShift = clock >= behaviorPolicy.shiftStartMinute &&
-                         clock < behaviorPolicy.shiftEndMinute;
-    std::size_t paths = 0;
-    for (std::size_t scan = 0;
-         scan < std::min(
-                    behaviorPolicy.attendanceChecksPerTick,
-                    citizens.citizens_.size()
-                );
-         ++scan)
-    {
-        auto& c =
-            citizens.citizens_[attendanceCursor_++ % citizens.citizens_.size()];
-        const auto* w = workplace(c.workplaceId);
-        if (!w || !map.grid().isValidPosition(c.tilePosition) ||
-            c.activity == CitizenActivity::AssignedToCommand)
-            continue;
-        if (!onShift || !w->operational)
-        {
-            if (c.activity == CitizenActivity::AtWork ||
-                c.activity == CitizenActivity::TravelingToWork)
-            {
-                c.activity = CitizenActivity::Idle;
-                c.path.clear();
-                c.stepProgress = 0;
-                c.idleWait = -1;
-                ++citizens.version_;
-            }
-            continue;
-        }
-        if (c.activity == CitizenActivity::TravelingToWork && c.path.empty())
-        {
-            c.activity = c.tilePosition == c.destination
-                             ? CitizenActivity::AtWork
-                             : CitizenActivity::Idle;
-            ++citizens.version_;
-        }
-        if (c.activity == CitizenActivity::AtWork || !c.path.empty() ||
-            minute < c.nextWorkCheckMinutes)
-            continue;
-        if (paths >= behaviorPolicy.pathRequestsPerTick)
-            break;
-        ++paths;
-        c.nextWorkCheckMinutes = minute + behaviorPolicy.retryMinutes;
-        const auto& f = w->footprint;
-        // Sample the closest edge, not every tile of an arbitrarily large
-        // workplace.
-        const std::array<SettlementTilePosition, 4> access{
-            {{std::clamp(
-                  c.tilePosition.x,
-                  f.topLeft.x,
-                  f.topLeft.x + f.width - 1
-              ),
-              f.topLeft.y - 1},
-             {std::clamp(
-                  c.tilePosition.x,
-                  f.topLeft.x,
-                  f.topLeft.x + f.width - 1
-              ),
-              f.topLeft.y + f.height},
-             {f.topLeft.x - 1,
-              std::clamp(
-                  c.tilePosition.y,
-                  f.topLeft.y,
-                  f.topLeft.y + f.height - 1
-              )},
-             {f.topLeft.x + f.width,
-              std::clamp(
-                  c.tilePosition.y,
-                  f.topLeft.y,
-                  f.topLeft.y + f.height - 1
-              )}}
-        };
-        const auto goal = access
-            [(std::uint64_t(minute / behaviorPolicy.retryMinutes) +
-              c.id.value()) %
-             access.size()];
-        if (citizens.moveTo(c.id, map, goal))
-        {
-            c.activity = c.tilePosition == goal
-                             ? CitizenActivity::AtWork
-                             : CitizenActivity::TravelingToWork;
-            ++citizens.version_;
-        }
-    }
 }
 } // namespace Paladin

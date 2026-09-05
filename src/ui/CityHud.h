@@ -43,10 +43,11 @@ namespace Paladin
         }
 
         void setSettlementStatus(bool hasKeep, std::size_t population) noexcept;
-        void setGoodsAmounts(double stone, double lumber) noexcept
+        void setGoodsAmounts(double stone, double lumber, double fish) noexcept
         {
             stoneAmount_ = stone;
             lumberAmount_ = lumber;
+            fishAmount_ = fish;
         }
 
         void pointerMoved(float x, float y) noexcept;
@@ -96,6 +97,7 @@ namespace Paladin
         std::size_t population_ = 8;
         double stoneAmount_ = 0;
         double lumberAmount_ = 0;
+        double fishAmount_ = 0;
         std::array<UiButton, CategoryCount> bottomButtons_;
         UiRectangle toolbarBounds_;
         std::vector<UiButton> optionButtons_;

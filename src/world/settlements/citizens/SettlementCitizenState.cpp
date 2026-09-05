@@ -19,24 +19,50 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::array<std::string_view, 40> maleNames{
-            "Arlen", "Tovan", "Calen", "Ronan", "Darian", "Kael",
-            "Bren", "Orin", "Levon", "Theron", "Jarek", "Corin",
-            "Malric", "Edrin", "Tomas", "Varon", "Lucan", "Alric",
-            "Fenric", "Soren", "Aldren", "Beran", "Cedran", "Doran",
-            "Evren", "Garric", "Hadren", "Ivarn", "Joren", "Kellan",
-            "Merek", "Nolan", "Odran", "Perric", "Roder", "Stellan",
-            "Torren", "Ulren", "Wystan", "Yorick"
+        constexpr std::array<std::string_view, 100> maleNames{
+            "Arlen", "Tovan", "Calen", "Ronan", "Darian",
+            "Kael", "Bren", "Orin", "Levon", "Theron",
+            "Jarek", "Corin", "Malric", "Edrin", "Tomas",
+            "Varon", "Lucan", "Alric", "Fenric", "Soren",
+            "Aldren", "Beran", "Cedran", "Doran", "Evren",
+            "Garric", "Hadren", "Ivarn", "Joren", "Kellan",
+            "Merek", "Nolan", "Odran", "Perric", "Roder",
+            "Stellan", "Torren", "Ulren", "Wystan", "Yorick",
+            "Adrian", "Aldric", "Ansel", "Arden", "Asher",
+            "Bastian", "Benedict", "Bram", "Caelan", "Cassian",
+            "Caspar", "Cillian", "Conrad", "Damon", "Darius",
+            "Declan", "Dominic", "Edric", "Edwin", "Elias",
+            "Emrys", "Ewan", "Fabian", "Felix", "Finn",
+            "Florian", "Gareth", "Gavin", "Gideon", "Godric",
+            "Harlan", "Hector", "Hugo", "Idris", "Jasper",
+            "Julian", "Kendrick", "Laurence", "Leander", "Lionel",
+            "Lorcan", "Magnus", "Merrick", "Nathan", "Osric",
+            "Owen", "Percival", "Quentin", "Raphael", "Rhys",
+            "Roland", "Rowan", "Silas", "Simeon", "Tobias",
+            "Tristan", "Valentin", "Victor", "Walter", "Wilfred"
         };
 
-        constexpr std::array<std::string_view, 40> femaleNames{
-            "Mira", "Elia", "Sera", "Nira", "Liora", "Kaela", "Maris",
-            "Elara", "Vessa", "Talia", "Rina", "Anya", "Selene",
-            "Maera", "Isolde", "Lyra", "Vela", "Seris", "Amara",
-            "Coralie", "Aveline", "Briala", "Ceryn", "Delara", "Eirwen",
-            "Fiora", "Giselle", "Halia", "Ilara", "Jessamine", "Kerra",
-            "Lenora", "Mirelle", "Nerissa", "Odelle", "Petra", "Roselyn",
-            "Sabine", "Thalia", "Ysara"
+        constexpr std::array<std::string_view, 100> femaleNames{
+            "Mira", "Elia", "Sera", "Nira", "Liora",
+            "Kaela", "Maris", "Elara", "Vessa", "Talia",
+            "Rina", "Anya", "Selene", "Maera", "Isolde",
+            "Lyra", "Vela", "Seris", "Amara", "Coralie",
+            "Aveline", "Briala", "Ceryn", "Delara", "Eirwen",
+            "Fiora", "Giselle", "Halia", "Ilara", "Jessamine",
+            "Kerra", "Lenora", "Mirelle", "Nerissa", "Odelle",
+            "Petra", "Roselyn", "Sabine", "Thalia", "Ysara",
+            "Adela", "Adelaide", "Adrienne", "Agnes", "Ailsa",
+            "Alina", "Annora", "Arabella", "Astrid", "Aurelia",
+            "Beatrice", "Branwen", "Brielle", "Camilla", "Carina",
+            "Cassandra", "Cecilia", "Celeste", "Clara", "Cordelia",
+            "Della", "Dorothea", "Edith", "Eleanor", "Elise",
+            "Elowen", "Emilia", "Enid", "Estelle", "Eva",
+            "Freya", "Genevieve", "Guinevere", "Helena", "Imogen",
+            "Ingrid", "Iona", "Iris", "Johanna", "Judith",
+            "Lavinia", "Leona", "Linnea", "Livia", "Lucille",
+            "Lydia", "Margot", "Matilda", "Melisande", "Minerva",
+            "Nadia", "Noelle", "Ophelia", "Oriana", "Philippa",
+            "Rosalind", "Rowena", "Theodora", "Viola", "Winifred"
         };
 
         bool isWalkableCitizenTile(

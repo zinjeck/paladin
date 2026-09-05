@@ -33,6 +33,8 @@ namespace Paladin
         SettlementObjectId id;
         std::string objectTypeId;
         SettlementObjectFootprint footprint;
+        std::vector<SettlementTilePosition> productionWater;
+        double productionProgress = 0;
     };
 
     enum class ConstructionSitePhase : std::uint8_t
@@ -58,6 +60,8 @@ namespace Paladin
             ConstructionSitePhase::AwaitingMaterials;
         std::uint16_t progressPermille = 0;
         std::vector<ConstructionResourceDelivery> resourceDeliveries;
+        std::vector<SettlementTilePosition> productionWater;
+        double laborMinutes = 0;
     };
 
     enum class SettlementTilePlacementStatus : std::uint8_t
@@ -154,13 +158,31 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t presentationVersion() const noexcept;
 
+        std::uint64_t navigationVersion() const
+        {
+            return navigationVersion_;
+        }
         bool hasCityKeep() const noexcept;
+        bool deliverMaterials(
+            ConstructionSiteId,
+            std::string_view resource,
+            int amount
+        );
+        SettlementObjectId build(
+            ConstructionSiteId,
+            double laborMinutes,
+            double requiredMinutes,
+            SettlementTilePosition workerTile
+        );
+        bool demolish(SettlementObjectId, SettlementTilePosition tile);
+        double accrueProduction(SettlementObjectId, double amount);
+        void rebuildOccupancy();
         std::size_t cancelConstructionWithin(const SettlementObjectFootprint& area);
         bool blocksMovement(SettlementTilePosition position) const noexcept
         {
-            return position.x < 0 || position.y < 0
-                || position.x >= mapWidth_ || position.y >= mapHeight_
-                || structureOccupiedTiles_[tileIndex(position)] != 0;
+            return position.x < 0 || position.y < 0 ||
+                   position.x >= mapWidth_ || position.y >= mapHeight_ ||
+                   movementBlockedTiles_[tileIndex(position)] != 0;
         }
 
     private:
@@ -202,12 +224,14 @@ namespace Paladin
         std::int32_t mapWidth_ = 0;
         std::int32_t mapHeight_ = 0;
         std::vector<std::uint8_t> structureOccupiedTiles_;
+        std::vector<std::uint8_t> movementBlockedTiles_;
         std::vector<std::uint8_t> infrastructureOccupiedTiles_;
         std::vector<CompletedSettlementObject> completedObjects_;
         std::vector<SettlementConstructionSite> constructionSites_;
         IdGenerator<SettlementObjectId> objectIds_;
         IdGenerator<ConstructionSiteId> constructionSiteIds_;
         std::uint64_t presentationVersion_ = 0;
+        std::uint64_t navigationVersion_ = 0;
         mutable const SettlementGrid* cachedPlacementGrid_ = nullptr;
         mutable std::uint64_t cachedPlacementVersion_ =
             static_cast<std::uint64_t>(-1);

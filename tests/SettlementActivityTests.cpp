@@ -106,8 +106,12 @@ void runSettlementActivityTests()
     obstacle.previewWidth = obstacle.previewHeight = 1;
     obstacle.minimumWidth = obstacle.minimumHeight = 1;
     const auto blocked = citizens.citizen(id)->path.front();
-    PALADIN_CHECK(movementMap.objectState().createConstructionSites(
-        movementMap.grid(), obstacle, {blocked, 1, 1}));
+    obstacle.bypassesConstruction = true;
+    PALADIN_CHECK(movementMap.objectState().placeCompletedObject(
+        movementMap.grid(),
+        obstacle,
+        {blocked, 1, 1}
+    ));
     for (int i = 0; i < 400; ++i)
     {
         citizens.tickMovement(movementMap, .1);

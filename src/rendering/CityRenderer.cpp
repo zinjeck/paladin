@@ -64,7 +64,6 @@ namespace Paladin
         renderer.fillRectangle(right - stroke, top, stroke, bottom - top, outline);
     }
 
-
     void CityRenderer::render(
         Renderer& renderer,
         const SettlementMap& settlementMap,
@@ -72,7 +71,8 @@ namespace Paladin
         const TileRenderMetrics& metrics,
         const SettlementObjectPlacementController& placementController,
         const SettlementCommandController& commandController,
-        const SettlementCitizenState& citizens
+        const SettlementCitizenState& citizens,
+        const SettlementInspectionController& inspection
     ) const
     {
         gridRenderer_.render(
@@ -100,6 +100,14 @@ namespace Paladin
             metrics
         );
 
+        logisticsRenderer_.render(
+            renderer,
+            settlementMap,
+            camera,
+            metrics,
+            placementController,
+            inspection
+        );
         citizenRenderer_.render(renderer, citizens, camera, metrics);
     }
 }

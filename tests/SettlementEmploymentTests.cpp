@@ -184,7 +184,7 @@ void runSettlementEmploymentTests()
         map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 3, 3})
     );
     PALADIN_CHECK(!map.objectState().blocksMovement({11, 11}));
-    PALADIN_CHECK(map.objectState().blocksMovement({20, 20}));
+    PALADIN_CHECK(!map.objectState().blocksMovement({20, 20}));
     fishing.bypassesConstruction = true;
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
@@ -230,19 +230,18 @@ void runSettlementEmploymentTests()
     );
     jobs.record(40 * 1440, citizens);
     PALADIN_CHECK(jobs.history().size() <= 2);
-    jobs.tickAttendance(map, citizens, 9 * 60);
+
     bool arrived = false;
     for (int tick = 0; tick < 1500; ++tick)
     {
         const double minute = 9 * 60 + tick * .1;
-        jobs.tickAttendance(map, citizens, minute);
-        citizens.tickMovement(map, .1);
+        map.activities.tick(map, citizens, minute, .1);
         for (const auto& c : citizens.citizens())
             arrived = arrived || (c.workplaceId == storeId &&
                                   c.activity == CitizenActivity::AtWork);
     }
     PALADIN_CHECK(arrived);
-    jobs.tickAttendance(map, citizens, 18 * 60);
+    map.activities.tick(map, citizens, 18 * 60, 1);
     for (const auto& c : citizens.citizens())
         PALADIN_CHECK(c.activity != CitizenActivity::AtWork);
     // Larger footprints raise the ceiling without opening staffing slots.

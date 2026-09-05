@@ -567,7 +567,7 @@ namespace Paladin
         if (goodsOpen_)
         {
             for (const auto& cell : goodsCells_) uiRenderer.drawPanel(renderer, cell);
-            for (std::size_t i = 0; i < 2; ++i)
+            for (std::size_t i = 0; i < 3; ++i)
             {
                 const auto& cell = goodsCells_[i];
                 const float x = cell.x + cell.width * .5F;
@@ -583,9 +583,44 @@ namespace Paladin
                     renderer.fillRectangle(x - 4, y + 4, 2, 12, edge);
                     renderer.fillRectangle(x + 3, y + 4, 2, 12, edge);
                 }
+                if (i == 2)
+                {
+                    renderer
+                        .fillRectangle(x - 12, y, 24, 22, {90, 90, 90, 255});
+                    renderer.fillRectangle(
+                        x - 8,
+                        y + 6,
+                        15,
+                        9,
+                        {78, 155, 195, 255}
+                    );
+                    renderer.fillRectangle(
+                        x - 5,
+                        y + 3,
+                        8,
+                        15,
+                        {108, 190, 224, 255}
+                    );
+                    renderer.fillRectangle(
+                        x + 7,
+                        y + 4,
+                        4,
+                        13,
+                        {70, 135, 175, 255}
+                    );
+                    renderer
+                        .fillRectangle(x - 7, y + 7, 2, 2, {20, 35, 45, 255});
+                }
                 std::ostringstream amount;
                 amount << std::fixed << std::setprecision(0)
-                    << std::floor(std::max(0.0, i == 0 ? stoneAmount_ : lumberAmount_));
+                       << std::floor(
+                              std::max(
+                                  0.0,
+                                  i == 0   ? stoneAmount_
+                                  : i == 1 ? lumberAmount_
+                                           : fishAmount_
+                              )
+                          );
                 const auto label = amount.str();
                 const float size = std::min(2.0F, (cell.width - 8) /
                     std::max(1.0F, float(label.size()) * 6 - 1));

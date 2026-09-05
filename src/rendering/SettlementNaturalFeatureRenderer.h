@@ -20,7 +20,7 @@ namespace Paladin
             std::unique_ptr<Texture> texture;
             std::uint64_t version = 0;
         };
-        mutable const SettlementMap* source_ = nullptr;
+        mutable std::uint64_t sourceInstance_ = 0;
         mutable std::vector<Chunk> chunks_;
     };
 }

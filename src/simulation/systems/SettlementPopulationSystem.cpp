@@ -31,6 +31,11 @@ namespace Paladin
             SettlementSimulationState& state =
                 settlement->simulationState();
 
+            if (state.hasLocalMap())
+            {
+                continue;
+            }
+
             if (!state.isInitialized())
             {
                 continue;

@@ -181,15 +181,13 @@ namespace Paladin
         const std::optional<SettlementObjectFootprint> footprint =
             visibleFootprint();
 
-        return
-            definition &&
-            (settlementMap.objectState().hasCityKeep() || definition->id == SettlementObjectTypes::CityKeep) &&
-            footprint &&
-            settlementMap.objectState().canPlace(
-                settlementMap.grid(),
-                *definition,
-                *footprint
-            );
+        return definition &&
+               (settlementMap.logistics.founded() ||
+                settlementMap.objectState().hasCityKeep() ||
+                definition->id == SettlementObjectTypes::CityKeep) &&
+               footprint &&
+               settlementMap.objectState()
+                   .canPlace(settlementMap.grid(), *definition, *footprint);
     }
 
 
@@ -256,7 +254,8 @@ namespace Paladin
     )
     {
         SettlementObjectState& state = settlementMap.objectState();
-        if (!state.hasCityKeep() && definition.id != SettlementObjectTypes::CityKeep)
+        if (!settlementMap.logistics.founded() && !state.hasCityKeep() &&
+            definition.id != SettlementObjectTypes::CityKeep)
             return SettlementPlacementCommitResult::None;
         SettlementPlacementCommitResult result =
             SettlementPlacementCommitResult::None;
@@ -283,7 +282,11 @@ namespace Paladin
 
         if (result != SettlementPlacementCommitResult::None)
         {
-            settlementMap.naturalFeatures().clear(footprint);
+            if (definition.id == SettlementObjectTypes::CityKeep)
+            {
+                settlementMap.naturalFeatures().clear(footprint);
+            }
+            settlementMap.logistics.synchronize(state, 0);
             cancelPlacement();
         }
 

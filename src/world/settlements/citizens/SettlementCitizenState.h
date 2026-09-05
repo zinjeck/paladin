@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "simulation/systems/SettlementActivitySystem.h"
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/SettlementTilePosition.h"
 
@@ -25,7 +26,12 @@ namespace Paladin
         Idle,
         AssignedToCommand,
         TravelingToWork,
-        AtWork
+        AtWork,
+        SeekingFood,
+        Hauling,
+        Constructing,
+        ReturningHome,
+        AtHome
     };
 
     struct CitizenIdlePolicy
@@ -40,6 +46,13 @@ namespace Paladin
         std::size_t decisionsPerTick = 64;
     };
 
+    struct CitizenRouteFailure
+    {
+        InventoryId source;
+        SettlementTilePosition origin;
+        std::uint64_t topologyVersion = 0;
+        double untilMinute = 0;
+    };
     struct SettlementCitizen
     {
         CitizenId id;
@@ -60,6 +73,20 @@ namespace Paladin
         double idleWait = -1;
         std::uint64_t choiceSequence = 0;
         bool explicitMovement = false;
+        std::size_t constructionSearchCursor = 0;
+        std::size_t commandSearchCursor = 0;
+        std::vector<CitizenRouteFailure> routeFailures;
+        double health = 100;
+        double hunger = 0;
+        double happiness = 100;
+        double homelessMinutes = 0;
+        SettlementObjectId homeId;
+        CitizenTask task;
+        std::string carriedResource;
+        int carriedAmount = 0;
+        double nextDecisionMinute = 0;
+        std::uint64_t observedLogisticsVersion = 0;
+
         double visualX() const noexcept;
         double visualY() const noexcept;
     };
@@ -114,6 +141,8 @@ namespace Paladin
 
     private:
         friend class SettlementEmploymentState;
+        friend class SettlementActivitySystem;
+        friend struct SettlementActivityTestFixture;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;

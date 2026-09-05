@@ -11,7 +11,7 @@ namespace Paladin
 void SettlementNavigation::synchronize(const SettlementMap& map)
 {
     if (sourceInstance_ == map.instanceId() &&
-        version_ == map.objectState().presentationVersion())
+        version_ == map.objectState().navigationVersion())
     {
         return;
     }
@@ -32,7 +32,7 @@ void SettlementNavigation::synchronize(const SettlementMap& map)
         }
     }
     sourceInstance_ = map.instanceId();
-    version_ = map.objectState().presentationVersion();
+    version_ = map.objectState().navigationVersion();
 }
 
 bool SettlementNavigation::walkable(
@@ -52,6 +52,15 @@ bool SettlementNavigation::canStep(
 ) const
 {
     const int dx = std::abs(a.x - b.x), dy = std::abs(a.y - b.y);
+    const auto* enclosing = map.objectState().completedObjectAt(a);
+    const bool exiting = map.objectState().blocksMovement(a) && enclosing &&
+                         enclosing->footprint.contains(b) &&
+                         map.grid().tile(b) &&
+                         map.grid().tile(b)->terrain == TerrainType::Land;
+    if (exiting && dx <= 1 && dy <= 1 && dx + dy > 0)
+    {
+        return true;
+    }
     return dx <= 1 && dy <= 1 && dx + dy > 0 && walkable(map, b) &&
            (dx == 0 || dy == 0 ||
             (walkable(map, {a.x, b.y}) && walkable(map, {b.x, a.y})));

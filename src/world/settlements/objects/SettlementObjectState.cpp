@@ -1,9 +1,11 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 
-#include "world/TerrainType.h"
 #include "world/SettlementGrid.h"
+#include "world/TerrainType.h"
 #include "world/WorldTile.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/fishery/FisheryJob.h"
+#include <cmath>
 
 #include <algorithm>
 #include <array>
@@ -107,6 +109,7 @@ namespace Paladin
             if (const auto* definition = SettlementObjectCatalog::definition(site.objectTypeId))
                 occupy(*definition, site.footprint);
         ++presentationVersion_;
+        ++navigationVersion_;
         return removed;
     }
 
@@ -121,41 +124,40 @@ namespace Paladin
             position.y < topLeft.y + height;
     }
 
-
     SettlementObjectState::SettlementObjectState(
         std::int32_t mapWidth,
         std::int32_t mapHeight
-    )
-        : mapWidth_(mapWidth),
-          mapHeight_(mapHeight),
-          structureOccupiedTiles_(
-              mapWidth > 0 && mapHeight > 0
-                  ? static_cast<std::size_t>(mapWidth)
-                    * static_cast<std::size_t>(mapHeight)
-                  : 0,
-              0
-          ),
-          infrastructureOccupiedTiles_(
-              mapWidth > 0 && mapHeight > 0
-                  ? static_cast<std::size_t>(mapWidth)
-                    * static_cast<std::size_t>(mapHeight)
-                  : 0,
-              0
-          ),
-          structureBlockedPrefix_(
-              mapWidth > 0 && mapHeight > 0
-                  ? (static_cast<std::size_t>(mapWidth) + 1U)
-                    * (static_cast<std::size_t>(mapHeight) + 1U)
-                  : 0,
-              0
-          ),
-          infrastructureBlockedPrefix_(
-              mapWidth > 0 && mapHeight > 0
-                  ? (static_cast<std::size_t>(mapWidth) + 1U)
-                    * (static_cast<std::size_t>(mapHeight) + 1U)
-                  : 0,
-              0
-          )
+    ) :
+        mapWidth_(mapWidth), mapHeight_(mapHeight),
+        structureOccupiedTiles_(
+            mapWidth > 0 && mapHeight > 0
+                ? static_cast<std::size_t>(mapWidth) *
+                      static_cast<std::size_t>(mapHeight)
+                : 0,
+            0
+        ),
+        movementBlockedTiles_(structureOccupiedTiles_.size(), 0),
+        infrastructureOccupiedTiles_(
+            mapWidth > 0 && mapHeight > 0
+                ? static_cast<std::size_t>(mapWidth) *
+                      static_cast<std::size_t>(mapHeight)
+                : 0,
+            0
+        ),
+        structureBlockedPrefix_(
+            mapWidth > 0 && mapHeight > 0
+                ? (static_cast<std::size_t>(mapWidth) + 1U) *
+                      (static_cast<std::size_t>(mapHeight) + 1U)
+                : 0,
+            0
+        ),
+        infrastructureBlockedPrefix_(
+            mapWidth > 0 && mapHeight > 0
+                ? (static_cast<std::size_t>(mapWidth) + 1U) *
+                      (static_cast<std::size_t>(mapHeight) + 1U)
+                : 0,
+            0
+        )
     {
     }
 
@@ -304,7 +306,13 @@ namespace Paladin
             footprint
         });
 
+        if (definition.id == SettlementObjectTypes::FishingGrounds)
+        {
+            completedObjects_.back().productionWater =
+                fisheryZonePreview(grid, *this, footprint).availableWater;
+        }
         occupy(definition, footprint);
+        rebuildOccupancy();
         ++presentationVersion_;
         return true;
     }
@@ -390,10 +398,16 @@ namespace Paladin
                 initialResourceDeliveries(definition)
             });
 
+            if (definition.id == SettlementObjectTypes::FishingGrounds)
+            {
+                constructionSites_.back().productionWater =
+                    fisheryZonePreview(grid, *this, footprint).availableWater;
+            }
             occupy(definition, footprint);
         }
 
         ++presentationVersion_;
+        ++navigationVersion_;
         return true;
     }
 

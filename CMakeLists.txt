@@ -38,6 +38,7 @@ add_executable(Paladin
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
     src/rendering/CityRenderer.cpp
+    src/rendering/SettlementLogisticsRenderer.cpp
     src/rendering/SettlementNaturalFeatureRenderer.cpp
     src/rendering/Texture.cpp
     src/rendering/SpriteRenderer.cpp
@@ -69,6 +70,12 @@ add_executable(Paladin
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp
     src/simulation/systems/SettlementCitizenMovement.cpp
+    src/simulation/systems/SettlementActivitySystem.cpp
+    src/simulation/systems/SettlementActivitySelection.cpp
+    src/simulation/systems/SettlementCitizenNeeds.cpp
+    src/world/settlements/SettlementLogistics.cpp
+    src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
+    src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementResourceDefinition.cpp
@@ -128,6 +135,7 @@ enable_testing()
 
 add_executable(PaladinTests
     tests/TestMain.cpp
+    tests/SettlementSimulationLoopTests.cpp
     tests/SettlementActivityTests.cpp
     tests/SettlementEmploymentTests.cpp
     tests/CoreTests.cpp
@@ -150,6 +158,12 @@ add_executable(PaladinTests
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp
     src/simulation/systems/SettlementCitizenMovement.cpp
+    src/simulation/systems/SettlementActivitySystem.cpp
+    src/simulation/systems/SettlementActivitySelection.cpp
+    src/simulation/systems/SettlementCitizenNeeds.cpp
+    src/world/settlements/SettlementLogistics.cpp
+    src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
+    src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp
     src/world/settlements/SettlementFoundationProfile.cpp
     src/world/settlements/SettlementResourceDefinition.cpp
