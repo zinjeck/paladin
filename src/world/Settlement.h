@@ -17,12 +17,8 @@ namespace Paladin
     class Settlement
     {
     public:
-        Settlement(
-            SettlementId id,
-            WorldTilePosition position
-        ) noexcept
-            : id_(id),
-              position_(position)
+        Settlement(SettlementId id, WorldTilePosition position) noexcept
+            : id_(id), position_(position)
         {
         }
 
@@ -30,15 +26,12 @@ namespace Paladin
             SettlementId id,
             WorldTilePosition position,
             std::string name,
-            PolityId ownerPolityId,
+            RealmId ownerRealmId,
             CultureId primaryCultureId,
             const SettlementFoundationProfile& foundationProfile
         )
-            : id_(id),
-              position_(position),
-              name_(std::move(name)),
-              ownerPolityId_(ownerPolityId),
-              primaryCultureId_(primaryCultureId)
+            : id_(id), position_(position), name_(std::move(name)),
+              ownerRealmId_(ownerRealmId), primaryCultureId_(primaryCultureId)
         {
             if (!simulationState_.bootstrap(foundationProfile))
             {
@@ -61,15 +54,15 @@ namespace Paladin
         }
 
         [[nodiscard]]
-        PolityId ownerPolityId() const noexcept
+        RealmId ownerRealmId() const noexcept
         {
-            return ownerPolityId_;
+            return ownerRealmId_;
         }
 
         [[nodiscard]]
-        bool hasOwnerPolity() const noexcept
+        bool hasOwnerRealm() const noexcept
         {
-            return ownerPolityId_.isValid();
+            return ownerRealmId_.isValid();
         }
 
         [[nodiscard]]
@@ -99,9 +92,7 @@ namespace Paladin
     private:
         friend class World;
 
-        void setPosition(
-            WorldTilePosition position
-        ) noexcept
+        void setPosition(WorldTilePosition position) noexcept
         {
             position_ = position;
         }
@@ -111,11 +102,9 @@ namespace Paladin
             name_ = std::move(name);
         }
 
-        void setOwnerPolity(
-            PolityId polityId
-        ) noexcept
+        void setOwnerRealm(RealmId realmId) noexcept
         {
-            ownerPolityId_ = polityId;
+            ownerRealmId_ = realmId;
         }
 
         SettlementId id_;
@@ -125,8 +114,8 @@ namespace Paladin
         std::string name_;
 
         // Invalid ID means independent / currently unowned.
-        PolityId ownerPolityId_;
+        RealmId ownerRealmId_;
         CultureId primaryCultureId_;
         SettlementSimulationState simulationState_;
     };
-}
+} // namespace Paladin

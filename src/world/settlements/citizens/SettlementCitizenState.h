@@ -66,7 +66,16 @@ namespace Paladin
         SettlementTilePosition tilePosition{-1, -1};
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
-        std::uint16_t ageYears = 20; // No aging until the lifecycle system is enabled.
+        std::uint16_t ageYears = 25;
+        bool child = false;
+        double ageMinutes = 0;
+        CitizenId spouseId;
+        CitizenId motherId;
+        CitizenId fatherId;
+        double fertilityExposure = 0;
+        double fertilityTarget = 0;
+        std::uint64_t birthSequence = 0;
+        SettlementObjectId exitingHomeId;
         WorkplaceId workplaceId;
         double nextWorkCheckMinutes = 0;
         SettlementTilePosition idleAnchor{-1, -1};
@@ -82,12 +91,12 @@ namespace Paladin
         std::size_t commandSearchCursor = 0;
         std::vector<CitizenRouteFailure> routeFailures;
         double health = 100;
+        double energy = 100;
+        double restThreshold = 0;
         double hunger = 0;
         double foodSeekHunger = -1;
         std::uint64_t mealSequence = 0;
         double sleptMinutes = 0;
-        std::int64_t sleepCycle = -1;
-        double sleepStartMinute = 0;
         double nextHomeWander = 0;
         std::int64_t breakDay = -1;
         double breakDue = 0;
@@ -124,10 +133,7 @@ namespace Paladin
     {
     public:
         [[nodiscard]]
-        bool initialize(
-            std::uint64_t citizenCount,
-            std::uint64_t nameSeed
-        );
+        bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);
 
         bool spawn(std::uint64_t count);
         void recordPopulation(double minute);
@@ -140,18 +146,12 @@ namespace Paladin
             return navigation_;
         }
 
-        void placeUnpositionedCitizens(
-            const SettlementMap& settlementMap
-        );
+        void placeUnpositionedCitizens(const SettlementMap& settlementMap);
 
         [[nodiscard]]
-        CitizenId assignIdleCitizen(
-            SettlementCommandId commandId
-        ) noexcept;
+        CitizenId assignIdleCitizen(SettlementCommandId commandId) noexcept;
 
-        void releaseCommand(
-            SettlementCommandId commandId
-        ) noexcept;
+        void releaseCommand(SettlementCommandId commandId) noexcept;
 
         [[nodiscard]]
         std::span<const SettlementCitizen> citizens() const noexcept;
@@ -169,14 +169,22 @@ namespace Paladin
 
         void resetLocalPlacement() noexcept;
         void tickMovement(const SettlementMap& map, double gameMinutes);
-        bool moveTo(CitizenId id, const SettlementMap& map, SettlementTilePosition destination);
+        bool moveTo(
+            CitizenId id,
+            const SettlementMap& map,
+            SettlementTilePosition destination
+        );
         CitizenMovementPolicy movementPolicy;
         CitizenIdlePolicy idlePolicy;
 
     private:
         friend class SettlementEmploymentState;
         friend class SettlementActivitySystem;
+        friend class SettlementFamilySystem;
         friend struct SettlementActivityTestFixture;
+        bool appendCitizens(std::uint64_t count, bool child);
+        void matchSingles();
+        std::uint64_t familyVersion_ = 0;
         std::deque<PopulationSample> populationHistory_;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
@@ -185,4 +193,4 @@ namespace Paladin
         IdGenerator<CitizenId> citizenIds_;
         std::uint64_t version_ = 0;
     };
-}
+} // namespace Paladin

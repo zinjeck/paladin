@@ -8,20 +8,22 @@
 using namespace Paladin;
 namespace
 {
-SettlementMap makeMap(int side)
-{
-    SettlementGrid grid(side, side);
-    for (int y = 0; y < side; ++y)
-        for (int x = 0; x < side; ++x)
+    SettlementMap makeMap(int side)
+    {
+        SettlementGrid grid(side, side);
+        for (int y = 0; y < side; ++y)
         {
-            auto& tile = *grid.tile({x, y});
-            tile.terrain = TerrainType::Land;
-            tile.biome = BiomeType::Forest;
-            tile.temperature = Temperature(.5F);
-            tile.rainfall = Rainfall(.7F);
+            for (int x = 0; x < side; ++x)
+            {
+                auto& tile = *grid.tile({x, y});
+                tile.terrain = TerrainType::Land;
+                tile.biome = BiomeType::Forest;
+                tile.temperature = Temperature(.5F);
+                tile.rainfall = Rainfall(.7F);
+            }
         }
-    return SettlementMap(std::move(grid), {0, 0}, 1, 1, side, 789);
-}
+        return SettlementMap(std::move(grid), {0, 0}, 1, 1, side, 789);
+    }
 } // namespace
 void runSettlementActivityTests()
 {
@@ -31,6 +33,7 @@ void runSettlementActivityTests()
     same.naturalFeatures().generate(same.grid(), 789);
     std::size_t trees = 0, rocks = 0;
     for (int y = 0; y < 96; ++y)
+    {
         for (int x = 0; x < 96; ++x)
         {
             const auto kind = map.naturalFeatures().at({x, y}).kind;
@@ -38,6 +41,7 @@ void runSettlementActivityTests()
             trees += kind == NaturalFeatureKind::Tree;
             rocks += kind == NaturalFeatureKind::Rock;
         }
+    }
     PALADIN_CHECK(trees > 100 && rocks > 0);
     PALADIN_CHECK(
         map.naturalFeatures().countIn({{0, 0}, 96, 96}) == trees + rocks
@@ -161,7 +165,9 @@ void runSettlementActivityTests()
         citizens.citizen(id)->visualY() != initial.y
     );
     for (int i = 0; i < 400; ++i)
+    {
         citizens.tickMovement(movementMap, .1);
+    }
     PALADIN_CHECK(
         (citizens.citizen(id)->tilePosition == SettlementTilePosition{2, 10})
     );

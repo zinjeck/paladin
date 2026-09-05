@@ -7,9 +7,7 @@ namespace Paladin
     WorldTime::WorldTime() noexcept = default;
 
 
-    void WorldTime::advanceMinutes(
-        std::uint64_t gameMinutes
-    ) noexcept
+    void WorldTime::advanceMinutes(std::uint64_t gameMinutes) noexcept
     {
         if (gameMinutes == 0)
         {
@@ -31,8 +29,7 @@ namespace Paladin
 
     std::uint64_t WorldTime::day() const noexcept
     {
-        return
-            totalGameMinutes_ / MinutesPerDay + 1;
+        return totalGameMinutes_ / MinutesPerDay + 1;
     }
 
 
@@ -46,9 +43,7 @@ namespace Paladin
 
     int WorldTime::minute() const noexcept
     {
-        return static_cast<int>(
-            totalGameMinutes_ % MinutesPerHour
-        );
+        return static_cast<int>(totalGameMinutes_ % MinutesPerHour);
     }
 
 
@@ -60,9 +55,7 @@ namespace Paladin
 
     double WorldTime::secondsIntoDay() const noexcept
     {
-        return static_cast<double>(
-            totalGameMinutes_ % MinutesPerDay * 60
-        );
+        return static_cast<double>(totalGameMinutes_ % MinutesPerDay * 60);
     }
 
 
@@ -76,4 +69,4 @@ namespace Paladin
     {
         return totalGameMinutes_;
     }
-}
+} // namespace Paladin

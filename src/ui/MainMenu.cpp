@@ -6,57 +6,36 @@
 namespace Paladin
 {
     MainMenu::MainMenu()
-        : playButton_("Play"),
-          tutorialButton_("Tutorial"),
-          exitButton_("Exit")
+        : playButton_("Play"), tutorialButton_("Tutorial"), exitButton_("Exit")
     {
     }
 
-    void MainMenu::layout(
-        int viewportWidth,
-        int viewportHeight
-    ) noexcept
+    void MainMenu::layout(int viewportWidth, int viewportHeight) noexcept
     {
         constexpr float buttonWidth = 220.0F;
         constexpr float buttonHeight = 44.0F;
         constexpr float buttonGap = 16.0F;
 
-        constexpr float totalHeight =
-            buttonHeight * 3.0F
-            + buttonGap * 2.0F;
+        constexpr float totalHeight = buttonHeight * 3.0F + buttonGap * 2.0F;
 
         const float left =
-            (
-                static_cast<float>(viewportWidth)
-                - buttonWidth
-            ) * 0.5F;
+            (static_cast<float>(viewportWidth) - buttonWidth) * 0.5F;
 
         const float top =
-            (
-                static_cast<float>(viewportHeight)
-                - totalHeight
-            ) * 0.5F;
+            (static_cast<float>(viewportHeight) - totalHeight) * 0.5F;
 
-        playButton_.setBounds({
-            left,
-            top,
-            buttonWidth,
-            buttonHeight
-        });
+        playButton_.setBounds({left, top, buttonWidth, buttonHeight});
 
-        tutorialButton_.setBounds({
-            left,
-            top + buttonHeight + buttonGap,
-            buttonWidth,
-            buttonHeight
-        });
+        tutorialButton_.setBounds(
+            {left, top + buttonHeight + buttonGap, buttonWidth, buttonHeight}
+        );
 
-        exitButton_.setBounds({
-            left,
-            top + (buttonHeight + buttonGap) * 2.0F,
-            buttonWidth,
-            buttonHeight
-        });
+        exitButton_.setBounds(
+            {left,
+             top + (buttonHeight + buttonGap) * 2.0F,
+             buttonWidth,
+             buttonHeight}
+        );
     }
 
     void MainMenu::pointerMoved(float x, float y) noexcept
@@ -68,14 +47,11 @@ namespace Paladin
 
     void MainMenu::pointerPressed(float x, float y) noexcept
     {
-        const bool playPressed =
-            playButton_.pointerPressed(x, y);
+        const bool playPressed = playButton_.pointerPressed(x, y);
 
-        const bool tutorialPressed =
-            tutorialButton_.pointerPressed(x, y);
+        const bool tutorialPressed = tutorialButton_.pointerPressed(x, y);
 
-        const bool exitPressed =
-            exitButton_.pointerPressed(x, y);
+        const bool exitPressed = exitButton_.pointerPressed(x, y);
 
         if (!playPressed)
         {
@@ -93,19 +69,13 @@ namespace Paladin
         }
     }
 
-    MainMenuAction MainMenu::pointerReleased(
-        float x,
-        float y
-    ) noexcept
+    MainMenuAction MainMenu::pointerReleased(float x, float y) noexcept
     {
-        const bool playClicked =
-            playButton_.pointerReleased(x, y);
+        const bool playClicked = playButton_.pointerReleased(x, y);
 
-        const bool tutorialClicked =
-            tutorialButton_.pointerReleased(x, y);
+        const bool tutorialClicked = tutorialButton_.pointerReleased(x, y);
 
-        const bool exitClicked =
-            exitButton_.pointerReleased(x, y);
+        const bool exitClicked = exitButton_.pointerReleased(x, y);
 
         if (playClicked)
         {
@@ -143,4 +113,4 @@ namespace Paladin
         tutorialButton_.render(renderer, uiRenderer);
         exitButton_.render(renderer, uiRenderer);
     }
-}
+} // namespace Paladin

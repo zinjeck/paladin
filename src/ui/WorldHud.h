@@ -4,59 +4,59 @@
 
 namespace Paladin
 {
-class GrayUiRenderer;
-class Renderer;
+    class GrayUiRenderer;
+    class Renderer;
 
-enum class WorldHudAction
-{
-    None,
-    SelectRegion,
-    MoveCapital,
-    RenameCapital,
-    EditPolity,
-    Play,
-    Back
-};
-
-class WorldHud
-{
-  public:
-    WorldHud();
-    void setAdditionalSelection(bool value) noexcept
+    enum class WorldHudAction
     {
-        additionalSelection_ = value;
-    }
+        None,
+        SelectRegion,
+        MoveCapital,
+        RenameCapital,
+        EditRealm,
+        Play,
+        Back
+    };
 
-    void layout(int viewportWidth, int viewportHeight) noexcept;
+    class WorldHud
+    {
+    public:
+        WorldHud();
+        void setAdditionalSelection(bool value) noexcept
+        {
+            additionalSelection_ = value;
+        }
 
-    void setCapitalEstablished(bool established) noexcept;
-    void setSimulationControlsUnlocked(bool unlocked) noexcept;
-    void pointerMoved(float x, float y) noexcept;
+        void layout(int viewportWidth, int viewportHeight) noexcept;
 
-    [[nodiscard]]
-    bool pointerPressed(float x, float y) noexcept;
+        void setCapitalEstablished(bool established) noexcept;
+        void setSimulationControlsUnlocked(bool unlocked) noexcept;
+        void pointerMoved(float x, float y) noexcept;
 
-    [[nodiscard]]
-    bool containsInteractivePoint(float x, float y) const noexcept;
+        [[nodiscard]]
+        bool pointerPressed(float x, float y) noexcept;
 
-    [[nodiscard]]
-    WorldHudAction pointerReleased(float x, float y) noexcept;
+        [[nodiscard]]
+        bool containsInteractivePoint(float x, float y) const noexcept;
 
-    void render(
-        Renderer& renderer,
-        const GrayUiRenderer& uiRenderer,
-        bool regionSelectionActive
-    );
+        [[nodiscard]]
+        WorldHudAction pointerReleased(float x, float y) noexcept;
 
-  private:
-    UiButton selectRegionButton_;
-    UiButton moveCapitalButton_;
-    UiButton renameCapitalButton_;
-    UiButton editPolityButton_;
-    UiButton playButton_;
-    UiButton backButton_;
-    bool additionalSelection_ = false;
-    bool capitalEstablished_ = false;
-    bool simulationControlsUnlocked_ = false;
-};
+        void render(
+            Renderer& renderer,
+            const GrayUiRenderer& uiRenderer,
+            bool regionSelectionActive
+        );
+
+    private:
+        UiButton selectRegionButton_;
+        UiButton moveCapitalButton_;
+        UiButton renameCapitalButton_;
+        UiButton editRealmButton_;
+        UiButton playButton_;
+        UiButton backButton_;
+        bool additionalSelection_ = false;
+        bool capitalEstablished_ = false;
+        bool simulationControlsUnlocked_ = false;
+    };
 } // namespace Paladin

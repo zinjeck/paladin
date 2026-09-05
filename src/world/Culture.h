@@ -13,12 +13,8 @@ namespace Paladin
     class Culture
     {
     public:
-        Culture(
-            CultureId id,
-            std::string name
-        )
-            : id_(id),
-              name_(std::move(name))
+        Culture(CultureId id, std::string name)
+            : id_(id), name_(std::move(name))
         {
         }
 
@@ -45,4 +41,4 @@ namespace Paladin
         CultureId id_;
         std::string name_;
     };
-}
+} // namespace Paladin

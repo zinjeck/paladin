@@ -7,11 +7,7 @@ namespace Paladin
     class Window
     {
     public:
-        Window(
-            const char* title,
-            int width,
-            int height
-        );
+        Window(const char* title, int width, int height);
 
         ~Window();
 
@@ -25,4 +21,4 @@ namespace Paladin
     private:
         SDL_Window* window_ = nullptr;
     };
-}
+} // namespace Paladin

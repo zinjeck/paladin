@@ -18,12 +18,12 @@ namespace Paladin
     {
         switch (tier)
         {
-            case SettlementSimulationTier::Detailed:
-            case SettlementSimulationTier::Inactive:
-            case SettlementSimulationTier::Strategic:
-                return true;
+        case SettlementSimulationTier::Detailed:
+        case SettlementSimulationTier::Inactive:
+        case SettlementSimulationTier::Strategic:
+            return true;
         }
 
         return false;
     }
-}
+} // namespace Paladin

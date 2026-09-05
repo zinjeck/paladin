@@ -10,4 +10,4 @@ namespace Paladin
         Water,
         Mountain
     };
-}
+} // namespace Paladin

@@ -37,4 +37,4 @@ namespace Paladin
                 defaultSettlementMapGenerationSettings()
         ) const;
     };
-}
+} // namespace Paladin

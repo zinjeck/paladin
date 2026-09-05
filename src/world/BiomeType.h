@@ -14,4 +14,4 @@ namespace Paladin
         Taiga,
         Ocean
     };
-}
+} // namespace Paladin

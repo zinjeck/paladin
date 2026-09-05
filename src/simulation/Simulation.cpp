@@ -13,10 +13,7 @@
 namespace Paladin
 {
     Simulation::Simulation()
-        : Simulation(
-              withRandomWorldSeed(),
-              defaultSimulationTimingSettings()
-          )
+        : Simulation(withRandomWorldSeed(), defaultSimulationTimingSettings())
     {
     }
 
@@ -26,33 +23,26 @@ namespace Paladin
         SimulationTimingSettings timingSettings
     )
         : world_(std::make_unique<World>(generationSettings)),
-          worldSimulationPipeline_(
-              std::make_unique<WorldSimulationPipeline>()
-          ),
+          worldSimulationPipeline_(std::make_unique<WorldSimulationPipeline>()),
           timingSettings_(timingSettings)
     {
-        if (
-            timingSettings_.gameMinutesPerStep == 0 ||
+        if (timingSettings_.gameMinutesPerStep == 0 ||
             !std::isfinite(timingSettings_.realSecondsPerStep) ||
-            timingSettings_.realSecondsPerStep <= 0.0
-        )
+            timingSettings_.realSecondsPerStep <= 0.0)
         {
             timingSettings_ = defaultSimulationTimingSettings();
         }
 
-        playerPolityId_ = world_->createPolity();
+        playerRealmId_ = world_->createRealm();
     }
 
 
     Simulation::~Simulation() = default;
 
 
-    void Simulation::tick(
-        double realDeltaSeconds
-    )
+    void Simulation::tick(double realDeltaSeconds)
     {
-        const double multiplier =
-            speedMultiplier();
+        const double multiplier = speedMultiplier();
 
         if (multiplier <= 0.0)
         {
@@ -69,13 +59,9 @@ namespace Paladin
         // Commit only whole authoritative world minutes while retaining the
         // fractional phase between fixed simulation updates.
         const double gameDeltaMinutes =
-            realDeltaSeconds * multiplier *
-            gameMinutesPerRealSecond;
+            realDeltaSeconds * multiplier * gameMinutesPerRealSecond;
 
-        if (
-            !std::isfinite(gameDeltaMinutes) ||
-            gameDeltaMinutes <= 0.0
-        )
+        if (!std::isfinite(gameDeltaMinutes) || gameDeltaMinutes <= 0.0)
         {
             return;
         }
@@ -110,9 +96,8 @@ namespace Paladin
             return;
         }
 
-        const double maximumMinutes = static_cast<double>(
-            std::numeric_limits<std::uint64_t>::max()
-        );
+        const double maximumMinutes =
+            static_cast<double>(std::numeric_limits<std::uint64_t>::max());
 
         const std::uint64_t gameMinutes =
             wholeMinutes >= maximumMinutes
@@ -123,16 +108,11 @@ namespace Paladin
 
         world_->advanceTime(gameMinutes);
         ScopedTiming aggregateTimer{aggregateTiming};
-        worldSimulationPipeline_->tick(
-            *world_,
-            gameMinutes
-        );
+        worldSimulationPipeline_->tick(*world_, gameMinutes);
     }
 
 
-    void Simulation::setSpeed(
-        SimulationSpeed speed
-    ) noexcept
+    void Simulation::setSpeed(SimulationSpeed speed) noexcept
     {
         speed_ = speed;
     }
@@ -146,8 +126,7 @@ namespace Paladin
 
     bool Simulation::isPaused() const noexcept
     {
-        return speed_ ==
-            SimulationSpeed::Paused;
+        return speed_ == SimulationSpeed::Paused;
     }
 
 
@@ -169,9 +148,9 @@ namespace Paladin
     }
 
 
-    PolityId Simulation::playerPolityId() const noexcept
+    RealmId Simulation::playerRealmId() const noexcept
     {
-        return playerPolityId_;
+        return playerRealmId_;
     }
 
 
@@ -181,24 +160,17 @@ namespace Paladin
     }
 
 
-    SettlementId
-    Simulation::detailedSimulationSettlementId() const noexcept
+    SettlementId Simulation::detailedSimulationSettlementId() const noexcept
     {
         return detailedSimulationSettlementId_;
     }
 
 
-    bool Simulation::setPresentedSettlement(
-        SettlementId settlementId
-    ) noexcept
+    bool Simulation::setPresentedSettlement(SettlementId settlementId) noexcept
     {
-        const Settlement* settlement =
-            world_->settlement(settlementId);
+        const Settlement* settlement = world_->settlement(settlementId);
 
-        if (
-            !settlement ||
-            settlement->ownerPolityId() != playerPolityId_
-        )
+        if (!settlement || settlement->ownerRealmId() != playerRealmId_)
         {
             return false;
         }
@@ -208,17 +180,11 @@ namespace Paladin
     }
 
 
-    bool Simulation::setDetailedSimulationSettlement(
-        SettlementId settlementId
-    )
+    bool Simulation::setDetailedSimulationSettlement(SettlementId settlementId)
     {
-        const Settlement* settlement =
-            world_->settlement(settlementId);
+        const Settlement* settlement = world_->settlement(settlementId);
 
-        if (
-            !settlement ||
-            settlement->ownerPolityId() != playerPolityId_
-        )
+        if (!settlement || settlement->ownerRealmId() != playerRealmId_)
         {
             return false;
         }
@@ -264,33 +230,27 @@ namespace Paladin
     {
         Settlement* settlement = world_->settlement(settlementId);
 
-        if (
-            !settlement ||
-            settlement->ownerPolityId() != playerPolityId_ ||
-            !settlement->simulationState().isInitialized()
-        )
+        if (!settlement || settlement->ownerRealmId() != playerRealmId_ ||
+            !settlement->simulationState().isInitialized())
         {
             return false;
         }
 
-        SettlementSimulationState& state =
-            settlement->simulationState();
+        SettlementSimulationState& state = settlement->simulationState();
 
         const TerritoryFoundationPolicy& territoryPolicy =
             world_->territoryFoundationPolicy();
 
         const SettlementMap* existingMap = state.localMap();
 
-        if (
-            existingMap &&
+        if (existingMap &&
             existingMap->sourceRegionCenter() == settlement->position() &&
             existingMap->sourceRegionWidth() ==
                 territoryPolicy.settlementRegionWidth &&
             existingMap->sourceRegionHeight() ==
                 territoryPolicy.settlementRegionHeight &&
             existingMap->localTilesPerWorldTile() ==
-                settings.localTilesPerWorldTile
-        )
+                settings.localTilesPerWorldTile)
         {
             return true;
         }
@@ -310,10 +270,10 @@ namespace Paladin
             return false;
         }
 
-        if (const auto* polity = world_->polity(settlement->ownerPolityId()))
+        if (const auto* realm = world_->realm(settlement->ownerRealmId()))
         {
             generatedMap->activities.policy.setWorkDayHours(
-                polity->workDayHours()
+                realm->workDayHours()
             );
         }
         state.setLocalMap(std::move(generatedMap));
@@ -321,15 +281,12 @@ namespace Paladin
     }
 
 
-    SettlementMap* Simulation::settlementMap(
-        SettlementId settlementId
-    ) noexcept
+    SettlementMap* Simulation::settlementMap(SettlementId settlementId) noexcept
     {
         Settlement* settlement = world_->settlement(settlementId);
 
-        return settlement
-            ? settlement->simulationState().localMap_.get()
-            : nullptr;
+        return settlement ? settlement->simulationState().localMap_.get()
+                          : nullptr;
     }
 
 
@@ -339,9 +296,7 @@ namespace Paladin
     {
         const Settlement* settlement = world_->settlement(settlementId);
 
-        return settlement
-            ? settlement->simulationState().localMap()
-            : nullptr;
+        return settlement ? settlement->simulationState().localMap() : nullptr;
     }
 
 
@@ -350,81 +305,93 @@ namespace Paladin
         const FoundingIdentity& identity
     )
     {
-        const SettlementId settlementId =
-            world_->foundCapitalSettlement(
+        const SettlementId settlementId = world_->foundCapitalSettlement(
             position,
-            playerPolityId_,
+            playerRealmId_,
             identity,
             playerSettlementFoundationProfile(world_->generationSeed())
         );
 
         if (settlementId.isValid())
         {
-            static_cast<void>(
-                setPresentedSettlement(settlementId)
-            );
-
+            static_cast<void>(setPresentedSettlement(settlementId));
         }
 
         return settlementId;
     }
 
 
-    SettlementId Simulation::foundPlayerSettlement(WorldTilePosition position, std::string name)
+    SettlementId Simulation::foundPlayerSettlement(
+        WorldTilePosition position,
+        std::string name
+    )
     {
-        if (!isValidFoundingName(name) || !world_->canFoundAdditionalSettlementAt(position,playerPolityId_)) return {};
-        const auto& policy=world_->territoryFoundationPolicy();
-        auto map=settlementMapGenerator_.generate(world_->grid(),position,policy.settlementRegionWidth,
-            policy.settlementRegionHeight,world_->generationSeed(),SettlementMapGenerationSettings{});
-        if (!map) return {};
-        map->activities.policy.setWorkDayHours(world_->polity(playerPolityId_)->workDayHours());
-        auto profile=playerSettlementFoundationProfile(world_->generationSeed() ^ (std::uint64_t(position.x)<<32) ^ std::uint32_t(position.y));
-        const auto id=world_->foundSettlement(position,playerPolityId_,profile);
-        if (!id) return {};
+        if (!isValidFoundingName(name) ||
+            !world_->canFoundAdditionalSettlementAt(position, playerRealmId_))
+        {
+            return {};
+        }
+        const auto& policy = world_->territoryFoundationPolicy();
+        auto map = settlementMapGenerator_.generate(
+            world_->grid(),
+            position,
+            policy.settlementRegionWidth,
+            policy.settlementRegionHeight,
+            world_->generationSeed(),
+            SettlementMapGenerationSettings{}
+        );
+        if (!map)
+        {
+            return {};
+        }
+        map->activities.policy.setWorkDayHours(
+            world_->realm(playerRealmId_)->workDayHours()
+        );
+        auto profile = playerSettlementFoundationProfile(
+            world_->generationSeed() ^ (std::uint64_t(position.x) << 32) ^
+            std::uint32_t(position.y)
+        );
+        const auto id =
+            world_->foundSettlement(position, playerRealmId_, profile);
+        if (!id)
+        {
+            return {};
+        }
         world_->settlement(id)->simulationState().setLocalMap(std::move(map));
-        static_cast<void>(world_->renameSettlement(id,std::move(name)));
+        static_cast<void>(world_->renameSettlement(id, std::move(name)));
         static_cast<void>(setPresentedSettlement(id));
         return id;
     }
 
     bool Simulation::renamePlayerCapital(std::string name)
     {
-        const Polity* polity = world_->polity(playerPolityId_);
+        const Realm* realm = world_->realm(playerRealmId_);
 
-        return
-            polity &&
-            world_->renameSettlement(
-                polity->capitalSettlementId(),
-                std::move(name)
-            );
+        return realm && world_->renameSettlement(
+                            realm->capitalSettlementId(),
+                            std::move(name)
+                        );
     }
 
 
-    bool Simulation::editPlayerPolity(
-        const FoundingIdentity& identity
-    )
+    bool Simulation::editPlayerRealm(const FoundingIdentity& identity)
     {
-        return world_->editPolityIdentity(playerPolityId_, identity);
+        return world_->editRealmIdentity(playerRealmId_, identity);
     }
 
 
     bool Simulation::movePlayerCapital(WorldTilePosition position)
     {
-        const Polity* polity = world_->polity(playerPolityId_);
+        const Realm* realm = world_->realm(playerRealmId_);
 
-        if (!polity)
+        if (!realm)
         {
             return false;
         }
 
-        Settlement* capital = world_->settlement(
-            polity->capitalSettlementId()
-        );
+        Settlement* capital = world_->settlement(realm->capitalSettlementId());
 
-        if (
-            !capital ||
-            !world_->relocateSoleCapital(playerPolityId_, position)
-        )
+        if (!capital || !world_->relocateSoleCapital(playerRealmId_, position))
         {
             return false;
         }
@@ -443,30 +410,19 @@ namespace Paladin
                 continue;
             }
 
-            SettlementSimulationTier tier =
-                SettlementSimulationTier::Strategic;
+            SettlementSimulationTier tier = SettlementSimulationTier::Strategic;
 
-            if (
-                settlement.id() ==
-                detailedSimulationSettlementId_
-            )
+            if (settlement.id() == detailedSimulationSettlementId_)
             {
                 tier = SettlementSimulationTier::Detailed;
             }
-            else if (
-                settlement.ownerPolityId() == playerPolityId_
-            )
+            else if (settlement.ownerRealmId() == playerRealmId_)
             {
                 tier = SettlementSimulationTier::Inactive;
             }
 
-            if (
-                !worldSimulationPipeline_->transitionSettlementTier(
-                    *world_,
-                    settlement.id(),
-                    tier
-                )
-            )
+            if (!worldSimulationPipeline_
+                     ->transitionSettlementTier(*world_, settlement.id(), tier))
             {
                 return false;
             }
@@ -480,79 +436,80 @@ namespace Paladin
     {
         switch (speed_)
         {
-            case SimulationSpeed::Paused:
-                return 0.0;
+        case SimulationSpeed::Paused:
+            return 0.0;
 
-            case SimulationSpeed::Normal:
-                return 1.0;
+        case SimulationSpeed::Normal:
+            return 1.0;
 
-            case SimulationSpeed::Fast:
-                return 2.0;
+        case SimulationSpeed::Fast:
+            return 2.0;
 
-            case SimulationSpeed::VeryFast:
-                return 3.0;
+        case SimulationSpeed::VeryFast:
+            return 3.0;
         }
 
         return 1.0;
     }
-}
-
-namespace Paladin
-{
-std::string Simulation::systemTimingText() const
-{
-    std::string text;
-    for (std::size_t i = 0; i < worldSimulationPipeline_->systemTimings.size();
-         ++i)
-    {
-        text += std::string(
-                    i == 0   ? "Economy: "
-                    : i == 1 ? "Population: "
-                             : "System: "
-                ) +
-                worldSimulationPipeline_->systemTimings[i].text() + "\n";
-    }
-    return text;
-}
 } // namespace Paladin
 
 namespace Paladin
 {
-void Simulation::changeWorkDay(SettlementId id, bool realm, int delta)
-{
-    const auto* settlement = world_->settlement(id);
-    if (!settlement || settlement->ownerPolityId() != playerPolityId_)
+    std::string Simulation::systemTimingText() const
     {
-        return;
+        std::string text;
+        for (std::size_t i = 0;
+             i < worldSimulationPipeline_->systemTimings.size();
+             ++i)
+        {
+            text += std::string(
+                        i == 0   ? "Economy: "
+                        : i == 1 ? "Population: "
+                                 : "System: "
+                    ) +
+                    worldSimulationPipeline_->systemTimings[i].text() + "\n";
+        }
+        return text;
     }
-    if (realm)
+} // namespace Paladin
+
+namespace Paladin
+{
+    void Simulation::changeWorkDay(SettlementId id, bool realm, int delta)
     {
-        auto* polity = world_->polity(playerPolityId_);
-        if (!polity)
+        const auto* settlement = world_->settlement(id);
+        if (!settlement || settlement->ownerRealmId() != playerRealmId_)
         {
             return;
         }
-        const int hours = std::clamp(polity->workDayHours() + delta, 0, 14);
-        polity->setWorkDayHours(hours);
-        // A realm enactment applies to every controlled city, including
-        // future maps through the polity's persistent default.
-        for (const auto& city : world_->settlements())
+        if (realm)
         {
-            if (city.ownerPolityId() == playerPolityId_)
+            auto* realm = world_->realm(playerRealmId_);
+            if (!realm)
             {
-                if (auto* map = settlementMap(city.id()))
+                return;
+            }
+            const int hours = std::clamp(realm->workDayHours() + delta, 0, 14);
+            realm->setWorkDayHours(hours);
+            // A realm enactment applies to every controlled city, including
+            // future maps through the realm's persistent default.
+            for (const auto& city : world_->settlements())
+            {
+                if (city.ownerRealmId() == playerRealmId_)
                 {
-                    map->activities.policy.setWorkDayHours(hours);
+                    if (auto* map = settlementMap(city.id()))
+                    {
+                        map->activities.policy.setWorkDayHours(hours);
+                    }
                 }
             }
         }
+        else if (auto* map = settlementMap(id))
+        {
+            const auto& policy = map->activities.policy;
+            map->activities.policy.setWorkDayHours(
+                (policy.shiftEndMinute - policy.shiftStartMinute) / 60 + delta
+            );
+        }
     }
-    else if (auto* map = settlementMap(id))
-    {
-        const auto& policy = map->activities.policy;
-        map->activities.policy.setWorkDayHours(
-            (policy.shiftEndMinute - policy.shiftStartMinute) / 60 + delta
-        );
-    }
-}
 } // namespace Paladin

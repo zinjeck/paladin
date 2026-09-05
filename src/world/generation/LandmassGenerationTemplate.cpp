@@ -46,36 +46,14 @@ namespace Paladin
                 1.18
             };
 
-            definition.continentNoise = {
-                0,
-                ShapeNoiseType::Simplex,
-                0.004,
-                3,
-                0.45,
-                2.0,
-                0.14
-            };
+            definition.continentNoise =
+                {0, ShapeNoiseType::Simplex, 0.004, 3, 0.45, 2.0, 0.14};
 
-            definition.regionalNoise = {
-                9'917,
-                ShapeNoiseType::Simplex,
-                0.026,
-                3,
-                0.46,
-                2.15,
-                0.11
-            };
+            definition.regionalNoise =
+                {9'917, ShapeNoiseType::Simplex, 0.026, 3, 0.46, 2.15, 0.11};
 
             definition.coastline = {
-                {
-                    17'771,
-                    ShapeNoiseType::Simplex,
-                    0.085,
-                    2,
-                    0.55,
-                    2.4,
-                    1.0
-                },
+                {17'771, ShapeNoiseType::Simplex, 0.085, 2, 0.55, 2.4, 1.0},
                 0.62,
                 0.18,
                 0.025,
@@ -84,24 +62,13 @@ namespace Paladin
             };
 
             definition.islands = {
-                {
-                    28'891,
-                    ShapeNoiseType::Simplex,
-                    0.021,
-                    4,
-                    0.52,
-                    2.1,
-                    1.0
-                },
+                {28'891, ShapeNoiseType::Simplex, 0.021, 4, 0.52, 2.1, 1.0},
                 0.14,
                 0.50,
                 1.35
             };
 
-            definition.edgeFalloff = {
-                7.0,
-                0.95
-            };
+            definition.edgeFalloff = {7.0, 0.95};
 
             definition.elevationBias = -0.14;
             definition.maximumContinentCore = 1.05;
@@ -110,10 +77,9 @@ namespace Paladin
 
         const std::vector<LandmassGenerationTemplate>& templates()
         {
-            static const std::vector<LandmassGenerationTemplate>
-                definitions{
-                    createGodotBaseTemplate()
-                };
+            static const std::vector<LandmassGenerationTemplate> definitions{
+                createGodotBaseTemplate()
+            };
 
             return definitions;
         }
@@ -123,28 +89,20 @@ namespace Paladin
             return std::isfinite(value) && value >= 0.0;
         }
 
-        bool isValidNoise(
-            const FractalShapeNoise& noise
-        ) noexcept
+        bool isValidNoise(const FractalShapeNoise& noise) noexcept
         {
-            const bool hasKnownType =
-                noise.type == ShapeNoiseType::Value ||
-                noise.type == ShapeNoiseType::Simplex;
+            const bool hasKnownType = noise.type == ShapeNoiseType::Value ||
+                                      noise.type == ShapeNoiseType::Simplex;
 
-            return
-                hasKnownType &&
-                std::isfinite(noise.frequency) &&
-                noise.frequency > 0.0 &&
-                noise.octaveCount > 0 &&
-                isFiniteNonnegative(noise.gain) &&
-                std::isfinite(noise.lacunarity) &&
-                noise.lacunarity > 0.0 &&
-                isFiniteNonnegative(noise.amplitude);
+            return hasKnownType && std::isfinite(noise.frequency) &&
+                   noise.frequency > 0.0 && noise.octaveCount > 0 &&
+                   isFiniteNonnegative(noise.gain) &&
+                   std::isfinite(noise.lacunarity) && noise.lacunarity > 0.0 &&
+                   isFiniteNonnegative(noise.amplitude);
         }
-    }
+    } // namespace
 
-    std::span<const LandmassGenerationTemplate>
-    landmassGenerationTemplates()
+    std::span<const LandmassGenerationTemplate> landmassGenerationTemplates()
     {
         return templates();
     }
@@ -153,8 +111,7 @@ namespace Paladin
         std::string_view id
     )
     {
-        for (const LandmassGenerationTemplate& definition
-            : templates())
+        for (const LandmassGenerationTemplate& definition : templates())
         {
             if (definition.id == id)
             {
@@ -172,12 +129,10 @@ namespace Paladin
     ) noexcept
     {
         return {
-            requestedMinimum == 0
-                ? definition.defaultMinimumContinentCount
-                : requestedMinimum,
-            requestedMaximum == 0
-                ? definition.defaultMaximumContinentCount
-                : requestedMaximum
+            requestedMinimum == 0 ? definition.defaultMinimumContinentCount
+                                  : requestedMinimum,
+            requestedMaximum == 0 ? definition.defaultMaximumContinentCount
+                                  : requestedMaximum
         };
     }
 
@@ -185,9 +140,7 @@ namespace Paladin
         const LandmassGenerationTemplate& definition
     ) noexcept
     {
-        if (
-            definition.id.empty() ||
-            definition.displayName.empty() ||
+        if (definition.id.empty() || definition.displayName.empty() ||
             definition.defaultMinimumContinentCount <= 0 ||
             definition.defaultMaximumContinentCount <
                 definition.defaultMinimumContinentCount ||
@@ -199,23 +152,18 @@ namespace Paladin
             !std::isfinite(definition.minimumCenterY) ||
             !std::isfinite(definition.maximumCenterY) ||
             definition.minimumCenterX > definition.maximumCenterX ||
-            definition.minimumCenterY > definition.maximumCenterY
-        )
+            definition.minimumCenterY > definition.maximumCenterY)
         {
             return false;
         }
 
-        if (
-            static_cast<std::size_t>(
-                definition.defaultMaximumContinentCount
-            ) > definition.continentSlots.size()
-        )
+        if (static_cast<std::size_t>(definition.defaultMaximumContinentCount) >
+            definition.continentSlots.size())
         {
             return false;
         }
 
-        for (const NormalizedMapPoint& slot
-            : definition.continentSlots)
+        for (const NormalizedMapPoint& slot : definition.continentSlots)
         {
             if (!std::isfinite(slot.x) || !std::isfinite(slot.y))
             {
@@ -223,18 +171,12 @@ namespace Paladin
             }
         }
 
-        const ContinentLobeTemplate& lobes =
-            definition.continentLobes;
+        const ContinentLobeTemplate& lobes = definition.continentLobes;
 
-        if (
-            lobes.minimumCount <= 0 ||
+        if (lobes.minimumCount <= 0 ||
             lobes.maximumCount < lobes.minimumCount ||
-            !isFiniteNonnegative(
-                lobes.maximumOffsetWidthFraction
-            ) ||
-            !isFiniteNonnegative(
-                lobes.maximumOffsetHeightFraction
-            ) ||
+            !isFiniteNonnegative(lobes.maximumOffsetWidthFraction) ||
+            !isFiniteNonnegative(lobes.maximumOffsetHeightFraction) ||
             !std::isfinite(lobes.minimumRadiusWidthFraction) ||
             lobes.minimumRadiusWidthFraction <= 0.0 ||
             !std::isfinite(lobes.maximumRadiusWidthFraction) ||
@@ -251,37 +193,34 @@ namespace Paladin
             !std::isfinite(lobes.distanceExponent) ||
             lobes.distanceExponent <= 0.0 ||
             !std::isfinite(lobes.falloffExponent) ||
-            lobes.falloffExponent <= 0.0
-        )
+            lobes.falloffExponent <= 0.0)
         {
             return false;
         }
 
-        const CoastlineBreakupTemplate& coastline =
-            definition.coastline;
+        const CoastlineBreakupTemplate& coastline = definition.coastline;
 
         const IslandTemplate& islands = definition.islands;
 
-        return
-            isValidNoise(definition.continentNoise) &&
-            isValidNoise(definition.regionalNoise) &&
-            isValidNoise(coastline.noise) &&
-            std::isfinite(coastline.interiorCoreThreshold) &&
-            std::isfinite(coastline.coastlineCoreThreshold) &&
-            coastline.interiorCoreThreshold >=
-                coastline.coastlineCoreThreshold &&
-            isFiniteNonnegative(coastline.interiorAmplitude) &&
-            isFiniteNonnegative(coastline.coastlineAmplitude) &&
-            isFiniteNonnegative(coastline.offshoreAmplitude) &&
-            isValidNoise(islands.noise) &&
-            isFiniteNonnegative(islands.maximumContinentCore) &&
-            std::isfinite(islands.noiseThreshold) &&
-            isFiniteNonnegative(islands.amplitude) &&
-            std::isfinite(definition.edgeFalloff.exponent) &&
-            definition.edgeFalloff.exponent > 0.0 &&
-            isFiniteNonnegative(definition.edgeFalloff.strength) &&
-            std::isfinite(definition.elevationBias) &&
-            std::isfinite(definition.maximumContinentCore) &&
-            definition.maximumContinentCore > 0.0;
+        return isValidNoise(definition.continentNoise) &&
+               isValidNoise(definition.regionalNoise) &&
+               isValidNoise(coastline.noise) &&
+               std::isfinite(coastline.interiorCoreThreshold) &&
+               std::isfinite(coastline.coastlineCoreThreshold) &&
+               coastline.interiorCoreThreshold >=
+                   coastline.coastlineCoreThreshold &&
+               isFiniteNonnegative(coastline.interiorAmplitude) &&
+               isFiniteNonnegative(coastline.coastlineAmplitude) &&
+               isFiniteNonnegative(coastline.offshoreAmplitude) &&
+               isValidNoise(islands.noise) &&
+               isFiniteNonnegative(islands.maximumContinentCore) &&
+               std::isfinite(islands.noiseThreshold) &&
+               isFiniteNonnegative(islands.amplitude) &&
+               std::isfinite(definition.edgeFalloff.exponent) &&
+               definition.edgeFalloff.exponent > 0.0 &&
+               isFiniteNonnegative(definition.edgeFalloff.strength) &&
+               std::isfinite(definition.elevationBias) &&
+               std::isfinite(definition.maximumContinentCore) &&
+               definition.maximumContinentCore > 0.0;
     }
-}
+} // namespace Paladin

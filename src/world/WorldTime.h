@@ -43,4 +43,4 @@ namespace Paladin
         // integral; rendering may interpolate independently later.
         std::uint64_t totalGameMinutes_ = 6 * MinutesPerHour;
     };
-}
+} // namespace Paladin

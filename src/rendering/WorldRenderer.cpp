@@ -18,9 +18,7 @@ namespace Paladin
     WorldRenderer::WorldRenderer(
         TerritoryPresentationPolicy territoryPresentationPolicy
     )
-        : territoryPresentationPolicy_(
-              std::move(territoryPresentationPolicy)
-          )
+        : territoryPresentationPolicy_(std::move(territoryPresentationPolicy))
     {
     }
 
@@ -35,36 +33,30 @@ namespace Paladin
         std::span<const TileOutlineRenderItem> outlines
     ) const
     {
-        gridRenderer_.render(
-            renderer,
-            world.grid(),
-            camera,
-            metrics
-        );
+        gridRenderer_.render(renderer, world.grid(), camera, metrics);
 
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
         if (!politicalViewInitialized_)
         {
             politicalViewActive_ =
-                tilePixels <= territoryPresentationPolicy_
-                    .enterPoliticalViewTilePixels;
+                tilePixels <=
+                territoryPresentationPolicy_.enterPoliticalViewTilePixels;
 
             politicalViewInitialized_ = true;
         }
         else if (
             politicalViewActive_ &&
-            tilePixels > territoryPresentationPolicy_
-                .exitPoliticalViewTilePixels
+            tilePixels >
+                territoryPresentationPolicy_.exitPoliticalViewTilePixels
         )
         {
             politicalViewActive_ = false;
         }
         else if (
             !politicalViewActive_ &&
-            tilePixels <= territoryPresentationPolicy_
-                .enterPoliticalViewTilePixels
+            tilePixels <=
+                territoryPresentationPolicy_.enterPoliticalViewTilePixels
         )
         {
             politicalViewActive_ = true;
@@ -79,35 +71,15 @@ namespace Paladin
             territoryPresentationPolicy_
         );
 
-        spriteRenderer_.render(
-            renderer,
-            sprites,
-            camera,
-            metrics
-        );
+        spriteRenderer_.render(renderer, sprites, camera, metrics);
 
         if (!politicalViewActive_)
         {
-            settlementMarkerRenderer_.render(
-                renderer,
-                world,
-                camera,
-                metrics
-            );
+            settlementMarkerRenderer_.render(renderer, world, camera, metrics);
         }
 
-        overlayRenderer_.render(
-            renderer,
-            overlays,
-            camera,
-            metrics
-        );
+        overlayRenderer_.render(renderer, overlays, camera, metrics);
 
-        overlayRenderer_.renderOutlines(
-            renderer,
-            outlines,
-            camera,
-            metrics
-        );
+        overlayRenderer_.renderOutlines(renderer, outlines, camera, metrics);
     }
-}
+} // namespace Paladin

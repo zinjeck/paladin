@@ -2,21 +2,20 @@
 
 namespace Paladin
 {
-    const SettlementSimulationPolicy&
-    SettlementSimulationPolicies::forTier(
+    const SettlementSimulationPolicy& SettlementSimulationPolicies::forTier(
         SettlementSimulationTier tier
     ) const noexcept
     {
         switch (tier)
         {
-            case SettlementSimulationTier::Detailed:
-                return detailed;
+        case SettlementSimulationTier::Detailed:
+            return detailed;
 
-            case SettlementSimulationTier::Inactive:
-                return inactive;
+        case SettlementSimulationTier::Inactive:
+            return inactive;
 
-            case SettlementSimulationTier::Strategic:
-                return strategic;
+        case SettlementSimulationTier::Strategic:
+            return strategic;
         }
 
         return strategic;
@@ -25,38 +24,28 @@ namespace Paladin
 
     bool SettlementSimulationPolicies::isValid() const noexcept
     {
-        return
-            detailed.isValid() &&
-            inactive.isValid() &&
-            strategic.isValid() &&
-            detailed.resolution ==
-                SettlementSimulationResolution::DetailedLocal &&
-            inactive.resolution ==
-                SettlementSimulationResolution::InactiveLocalAggregate &&
-            strategic.resolution ==
-                SettlementSimulationResolution::StrategicAggregate;
+        return detailed.isValid() && inactive.isValid() &&
+               strategic.isValid() &&
+               detailed.resolution ==
+                   SettlementSimulationResolution::DetailedLocal &&
+               inactive.resolution ==
+                   SettlementSimulationResolution::InactiveLocalAggregate &&
+               strategic.resolution ==
+                   SettlementSimulationResolution::StrategicAggregate;
     }
 
 
-    SettlementSimulationPolicies
-    defaultSettlementSimulationPolicies() noexcept
+    SettlementSimulationPolicies defaultSettlementSimulationPolicies() noexcept
     {
         constexpr std::uint64_t minutesPerHour = 60;
         constexpr std::uint64_t minutesPerDay = 24 * minutesPerHour;
 
         return {
-            {
-                SettlementSimulationResolution::DetailedLocal,
-                1
-            },
-            {
-                SettlementSimulationResolution::InactiveLocalAggregate,
-                minutesPerHour
-            },
-            {
-                SettlementSimulationResolution::StrategicAggregate,
-                30 * minutesPerDay
-            }
+            {SettlementSimulationResolution::DetailedLocal, 1},
+            {SettlementSimulationResolution::InactiveLocalAggregate,
+             minutesPerHour},
+            {SettlementSimulationResolution::StrategicAggregate,
+             30 * minutesPerDay}
         };
     }
-}
+} // namespace Paladin

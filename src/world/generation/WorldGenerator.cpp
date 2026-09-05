@@ -2,8 +2,8 @@
 
 #include "world/WorldGrid.h"
 #include "world/generation/ClimateGenerator.h"
-#include "world/generation/LandmassGenerator.h"
 #include "world/generation/LandmassGenerationTemplate.h"
+#include "world/generation/LandmassGenerator.h"
 #include "world/generation/TerrainBiomeClassifier.h"
 #include "world/generation/WorldGenerationSettings.h"
 
@@ -18,20 +18,15 @@ namespace Paladin
             const WorldGenerationSettings& settings
         )
         {
-            if (
-                settings.width <= 0 ||
-                settings.height <= 0
-            )
+            if (settings.width <= 0 || settings.height <= 0)
             {
                 throw std::invalid_argument(
                     "World generation dimensions must be positive."
                 );
             }
 
-            if (
-                grid.width() != settings.width ||
-                grid.height() != settings.height
-            )
+            if (grid.width() != settings.width ||
+                grid.height() != settings.height)
             {
                 throw std::invalid_argument(
                     "World generation settings must match the target grid."
@@ -39,16 +34,10 @@ namespace Paladin
             }
 
             const LandmassGenerationTemplate* landmassTemplate =
-                findLandmassGenerationTemplate(
-                    settings.landmassTemplateId
-                );
+                findLandmassGenerationTemplate(settings.landmassTemplateId);
 
-            if (
-                !landmassTemplate ||
-                !isValidLandmassGenerationTemplate(
-                    *landmassTemplate
-                )
-            )
+            if (!landmassTemplate ||
+                !isValidLandmassGenerationTemplate(*landmassTemplate))
             {
                 throw std::invalid_argument(
                     "World generation requires a valid landmass template."
@@ -62,30 +51,25 @@ namespace Paladin
                     settings.maximumContinentCount
                 );
 
-            if (
-                continentCount.minimum <= 0 ||
+            if (continentCount.minimum <= 0 ||
                 continentCount.maximum < continentCount.minimum ||
-                static_cast<std::size_t>(
-                    continentCount.maximum
-                ) > landmassTemplate->continentSlots.size()
-            )
+                static_cast<std::size_t>(continentCount.maximum) >
+                    landmassTemplate->continentSlots.size())
             {
                 throw std::invalid_argument(
-                    "World generation continent count exceeds the selected template."
+                    "World generation continent count exceeds the selected "
+                    "template."
                 );
             }
 
-            if (
-                settings.seaLevel <= 0.0F ||
-                settings.seaLevel >= 1.0F
-            )
+            if (settings.seaLevel <= 0.0F || settings.seaLevel >= 1.0F)
             {
                 throw std::invalid_argument(
                     "World generation sea level must be between zero and one."
                 );
             }
         }
-    }
+    } // namespace
 
     void WorldGenerator::generate(
         WorldGrid& grid,
@@ -98,4 +82,4 @@ namespace Paladin
         ClimateGenerator{}.generate(grid, settings);
         TerrainBiomeClassifier{}.classify(grid, settings);
     }
-}
+} // namespace Paladin

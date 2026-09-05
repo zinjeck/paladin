@@ -24,4 +24,4 @@ namespace Paladin
             RenderColor color
         ) const;
     };
-}
+} // namespace Paladin

@@ -24,4 +24,4 @@ namespace Paladin
     private:
         OverlayRenderer overlayRenderer_;
     };
-}
+} // namespace Paladin

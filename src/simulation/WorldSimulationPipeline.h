@@ -22,23 +22,15 @@ namespace Paladin
         );
         ~WorldSimulationPipeline();
 
-        WorldSimulationPipeline(
-            const WorldSimulationPipeline&
-        ) = delete;
+        WorldSimulationPipeline(const WorldSimulationPipeline&) = delete;
 
-        WorldSimulationPipeline& operator=(
-            const WorldSimulationPipeline&
-        ) = delete;
+        WorldSimulationPipeline& operator=(const WorldSimulationPipeline&) =
+            delete;
 
         [[nodiscard]]
-        bool addSystem(
-            std::unique_ptr<WorldSimulationSystem> system
-        );
+        bool addSystem(std::unique_ptr<WorldSimulationSystem> system);
 
-        void tick(
-            World& world,
-            std::uint64_t gameMinutes
-        );
+        void tick(World& world, std::uint64_t gameMinutes);
 
         // Commits all time retained under the previous policy before changing
         // resolution. A city view can therefore never reinterpret inactive
@@ -70,4 +62,4 @@ namespace Paladin
         std::vector<SettlementSimulationStep> settlementSteps_;
         SettlementSimulationPolicies policies_;
     };
-}
+} // namespace Paladin

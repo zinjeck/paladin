@@ -8,9 +8,7 @@ namespace Paladin
 {
     namespace
     {
-        DemographicRates normalizedRates(
-            DemographicRates rates
-        ) noexcept
+        DemographicRates normalizedRates(DemographicRates rates) noexcept
         {
             rates.annualBirthsPerPerson =
                 std::isfinite(rates.annualBirthsPerPerson)
@@ -28,37 +26,27 @@ namespace Paladin
             }
 
             rates.annualDeathsAtZeroNeedFulfillmentPerPerson =
-                std::isfinite(
-                    rates.annualDeathsAtZeroNeedFulfillmentPerPerson
-                )
+                std::isfinite(rates.annualDeathsAtZeroNeedFulfillmentPerPerson)
                     ? std::max(
-                        0.0,
-                        rates
-                            .annualDeathsAtZeroNeedFulfillmentPerPerson
-                    )
+                          0.0,
+                          rates.annualDeathsAtZeroNeedFulfillmentPerPerson
+                      )
                     : 0.0;
 
             rates.maximumAnnualSurplusBirthsPerPerson =
-                std::isfinite(
-                    rates.maximumAnnualSurplusBirthsPerPerson
-                )
-                    ? std::max(
-                        0.0,
-                        rates.maximumAnnualSurplusBirthsPerPerson
-                    )
+                std::isfinite(rates.maximumAnnualSurplusBirthsPerPerson)
+                    ? std::max(0.0, rates.maximumAnnualSurplusBirthsPerPerson)
                     : 0.0;
 
             return rates;
         }
-    }
+    } // namespace
 
     SettlementPopulation::SettlementPopulation(
         std::uint64_t residents,
         DemographicRates rates
     ) noexcept
-        : residents_(residents),
-          rates_(normalizedRates(rates)),
-          version_(1)
+        : residents_(residents), rates_(normalizedRates(rates)), version_(1)
     {
     }
 
@@ -78,9 +66,7 @@ namespace Paladin
         return version_;
     }
 
-    void SettlementPopulation::setRates(
-        DemographicRates rates
-    ) noexcept
+    void SettlementPopulation::setRates(DemographicRates rates) noexcept
     {
         const DemographicRates nextRates = normalizedRates(rates);
 
@@ -93,9 +79,7 @@ namespace Paladin
         ++version_;
     }
 
-    void SettlementPopulation::applyNetChange(
-        double populationChange
-    ) noexcept
+    void SettlementPopulation::applyNetChange(double populationChange) noexcept
     {
         if (!std::isfinite(populationChange))
         {
@@ -112,17 +96,12 @@ namespace Paladin
             constexpr std::uint64_t maximumResidents =
                 std::numeric_limits<std::uint64_t>::max();
 
-            const std::uint64_t availableGrowth =
-                maximumResidents - residents_;
+            const std::uint64_t availableGrowth = maximumResidents - residents_;
 
-            const double requestedGrowth =
-                std::floor(fractionalChange_);
+            const double requestedGrowth = std::floor(fractionalChange_);
 
-            if (
-                availableGrowth == 0 ||
-                requestedGrowth >=
-                    static_cast<double>(availableGrowth)
-            )
+            if (availableGrowth == 0 ||
+                requestedGrowth >= static_cast<double>(availableGrowth))
             {
                 residents_ = maximumResidents;
                 fractionalChange_ = 0.0;
@@ -134,18 +113,13 @@ namespace Paladin
                 static_cast<std::uint64_t>(requestedGrowth);
 
             residents_ += appliedGrowth;
-            fractionalChange_ -=
-                static_cast<double>(appliedGrowth);
+            fractionalChange_ -= static_cast<double>(appliedGrowth);
         }
         else if (fractionalChange_ <= -1.0)
         {
-            const double requestedDecline =
-                std::floor(-fractionalChange_);
+            const double requestedDecline = std::floor(-fractionalChange_);
 
-            if (
-                requestedDecline >=
-                    static_cast<double>(residents_)
-            )
+            if (requestedDecline >= static_cast<double>(residents_))
             {
                 residents_ = 0;
                 fractionalChange_ = 0.0;
@@ -157,16 +131,13 @@ namespace Paladin
                 static_cast<std::uint64_t>(requestedDecline);
 
             residents_ -= appliedDecline;
-            fractionalChange_ +=
-                static_cast<double>(appliedDecline);
+            fractionalChange_ += static_cast<double>(appliedDecline);
         }
 
-        if (
-            residents_ != openingResidents ||
-            fractionalChange_ != openingFractionalChange
-        )
+        if (residents_ != openingResidents ||
+            fractionalChange_ != openingFractionalChange)
         {
             ++version_;
         }
     }
-}
+} // namespace Paladin

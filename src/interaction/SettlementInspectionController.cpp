@@ -1,76 +1,77 @@
 #include "interaction/SettlementInspectionController.h"
 
+#include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
-#include "world/settlements/citizens/SettlementCitizenState.h"
 
 namespace Paladin
 {
-bool SettlementInspectionController::selectAt(
-    SettlementTilePosition position,
-    const SettlementObjectState& objectState,
-    const SettlementCitizenState& citizenState,
-    bool placePanelOnRight,
-    const SettlementLogistics* logistics
-) noexcept
-{
-    const SettlementCitizen* citizen = citizenState.citizenAt(position);
-
-    if (citizen)
+    bool SettlementInspectionController::selectAt(
+        SettlementTilePosition position,
+        const SettlementObjectState& objectState,
+        const SettlementCitizenState& citizenState,
+        bool placePanelOnRight,
+        const SettlementLogistics* logistics
+    ) noexcept
     {
-        kind_ = SettlementInspectionKind::Citizen;
-        citizenId_ = citizen->id;
-        constructionSiteId_ = {};
-        objectId_ = {};
-        placePanelOnRight_ = placePanelOnRight;
-        return true;
-    }
+        const SettlementCitizen* citizen = citizenState.citizenAt(position);
 
-    const SettlementConstructionSite* constructionSite =
-        objectState.constructionSiteAt(position);
-
-    if (constructionSite &&
-        constructionSite->objectTypeId != SettlementObjectTypes::Road)
-    {
-        kind_ = SettlementInspectionKind::ConstructionSite;
-        constructionSiteId_ = constructionSite->id;
-        objectId_ = {};
-        citizenId_ = {};
-        placePanelOnRight_ = placePanelOnRight;
-        return true;
-    }
-
-    const CompletedSettlementObject* object =
-        objectState.completedObjectAt(position);
-
-    if (object && object->objectTypeId != SettlementObjectTypes::Road)
-    {
-        kind_ = SettlementInspectionKind::CompletedObject;
-        objectId_ = object->id;
-        constructionSiteId_ = {};
-        citizenId_ = {};
-        placePanelOnRight_ = placePanelOnRight;
-        return true;
-    }
-
-    if (logistics)
-    {
-        for (const auto& inventory : logistics->inventories())
+        if (citizen)
         {
-            if (inventory.kind == InventoryKind::Groundpile &&
-                inventory.used() > 0 && inventory.footprint.contains(position))
+            kind_ = SettlementInspectionKind::Citizen;
+            citizenId_ = citizen->id;
+            constructionSiteId_ = {};
+            objectId_ = {};
+            placePanelOnRight_ = placePanelOnRight;
+            return true;
+        }
+
+        const SettlementConstructionSite* constructionSite =
+            objectState.constructionSiteAt(position);
+
+        if (constructionSite &&
+            constructionSite->objectTypeId != SettlementObjectTypes::Road)
+        {
+            kind_ = SettlementInspectionKind::ConstructionSite;
+            constructionSiteId_ = constructionSite->id;
+            objectId_ = {};
+            citizenId_ = {};
+            placePanelOnRight_ = placePanelOnRight;
+            return true;
+        }
+
+        const CompletedSettlementObject* object =
+            objectState.completedObjectAt(position);
+
+        if (object && object->objectTypeId != SettlementObjectTypes::Road)
+        {
+            kind_ = SettlementInspectionKind::CompletedObject;
+            objectId_ = object->id;
+            constructionSiteId_ = {};
+            citizenId_ = {};
+            placePanelOnRight_ = placePanelOnRight;
+            return true;
+        }
+
+        if (logistics)
+        {
+            for (const auto& inventory : logistics->inventories())
             {
-                clear();
-                kind_ = SettlementInspectionKind::Groundpile;
-                inventoryId_ = inventory.id;
-                placePanelOnRight_ = placePanelOnRight;
-                return true;
+                if (inventory.kind == InventoryKind::Groundpile &&
+                    inventory.used() > 0 &&
+                    inventory.footprint.contains(position))
+                {
+                    clear();
+                    kind_ = SettlementInspectionKind::Groundpile;
+                    inventoryId_ = inventory.id;
+                    placePanelOnRight_ = placePanelOnRight;
+                    return true;
+                }
             }
         }
+        clear();
+        return false;
     }
-    clear();
-    return false;
-}
 
 
     void SettlementInspectionController::clear() noexcept
@@ -83,8 +84,8 @@ bool SettlementInspectionController::selectAt(
     }
 
 
-    SettlementInspectionKind
-    SettlementInspectionController::kind() const noexcept
+    SettlementInspectionKind SettlementInspectionController::
+        kind() const noexcept
     {
         return kind_;
     }
@@ -96,35 +97,32 @@ bool SettlementInspectionController::selectAt(
     }
 
 
-    const CompletedSettlementObject*
-    SettlementInspectionController::selectedObject(
-        const SettlementObjectState& objectState
-    ) const noexcept
+    const CompletedSettlementObject* SettlementInspectionController::
+        selectedObject(const SettlementObjectState& objectState) const noexcept
     {
         return kind_ == SettlementInspectionKind::CompletedObject
-            ? objectState.completedObject(objectId_)
-            : nullptr;
+                   ? objectState.completedObject(objectId_)
+                   : nullptr;
     }
 
 
-    const SettlementConstructionSite*
-    SettlementInspectionController::selectedConstructionSite(
-        const SettlementObjectState& objectState
-    ) const noexcept
+    const SettlementConstructionSite* SettlementInspectionController::
+        selectedConstructionSite(
+            const SettlementObjectState& objectState
+        ) const noexcept
     {
         return kind_ == SettlementInspectionKind::ConstructionSite
-            ? objectState.constructionSite(constructionSiteId_)
-            : nullptr;
+                   ? objectState.constructionSite(constructionSiteId_)
+                   : nullptr;
     }
 
 
-    const SettlementCitizen*
-    SettlementInspectionController::selectedCitizen(
+    const SettlementCitizen* SettlementInspectionController::selectedCitizen(
         const SettlementCitizenState& citizenState
     ) const noexcept
     {
         return kind_ == SettlementInspectionKind::Citizen
-            ? citizenState.citizen(citizenId_)
-            : nullptr;
+                   ? citizenState.citizen(citizenId_)
+                   : nullptr;
     }
-}
+} // namespace Paladin

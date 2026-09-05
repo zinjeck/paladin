@@ -37,8 +37,7 @@ namespace Paladin
             return;
         }
 
-        double frameTimeSeconds =
-            currentTimeSeconds - previousTimeSeconds_;
+        double frameTimeSeconds = currentTimeSeconds - previousTimeSeconds_;
 
         previousTimeSeconds_ = currentTimeSeconds;
 
@@ -56,8 +55,7 @@ namespace Paladin
         frameDeltaSeconds_ = frameTimeSeconds;
         if (!paused_)
         {
-            accumulatorSeconds_ +=
-                frameTimeSeconds * speedMultiplier_;
+            accumulatorSeconds_ += frameTimeSeconds * speedMultiplier_;
         }
     }
 
@@ -66,9 +64,7 @@ namespace Paladin
         paused_ = paused;
     }
 
-    void SimulationClock::setSpeedMultiplier(
-        double multiplier
-    ) noexcept
+    void SimulationClock::setSpeedMultiplier(double multiplier) noexcept
     {
         if (std::isfinite(multiplier) && multiplier > 0.0)
         {
@@ -78,9 +74,7 @@ namespace Paladin
 
     bool SimulationClock::shouldTick() const
     {
-        return
-            !paused_ &&
-            accumulatorSeconds_ >= fixedDeltaSeconds_;
+        return !paused_ && accumulatorSeconds_ >= fixedDeltaSeconds_;
     }
 
     void SimulationClock::consumeTick()
@@ -112,4 +106,4 @@ namespace Paladin
     {
         return accumulatorSeconds_ / fixedDeltaSeconds_;
     }
-}
+} // namespace Paladin

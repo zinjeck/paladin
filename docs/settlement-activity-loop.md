@@ -91,9 +91,9 @@ Management windows and inspection panels can be dragged from their body or butto
 
 During adjustable-building door selection the footprint alone uses blue valid-edge tiles and red invalid tiles, including corners, interior tiles and blocked exterior access. The fishery collection overlay is suspended for this stage and returns after door selection/cancellation. Doors use brown fill and a dark brown frame in previews, sites and finished objects. Fishermen retain their outdoor shoreline work behavior. Citizen and population-average hunger colors remain green below 50, progressing through warning colors above it.
 
-After entering the first city, the world HUD shares the top-left information and five management buttons. The top name is the polity; population is the sum of actual citizens in all owned settlements; the third row names the active settlement. World management panels have a blank information area and five decision slots. Only Economy's Found a New Settlement decision is currently active. City panel contents remain unchanged.
+After entering the first city, the world HUD shares the top-left information and five management buttons. The top name is the realm; population is the sum of actual citizens in all owned settlements; the third row names the active settlement. World management panels have a blank information area and five decision slots. Only Economy's Found a New Settlement decision is currently active. City panel contents remain unchanged.
 
-Founding another settlement selects a region, asks only for its name, prepares the local map before changing the world, creates it under the existing polity/culture, and enters it without changing the capital. Owned markers can be clicked to select the active settlement and double-clicked to enter; Play also enters the active settlement. Existing maps and their simulations are retained across switching. New settlements use the current C++ region size and founding population, rather than copying the Godot village-size distinction. Eligibility borrows the prototype's 48-tile capital radius, mostly-land region and non-overlap rules, and also excludes foreign-controlled region tiles. A landmass-connectivity restriction is not added in this pass.
+Founding another settlement selects a region, asks only for its name, prepares the local map before changing the world, creates it under the existing realm/culture, and enters it without changing the capital. Owned markers can be clicked to select the active settlement and double-clicked to enter; Play also enters the active settlement. Existing maps and their simulations are retained across switching. New settlements use the current C++ region size and founding population, rather than copying the Godot village-size distinction. Eligibility borrows the prototype's 48-tile capital radius, mostly-land region and non-overlap rules, and also excludes foreign-controlled region tiles. A landmass-connectivity restriction is not added in this pass.
 
 Reference reviewed read-only: Godot scripts/session/GameSession.gd, found_player_village_and_show, and scripts/world/simulation/WorldPoliticalState.gd, is_player_village_region_eligible.
 
@@ -123,3 +123,54 @@ The real Simulation integration harness ran two settlements with 20,040 road run
 Validation: the existing suite, existing SDL/UI/settlement integration harness, and disposable stress harnesses under ignored out/build. No new tracked test files. Focused checks cover clearing across empty chunks, immediately rejecting removed command targets, reservation/resource conservation, shared construction, road completion, and independent settlement progress.
 
 Copilot suggestions were checked against the live code. Territory scans occur only when its cached content changes; the second pass needs the final centroid to choose an actual owned anchor tile. Debug text already refreshes only while its stats panel is visible. Vector size and grid dimension accessors are constant-time. Zoom-event powers and adjustable edge-scroll response were retained; no measured evidence justified approximating those controls.
+
+
+## September 5: placement colors and distinct sleeping positions
+
+Construction outlines remain green in both material and labor states; readiness no longer turns road rows blue while workers alternate between sites. Object doors are a slightly darkened version of the object's own fill color, including placement previews. Only the small door cursor icon remains brown with a dark brown border. Door support is explicit in the object definition; roads, wheat farms and pastureland have none.
+
+Residents reserve distinct sleeping tiles inside their assigned house, prefer clear positions away from the doorway, and physically walk there after entering. Sleep accrues only once they arrive. Duplicate legacy sleeping targets are reassigned; sharing is a last resort when every location is occupied/reserved. Indoor idle walks finish before sleep begins. Route replacement preserves the current partial step and plans from its endpoint, avoiding backward visual snaps when an idle citizen receives work.
+
+Existing simulation checks cover separate indoor sleepers, doorless farm placement, and visual continuity when a partially moving idle citizen accepts construction work.
+
+
+Sleep rollover correction: active sleep tasks now validate the current planned window as well as the remaining quota. The noon cycle reset can no longer renew an ongoing sleep task before the next night's window. Regression coverage first reproduced that rollover failure, then verified it wakes correctly; the existing household scenario now also checks that five-hour sleepers leave both the Sleep task and Sleeping presentation state.
+
+
+Idle job-polling correction: queued work and inventory revisions no longer invalidate a citizen's home activity. Unemployed residents poll for executable work under the existing decision budget and switch only after successful assignment. A failed search leaves their route and activity intact, rather than repeatedly cancelling and restarting the trip home. The regression holds a resident stationary beside an unfunded construction order, verifies no movement during failed searches, then releases lumber and verifies that hauling starts. Hypothetical delivery-leg checks also clear the source leg's movement state before planning from the pickup endpoint.
+
+
+## September 5: energy replaces scheduled daily sleep
+
+This supersedes the fixed daily sleep quotas, scheduled windows, and indoor-only sleep rules above. The final corrected rate is **25 energy per 24 waking hours, plus 25 per 12 hours spent on work tasks** (not 75). Gathering, hauling, demolition, and construction incur the same extra effort drain for unemployed citizens; workplace tasks incur it during work hours. Breaks and leisure incur only the awake drain. Sleeping incurs no awake/work drain and restores 10 energy/hour, or 50 in five hours.
+
+Citizens begin at 100 energy. Individual night-rest thresholds range from 50 to 60; off-duty citizens also seek daytime rest at 40, and severe exhaustion at 25 can override a shift. Rest is a continuous five-hour block measured only at the actual sleeping position. Urgent food can interrupt it. There is no midnight/noon reset and no forced sleep on spawning or at shift end. Below 50 energy, fatigue causes proportional health loss up to 20/day at zero energy; normal health recovery requires at least 50 energy.
+
+Homes remain preferred, with separate reserved interior sleeping positions. Citizens without an accessible home search a bounded local area for an unoccupied outdoor sleeping position using the existing route budget. Both indoor and outdoor sleepers wake after their block. Seasonal night preference and food-before-sleep checks remain.
+
+City population displays current population/completed housing capacity; the world total remains a population count. Citizen meters are Health, Happiness, Hunger, Energy. Placement remains selected after a successful construction order (except the unique founding keep). During door selection the footprint remains green, and only the hovered cell receives green/red validity feedback.
+
+
+## September 5: corrected awake drain and post-work leisure
+
+The latest correction replaces the 24-hour awake rate above: **16 waking hours cost 25 energy**, plus the unchanged 25 energy per 12 hours on work tasks, including unemployed gathering/hauling/construction. Sleep remains a five-hour block restoring 50; the player explicitly declined an eight-hour sleep window. Employed citizens reserve four hours after their shift for leisure before normal sleep, while critical exhaustion at 25 can override this preference. A normal block must fit before their next shift.
+
+Health, Happiness and Energy bars now shrink from their right edge toward the left; Hunger still grows toward the right. Actual nearby conversation restores 0.1 happiness per game minute (0.2–1.5 per normal 2–15 minute conversation), with no reward for walking to meet. Unemployment adds a gentle two happiness points/day downward pressure, composed with the other happiness influences and clamped to 0–100.
+
+
+### Flexible rest supersedes the fixed leisure window
+
+The player subsequently requested a balanced, adjustable system instead of fixed times. Five hours is now a preferred recovery block used for planning, not a mandatory duration or ceiling. Citizens wake as soon as energy reaches 100, can recover longer when depleted, and return for their shift when above the fatigue threshold. Critical exhaustion can still override work. The leisure preference derives from the off-duty interval minus estimated recovery, with a tunable share allocated after work. Energy, the next shift's expected effort, and seasonal nighttime preference determine when rest is needed. Conversation gain, unemployment pressure, awake/work drains, recovery rate, fatigue thresholds and leisure share live together in CitizenSimulationPolicy.
+
+
+## September 5: families, children, and Realm terminology
+
+Founding/debug adults spawn with deterministic random ages 25–45 and pair with available opposite-sex unmarried adults. Marriage stores reciprocal citizen IDs; close parent/child and sibling pairings are excluded. The family allocator reserves homes for couples and their dependent children before filling spare beds with unmarried adults of either sex. A newborn takes precedence over adult lodgers, who leave through the actual door and become homeless if there is no other vacancy. Four family members fill a house; no additional birth occurs without a vacancy or an unmarried adult lodger to displace.
+
+A configurable 3% daily probability is accumulated as eligible-time hazard, independent of presentation speed: both spouses must be alive, above 80 health, sharing a completed house, with the mother younger than 45. Newborns have parent IDs and the Child flag and render at half adult width/height. After one season (three days elapsed since birth), children become age-18 adults. Adult aging uses one year per four-season cycle (12 days), configurable separately. At age 45, mothers become ineligible before the next birth check. Children consume food, rest, socialize, and count in city/realm population, but cannot be hired, execute player work, or count as unemployed adults. Marriage and Child/Adult state appear in inspection.
+
+SettlementFamilySystem owns aging, births, marriage maintenance and housing allocation. SettlementJobBoard owns command/construction indexing, clearing cursors, incremental maintenance and exclusive claims; decision/path budgets remain in SettlementActivitySystem. Household moves cancel activities through the same reservation-release authority. Citizen appends use stable IDs across vector growth and amortized capacity growth.
+
+All source terminology, types, accessors, UI text and the Realm/RealmOrigin filenames now use Realm. The formatter now specifies namespace indentation, access-label alignment, and mandatory braces; first-party C++ files are normalized to that configuration.
+
+Sleep initiation correction: energy must be strictly below 50 before a new sleep task can begin. Preparing for the next shift cannot override that gate. Individual normal night thresholds are now 45–50, daytime rest is reserved for greater fatigue, and ongoing sleep continues toward full recovery. This removes repeated 99-to-100 sleep attempts without introducing a fixed bedtime.

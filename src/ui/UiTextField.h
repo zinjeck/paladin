@@ -14,10 +14,7 @@ namespace Paladin
     class UiTextField
     {
     public:
-        UiTextField(
-            std::string placeholder,
-            std::size_t maximumLength
-        );
+        UiTextField(std::string placeholder, std::size_t maximumLength);
 
         void setBounds(UiRectangle bounds) noexcept;
         void setFocused(bool focused) noexcept;
@@ -36,10 +33,7 @@ namespace Paladin
         [[nodiscard]]
         const std::string& text() const noexcept;
 
-        void render(
-            Renderer& renderer,
-            const GrayUiRenderer& uiRenderer
-        ) const;
+        void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
     private:
         std::string placeholder_;
@@ -48,4 +42,4 @@ namespace Paladin
         UiRectangle bounds_;
         bool focused_ = false;
     };
-}
+} // namespace Paladin

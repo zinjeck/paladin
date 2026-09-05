@@ -5,12 +5,8 @@
 
 namespace Paladin
 {
-    TerritoryMap::TerritoryMap(
-        std::int32_t width,
-        std::int32_t height
-    )
-        : width_(width),
-          height_(height)
+    TerritoryMap::TerritoryMap(std::int32_t width, std::int32_t height)
+        : width_(width), height_(height)
     {
         if (width_ <= 0 || height_ <= 0)
         {
@@ -20,8 +16,7 @@ namespace Paladin
         }
 
         controllers_.resize(
-            static_cast<std::size_t>(width_)
-                * static_cast<std::size_t>(height_)
+            static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_)
         );
     }
 
@@ -42,15 +37,12 @@ namespace Paladin
         WorldTilePosition position
     ) const noexcept
     {
-        return
-            position.x >= 0 &&
-            position.y >= 0 &&
-            position.x < width_ &&
-            position.y < height_;
+        return position.x >= 0 && position.y >= 0 && position.x < width_ &&
+               position.y < height_;
     }
 
 
-    PolityId TerritoryMap::controllerAt(
+    RealmId TerritoryMap::controllerAt(
         WorldTilePosition position
     ) const noexcept
     {
@@ -63,9 +55,7 @@ namespace Paladin
     }
 
 
-    bool TerritoryMap::isControlled(
-        WorldTilePosition position
-    ) const noexcept
+    bool TerritoryMap::isControlled(WorldTilePosition position) const noexcept
     {
         return controllerAt(position).isValid();
     }
@@ -78,26 +68,22 @@ namespace Paladin
 
 
     std::size_t TerritoryMap::controlledTileCount(
-        PolityId polityId
+        RealmId realmId
     ) const noexcept
     {
-        if (!polityId.isValid())
+        if (!realmId.isValid())
         {
             return 0;
         }
 
         return static_cast<std::size_t>(
-            std::count(
-                controllers_.begin(),
-                controllers_.end(),
-                polityId
-            )
+            std::count(controllers_.begin(), controllers_.end(), realmId)
         );
     }
 
 
-    std::span<const WorldTilePosition>
-    TerritoryMap::controlledPositions() const noexcept
+    std::span<const WorldTilePosition> TerritoryMap::
+        controlledPositions() const noexcept
     {
         return controlledPositions_;
     }
@@ -109,20 +95,18 @@ namespace Paladin
     }
 
 
-    std::size_t TerritoryMap::clearController(
-        PolityId polityId
-    )
+    std::size_t TerritoryMap::clearController(RealmId realmId)
     {
-        if (!polityId.isValid())
+        if (!realmId.isValid())
         {
             return 0;
         }
 
         std::size_t clearedCount = 0;
 
-        for (PolityId& controller : controllers_)
+        for (RealmId& controller : controllers_)
         {
-            if (controller == polityId)
+            if (controller == realmId)
             {
                 controller = {};
                 ++clearedCount;
@@ -137,9 +121,7 @@ namespace Paladin
         std::erase_if(
             controlledPositions_,
             [this](WorldTilePosition position)
-            {
-                return !controllers_[indexOf(position)].isValid();
-            }
+            { return !controllers_[indexOf(position)].isValid(); }
         );
 
         controlledTileCount_ -= clearedCount;
@@ -150,36 +132,33 @@ namespace Paladin
 
     bool TerritoryMap::claimIfUncontrolled(
         WorldTilePosition position,
-        PolityId polityId
+        RealmId realmId
     )
     {
-        if (!isValidPosition(position) || !polityId.isValid())
+        if (!isValidPosition(position) || !realmId.isValid())
         {
             return false;
         }
 
-        PolityId& controller = controllers_[indexOf(position)];
+        RealmId& controller = controllers_[indexOf(position)];
 
         if (controller.isValid())
         {
-            return controller == polityId;
+            return controller == realmId;
         }
 
         controlledPositions_.push_back(position);
-        controller = polityId;
+        controller = realmId;
         ++controlledTileCount_;
         ++revision_;
         return true;
     }
 
 
-    std::size_t TerritoryMap::indexOf(
-        WorldTilePosition position
-    ) const noexcept
+    std::size_t TerritoryMap::indexOf(WorldTilePosition position) const noexcept
     {
-        return
-            static_cast<std::size_t>(position.y)
-                * static_cast<std::size_t>(width_)
-            + static_cast<std::size_t>(position.x);
+        return static_cast<std::size_t>(position.y) *
+                   static_cast<std::size_t>(width_) +
+               static_cast<std::size_t>(position.x);
     }
-}
+} // namespace Paladin

@@ -8,14 +8,12 @@ namespace Paladin
 {
     struct WorldTile
     {
-        TerrainType terrain =
-            TerrainType::Water;
+        TerrainType terrain = TerrainType::Water;
 
-        BiomeType biome =
-            BiomeType::Ocean;
+        BiomeType biome = BiomeType::Ocean;
 
         Elevation elevation{};
         Temperature temperature{};
         Rainfall rainfall{};
     };
-}
+} // namespace Paladin

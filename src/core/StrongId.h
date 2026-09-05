@@ -9,18 +9,14 @@
 
 namespace Paladin
 {
-    template<typename Tag>
-    class StrongId
+    template<typename Tag> class StrongId
     {
     public:
         using ValueType = std::uint64_t;
 
         constexpr StrongId() noexcept = default;
 
-        explicit constexpr StrongId(ValueType value) noexcept
-            : value_(value)
-        {
-        }
+        explicit constexpr StrongId(ValueType value) noexcept : value_(value) {}
 
         [[nodiscard]]
         constexpr ValueType value() const noexcept
@@ -39,15 +35,10 @@ namespace Paladin
             return isValid();
         }
 
-        friend constexpr bool operator==(
-            StrongId,
-            StrongId
-        ) noexcept = default;
+        friend constexpr bool operator==(StrongId, StrongId) noexcept = default;
 
-        friend constexpr auto operator<=>(
-            StrongId,
-            StrongId
-        ) noexcept = default;
+        friend constexpr auto operator<=>(StrongId, StrongId) noexcept =
+            default;
 
     private:
         // Zero is permanently reserved as "no ID".
@@ -58,17 +49,14 @@ namespace Paladin
     struct StrongIdHash
     {
         template<typename Tag>
-        std::size_t operator()(
-            StrongId<Tag> id
-        ) const noexcept
+        std::size_t operator()(StrongId<Tag> id) const noexcept
         {
             return std::hash<std::uint64_t>{}(id.value());
         }
     };
 
 
-    template<typename IdType>
-    class IdGenerator
+    template<typename IdType> class IdGenerator
     {
     public:
         [[nodiscard]]
@@ -76,19 +64,13 @@ namespace Paladin
         {
             if (nextValue_ == 0)
             {
-                throw std::overflow_error(
-                    "Paladin entity ID space exhausted."
-                );
+                throw std::overflow_error("Paladin entity ID space exhausted.");
             }
 
             const auto value = nextValue_;
 
-            if (
-                nextValue_ ==
-                std::numeric_limits<
-                    typename IdType::ValueType
-                >::max()
-            )
+            if (nextValue_ ==
+                std::numeric_limits<typename IdType::ValueType>::max())
             {
                 nextValue_ = 0;
             }
@@ -97,7 +79,7 @@ namespace Paladin
                 ++nextValue_;
             }
 
-            return IdType{ value };
+            return IdType{value};
         }
 
     private:
@@ -108,7 +90,7 @@ namespace Paladin
     // Distinct tags make these IDs incompatible at compile time.
 
     struct SettlementIdTag;
-    struct PolityIdTag;
+    struct RealmIdTag;
     struct ArmyIdTag;
     struct CitizenIdTag;
     struct CultureIdTag;
@@ -118,7 +100,7 @@ namespace Paladin
     struct WorkplaceIdTag;
 
     using SettlementId = StrongId<SettlementIdTag>;
-    using PolityId = StrongId<PolityIdTag>;
+    using RealmId = StrongId<RealmIdTag>;
     using ArmyId = StrongId<ArmyIdTag>;
     using CitizenId = StrongId<CitizenIdTag>;
     using CultureId = StrongId<CultureIdTag>;
@@ -126,4 +108,4 @@ namespace Paladin
     using ConstructionSiteId = StrongId<ConstructionSiteIdTag>;
     using WorkplaceId = StrongId<WorkplaceIdTag>;
     using SettlementCommandId = StrongId<SettlementCommandIdTag>;
-}
+} // namespace Paladin

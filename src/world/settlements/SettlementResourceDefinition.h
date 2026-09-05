@@ -14,23 +14,23 @@ namespace Paladin
 
     namespace SettlementResourceTypes
     {
-    inline constexpr std::string_view Fish = "fish";
-    inline constexpr std::string_view Food = "food";
-    inline constexpr std::string_view Materials = "materials";
-    inline constexpr std::string_view Stone = "stone";
-    inline constexpr std::string_view Lumber = "lumber";
-    }
+        inline constexpr std::string_view Fish = "fish";
+        inline constexpr std::string_view Food = "food";
+        inline constexpr std::string_view Materials = "materials";
+        inline constexpr std::string_view Stone = "stone";
+        inline constexpr std::string_view Lumber = "lumber";
+    } // namespace SettlementResourceTypes
 
     class SettlementResourceCatalog
     {
     public:
         [[nodiscard]]
-        static std::span<const SettlementResourceDefinition>
-        definitions() noexcept;
+        static std::span<
+            const SettlementResourceDefinition> definitions() noexcept;
 
         [[nodiscard]]
         static const SettlementResourceDefinition* definition(
             std::string_view resourceId
         ) noexcept;
     };
-}
+} // namespace Paladin

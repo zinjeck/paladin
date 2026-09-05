@@ -42,6 +42,5 @@ namespace Paladin
     };
 
     [[nodiscard]]
-    SettlementSimulationPolicies
-    defaultSettlementSimulationPolicies() noexcept;
-}
+    SettlementSimulationPolicies defaultSettlementSimulationPolicies() noexcept;
+} // namespace Paladin

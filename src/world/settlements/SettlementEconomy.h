@@ -38,9 +38,7 @@ namespace Paladin
     {
     public:
         [[nodiscard]]
-        bool configure(
-            const std::vector<ResourceFlowRate>& flowRates
-        );
+        bool configure(const std::vector<ResourceFlowRate>& flowRates);
 
         void simulate(
             ResourceStockpile& stockpile,
@@ -70,4 +68,4 @@ namespace Paladin
         double populationSustainableSupplyRatio_ = 1.0;
         std::uint64_t version_ = 0;
     };
-}
+} // namespace Paladin

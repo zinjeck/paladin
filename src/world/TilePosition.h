@@ -5,8 +5,7 @@
 
 namespace Paladin
 {
-    template<typename SpaceTag>
-    struct TilePosition
+    template<typename SpaceTag> struct TilePosition
     {
         std::int32_t x = 0;
         std::int32_t y = 0;
@@ -21,4 +20,4 @@ namespace Paladin
             const TilePosition&
         ) noexcept = default;
     };
-}
+} // namespace Paladin

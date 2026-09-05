@@ -6,11 +6,11 @@
 #include "world/Army.h"
 #include "world/Culture.h"
 #include "world/FoundingIdentity.h"
-#include "world/Polity.h"
+#include "world/Realm.h"
 #include "world/Settlement.h"
+#include "world/WorldGrid.h"
 #include "world/WorldTilePosition.h"
 #include "world/WorldTime.h"
-#include "world/WorldGrid.h"
 #include "world/generation/WorldGenerationSettings.h"
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/territory/TerritoryFoundationPolicy.h"
@@ -27,9 +27,7 @@ namespace Paladin
     {
     public:
         World();
-        explicit World(
-            const WorldGenerationSettings& generationSettings
-        );
+        explicit World(const WorldGenerationSettings& generationSettings);
 
         World(
             const WorldGenerationSettings& generationSettings,
@@ -48,60 +46,55 @@ namespace Paladin
         // ====================================================
 
         [[nodiscard]]
-        SettlementId createSettlement(
-            WorldTilePosition position = {}
-        );
+        SettlementId createSettlement(WorldTilePosition position = {});
 
         [[nodiscard]]
-        PolityId createPolity();
+        RealmId createRealm();
 
         [[nodiscard]]
-        CultureId createCulture(
-            std::string name
-        );
+        CultureId createCulture(std::string name);
 
         [[nodiscard]]
-        ArmyId createArmy(
-            WorldTilePosition position = {}
-        );
+        ArmyId createArmy(WorldTilePosition position = {});
 
         [[nodiscard]]
-        bool canFoundSettlementAt(
-            WorldTilePosition position
-        ) const noexcept;
+        bool canFoundSettlementAt(WorldTilePosition position) const noexcept;
 
         [[nodiscard]]
         bool canFoundSettlementAt(
             WorldTilePosition position,
-            PolityId ownerPolityId
+            RealmId ownerRealmId
         ) const noexcept;
 
         [[nodiscard]]
-        bool canFoundAdditionalSettlementAt(WorldTilePosition position, PolityId owner) const noexcept;
+        bool canFoundAdditionalSettlementAt(
+            WorldTilePosition position,
+            RealmId owner
+        ) const noexcept;
 
         SettlementId foundSettlement(
             WorldTilePosition position,
-            PolityId ownerPolityId
+            RealmId ownerRealmId
         );
 
         [[nodiscard]]
         SettlementId foundSettlement(
             WorldTilePosition position,
-            PolityId ownerPolityId,
+            RealmId ownerRealmId,
             const SettlementFoundationProfile& foundationProfile
         );
 
         [[nodiscard]]
         SettlementId foundCapitalSettlement(
             WorldTilePosition position,
-            PolityId ownerPolityId,
+            RealmId ownerRealmId,
             const FoundingIdentity& identity
         );
 
         [[nodiscard]]
         SettlementId foundCapitalSettlement(
             WorldTilePosition position,
-            PolityId ownerPolityId,
+            RealmId ownerRealmId,
             const FoundingIdentity& identity,
             const SettlementFoundationProfile& foundationProfile
         );
@@ -112,56 +105,40 @@ namespace Paladin
         // ====================================================
 
         [[nodiscard]]
-        Settlement* settlement(
-            SettlementId id
-        ) noexcept;
+        Settlement* settlement(SettlementId id) noexcept;
 
         [[nodiscard]]
-        const Settlement* settlement(
-            SettlementId id
-        ) const noexcept;
+        const Settlement* settlement(SettlementId id) const noexcept;
 
 
         [[nodiscard]]
-        Polity* polity(
-            PolityId id
-        ) noexcept;
+        Realm* realm(RealmId id) noexcept;
 
         [[nodiscard]]
-        const Polity* polity(
-            PolityId id
-        ) const noexcept;
+        const Realm* realm(RealmId id) const noexcept;
 
         [[nodiscard]]
-        Culture* culture(
-            CultureId id
-        ) noexcept;
+        Culture* culture(CultureId id) noexcept;
 
         [[nodiscard]]
-        const Culture* culture(
-            CultureId id
-        ) const noexcept;
+        const Culture* culture(CultureId id) const noexcept;
 
 
         [[nodiscard]]
-        Army* army(
-            ArmyId id
-        ) noexcept;
+        Army* army(ArmyId id) noexcept;
 
         [[nodiscard]]
-        const Army* army(
-            ArmyId id
-        ) const noexcept;
+        const Army* army(ArmyId id) const noexcept;
 
         [[nodiscard]]
         WorldTime& time() noexcept;
-        
+
         [[nodiscard]]
         const WorldTime& time() const noexcept;
 
         [[nodiscard]]
         WorldGrid& grid() noexcept;
-        
+
         [[nodiscard]]
         const WorldGrid& grid() const noexcept;
 
@@ -185,20 +162,18 @@ namespace Paladin
         std::span<const Culture> cultures() const noexcept;
 
         [[nodiscard]]
-        std::span<const Polity> polities() const noexcept;
+        std::span<const Realm> realms() const noexcept;
 
         // ====================================================
         // Settlement relationships
         // ====================================================
 
-        bool assignSettlementToPolity(
+        bool assignSettlementToRealm(
             SettlementId settlementId,
-            PolityId polityId
+            RealmId realmId
         ) noexcept;
 
-        bool makeSettlementIndependent(
-            SettlementId settlementId
-        ) noexcept;
+        bool makeSettlementIndependent(SettlementId settlementId) noexcept;
 
         bool setSettlementPosition(
             SettlementId settlementId,
@@ -206,36 +181,25 @@ namespace Paladin
         ) noexcept;
 
         [[nodiscard]]
-        bool renameSettlement(
-            SettlementId settlementId,
-            std::string name
-        );
+        bool renameSettlement(SettlementId settlementId, std::string name);
 
         [[nodiscard]]
-        bool editPolityIdentity(
-            PolityId polityId,
+        bool editRealmIdentity(
+            RealmId realmId,
             const FoundingIdentity& identity
         );
 
         [[nodiscard]]
-        bool relocateSoleCapital(
-            PolityId polityId,
-            WorldTilePosition position
-        );
+        bool relocateSoleCapital(RealmId realmId, WorldTilePosition position);
 
 
         // ====================================================
         // Army relationships
         // ====================================================
 
-        bool assignArmyToPolity(
-            ArmyId armyId,
-            PolityId polityId
-        ) noexcept;
+        bool assignArmyToRealm(ArmyId armyId, RealmId realmId) noexcept;
 
-        bool makeArmyIndependent(
-            ArmyId armyId
-        ) noexcept;
+        bool makeArmyIndependent(ArmyId armyId) noexcept;
 
         bool setArmyPosition(
             ArmyId armyId,
@@ -251,7 +215,7 @@ namespace Paladin
         std::size_t settlementCount() const noexcept;
 
         [[nodiscard]]
-        std::size_t polityCount() const noexcept;
+        std::size_t realmCount() const noexcept;
 
         [[nodiscard]]
         std::size_t cultureCount() const noexcept;
@@ -266,25 +230,13 @@ namespace Paladin
         WorldGrid grid_;
         TerritoryMap territory_;
         TerritoryFoundationPolicy territoryFoundationPolicy_;
-    
-        EntityRegistry<
-            Settlement,
-            SettlementId
-        > settlements_;
 
-        EntityRegistry<
-            Polity,
-            PolityId
-        > polities_;
+        EntityRegistry<Settlement, SettlementId> settlements_;
 
-        EntityRegistry<
-            Culture,
-            CultureId
-        > cultures_;
+        EntityRegistry<Realm, RealmId> realms_;
 
-        EntityRegistry<
-            Army,
-            ArmyId
-        > armies_;
+        EntityRegistry<Culture, CultureId> cultures_;
+
+        EntityRegistry<Army, ArmyId> armies_;
     };
-}
+} // namespace Paladin

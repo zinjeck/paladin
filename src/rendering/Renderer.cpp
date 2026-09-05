@@ -13,18 +13,12 @@ namespace Paladin
 
         if (!renderer_)
         {
-            SDL_Log(
-                "SDL_CreateRenderer failed: %s",
-                SDL_GetError()
-            );
+            SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
 
             return;
         }
 
-        SDL_SetRenderDrawBlendMode(
-            renderer_,
-            SDL_BLENDMODE_BLEND
-        );
+        SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
     }
 
     Renderer::~Renderer()
@@ -42,13 +36,7 @@ namespace Paladin
 
     void Renderer::beginFrame()
     {
-        SDL_SetRenderDrawColor(
-            renderer_,
-            18,
-            20,
-            24,
-            255
-        );
+        SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
 
         SDL_RenderClear(renderer_);
     }
@@ -73,24 +61,28 @@ namespace Paladin
             color.blue,
             color.alpha
         );
-    
-        const SDL_FRect rectangle{
-            x,
-            y,
-            width,
-            height
-        };
-    
-        SDL_RenderFillRect(
-            renderer_,
-            &rectangle
-        );
+
+        const SDL_FRect rectangle{x, y, width, height};
+
+        SDL_RenderFillRect(renderer_, &rectangle);
     }
 
 
-    void Renderer::drawLine(float x1, float y1, float x2, float y2, RenderColor color)
+    void Renderer::drawLine(
+        float x1,
+        float y1,
+        float x2,
+        float y2,
+        RenderColor color
+    )
     {
-        SDL_SetRenderDrawColor(renderer_, color.red, color.green, color.blue, color.alpha);
+        SDL_SetRenderDrawColor(
+            renderer_,
+            color.red,
+            color.green,
+            color.blue,
+            color.alpha
+        );
         SDL_RenderLine(renderer_, x1, y1, x2, y2);
     }
 
@@ -123,12 +115,9 @@ namespace Paladin
     }
 
 
-    std::unique_ptr<Texture> Renderer::loadBitmapTexture(
-        const char* filePath
-    )
+    std::unique_ptr<Texture> Renderer::loadBitmapTexture(const char* filePath)
     {
-        SDL_Surface* surface =
-            SDL_LoadBMP(filePath);
+        SDL_Surface* surface = SDL_LoadBMP(filePath);
 
         if (!surface)
         {
@@ -144,11 +133,7 @@ namespace Paladin
         const int width = surface->w;
         const int height = surface->h;
 
-        SDL_Texture* texture =
-            SDL_CreateTextureFromSurface(
-                renderer_,
-                surface
-            );
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
 
         SDL_DestroySurface(surface);
 
@@ -163,18 +148,9 @@ namespace Paladin
             return nullptr;
         }
 
-        SDL_SetTextureScaleMode(
-            texture,
-            SDL_SCALEMODE_NEAREST
-        );
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
-        return std::unique_ptr<Texture>(
-            new Texture(
-                texture,
-                width,
-                height
-            )
-        );
+        return std::unique_ptr<Texture>(new Texture(texture, width, height));
     }
 
 
@@ -186,13 +162,9 @@ namespace Paladin
     {
         static_assert(sizeof(RenderColor) == 4);
 
-        if (
-            width <= 0 ||
-            height <= 0 ||
-            pixels.size() !=
-                static_cast<std::size_t>(width)
-                    * static_cast<std::size_t>(height)
-        )
+        if (width <= 0 || height <= 0 ||
+            pixels.size() != static_cast<std::size_t>(width) *
+                                 static_cast<std::size_t>(height))
         {
             return nullptr;
         }
@@ -207,10 +179,7 @@ namespace Paladin
 
         if (!texture)
         {
-            SDL_Log(
-                "SDL_CreateTexture failed: %s",
-                SDL_GetError()
-            );
+            SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
 
             return nullptr;
         }
@@ -222,28 +191,17 @@ namespace Paladin
                 width * static_cast<int>(sizeof(RenderColor))
             ))
         {
-            SDL_Log(
-                "SDL_UpdateTexture failed: %s",
-                SDL_GetError()
-            );
+            SDL_Log("SDL_UpdateTexture failed: %s", SDL_GetError());
 
             SDL_DestroyTexture(texture);
             return nullptr;
         }
 
-        SDL_SetTextureScaleMode(
-            texture,
-            SDL_SCALEMODE_NEAREST
-        );
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
-        SDL_SetTextureBlendMode(
-            texture,
-            SDL_BLENDMODE_BLEND
-        );
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
 
-        return std::unique_ptr<Texture>(
-            new Texture(texture, width, height)
-        );
+        return std::unique_ptr<Texture>(new Texture(texture, width, height));
     }
 
 
@@ -257,25 +215,17 @@ namespace Paladin
             return nullptr;
         }
 
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(
-            renderer_,
-            surface
-        );
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
 
         if (!texture)
         {
-            SDL_Log(
-                "SDL_CreateTextureFromSurface failed: %s",
-                SDL_GetError()
-            );
+            SDL_Log("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
             return nullptr;
         }
 
         SDL_SetTextureScaleMode(
             texture,
-            smoothScaling
-                ? SDL_SCALEMODE_LINEAR
-                : SDL_SCALEMODE_NEAREST
+            smoothScaling ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST
         );
 
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
@@ -291,11 +241,8 @@ namespace Paladin
         std::span<const RenderColor> pixels
     )
     {
-        if (
-            pixels.size() !=
-                static_cast<std::size_t>(texture.width_)
-                    * static_cast<std::size_t>(texture.height_)
-        )
+        if (pixels.size() != static_cast<std::size_t>(texture.width_) *
+                                 static_cast<std::size_t>(texture.height_))
         {
             return false;
         }
@@ -304,8 +251,7 @@ namespace Paladin
             texture.texture_,
             nullptr,
             pixels.data(),
-            texture.width_
-                * static_cast<int>(sizeof(RenderColor))
+            texture.width_ * static_cast<int>(sizeof(RenderColor))
         );
     }
 
@@ -322,12 +268,7 @@ namespace Paladin
         float destinationHeight
     )
     {
-        const SDL_FRect source{
-            sourceX,
-            sourceY,
-            sourceWidth,
-            sourceHeight
-        };
+        const SDL_FRect source{sourceX, sourceY, sourceWidth, sourceHeight};
 
         const SDL_FRect destination{
             destinationX,
@@ -336,41 +277,28 @@ namespace Paladin
             destinationHeight
         };
 
-        SDL_RenderTexture(
-            renderer_,
-            texture.texture_,
-            &source,
-            &destination
-        );
+        SDL_RenderTexture(renderer_, texture.texture_, &source, &destination);
     }
-    
-    
+
+
     int Renderer::outputWidth() const noexcept
     {
         int width = 0;
         int height = 0;
-    
-        SDL_GetRenderOutputSize(
-            renderer_,
-            &width,
-            &height
-        );
-    
+
+        SDL_GetRenderOutputSize(renderer_, &width, &height);
+
         return width;
     }
-    
-    
+
+
     int Renderer::outputHeight() const noexcept
     {
         int width = 0;
         int height = 0;
-    
-        SDL_GetRenderOutputSize(
-            renderer_,
-            &width,
-            &height
-        );
-    
+
+        SDL_GetRenderOutputSize(renderer_, &width, &height);
+
         return height;
     }
-}
+} // namespace Paladin

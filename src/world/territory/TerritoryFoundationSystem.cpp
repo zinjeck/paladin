@@ -46,16 +46,15 @@ namespace Paladin
             std::int32_t width
         ) noexcept
         {
-            return
-                static_cast<std::size_t>(position.y)
-                    * static_cast<std::size_t>(width)
-                + static_cast<std::size_t>(position.x);
+            return static_cast<std::size_t>(position.y) *
+                       static_cast<std::size_t>(width) +
+                   static_cast<std::size_t>(position.x);
         }
 
         std::uint32_t borderlandIrregularityCost(
             WorldTilePosition position,
             WorldTilePosition settlementPosition,
-            PolityId polityId,
+            RealmId realmId,
             const TerritoryFoundationPolicy& policy
         ) noexcept
         {
@@ -69,14 +68,10 @@ namespace Paladin
             value *= 0x9E3779B185EBCA87ULL;
             value ^= static_cast<std::uint32_t>(position.y);
             value *= 0xC2B2AE3D27D4EB4FULL;
-            value ^= static_cast<std::uint32_t>(
-                settlementPosition.x
-            );
+            value ^= static_cast<std::uint32_t>(settlementPosition.x);
             value *= 0x165667B19E3779F9ULL;
-            value ^= static_cast<std::uint32_t>(
-                settlementPosition.y
-            );
-            value ^= polityId.value();
+            value ^= static_cast<std::uint32_t>(settlementPosition.y);
+            value ^= realmId.value();
 
             value ^= value >> 30U;
             value *= 0xBF58476D1CE4E5B9ULL;
@@ -87,69 +82,56 @@ namespace Paladin
             const std::uint64_t resultRange =
                 static_cast<std::uint64_t>(
                     policy.borderlandIrregularityMaximumCost
-                ) + 1ULL;
+                ) +
+                1ULL;
 
-            return static_cast<std::uint32_t>(
-                value % resultRange
-            );
+            return static_cast<std::uint32_t>(value % resultRange);
         }
-    }
+    } // namespace
 
 
-    std::size_t
-    TerritoryFoundationSystem::establishSettlementTerritory(
+    std::size_t TerritoryFoundationSystem::establishSettlementTerritory(
         const WorldGrid& grid,
         TerritoryMap& territory,
         WorldTilePosition settlementPosition,
-        PolityId polityId,
+        RealmId realmId,
         const TerritoryFoundationPolicy& policy,
         std::uint32_t borderlandTraversalBudget
     ) const
     {
-        if (
-            !polityId.isValid() ||
-            policy.settlementRegionWidth <= 0 ||
+        if (!realmId.isValid() || policy.settlementRegionWidth <= 0 ||
             policy.settlementRegionHeight <= 0 ||
             grid.width() != territory.width() ||
-            grid.height() != territory.height()
-        )
+            grid.height() != territory.height())
         {
             return 0;
         }
 
         const std::size_t previousControlledCount =
-            territory.controlledTileCount(polityId);
+            territory.controlledTileCount(realmId);
 
         const std::int32_t minimumX =
-            settlementPosition.x
-            - policy.settlementRegionWidth / 2;
+            settlementPosition.x - policy.settlementRegionWidth / 2;
 
         const std::int32_t minimumY =
-            settlementPosition.y
-            - policy.settlementRegionHeight / 2;
+            settlementPosition.y - policy.settlementRegionHeight / 2;
 
         std::priority_queue<
             ExpansionCandidate,
             std::vector<ExpansionCandidate>,
-            LowestCostFirst
-        > frontier;
+            LowestCostFirst>
+            frontier;
 
         std::vector<std::uint32_t> lowestCosts(
             grid.tileCount(),
             std::numeric_limits<std::uint32_t>::max()
         );
 
-        for (
-            std::int32_t localY = 0;
-            localY < policy.settlementRegionHeight;
-            ++localY
-        )
+        for (std::int32_t localY = 0; localY < policy.settlementRegionHeight;
+             ++localY)
         {
-            for (
-                std::int32_t localX = 0;
-                localX < policy.settlementRegionWidth;
-                ++localX
-            )
+            for (std::int32_t localX = 0; localX < policy.settlementRegionWidth;
+                 ++localX)
             {
                 const WorldTilePosition position{
                     minimumX + localX,
@@ -171,7 +153,7 @@ namespace Paladin
                     continue;
                 }
 
-                if (!territory.claimIfUncontrolled(position, polityId))
+                if (!territory.claimIfUncontrolled(position, realmId))
                 {
                     continue;
                 }
@@ -181,8 +163,7 @@ namespace Paladin
                     continue;
                 }
 
-                const std::size_t index =
-                    positionIndex(position, grid.width());
+                const std::size_t index = positionIndex(position, grid.width());
 
                 lowestCosts[index] = 0;
                 frontier.push({0, position});
@@ -225,43 +206,34 @@ namespace Paladin
                     policy.ruleFor(tile->terrain);
 
                 const std::uint64_t traversalCost =
-                    static_cast<std::uint64_t>(
-                        rule.borderlandTraversalCost
-                    )
-                    + borderlandIrregularityCost(
+                    static_cast<std::uint64_t>(rule.borderlandTraversalCost) +
+                    borderlandIrregularityCost(
                         neighbor,
                         settlementPosition,
-                        polityId,
+                        realmId,
                         policy
                     );
 
-                if (
-                    !rule.controllable ||
-                    rule.borderlandTraversalCost == 0 ||
+                if (!rule.controllable || rule.borderlandTraversalCost == 0 ||
                     traversalCost >
                         static_cast<std::uint64_t>(
-                            borderlandTraversalBudget
-                                - candidate.cost
-                        )
-                )
+                            borderlandTraversalBudget - candidate.cost
+                        ))
                 {
                     continue;
                 }
 
-                const PolityId existingController =
+                const RealmId existingController =
                     territory.controllerAt(neighbor);
 
-                if (
-                    existingController.isValid() &&
-                    existingController != polityId
-                )
+                if (existingController.isValid() &&
+                    existingController != realmId)
                 {
                     continue;
                 }
 
                 const std::uint32_t nextCost =
-                    candidate.cost
-                    + static_cast<std::uint32_t>(traversalCost);
+                    candidate.cost + static_cast<std::uint32_t>(traversalCost);
 
                 const std::size_t neighborIndex =
                     positionIndex(neighbor, grid.width());
@@ -273,17 +245,12 @@ namespace Paladin
 
                 lowestCosts[neighborIndex] = nextCost;
                 static_cast<void>(
-                    territory.claimIfUncontrolled(
-                        neighbor,
-                        polityId
-                    )
+                    territory.claimIfUncontrolled(neighbor, realmId)
                 );
                 frontier.push({nextCost, neighbor});
             }
         }
 
-        return
-            territory.controlledTileCount(polityId)
-            - previousControlledCount;
+        return territory.controlledTileCount(realmId) - previousControlledCount;
     }
-}
+} // namespace Paladin

@@ -8,15 +8,12 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::uint64_t goldenRatioIncrement =
-            0x9E37'79B9'7F4A'7C15ULL;
+        constexpr std::uint64_t goldenRatioIncrement = 0x9E37'79B9'7F4A'7C15ULL;
 
         std::uint64_t mixSeed(std::uint64_t value) noexcept
         {
-            value = (value ^ (value >> 30U))
-                * 0xBF58'476D'1CE4'E5B9ULL;
-            value = (value ^ (value >> 27U))
-                * 0x94D0'49BB'1331'11EBULL;
+            value = (value ^ (value >> 30U)) * 0xBF58'476D'1CE4'E5B9ULL;
+            value = (value ^ (value >> 27U)) * 0x94D0'49BB'1331'11EBULL;
             return value ^ (value >> 31U);
         }
 
@@ -42,19 +39,14 @@ namespace Paladin
 
             return mixSeed(material);
         }
-    }
+    } // namespace
 
     std::uint64_t nextRandomWorldSeed()
     {
-        static std::atomic<std::uint64_t> state{
-            initialSeedMaterial()
-        };
+        static std::atomic<std::uint64_t> state{initialSeedMaterial()};
 
         return mixSeed(
-            state.fetch_add(
-                goldenRatioIncrement,
-                std::memory_order_relaxed
-            )
+            state.fetch_add(goldenRatioIncrement, std::memory_order_relaxed)
         );
     }
 
@@ -65,4 +57,4 @@ namespace Paladin
         settings.seed = nextRandomWorldSeed();
         return settings;
     }
-}
+} // namespace Paladin

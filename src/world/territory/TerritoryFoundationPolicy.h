@@ -19,31 +19,19 @@ namespace Paladin
         std::uint32_t settlementBorderlandTraversalBudget = 0;
         std::uint32_t capitalBorderlandTraversalBudget = 2;
         std::uint32_t borderlandIrregularityMaximumCost = 2;
-        std::uint64_t borderlandShapeSalt =
-            0x6A09E667F3BCC909ULL;
+        std::uint64_t borderlandShapeSalt = 0x6A09E667F3BCC909ULL;
 
-        TerritoryTerrainRule land{
-            true,
-            1
-        };
+        TerritoryTerrainRule land{true, 1};
 
-        TerritoryTerrainRule water{
-            false,
-            0
-        };
+        TerritoryTerrainRule water{false, 0};
 
-        TerritoryTerrainRule mountain{
-            true,
-            2
-        };
+        TerritoryTerrainRule mountain{true, 2};
 
         [[nodiscard]]
-        const TerritoryTerrainRule& ruleFor(
-            TerrainType terrain
-        ) const noexcept;
+        const TerritoryTerrainRule& ruleFor(TerrainType terrain) const noexcept;
     };
 
     [[nodiscard]]
     const TerritoryFoundationPolicy&
     defaultTerritoryFoundationPolicy() noexcept;
-}
+} // namespace Paladin

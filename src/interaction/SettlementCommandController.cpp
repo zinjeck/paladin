@@ -8,14 +8,10 @@
 
 namespace Paladin
 {
-    bool SettlementCommandController::begin(
-        std::string_view commandTypeId
-    )
+    bool SettlementCommandController::begin(std::string_view commandTypeId)
     {
-        if (
-            commandTypeId != SettlementCommandTypes::Cancel &&
-            !SettlementCommandCatalog::definition(commandTypeId)
-        )
+        if (commandTypeId != SettlementCommandTypes::Cancel &&
+            !SettlementCommandCatalog::definition(commandTypeId))
         {
             return false;
         }
@@ -100,32 +96,27 @@ namespace Paladin
         if (isCancelMode())
         {
             return settlementMap.commandState().cancelIntersecting(
-                settlementMap,
-                *footprint,
-                citizens
-            ) > 0;
+                       settlementMap,
+                       *footprint,
+                       citizens
+                   ) > 0;
         }
 
-        return settlementMap.commandState().add(
-            settlementMap,
-            commandTypeId_,
-            *footprint,
-            citizens
-        );
+        return settlementMap.commandState()
+            .add(settlementMap, commandTypeId_, *footprint, citizens);
     }
 
 
-    std::optional<SettlementObjectFootprint>
-    SettlementCommandController::visibleFootprint() const noexcept
+    std::optional<SettlementObjectFootprint> SettlementCommandController::
+        visibleFootprint() const noexcept
     {
         if (!isActive() || !hoveredPosition_)
         {
             return std::nullopt;
         }
 
-        const SettlementTilePosition start = dragStart_.value_or(
-            *hoveredPosition_
-        );
+        const SettlementTilePosition start =
+            dragStart_.value_or(*hoveredPosition_);
         const std::int32_t left = std::min(start.x, hoveredPosition_->x);
         const std::int32_t top = std::min(start.y, hoveredPosition_->y);
         const std::int32_t right = std::max(start.x, hoveredPosition_->x);
@@ -137,4 +128,4 @@ namespace Paladin
             bottom - top + 1
         };
     }
-}
+} // namespace Paladin

@@ -5,35 +5,38 @@
 
 namespace Paladin
 {
-inline constexpr WorkplaceDefinition
-    FisheryWorkplace{SettlementObjectTypes::FishingGrounds, 4, 4, 9, 50};
-struct FisheryJobPolicy
-{
-    double minutesPerFish = 80;
-    int waterTilesPerWorker = 4;
-    int baseReach = 8;
-    int referenceArea = 4;
-};
-double fisheryProductionPerMinute(
-    std::size_t waterTiles,
-    int attendingWorkers,
-    const FisheryJobPolicy& policy
-);
-struct FishingSpot
-{
-    SettlementTilePosition land;
-    SettlementTilePosition water;
-};
-std::vector<FishingSpot> fisheryShoreline(const SettlementGrid&, const CompletedSettlementObject&);
-struct FisheryZonePreview
-{
-    std::vector<SettlementTilePosition> availableWater;
-    std::vector<SettlementTilePosition> excludedWater;
-    SettlementObjectFootprint bounds;
-};
-FisheryZonePreview fisheryZonePreview(
-    const SettlementGrid&,
-    const SettlementObjectState&,
-    const SettlementObjectFootprint&
-);
+    inline constexpr WorkplaceDefinition
+        FisheryWorkplace{SettlementObjectTypes::FishingGrounds, 4, 4, 9, 50};
+    struct FisheryJobPolicy
+    {
+        double minutesPerFish = 80;
+        int waterTilesPerWorker = 4;
+        int baseReach = 8;
+        int referenceArea = 4;
+    };
+    double fisheryProductionPerMinute(
+        std::size_t waterTiles,
+        int attendingWorkers,
+        const FisheryJobPolicy& policy
+    );
+    struct FishingSpot
+    {
+        SettlementTilePosition land;
+        SettlementTilePosition water;
+    };
+    std::vector<FishingSpot> fisheryShoreline(
+        const SettlementGrid&,
+        const CompletedSettlementObject&
+    );
+    struct FisheryZonePreview
+    {
+        std::vector<SettlementTilePosition> availableWater;
+        std::vector<SettlementTilePosition> excludedWater;
+        SettlementObjectFootprint bounds;
+    };
+    FisheryZonePreview fisheryZonePreview(
+        const SettlementGrid&,
+        const SettlementObjectState&,
+        const SettlementObjectFootprint&
+    );
 } // namespace Paladin

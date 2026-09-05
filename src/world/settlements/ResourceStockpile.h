@@ -21,16 +21,10 @@ namespace Paladin
         double amount(std::string_view resourceId) const noexcept;
 
         [[nodiscard]]
-        bool setAmount(
-            std::string resourceId,
-            double amount
-        );
+        bool setAmount(std::string resourceId, double amount);
 
         [[nodiscard]]
-        bool addAmount(
-            std::string_view resourceId,
-            double amount
-        );
+        bool addAmount(std::string_view resourceId, double amount);
 
         void clear() noexcept;
 
@@ -44,4 +38,4 @@ namespace Paladin
         std::vector<StockpileEntry> entries_;
         std::uint64_t version_ = 0;
     };
-}
+} // namespace Paladin

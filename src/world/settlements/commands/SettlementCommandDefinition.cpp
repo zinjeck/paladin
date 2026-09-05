@@ -6,25 +6,32 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::array<SettlementCommandDefinition, 5> commandDefinitions{{
-            {SettlementCommandTypes::ChopTree, "Chop Trees", CommandTargetKind::Tree},
-            {SettlementCommandTypes::CollectRock, "Collect Rocks", CommandTargetKind::Rock},
-            {SettlementCommandTypes::Gather, "Gather", CommandTargetKind::Gatherable},
-            {SettlementCommandTypes::Hunt, "Hunt", CommandTargetKind::Animal},
-            {SettlementCommandTypes::Demolish, "Demolish", CommandTargetKind::Object}
-        }};
+        constexpr std::array<SettlementCommandDefinition, 5> commandDefinitions{
+            {{SettlementCommandTypes::ChopTree,
+              "Chop Trees",
+              CommandTargetKind::Tree},
+             {SettlementCommandTypes::CollectRock,
+              "Collect Rocks",
+              CommandTargetKind::Rock},
+             {SettlementCommandTypes::Gather,
+              "Gather",
+              CommandTargetKind::Gatherable},
+             {SettlementCommandTypes::Hunt, "Hunt", CommandTargetKind::Animal},
+             {SettlementCommandTypes::Demolish,
+              "Demolish",
+              CommandTargetKind::Object}}
+        };
     }
 
 
-    std::span<const SettlementCommandDefinition>
-    SettlementCommandCatalog::definitions() noexcept
+    std::span<const SettlementCommandDefinition> SettlementCommandCatalog::
+        definitions() noexcept
     {
         return commandDefinitions;
     }
 
 
-    const SettlementCommandDefinition*
-    SettlementCommandCatalog::definition(
+    const SettlementCommandDefinition* SettlementCommandCatalog::definition(
         std::string_view commandTypeId
     ) noexcept
     {
@@ -38,4 +45,4 @@ namespace Paladin
 
         return nullptr;
     }
-}
+} // namespace Paladin

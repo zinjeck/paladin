@@ -21,9 +21,9 @@ namespace Paladin
             const WorldGrid& grid,
             TerritoryMap& territory,
             WorldTilePosition settlementPosition,
-            PolityId polityId,
+            RealmId realmId,
             const TerritoryFoundationPolicy& policy,
             std::uint32_t borderlandTraversalBudget
         ) const;
     };
-}
+} // namespace Paladin

@@ -7,12 +7,8 @@
 
 namespace Paladin
 {
-    UiTextField::UiTextField(
-        std::string placeholder,
-        std::size_t maximumLength
-    )
-        : placeholder_(std::move(placeholder)),
-          maximumLength_(maximumLength)
+    UiTextField::UiTextField(std::string placeholder, std::size_t maximumLength)
+        : placeholder_(std::move(placeholder)), maximumLength_(maximumLength)
     {
     }
 
@@ -46,16 +42,12 @@ namespace Paladin
             }
 
             const bool acceptedCharacter =
-                std::isalnum(character) ||
-                character == ' ' ||
-                character == '-' ||
-                character == '\'';
+                std::isalnum(character) || character == ' ' ||
+                character == '-' || character == '\'';
 
             if (acceptedCharacter)
             {
-                text_.push_back(
-                    static_cast<char>(character)
-                );
+                text_.push_back(static_cast<char>(character));
             }
         }
     }
@@ -89,12 +81,7 @@ namespace Paladin
         const GrayUiRenderer& uiRenderer
     ) const
     {
-        uiRenderer.drawTextField(
-            renderer,
-            bounds_,
-            text_,
-            placeholder_,
-            focused_
-        );
+        uiRenderer
+            .drawTextField(renderer, bounds_, text_, placeholder_, focused_);
     }
-}
+} // namespace Paladin

@@ -35,16 +35,12 @@ namespace Paladin
         {
             const char* basePath = SDL_GetBasePath();
 
-            return std::filesystem::path(
-                basePath ? basePath : ""
-            ) / "assets" / "fonts" / "Arimo-Regular.ttf";
+            return std::filesystem::path(basePath ? basePath : "") / "assets" /
+                   "fonts" / "Arimo-Regular.ttf";
         }
 
 
-        std::string cacheKey(
-            std::string_view text,
-            RenderColor color
-        )
+        std::string cacheKey(std::string_view text, RenderColor color)
         {
             std::string key;
             key.reserve(text.size() + 4U);
@@ -55,7 +51,7 @@ namespace Paladin
             key.append(text);
             return key;
         }
-    }
+    } // namespace
 
 
     NormalFontRenderer::NormalFontRenderer()
@@ -70,10 +66,8 @@ namespace Paladin
         implementation_->initializedTtf = true;
 
         const std::string fontPath = arimoFontPath().string();
-        implementation_->font = TTF_OpenFont(
-            fontPath.c_str(),
-            normalFontPointSize
-        );
+        implementation_->font =
+            TTF_OpenFont(fontPath.c_str(), normalFontPointSize);
 
         if (!implementation_->font)
         {
@@ -108,9 +102,7 @@ namespace Paladin
     }
 
 
-    float NormalFontRenderer::measureWidth(
-        std::string_view text
-    ) const noexcept
+    float NormalFontRenderer::measureWidth(std::string_view text) const noexcept
     {
         if (!implementation_->font || text.empty())
         {
@@ -155,10 +147,7 @@ namespace Paladin
         {
             constexpr std::size_t maximumCachedTextCount = 256U;
 
-            if (
-                implementation_->cache.size() >=
-                    maximumCachedTextCount
-            )
+            if (implementation_->cache.size() >= maximumCachedTextCount)
             {
                 implementation_->cache.clear();
             }
@@ -179,10 +168,7 @@ namespace Paladin
             Implementation::CachedText cached;
             cached.width = surface->w;
             cached.height = surface->h;
-            cached.texture = renderer.createTextureFromSurface(
-                surface,
-                true
-            );
+            cached.texture = renderer.createTextureFromSurface(surface, true);
             SDL_DestroySurface(surface);
 
             if (!cached.texture)
@@ -190,10 +176,8 @@ namespace Paladin
                 return;
             }
 
-            iterator = implementation_->cache.emplace(
-                key,
-                std::move(cached)
-            ).first;
+            iterator =
+                implementation_->cache.emplace(key, std::move(cached)).first;
         }
 
         const Implementation::CachedText& cached = iterator->second;
@@ -209,4 +193,4 @@ namespace Paladin
             static_cast<float>(cached.height)
         );
     }
-}
+} // namespace Paladin

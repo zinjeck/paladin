@@ -17,13 +17,8 @@ namespace Paladin
                 entries.begin(),
                 entries.end(),
                 resourceId,
-                [](
-                    const StockpileEntry& entry,
-                    std::string_view id
-                )
-                {
-                    return entry.resourceId < id;
-                }
+                [](const StockpileEntry& entry, std::string_view id)
+                { return entry.resourceId < id; }
             );
         }
 
@@ -36,27 +31,17 @@ namespace Paladin
                 entries.begin(),
                 entries.end(),
                 resourceId,
-                [](
-                    const StockpileEntry& entry,
-                    std::string_view id
-                )
-                {
-                    return entry.resourceId < id;
-                }
+                [](const StockpileEntry& entry, std::string_view id)
+                { return entry.resourceId < id; }
             );
         }
-    }
+    } // namespace
 
-    double ResourceStockpile::amount(
-        std::string_view resourceId
-    ) const noexcept
+    double ResourceStockpile::amount(std::string_view resourceId) const noexcept
     {
         const auto iterator = findEntry(entries_, resourceId);
 
-        if (
-            iterator == entries_.end() ||
-            iterator->resourceId != resourceId
-        )
+        if (iterator == entries_.end() || iterator->resourceId != resourceId)
         {
             return 0.0;
         }
@@ -64,26 +49,16 @@ namespace Paladin
         return iterator->amount;
     }
 
-    bool ResourceStockpile::setAmount(
-        std::string resourceId,
-        double newAmount
-    )
+    bool ResourceStockpile::setAmount(std::string resourceId, double newAmount)
     {
-        if (
-            resourceId.empty() ||
-            !std::isfinite(newAmount) ||
-            newAmount < 0.0
-        )
+        if (resourceId.empty() || !std::isfinite(newAmount) || newAmount < 0.0)
         {
             return false;
         }
 
         const auto iterator = findEntry(entries_, resourceId);
 
-        if (
-            iterator != entries_.end() &&
-            iterator->resourceId == resourceId
-        )
+        if (iterator != entries_.end() && iterator->resourceId == resourceId)
         {
             if (iterator->amount == newAmount)
             {
@@ -95,10 +70,7 @@ namespace Paladin
             return true;
         }
 
-        entries_.insert(
-            iterator,
-            {std::move(resourceId), newAmount}
-        );
+        entries_.insert(iterator, {std::move(resourceId), newAmount});
 
         ++version_;
 
@@ -123,10 +95,7 @@ namespace Paladin
             return false;
         }
 
-        return setAmount(
-            std::string(resourceId),
-            newAmount
-        );
+        return setAmount(std::string(resourceId), newAmount);
     }
 
     void ResourceStockpile::clear() noexcept
@@ -140,8 +109,7 @@ namespace Paladin
         ++version_;
     }
 
-    std::span<const StockpileEntry>
-    ResourceStockpile::entries() const noexcept
+    std::span<const StockpileEntry> ResourceStockpile::entries() const noexcept
     {
         return entries_;
     }
@@ -151,4 +119,4 @@ namespace Paladin
     {
         return version_;
     }
-}
+} // namespace Paladin

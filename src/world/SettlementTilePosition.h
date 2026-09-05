@@ -6,4 +6,4 @@ namespace Paladin
 {
     struct SettlementTileSpaceTag;
     using SettlementTilePosition = TilePosition<SettlementTileSpaceTag>;
-}
+} // namespace Paladin

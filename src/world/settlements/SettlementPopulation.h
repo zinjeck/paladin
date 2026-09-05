@@ -49,4 +49,4 @@ namespace Paladin
         DemographicRates rates_;
         std::uint64_t version_ = 0;
     };
-}
+} // namespace Paladin

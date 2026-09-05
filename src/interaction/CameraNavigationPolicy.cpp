@@ -2,10 +2,9 @@
 
 namespace Paladin
 {
-    const CameraNavigationPolicy&
-    defaultCameraNavigationPolicy() noexcept
+    const CameraNavigationPolicy& defaultCameraNavigationPolicy() noexcept
     {
         static const CameraNavigationPolicy policy;
         return policy;
     }
-}
+} // namespace Paladin

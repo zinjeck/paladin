@@ -4,14 +4,8 @@
 
 namespace Paladin
 {
-    Texture::Texture(
-        SDL_Texture* texture,
-        int width,
-        int height
-    ) noexcept
-        : texture_(texture),
-          width_(width),
-          height_(height)
+    Texture::Texture(SDL_Texture* texture, int width, int height) noexcept
+        : texture_(texture), width_(width), height_(height)
     {
     }
 
@@ -32,4 +26,4 @@ namespace Paladin
     {
         return height_;
     }
-}
+} // namespace Paladin

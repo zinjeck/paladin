@@ -5,9 +5,9 @@
 #include "rendering/Texture.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/BiomeType.h"
+#include "world/SettlementGrid.h"
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
-#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 
 #include <cstddef>
@@ -18,40 +18,36 @@ namespace Paladin
 {
     namespace
     {
-        RenderColor biomeColor(
-            BiomeType biome
-        ) noexcept
+        RenderColor biomeColor(BiomeType biome) noexcept
         {
             switch (biome)
             {
-                case BiomeType::Plain:
-                    return {92, 166, 64, 255};
+            case BiomeType::Plain:
+                return {92, 166, 64, 255};
 
-                case BiomeType::Forest:
-                    return {26, 107, 41, 255};
+            case BiomeType::Forest:
+                return {26, 107, 41, 255};
 
-                case BiomeType::Jungle:
-                    return {5, 92, 23, 255};
+            case BiomeType::Jungle:
+                return {5, 92, 23, 255};
 
-                case BiomeType::Desert:
-                    return {219, 184, 92, 255};
+            case BiomeType::Desert:
+                return {219, 184, 92, 255};
 
-                case BiomeType::Tundra:
-                    return {163, 184, 173, 255};
+            case BiomeType::Tundra:
+                return {163, 184, 173, 255};
 
-                case BiomeType::Taiga:
-                    return {51, 97, 82, 255};
+            case BiomeType::Taiga:
+                return {51, 97, 82, 255};
 
-                case BiomeType::Ocean:
-                    return {13, 41, 92, 255};
+            case BiomeType::Ocean:
+                return {13, 41, 92, 255};
             }
 
             return {255, 0, 255, 255};
         }
 
-        RenderColor tileColor(
-            const WorldTile& tile
-        ) noexcept
+        RenderColor tileColor(const WorldTile& tile) noexcept
         {
             if (tile.terrain == TerrainType::Water)
             {
@@ -65,7 +61,7 @@ namespace Paladin
 
             return biomeColor(tile.biome);
         }
-    }
+    } // namespace
 
 
     WorldGridRenderer::WorldGridRenderer() = default;
@@ -98,16 +94,24 @@ namespace Paladin
 
     void WorldGridRenderer::renderOverview(
         Renderer& renderer,
-        float x, float y, float width, float height
+        float x,
+        float y,
+        float width,
+        float height
     ) const
     {
         if (cachedTerrainTexture_ && width > 0.0F && height > 0.0F)
         {
             renderer.drawTexture(
-                *cachedTerrainTexture_, 0.0F, 0.0F,
+                *cachedTerrainTexture_,
+                0.0F,
+                0.0F,
                 static_cast<float>(cachedTerrainTexture_->width()),
                 static_cast<float>(cachedTerrainTexture_->height()),
-                x, y, width, height
+                x,
+                y,
+                width,
+                height
             );
         }
     }
@@ -121,8 +125,7 @@ namespace Paladin
         const TileRenderMetrics& metrics
     ) const
     {
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
         if (tilePixels <= 0.0)
         {
@@ -145,20 +148,19 @@ namespace Paladin
             {
                 for (std::int32_t x = 0; x < grid.width(); ++x)
                 {
-                    pixels[
-                        static_cast<std::size_t>(y)
-                            * static_cast<std::size_t>(grid.width())
-                        + static_cast<std::size_t>(x)
-                    ] = tileColor(*grid.tile({x, y}));
+                    pixels
+                        [static_cast<std::size_t>(y) *
+                             static_cast<std::size_t>(grid.width()) +
+                         static_cast<std::size_t>(x)] =
+                            tileColor(*grid.tile({x, y}));
                 }
             }
 
-            cachedTerrainTexture_ =
-                renderer.createTextureFromPixels(
-                    grid.width(),
-                    grid.height(),
-                    pixels
-                );
+            cachedTerrainTexture_ = renderer.createTextureFromPixels(
+                grid.width(),
+                grid.height(),
+                pixels
+            );
         }
 
         if (!cachedTerrainTexture_)
@@ -181,19 +183,13 @@ namespace Paladin
             static_cast<float>(grid.width()),
             static_cast<float>(grid.height()),
             static_cast<float>(
-                viewportWidth * 0.5
-                - camera.tileX() * tilePixels
+                viewportWidth * 0.5 - camera.tileX() * tilePixels
             ),
             static_cast<float>(
-                viewportHeight * 0.5
-                - camera.tileY() * tilePixels
+                viewportHeight * 0.5 - camera.tileY() * tilePixels
             ),
-            static_cast<float>(
-                static_cast<double>(grid.width()) * tilePixels
-            ),
-            static_cast<float>(
-                static_cast<double>(grid.height()) * tilePixels
-            )
+            static_cast<float>(static_cast<double>(grid.width()) * tilePixels),
+            static_cast<float>(static_cast<double>(grid.height()) * tilePixels)
         );
     }
-}
+} // namespace Paladin

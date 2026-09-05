@@ -38,4 +38,4 @@ namespace Paladin
         bool paused_ = true;
         bool firstFrame_ = true;
     };
-}
+} // namespace Paladin

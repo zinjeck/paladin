@@ -8,4 +8,4 @@ namespace Paladin
         static const TerritoryPresentationPolicy policy;
         return policy;
     }
-}
+} // namespace Paladin

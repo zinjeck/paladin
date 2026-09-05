@@ -10,16 +10,10 @@ namespace Paladin
         float height = 0.0F;
 
         [[nodiscard]]
-        bool contains(
-            float pointX,
-            float pointY
-        ) const noexcept
+        bool contains(float pointX, float pointY) const noexcept
         {
-            return
-                pointX >= x &&
-                pointY >= y &&
-                pointX < x + width &&
-                pointY < y + height;
+            return pointX >= x && pointY >= y && pointX < x + width &&
+                   pointY < y + height;
         }
     };
-}
+} // namespace Paladin

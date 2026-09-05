@@ -19,9 +19,7 @@ namespace Paladin
         ~WorldGridRenderer();
 
         WorldGridRenderer(const WorldGridRenderer&) = delete;
-        WorldGridRenderer& operator=(
-            const WorldGridRenderer&
-        ) = delete;
+        WorldGridRenderer& operator=(const WorldGridRenderer&) = delete;
 
         void render(
             Renderer& renderer,
@@ -40,7 +38,10 @@ namespace Paladin
         // Reuses the terrain texture populated by render().
         void renderOverview(
             Renderer& renderer,
-            float x, float y, float width, float height
+            float x,
+            float y,
+            float width,
+            float height
         ) const;
 
     private:
@@ -56,4 +57,4 @@ namespace Paladin
         mutable std::unique_ptr<Texture> cachedTerrainTexture_;
         mutable bool cacheBuildAttempted_ = false;
     };
-}
+} // namespace Paladin

@@ -32,9 +32,6 @@ namespace Paladin
     public:
         virtual ~WorldSimulationSystem() = default;
 
-        virtual void tick(
-            World& world,
-            const WorldSimulationStep& step
-        ) = 0;
+        virtual void tick(World& world, const WorldSimulationStep& step) = 0;
     };
-}
+} // namespace Paladin

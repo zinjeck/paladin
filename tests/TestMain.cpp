@@ -21,10 +21,7 @@ int main()
     }
     catch (const std::exception& exception)
     {
-        std::cerr
-            << "Paladin test failure: "
-            << exception.what()
-            << '\n';
+        std::cerr << "Paladin test failure: " << exception.what() << '\n';
 
         return 1;
     }

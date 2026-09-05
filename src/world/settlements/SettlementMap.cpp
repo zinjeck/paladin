@@ -6,38 +6,38 @@
 
 namespace Paladin
 {
-namespace
-{
-std::uint64_t nextMapInstance() noexcept
-{
-    static std::atomic<std::uint64_t> next{1};
-    const auto id = next.fetch_add(1, std::memory_order_relaxed);
-    if (id == 0)
+    namespace
     {
-        std::terminate();
-    }
-    return id;
-}
-} // namespace
+        std::uint64_t nextMapInstance() noexcept
+        {
+            static std::atomic<std::uint64_t> next{1};
+            const auto id = next.fetch_add(1, std::memory_order_relaxed);
+            if (id == 0)
+            {
+                std::terminate();
+            }
+            return id;
+        }
+    } // namespace
 
-SettlementMap::SettlementMap(
-    SettlementGrid grid,
-    WorldTilePosition sourceRegionCenter,
-    std::int32_t sourceRegionWidth,
-    std::int32_t sourceRegionHeight,
-    std::int32_t localTilesPerWorldTile,
-    std::uint64_t generationSeed
-) noexcept :
-    instanceId_(nextMapInstance()), grid_(std::move(grid)),
-    naturalFeatures_(grid_.width(), grid_.height()),
-    objectState_(grid_.width(), grid_.height()),
-    sourceRegionCenter_(sourceRegionCenter),
-    sourceRegionWidth_(sourceRegionWidth),
-    sourceRegionHeight_(sourceRegionHeight),
-    localTilesPerWorldTile_(localTilesPerWorldTile),
-    generationSeed_(generationSeed)
-{
-}
+    SettlementMap::SettlementMap(
+        SettlementGrid grid,
+        WorldTilePosition sourceRegionCenter,
+        std::int32_t sourceRegionWidth,
+        std::int32_t sourceRegionHeight,
+        std::int32_t localTilesPerWorldTile,
+        std::uint64_t generationSeed
+    ) noexcept
+        : instanceId_(nextMapInstance()), grid_(std::move(grid)),
+          naturalFeatures_(grid_.width(), grid_.height()),
+          objectState_(grid_.width(), grid_.height()),
+          sourceRegionCenter_(sourceRegionCenter),
+          sourceRegionWidth_(sourceRegionWidth),
+          sourceRegionHeight_(sourceRegionHeight),
+          localTilesPerWorldTile_(localTilesPerWorldTile),
+          generationSeed_(generationSeed)
+    {
+    }
 
     SettlementGrid& SettlementMap::grid() noexcept
     {
@@ -87,8 +87,7 @@ SettlementMap::SettlementMap(
     }
 
 
-    const SettlementObjectState&
-    SettlementMap::objectState() const noexcept
+    const SettlementObjectState& SettlementMap::objectState() const noexcept
     {
         return objectState_;
     }
@@ -100,9 +99,8 @@ SettlementMap::SettlementMap(
     }
 
 
-    const SettlementCommandState&
-    SettlementMap::commandState() const noexcept
+    const SettlementCommandState& SettlementMap::commandState() const noexcept
     {
         return commandState_;
     }
-}
+} // namespace Paladin

@@ -6,10 +6,7 @@
 
 namespace Paladin
 {
-    UiButton::UiButton(std::string text)
-        : text_(std::move(text))
-    {
-    }
+    UiButton::UiButton(std::string text) : text_(std::move(text)) {}
 
     void UiButton::setSkinId(std::string id)
     {
@@ -60,8 +57,7 @@ namespace Paladin
 
     bool UiButton::pointerReleased(float x, float y) noexcept
     {
-        const bool clicked =
-            enabled_ && pressed_ && bounds_.contains(x, y);
+        const bool clicked = enabled_ && pressed_ && bounds_.contains(x, y);
 
         pressed_ = false;
         return clicked;
@@ -88,4 +84,4 @@ namespace Paladin
             skinId_
         );
     }
-}
+} // namespace Paladin

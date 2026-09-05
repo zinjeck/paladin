@@ -11,11 +11,9 @@ namespace Paladin
         double tilePixels = 4.0;
 
         [[nodiscard]]
-        double scaledTilePixels(
-            double cameraZoom
-        ) const noexcept
+        double scaledTilePixels(double cameraZoom) const noexcept
         {
             return tilePixels * cameraZoom;
         }
     };
-}
+} // namespace Paladin

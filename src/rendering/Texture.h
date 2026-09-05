@@ -23,14 +23,10 @@ namespace Paladin
     private:
         friend class Renderer;
 
-        Texture(
-            SDL_Texture* texture,
-            int width,
-            int height
-        ) noexcept;
+        Texture(SDL_Texture* texture, int width, int height) noexcept;
 
         SDL_Texture* texture_ = nullptr;
         int width_ = 0;
         int height_ = 0;
     };
-}
+} // namespace Paladin

@@ -24,31 +24,35 @@ namespace Paladin
     class SettlementInspectionController
     {
     public:
-      [[nodiscard]]
-      bool selectAt(
-          SettlementTilePosition position,
-          const SettlementObjectState& objectState,
-          const SettlementCitizenState& citizenState,
-          bool placePanelOnRight,
-          const SettlementLogistics* logistics = nullptr
-      ) noexcept;
+        [[nodiscard]]
+        bool selectAt(
+            SettlementTilePosition position,
+            const SettlementObjectState& objectState,
+            const SettlementCitizenState& citizenState,
+            bool placePanelOnRight,
+            const SettlementLogistics* logistics = nullptr
+        ) noexcept;
 
-      const SettlementInventory* selectedInventory(
-          const SettlementLogistics& logistics
-      ) const
-      {
-          return kind_ == SettlementInspectionKind::Groundpile
-                     ? logistics.inventory(inventoryId_)
-                     : nullptr;
-      }
+        const SettlementInventory* selectedInventory(
+            const SettlementLogistics& logistics
+        ) const
+        {
+            return kind_ == SettlementInspectionKind::Groundpile
+                       ? logistics.inventory(inventoryId_)
+                       : nullptr;
+        }
         void clear() noexcept;
-        void selectWorkplace(SettlementObjectId object, ConstructionSiteId site) noexcept
+        void selectWorkplace(
+            SettlementObjectId object,
+            ConstructionSiteId site
+        ) noexcept
         {
             clear();
             objectId_ = object;
             constructionSiteId_ = site;
             kind_ = object ? SettlementInspectionKind::CompletedObject
-                : site ? SettlementInspectionKind::ConstructionSite : SettlementInspectionKind::None;
+                    : site ? SettlementInspectionKind::ConstructionSite
+                           : SettlementInspectionKind::None;
             placePanelOnRight_ = true;
         }
 
@@ -81,4 +85,4 @@ namespace Paladin
         InventoryId inventoryId_;
         bool placePanelOnRight_ = true;
     };
-}
+} // namespace Paladin

@@ -5,15 +5,12 @@
 
 namespace Paladin
 {
-    template<typename Tag>
-    class NormalizedWorldValue
+    template<typename Tag> class NormalizedWorldValue
     {
     public:
         constexpr NormalizedWorldValue() noexcept = default;
 
-        explicit constexpr NormalizedWorldValue(
-            float value
-        ) noexcept
+        explicit constexpr NormalizedWorldValue(float value) noexcept
             : value_(std::clamp(value, 0.0F, 1.0F))
         {
         }
@@ -24,9 +21,7 @@ namespace Paladin
             return value_;
         }
 
-        auto operator<=>(
-            const NormalizedWorldValue&
-        ) const = default;
+        auto operator<=>(const NormalizedWorldValue&) const = default;
 
     private:
         float value_ = 0.0F;
@@ -36,12 +31,9 @@ namespace Paladin
     struct TemperatureTag;
     struct RainfallTag;
 
-    using Elevation =
-        NormalizedWorldValue<ElevationTag>;
+    using Elevation = NormalizedWorldValue<ElevationTag>;
 
-    using Temperature =
-        NormalizedWorldValue<TemperatureTag>;
+    using Temperature = NormalizedWorldValue<TemperatureTag>;
 
-    using Rainfall =
-        NormalizedWorldValue<RainfallTag>;
-}
+    using Rainfall = NormalizedWorldValue<RainfallTag>;
+} // namespace Paladin

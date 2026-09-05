@@ -23,4 +23,4 @@ namespace Paladin
     private:
         BitmapFontRenderer fontRenderer_;
     };
-}
+} // namespace Paladin

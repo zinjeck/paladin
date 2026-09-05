@@ -46,4 +46,4 @@ namespace Paladin
         mutable bool politicalViewActive_ = false;
         mutable bool politicalViewInitialized_ = false;
     };
-}
+} // namespace Paladin

@@ -6,105 +6,111 @@
 
 namespace Paladin
 {
-double fisheryProductionPerMinute(
-    std::size_t waterTiles,
-    int attendingWorkers,
-    const FisheryJobPolicy& policy
-)
-{
-    if (policy.minutesPerFish <= 0 || policy.waterTilesPerWorker <= 0)
+    double fisheryProductionPerMinute(
+        std::size_t waterTiles,
+        int attendingWorkers,
+        const FisheryJobPolicy& policy
+    )
     {
-        return 0;
-    }
-    return std::min(
-               double(attendingWorkers),
-               double(waterTiles) / policy.waterTilesPerWorker
-           ) /
-           policy.minutesPerFish;
-}
-FisheryZonePreview fisheryZonePreview(
-    const SettlementGrid& grid,
-    const SettlementObjectState& objects,
-    const SettlementObjectFootprint& f
-)
-{
-    FisheryZonePreview result;
-    const FisheryJobPolicy policy;
-    const int radius = std::max(
-        policy.baseReach,
-        int(std::lround(
-            policy.baseReach *
-            std::sqrt(double(f.width) * f.height / policy.referenceArea)
-        ))
-    );
-    const int left = std::max(0, f.topLeft.x - radius);
-    const int top = std::max(0, f.topLeft.y - radius);
-    const int right = std::min(grid.width(), f.topLeft.x + f.width + radius);
-    const int bottom = std::min(grid.height(), f.topLeft.y + f.height + radius);
-    result.bounds = {{left, top}, right - left, bottom - top};
-    std::unordered_set<std::size_t> claimed;
-    const auto record = [&](const auto& entries)
-    {
-        for (const auto& entry : entries)
+        if (policy.minutesPerFish <= 0 || policy.waterTilesPerWorker <= 0)
         {
-            if (entry.objectTypeId != SettlementObjectTypes::FishingGrounds)
+            return 0;
+        }
+        return std::min(
+                   double(attendingWorkers),
+                   double(waterTiles) / policy.waterTilesPerWorker
+               ) /
+               policy.minutesPerFish;
+    }
+    FisheryZonePreview fisheryZonePreview(
+        const SettlementGrid& grid,
+        const SettlementObjectState& objects,
+        const SettlementObjectFootprint& f
+    )
+    {
+        FisheryZonePreview result;
+        const FisheryJobPolicy policy;
+        const int radius = std::max(
+            policy.baseReach,
+            int(std::lround(
+                policy.baseReach *
+                std::sqrt(double(f.width) * f.height / policy.referenceArea)
+            ))
+        );
+        const int left = std::max(0, f.topLeft.x - radius);
+        const int top = std::max(0, f.topLeft.y - radius);
+        const int right =
+            std::min(grid.width(), f.topLeft.x + f.width + radius);
+        const int bottom =
+            std::min(grid.height(), f.topLeft.y + f.height + radius);
+        result.bounds = {{left, top}, right - left, bottom - top};
+        std::unordered_set<std::size_t> claimed;
+        const auto record = [&](const auto& entries)
+        {
+            for (const auto& entry : entries)
             {
-                continue;
+                if (entry.objectTypeId != SettlementObjectTypes::FishingGrounds)
+                {
+                    continue;
+                }
+                for (auto p : entry.productionWater)
+                {
+                    claimed.insert(std::size_t(p.y) * grid.width() + p.x);
+                }
             }
-            for (auto p : entry.productionWater)
+        };
+        record(objects.completedObjects());
+        record(objects.constructionSites());
+        for (int y = top; y < bottom; ++y)
+        {
+            for (int x = left; x < right; ++x)
             {
-                claimed.insert(std::size_t(p.y) * grid.width() + p.x);
+                const SettlementTilePosition p{x, y};
+                if (grid.tile(p)->terrain != TerrainType::Water)
+                {
+                    continue;
+                }
+                (claimed.contains(std::size_t(y) * grid.width() + x)
+                     ? result.excludedWater
+                     : result.availableWater)
+                    .push_back(p);
             }
         }
-    };
-    record(objects.completedObjects());
-    record(objects.constructionSites());
-    for (int y = top; y < bottom; ++y)
-    {
-        for (int x = left; x < right; ++x)
-        {
-            const SettlementTilePosition p{x, y};
-            if (grid.tile(p)->terrain != TerrainType::Water)
-            {
-                continue;
-            }
-            (claimed.contains(std::size_t(y) * grid.width() + x)
-                 ? result.excludedWater
-                 : result.availableWater)
-                .push_back(p);
-        }
+        return result;
     }
-    return result;
-}
 } // namespace Paladin
 
 namespace Paladin
 {
-std::vector<FishingSpot> fisheryShoreline(
-    const SettlementGrid& grid,
-    const CompletedSettlementObject& fishery
-)
-{
-    std::vector<FishingSpot> spots;
-    std::unordered_set<std::uint64_t> seen;
-    for (const auto water : fishery.productionWater)
+    std::vector<FishingSpot> fisheryShoreline(
+        const SettlementGrid& grid,
+        const CompletedSettlementObject& fishery
+    )
     {
-        for (const auto delta :
-             {SettlementTilePosition{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+        std::vector<FishingSpot> spots;
+        std::unordered_set<std::uint64_t> seen;
+        for (const auto water : fishery.productionWater)
         {
-            const SettlementTilePosition land{
-                water.x + delta.x,
-                water.y + delta.y
-            };
-            const auto* tile = grid.tile(land);
-            if (!tile || tile->terrain == TerrainType::Water)
-                continue;
-            const auto key = (std::uint64_t(std::uint32_t(land.x)) << 32) |
-                             std::uint32_t(land.y);
-            if (seen.insert(key).second)
-                spots.push_back({land, water});
+            for (const auto delta :
+                 {SettlementTilePosition{1, 0}, {-1, 0}, {0, 1}, {0, -1}})
+            {
+                const SettlementTilePosition land{
+                    water.x + delta.x,
+                    water.y + delta.y
+                };
+                const auto* tile = grid.tile(land);
+                if (!tile || tile->terrain == TerrainType::Water)
+                {
+                    continue;
+                }
+                const auto key = (std::uint64_t(std::uint32_t(land.x)) << 32) |
+                                 std::uint32_t(land.y);
+                if (seen.insert(key).second)
+                {
+                    spots.push_back({land, water});
+                }
+            }
         }
+        return spots;
     }
-    return spots;
-}
 } // namespace Paladin

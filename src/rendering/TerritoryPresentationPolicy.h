@@ -22,4 +22,4 @@ namespace Paladin
     [[nodiscard]]
     const TerritoryPresentationPolicy&
     defaultTerritoryPresentationPolicy() noexcept;
-}
+} // namespace Paladin

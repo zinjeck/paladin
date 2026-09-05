@@ -15,68 +15,116 @@ namespace Paladin
         {
             if (character >= 'a' && character <= 'z')
             {
-                character = static_cast<char>(
-                    character - 'a' + 'A'
-                );
+                character = static_cast<char>(character - 'a' + 'A');
             }
 
             switch (character)
             {
-                case 'A': return {14, 17, 17, 31, 17, 17, 17};
-                case 'B': return {30, 17, 17, 30, 17, 17, 30};
-                case 'C': return {15, 16, 16, 16, 16, 16, 15};
-                case 'D': return {30, 17, 17, 17, 17, 17, 30};
-                case 'E': return {31, 16, 16, 30, 16, 16, 31};
-                case 'F': return {31, 16, 16, 30, 16, 16, 16};
-                case 'G': return {15, 16, 16, 19, 17, 17, 15};
-                case 'H': return {17, 17, 17, 31, 17, 17, 17};
-                case 'I': return {31, 4, 4, 4, 4, 4, 31};
-                case 'J': return {7, 2, 2, 2, 18, 18, 12};
-                case 'K': return {17, 18, 20, 24, 20, 18, 17};
-                case 'L': return {16, 16, 16, 16, 16, 16, 31};
-                case 'M': return {17, 27, 21, 21, 17, 17, 17};
-                case 'N': return {17, 25, 21, 19, 17, 17, 17};
-                case 'O': return {14, 17, 17, 17, 17, 17, 14};
-                case 'P': return {30, 17, 17, 30, 16, 16, 16};
-                case 'Q': return {14, 17, 17, 17, 21, 18, 13};
-                case 'R': return {30, 17, 17, 30, 20, 18, 17};
-                case 'S': return {15, 16, 16, 14, 1, 1, 30};
-                case 'T': return {31, 4, 4, 4, 4, 4, 4};
-                case 'U': return {17, 17, 17, 17, 17, 17, 14};
-                case 'V': return {17, 17, 17, 17, 17, 10, 4};
-                case 'W': return {17, 17, 17, 21, 21, 21, 10};
-                case 'X': return {17, 17, 10, 4, 10, 17, 17};
-                case 'Y': return {17, 17, 10, 4, 4, 4, 4};
-                case 'Z': return {31, 1, 2, 4, 8, 16, 31};
+            case 'A':
+                return {14, 17, 17, 31, 17, 17, 17};
+            case 'B':
+                return {30, 17, 17, 30, 17, 17, 30};
+            case 'C':
+                return {15, 16, 16, 16, 16, 16, 15};
+            case 'D':
+                return {30, 17, 17, 17, 17, 17, 30};
+            case 'E':
+                return {31, 16, 16, 30, 16, 16, 31};
+            case 'F':
+                return {31, 16, 16, 30, 16, 16, 16};
+            case 'G':
+                return {15, 16, 16, 19, 17, 17, 15};
+            case 'H':
+                return {17, 17, 17, 31, 17, 17, 17};
+            case 'I':
+                return {31, 4, 4, 4, 4, 4, 31};
+            case 'J':
+                return {7, 2, 2, 2, 18, 18, 12};
+            case 'K':
+                return {17, 18, 20, 24, 20, 18, 17};
+            case 'L':
+                return {16, 16, 16, 16, 16, 16, 31};
+            case 'M':
+                return {17, 27, 21, 21, 17, 17, 17};
+            case 'N':
+                return {17, 25, 21, 19, 17, 17, 17};
+            case 'O':
+                return {14, 17, 17, 17, 17, 17, 14};
+            case 'P':
+                return {30, 17, 17, 30, 16, 16, 16};
+            case 'Q':
+                return {14, 17, 17, 17, 21, 18, 13};
+            case 'R':
+                return {30, 17, 17, 30, 20, 18, 17};
+            case 'S':
+                return {15, 16, 16, 14, 1, 1, 30};
+            case 'T':
+                return {31, 4, 4, 4, 4, 4, 4};
+            case 'U':
+                return {17, 17, 17, 17, 17, 17, 14};
+            case 'V':
+                return {17, 17, 17, 17, 17, 10, 4};
+            case 'W':
+                return {17, 17, 17, 21, 21, 21, 10};
+            case 'X':
+                return {17, 17, 10, 4, 10, 17, 17};
+            case 'Y':
+                return {17, 17, 10, 4, 4, 4, 4};
+            case 'Z':
+                return {31, 1, 2, 4, 8, 16, 31};
 
-                case '0': return {14, 17, 19, 21, 25, 17, 14};
-                case '1': return {4, 12, 4, 4, 4, 4, 14};
-                case '2': return {14, 17, 1, 2, 4, 8, 31};
-                case '3': return {30, 1, 1, 14, 1, 1, 30};
-                case '4': return {2, 6, 10, 18, 31, 2, 2};
-                case '5': return {31, 16, 16, 30, 1, 1, 30};
-                case '6': return {14, 16, 16, 30, 17, 17, 14};
-                case '7': return {31, 1, 2, 4, 8, 8, 8};
-                case '8': return {14, 17, 17, 14, 17, 17, 14};
-                case '9': return {14, 17, 17, 15, 1, 1, 14};
+            case '0':
+                return {14, 17, 19, 21, 25, 17, 14};
+            case '1':
+                return {4, 12, 4, 4, 4, 4, 14};
+            case '2':
+                return {14, 17, 1, 2, 4, 8, 31};
+            case '3':
+                return {30, 1, 1, 14, 1, 1, 30};
+            case '4':
+                return {2, 6, 10, 18, 31, 2, 2};
+            case '5':
+                return {31, 16, 16, 30, 1, 1, 30};
+            case '6':
+                return {14, 16, 16, 30, 17, 17, 14};
+            case '7':
+                return {31, 1, 2, 4, 8, 8, 8};
+            case '8':
+                return {14, 17, 17, 14, 17, 17, 14};
+            case '9':
+                return {14, 17, 17, 15, 1, 1, 14};
 
-                case '<': return {2, 4, 8, 16, 8, 4, 2};
-                case '>': return {8, 4, 2, 1, 2, 4, 8};
-                case '%': return {25, 25, 2, 4, 8, 19, 19};
-                case '|': return {4, 4, 4, 4, 4, 4, 4};
-                case '(': return {2, 4, 8, 8, 8, 4, 2};
-                case ')': return {8, 4, 2, 2, 2, 4, 8};
-                case ':': return {0, 4, 4, 0, 4, 4, 0};
-                case '-': return {0, 0, 0, 31, 0, 0, 0};
-                case '+': return {0, 4, 4, 31, 4, 4, 0};
-                case '.': return {0, 0, 0, 0, 0, 12, 12};
-                case '/': return {1, 1, 2, 4, 8, 16, 16};
-                case '\'': return {4, 4, 2, 0, 0, 0, 0};
-                case ' ': return {0, 0, 0, 0, 0, 0, 0};
-                default: return {14, 17, 1, 2, 4, 0, 4};
+            case '<':
+                return {2, 4, 8, 16, 8, 4, 2};
+            case '>':
+                return {8, 4, 2, 1, 2, 4, 8};
+            case '%':
+                return {25, 25, 2, 4, 8, 19, 19};
+            case '|':
+                return {4, 4, 4, 4, 4, 4, 4};
+            case '(':
+                return {2, 4, 8, 8, 8, 4, 2};
+            case ')':
+                return {8, 4, 2, 2, 2, 4, 8};
+            case ':':
+                return {0, 4, 4, 0, 4, 4, 0};
+            case '-':
+                return {0, 0, 0, 31, 0, 0, 0};
+            case '+':
+                return {0, 4, 4, 31, 4, 4, 0};
+            case '.':
+                return {0, 0, 0, 0, 0, 12, 12};
+            case '/':
+                return {1, 1, 2, 4, 8, 16, 16};
+            case '\'':
+                return {4, 4, 2, 0, 0, 0, 0};
+            case ' ':
+                return {0, 0, 0, 0, 0, 0, 0};
+            default:
+                return {14, 17, 1, 2, 4, 0, 4};
             }
         }
-    }
+    } // namespace
 
     float BitmapFontRenderer::measureWidth(
         std::string_view text,
@@ -88,12 +136,7 @@ namespace Paladin
             return 0.0F;
         }
 
-        return
-            (
-                static_cast<float>(text.size()) * 6.0F
-                - 1.0F
-            )
-            * pixelSize;
+        return (static_cast<float>(text.size()) * 6.0F - 1.0F) * pixelSize;
     }
 
     void BitmapFontRenderer::drawText(
@@ -118,9 +161,7 @@ namespace Paladin
                 for (std::size_t column = 0; column < 5; ++column)
                 {
                     const std::uint8_t bit =
-                        static_cast<std::uint8_t>(
-                            1U << (4U - column)
-                        );
+                        static_cast<std::uint8_t>(1U << (4U - column));
 
                     if ((rows[row] & bit) == 0)
                     {
@@ -129,11 +170,19 @@ namespace Paladin
 
                     // Shared rounded edges avoid gaps between adjacent
                     // bitmap pixels when a label uses a fractional scale.
-                    const float left = std::round(cursorX + static_cast<float>(column) * pixelSize);
-                    const float top = std::round(y + static_cast<float>(row) * pixelSize);
-                    const float right = std::round(cursorX + static_cast<float>(column + 1) * pixelSize);
-                    const float bottom = std::round(y + static_cast<float>(row + 1) * pixelSize);
-                    rectangles.push_back({left, top, right - left, bottom - top});
+                    const float left = std::round(
+                        cursorX + static_cast<float>(column) * pixelSize
+                    );
+                    const float top =
+                        std::round(y + static_cast<float>(row) * pixelSize);
+                    const float right = std::round(
+                        cursorX + static_cast<float>(column + 1) * pixelSize
+                    );
+                    const float bottom =
+                        std::round(y + static_cast<float>(row + 1) * pixelSize);
+                    rectangles.push_back(
+                        {left, top, right - left, bottom - top}
+                    );
                 }
             }
 
@@ -142,4 +191,4 @@ namespace Paladin
 
         renderer.fillRectangles(rectangles, color);
     }
-}
+} // namespace Paladin

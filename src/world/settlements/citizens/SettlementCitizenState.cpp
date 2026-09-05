@@ -1,7 +1,7 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 
-#include "world/TerrainType.h"
 #include "world/SettlementGrid.h"
+#include "world/TerrainType.h"
 #include "world/WorldTile.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -9,8 +9,8 @@
 
 #include "world/generation/GenerationNoise.h"
 #include <algorithm>
-#include <cmath>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <deque>
 #include <string_view>
@@ -20,49 +20,49 @@ namespace Paladin
     namespace
     {
         constexpr std::array<std::string_view, 100> maleNames{
-            "Arlen", "Tovan", "Calen", "Ronan", "Darian",
-            "Kael", "Bren", "Orin", "Levon", "Theron",
-            "Jarek", "Corin", "Malric", "Edrin", "Tomas",
-            "Varon", "Lucan", "Alric", "Fenric", "Soren",
-            "Aldren", "Beran", "Cedran", "Doran", "Evren",
-            "Garric", "Hadren", "Ivarn", "Joren", "Kellan",
-            "Merek", "Nolan", "Odran", "Perric", "Roder",
-            "Stellan", "Torren", "Ulren", "Wystan", "Yorick",
-            "Adrian", "Aldric", "Ansel", "Arden", "Asher",
-            "Bastian", "Benedict", "Bram", "Caelan", "Cassian",
-            "Caspar", "Cillian", "Conrad", "Damon", "Darius",
-            "Declan", "Dominic", "Edric", "Edwin", "Elias",
-            "Emrys", "Ewan", "Fabian", "Felix", "Finn",
-            "Florian", "Gareth", "Gavin", "Gideon", "Godric",
-            "Harlan", "Hector", "Hugo", "Idris", "Jasper",
-            "Julian", "Kendrick", "Laurence", "Leander", "Lionel",
-            "Lorcan", "Magnus", "Merrick", "Nathan", "Osric",
-            "Owen", "Percival", "Quentin", "Raphael", "Rhys",
-            "Roland", "Rowan", "Silas", "Simeon", "Tobias",
-            "Tristan", "Valentin", "Victor", "Walter", "Wilfred"
+            "Arlen",   "Tovan",    "Calen",    "Ronan",   "Darian",
+            "Kael",    "Bren",     "Orin",     "Levon",   "Theron",
+            "Jarek",   "Corin",    "Malric",   "Edrin",   "Tomas",
+            "Varon",   "Lucan",    "Alric",    "Fenric",  "Soren",
+            "Aldren",  "Beran",    "Cedran",   "Doran",   "Evren",
+            "Garric",  "Hadren",   "Ivarn",    "Joren",   "Kellan",
+            "Merek",   "Nolan",    "Odran",    "Perric",  "Roder",
+            "Stellan", "Torren",   "Ulren",    "Wystan",  "Yorick",
+            "Adrian",  "Aldric",   "Ansel",    "Arden",   "Asher",
+            "Bastian", "Benedict", "Bram",     "Caelan",  "Cassian",
+            "Caspar",  "Cillian",  "Conrad",   "Damon",   "Darius",
+            "Declan",  "Dominic",  "Edric",    "Edwin",   "Elias",
+            "Emrys",   "Ewan",     "Fabian",   "Felix",   "Finn",
+            "Florian", "Gareth",   "Gavin",    "Gideon",  "Godric",
+            "Harlan",  "Hector",   "Hugo",     "Idris",   "Jasper",
+            "Julian",  "Kendrick", "Laurence", "Leander", "Lionel",
+            "Lorcan",  "Magnus",   "Merrick",  "Nathan",  "Osric",
+            "Owen",    "Percival", "Quentin",  "Raphael", "Rhys",
+            "Roland",  "Rowan",    "Silas",    "Simeon",  "Tobias",
+            "Tristan", "Valentin", "Victor",   "Walter",  "Wilfred"
         };
 
         constexpr std::array<std::string_view, 100> femaleNames{
-            "Mira", "Elia", "Sera", "Nira", "Liora",
-            "Kaela", "Maris", "Elara", "Vessa", "Talia",
-            "Rina", "Anya", "Selene", "Maera", "Isolde",
-            "Lyra", "Vela", "Seris", "Amara", "Coralie",
-            "Aveline", "Briala", "Ceryn", "Delara", "Eirwen",
-            "Fiora", "Giselle", "Halia", "Ilara", "Jessamine",
-            "Kerra", "Lenora", "Mirelle", "Nerissa", "Odelle",
-            "Petra", "Roselyn", "Sabine", "Thalia", "Ysara",
-            "Adela", "Adelaide", "Adrienne", "Agnes", "Ailsa",
-            "Alina", "Annora", "Arabella", "Astrid", "Aurelia",
-            "Beatrice", "Branwen", "Brielle", "Camilla", "Carina",
-            "Cassandra", "Cecilia", "Celeste", "Clara", "Cordelia",
-            "Della", "Dorothea", "Edith", "Eleanor", "Elise",
-            "Elowen", "Emilia", "Enid", "Estelle", "Eva",
-            "Freya", "Genevieve", "Guinevere", "Helena", "Imogen",
-            "Ingrid", "Iona", "Iris", "Johanna", "Judith",
-            "Lavinia", "Leona", "Linnea", "Livia", "Lucille",
-            "Lydia", "Margot", "Matilda", "Melisande", "Minerva",
-            "Nadia", "Noelle", "Ophelia", "Oriana", "Philippa",
-            "Rosalind", "Rowena", "Theodora", "Viola", "Winifred"
+            "Mira",      "Elia",      "Sera",      "Nira",      "Liora",
+            "Kaela",     "Maris",     "Elara",     "Vessa",     "Talia",
+            "Rina",      "Anya",      "Selene",    "Maera",     "Isolde",
+            "Lyra",      "Vela",      "Seris",     "Amara",     "Coralie",
+            "Aveline",   "Briala",    "Ceryn",     "Delara",    "Eirwen",
+            "Fiora",     "Giselle",   "Halia",     "Ilara",     "Jessamine",
+            "Kerra",     "Lenora",    "Mirelle",   "Nerissa",   "Odelle",
+            "Petra",     "Roselyn",   "Sabine",    "Thalia",    "Ysara",
+            "Adela",     "Adelaide",  "Adrienne",  "Agnes",     "Ailsa",
+            "Alina",     "Annora",    "Arabella",  "Astrid",    "Aurelia",
+            "Beatrice",  "Branwen",   "Brielle",   "Camilla",   "Carina",
+            "Cassandra", "Cecilia",   "Celeste",   "Clara",     "Cordelia",
+            "Della",     "Dorothea",  "Edith",     "Eleanor",   "Elise",
+            "Elowen",    "Emilia",    "Enid",      "Estelle",   "Eva",
+            "Freya",     "Genevieve", "Guinevere", "Helena",    "Imogen",
+            "Ingrid",    "Iona",      "Iris",      "Johanna",   "Judith",
+            "Lavinia",   "Leona",     "Linnea",    "Livia",     "Lucille",
+            "Lydia",     "Margot",    "Matilda",   "Melisande", "Minerva",
+            "Nadia",     "Noelle",    "Ophelia",   "Oriana",    "Philippa",
+            "Rosalind",  "Rowena",    "Theodora",  "Viola",     "Winifred"
         };
 
         bool isWalkableCitizenTile(
@@ -73,11 +73,8 @@ namespace Paladin
             const SettlementGrid& grid = settlementMap.grid();
             const WorldTile* tile = grid.tile(position);
 
-            if (
-                !tile ||
-                tile->terrain == TerrainType::Water ||
-                tile->terrain == TerrainType::Mountain
-            )
+            if (!tile || tile->terrain == TerrainType::Water ||
+                tile->terrain == TerrainType::Mountain)
             {
                 return false;
             }
@@ -93,20 +90,16 @@ namespace Paladin
             {
                 const SettlementObjectDefinition* definition =
                     SettlementObjectCatalog::definition(objectTypeId);
-                return
-                    !definition ||
-                    definition->placementLayer ==
-                        SettlementObjectPlacementLayer::Structure;
+                return !definition ||
+                       definition->placementLayer ==
+                           SettlementObjectPlacementLayer::Structure;
             };
 
-            return
-                (!object || !blocksCitizen(object->objectTypeId)) &&
-                (
-                    !constructionSite ||
-                    !blocksCitizen(constructionSite->objectTypeId)
-                );
+            return (!object || !blocksCitizen(object->objectTypeId)) &&
+                   (!constructionSite ||
+                    !blocksCitizen(constructionSite->objectTypeId));
         }
-    }
+    } // namespace
 
 
     bool SettlementCitizenState::initialize(
@@ -125,6 +118,19 @@ namespace Paladin
 
     bool SettlementCitizenState::spawn(std::uint64_t citizenCount)
     {
+        if (!appendCitizens(citizenCount, false))
+        {
+            return false;
+        }
+        matchSingles();
+        return true;
+    }
+
+    bool SettlementCitizenState::appendCitizens(
+        std::uint64_t citizenCount,
+        bool child
+    )
+    {
         if (!citizenCount || citizenCount > 100000 ||
             citizens_.size() > citizens_.max_size() - citizenCount)
         {
@@ -132,7 +138,17 @@ namespace Paladin
         }
         const auto nameSeed = behaviorSeed_;
         const auto first = citizens_.size();
-        citizens_.reserve(first + static_cast<std::size_t>(citizenCount));
+        const auto required = first + static_cast<std::size_t>(citizenCount);
+        if (required > citizens_.capacity())
+        {
+            const auto growth = std::min(
+                citizens_.max_size() - citizens_.capacity(),
+                citizens_.capacity() / 2
+            );
+            citizens_.reserve(
+                std::max(required, citizens_.capacity() + growth)
+            );
+        }
 
         const auto savedIds = citizenIds_;
         try
@@ -140,20 +156,30 @@ namespace Paladin
             for (std::uint64_t index = first; index < first + citizenCount;
                  ++index)
             {
+                const auto id = citizenIds_.generate();
+                const auto sequence = id.value() - 1;
                 const CitizenSex sex =
-                    (GenerationNoise::mix(nameSeed ^ (index * 104729ULL)) &
+                    (GenerationNoise::mix(nameSeed ^ (sequence * 104729ULL)) &
                      1U) == 0
                         ? CitizenSex::Male
                         : CitizenSex::Female;
                 const auto& names =
                     sex == CitizenSex::Male ? maleNames : femaleNames;
                 const std::size_t poolIndex = static_cast<std::size_t>(
-                    (nameSeed + index * 17U) % names.size()
+                    (nameSeed + sequence * 17U) % names.size()
                 );
 
-                citizens_.push_back(
-                    {citizenIds_.generate(), std::string(names[poolIndex]), sex}
-                );
+                citizens_.push_back({id, std::string(names[poolIndex]), sex});
+                auto& citizen = citizens_.back();
+                citizen.child = child;
+                citizen.ageYears =
+                    child
+                        ? 0
+                        : std::uint16_t(
+                              25 + GenerationNoise::mix(
+                                       nameSeed ^ citizen.id.value() ^ 0xA6EULL
+                                   ) % 21
+                          );
             }
         }
         catch (...)
@@ -163,6 +189,7 @@ namespace Paladin
             throw;
         }
         ++version_;
+        ++familyVersion_;
         return true;
     }
 
@@ -179,7 +206,7 @@ namespace Paladin
         const CompletedSettlementObject* cityKeep = nullptr;
 
         for (const CompletedSettlementObject& object :
-            settlementMap.objectState().completedObjects())
+             settlementMap.objectState().completedObjects())
         {
             if (object.objectTypeId == SettlementObjectTypes::CityKeep)
             {
@@ -202,9 +229,8 @@ namespace Paladin
         );
         std::deque<SettlementTilePosition> searchFrontier;
 
-        const auto enqueue = [&grid, &visited, &searchFrontier](
-            SettlementTilePosition position
-        )
+        const auto enqueue =
+            [&grid, &visited, &searchFrontier](SettlementTilePosition position)
         {
             if (!grid.isValidPosition(position))
             {
@@ -225,48 +251,36 @@ namespace Paladin
             searchFrontier.push_back(position);
         };
 
-        for (
-            std::int32_t y = cityKeep->footprint.topLeft.y;
-            y < cityKeep->footprint.topLeft.y + cityKeep->footprint.height;
-            ++y
-        )
+        for (std::int32_t y = cityKeep->footprint.topLeft.y;
+             y < cityKeep->footprint.topLeft.y + cityKeep->footprint.height;
+             ++y)
         {
-            for (
-                std::int32_t x = cityKeep->footprint.topLeft.x;
-                x < cityKeep->footprint.topLeft.x + cityKeep->footprint.width;
-                ++x
-            )
+            for (std::int32_t x = cityKeep->footprint.topLeft.x;
+                 x < cityKeep->footprint.topLeft.x + cityKeep->footprint.width;
+                 ++x)
             {
                 enqueue({x, y});
             }
         }
 
-        constexpr std::array<SettlementTilePosition, 4> neighborOffsets{{
-            {0, -1}, {-1, 0}, {1, 0}, {0, 1}
-        }};
+        constexpr std::array<SettlementTilePosition, 4> neighborOffsets{
+            {{0, -1}, {-1, 0}, {1, 0}, {0, 1}}
+        };
 
-        while (
-            !searchFrontier.empty() &&
-            spawnTiles.size() < citizens_.size()
-        )
+        while (!searchFrontier.empty() && spawnTiles.size() < citizens_.size())
         {
             const SettlementTilePosition position = searchFrontier.front();
             searchFrontier.pop_front();
 
-            if (
-                !cityKeep->footprint.contains(position) &&
-                isWalkableCitizenTile(settlementMap, position)
-            )
+            if (!cityKeep->footprint.contains(position) &&
+                isWalkableCitizenTile(settlementMap, position))
             {
                 spawnTiles.push_back(position);
             }
 
             for (const SettlementTilePosition offset : neighborOffsets)
             {
-                enqueue({
-                    position.x + offset.x,
-                    position.y + offset.y
-                });
+                enqueue({position.x + offset.x, position.y + offset.y});
             }
         }
 
@@ -284,8 +298,7 @@ namespace Paladin
                 continue;
             }
 
-            citizen.tilePosition =
-                spawnTiles[spawnIndex % spawnTiles.size()];
+            citizen.tilePosition = spawnTiles[spawnIndex % spawnTiles.size()];
             ++spawnIndex;
             changed = true;
         }
@@ -308,7 +321,7 @@ namespace Paladin
 
         for (SettlementCitizen& citizen : citizens_)
         {
-            if (citizen.activity != CitizenActivity::Idle)
+            if (citizen.child || citizen.activity != CitizenActivity::Idle)
             {
                 continue;
             }
@@ -350,8 +363,8 @@ namespace Paladin
     }
 
 
-    std::span<const SettlementCitizen>
-    SettlementCitizenState::citizens() const noexcept
+    std::span<const SettlementCitizen> SettlementCitizenState::
+        citizens() const noexcept
     {
         return citizens_;
     }
@@ -364,10 +377,7 @@ namespace Paladin
         const auto iterator = std::find_if(
             citizens_.begin(),
             citizens_.end(),
-            [id](const SettlementCitizen& citizen)
-            {
-                return citizen.id == id;
-            }
+            [id](const SettlementCitizen& citizen) { return citizen.id == id; }
         );
 
         return iterator == citizens_.end() ? nullptr : &*iterator;
@@ -383,8 +393,10 @@ namespace Paladin
             citizens_.rend(),
             [position](const SettlementCitizen& citizen)
             {
-                return SettlementTilePosition{int(std::floor(citizen.visualX() + .5)),
-                    int(std::floor(citizen.visualY() + .5))} == position;
+                return SettlementTilePosition{
+                           int(std::floor(citizen.visualX() + .5)),
+                           int(std::floor(citizen.visualY() + .5))
+                       } == position;
             }
         );
 
@@ -396,4 +408,4 @@ namespace Paladin
     {
         return version_;
     }
-}
+} // namespace Paladin

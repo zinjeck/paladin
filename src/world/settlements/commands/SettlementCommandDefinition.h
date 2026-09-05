@@ -5,7 +5,14 @@
 
 namespace Paladin
 {
-    enum class CommandTargetKind { Tree, Rock, Gatherable, Animal, Object };
+    enum class CommandTargetKind
+    {
+        Tree,
+        Rock,
+        Gatherable,
+        Animal,
+        Object
+    };
 
     struct SettlementCommandDefinition
     {
@@ -22,18 +29,18 @@ namespace Paladin
         inline constexpr std::string_view Hunt = "hunt";
         inline constexpr std::string_view Demolish = "demolish";
         inline constexpr std::string_view Cancel = "cancel_task";
-    }
+    } // namespace SettlementCommandTypes
 
     class SettlementCommandCatalog
     {
     public:
         [[nodiscard]]
-        static std::span<const SettlementCommandDefinition>
-        definitions() noexcept;
+        static std::span<
+            const SettlementCommandDefinition> definitions() noexcept;
 
         [[nodiscard]]
         static const SettlementCommandDefinition* definition(
             std::string_view commandTypeId
         ) noexcept;
     };
-}
+} // namespace Paladin

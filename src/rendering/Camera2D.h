@@ -9,12 +9,8 @@ namespace Paladin
     public:
         Camera2D() noexcept = default;
 
-        Camera2D(
-            double tileX,
-            double tileY
-        ) noexcept
-            : tileX_(tileX),
-              tileY_(tileY)
+        Camera2D(double tileX, double tileY) noexcept
+            : tileX_(tileX), tileY_(tileY)
         {
         }
 
@@ -30,19 +26,13 @@ namespace Paladin
             return tileY_;
         }
 
-        void setPosition(
-            double tileX,
-            double tileY
-        ) noexcept
+        void setPosition(double tileX, double tileY) noexcept
         {
             tileX_ = tileX;
             tileY_ = tileY;
         }
 
-        void move(
-            double deltaTileX,
-            double deltaTileY
-        ) noexcept
+        void move(double deltaTileX, double deltaTileY) noexcept
         {
             tileX_ += deltaTileX;
             tileY_ += deltaTileY;
@@ -56,18 +46,12 @@ namespace Paladin
 
         void setZoom(double zoom) noexcept
         {
-            zoom_ = std::clamp(
-                zoom,
-                MinimumZoom,
-                MaximumZoom
-            );
+            zoom_ = std::clamp(zoom, MinimumZoom, MaximumZoom);
         }
 
         void multiplyZoom(double multiplier) noexcept
         {
-            setZoom(
-                zoom_ * multiplier
-            );
+            setZoom(zoom_ * multiplier);
         }
 
     private:
@@ -82,4 +66,4 @@ namespace Paladin
 
         double zoom_ = 1.0;
     };
-}
+} // namespace Paladin

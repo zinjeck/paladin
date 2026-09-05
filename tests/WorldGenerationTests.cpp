@@ -6,9 +6,9 @@
 #include "world/World.h"
 #include "world/WorldGrid.h"
 #include "world/WorldTile.h"
-#include "world/generation/WorldGenerationSettings.h"
-#include "world/generation/WorldGenerationSeed.h"
 #include "world/generation/SettlementMapGenerator.h"
+#include "world/generation/WorldGenerationSeed.h"
+#include "world/generation/WorldGenerationSettings.h"
 #include "world/settlements/SettlementMap.h"
 
 #include <bit>
@@ -20,28 +20,19 @@
 namespace
 {
     static_assert(!std::is_same_v<
-        Paladin::WorldTilePosition,
-        Paladin::SettlementTilePosition
-    >);
+                  Paladin::WorldTilePosition,
+                  Paladin::SettlementTilePosition>);
     static_assert(!std::is_convertible_v<
-        Paladin::WorldTilePosition,
-        Paladin::SettlementTilePosition
-    >);
+                  Paladin::WorldTilePosition,
+                  Paladin::SettlementTilePosition>);
 
-    template<typename Grid>
-    std::uint64_t worldHash(
-        const Grid& grid
-    )
+    template<typename Grid> std::uint64_t worldHash(const Grid& grid)
     {
-        std::uint64_t hash =
-            1'469'598'103'934'665'603ULL;
+        std::uint64_t hash = 1'469'598'103'934'665'603ULL;
 
-        constexpr std::uint64_t prime =
-            1'099'511'628'211ULL;
+        constexpr std::uint64_t prime = 1'099'511'628'211ULL;
 
-        const auto addValue = [&hash](
-            std::uint64_t value
-        )
+        const auto addValue = [&hash](std::uint64_t value)
         {
             hash ^= value;
             hash *= prime;
@@ -51,28 +42,19 @@ namespace
         {
             for (std::int32_t x = 0; x < grid.width(); ++x)
             {
-                const Paladin::WorldTile* tile =
-                    grid.tile({x, y});
+                const Paladin::WorldTile* tile = grid.tile({x, y});
+
+                addValue(static_cast<std::uint64_t>(tile->terrain));
+
+                addValue(static_cast<std::uint64_t>(tile->biome));
+
+                addValue(std::bit_cast<std::uint32_t>(tile->elevation.value()));
 
                 addValue(
-                    static_cast<std::uint64_t>(tile->terrain)
+                    std::bit_cast<std::uint32_t>(tile->temperature.value())
                 );
 
-                addValue(
-                    static_cast<std::uint64_t>(tile->biome)
-                );
-
-                addValue(std::bit_cast<std::uint32_t>(
-                    tile->elevation.value()
-                ));
-
-                addValue(std::bit_cast<std::uint32_t>(
-                    tile->temperature.value()
-                ));
-
-                addValue(std::bit_cast<std::uint32_t>(
-                    tile->rainfall.value()
-                ));
+                addValue(std::bit_cast<std::uint32_t>(tile->rainfall.value()));
             }
         }
 
@@ -89,31 +71,24 @@ namespace
         const Paladin::World firstWorld(settings);
         const Paladin::World secondWorld(settings);
 
-        PALADIN_CHECK(
-            firstWorld.generationSeed() == settings.seed
-        );
+        PALADIN_CHECK(firstWorld.generationSeed() == settings.seed);
 
         PALADIN_CHECK(
-            worldHash(firstWorld.grid())
-            == worldHash(secondWorld.grid())
+            worldHash(firstWorld.grid()) == worldHash(secondWorld.grid())
         );
 
         settings.seed += 1;
         const Paladin::World differentWorld(settings);
 
         PALADIN_CHECK(
-            worldHash(firstWorld.grid())
-            != worldHash(differentWorld.grid())
+            worldHash(firstWorld.grid()) != worldHash(differentWorld.grid())
         );
     }
 
     void testGeneratedWorldInvariants()
     {
         static_assert(
-            !std::is_assignable_v<
-                Paladin::Elevation&,
-                Paladin::Temperature
-            >
+            !std::is_assignable_v<Paladin::Elevation&, Paladin::Temperature>
         );
 
         Paladin::WorldGenerationSettings settings;
@@ -133,14 +108,12 @@ namespace
 
         for (std::int32_t y = 0; y < grid.height(); ++y)
         {
-            const double latitude =
-                (static_cast<double>(y) + 0.5)
-                / static_cast<double>(grid.height());
+            const double latitude = (static_cast<double>(y) + 0.5) /
+                                    static_cast<double>(grid.height());
 
             for (std::int32_t x = 0; x < grid.width(); ++x)
             {
-                const Paladin::WorldTile* tile =
-                    grid.tile({x, y});
+                const Paladin::WorldTile* tile = grid.tile({x, y});
 
                 PALADIN_CHECK(
                     tile->elevation.value() >= 0.0F &&
@@ -159,59 +132,44 @@ namespace
 
                 if (latitude >= 0.42 && latitude <= 0.58)
                 {
-                    equatorialTemperatureTotal +=
-                        tile->temperature.value();
+                    equatorialTemperatureTotal += tile->temperature.value();
 
                     ++equatorialTileCount;
                 }
 
                 if (latitude <= 0.12 || latitude >= 0.88)
                 {
-                    polarTemperatureTotal +=
-                        tile->temperature.value();
+                    polarTemperatureTotal += tile->temperature.value();
 
                     ++polarTileCount;
                 }
 
-                if (
-                    tile->terrain
-                    == Paladin::TerrainType::Mountain
-                )
+                if (tile->terrain == Paladin::TerrainType::Mountain)
                 {
                     ++mountainTileCount;
                 }
 
-                if (
-                    tile->terrain
-                    == Paladin::TerrainType::Water
-                )
+                if (tile->terrain == Paladin::TerrainType::Water)
                 {
                     ++waterTileCount;
 
-                    PALADIN_CHECK(
-                        tile->biome == Paladin::BiomeType::Ocean
-                    );
+                    PALADIN_CHECK(tile->biome == Paladin::BiomeType::Ocean);
                 }
                 else
                 {
-                    PALADIN_CHECK(
-                        tile->biome != Paladin::BiomeType::Ocean
-                    );
+                    PALADIN_CHECK(tile->biome != Paladin::BiomeType::Ocean);
                 }
             }
         }
 
         const double equatorialAverage =
-            equatorialTemperatureTotal
-            / static_cast<double>(equatorialTileCount);
+            equatorialTemperatureTotal /
+            static_cast<double>(equatorialTileCount);
 
         const double polarAverage =
-            polarTemperatureTotal
-            / static_cast<double>(polarTileCount);
+            polarTemperatureTotal / static_cast<double>(polarTileCount);
 
-        PALADIN_CHECK(
-            equatorialAverage > polarAverage + 0.35
-        );
+        PALADIN_CHECK(equatorialAverage > polarAverage + 0.35);
 
         PALADIN_CHECK(mountainTileCount > 0);
         PALADIN_CHECK(waterTileCount > 0);
@@ -227,17 +185,13 @@ namespace
             {
                 Paladin::WorldTile* tile = sourceGrid.tile({x, y});
 
-                tile->terrain = x < 4
-                    ? Paladin::TerrainType::Water
-                    : Paladin::TerrainType::Land;
+                tile->terrain = x < 4 ? Paladin::TerrainType::Water
+                                      : Paladin::TerrainType::Land;
 
-                tile->biome = x < 4
-                    ? Paladin::BiomeType::Ocean
-                    : Paladin::BiomeType::Forest;
+                tile->biome = x < 4 ? Paladin::BiomeType::Ocean
+                                    : Paladin::BiomeType::Forest;
 
-                tile->elevation = Paladin::Elevation(
-                    x < 4 ? 0.2F : 0.7F
-                );
+                tile->elevation = Paladin::Elevation(x < 4 ? 0.2F : 0.7F);
 
                 tile->temperature = Paladin::Temperature(0.6F);
                 tile->rainfall = Paladin::Rainfall(0.7F);
@@ -281,22 +235,19 @@ namespace
         PALADIN_CHECK(worldHash(first->grid()) == worldHash(second->grid()));
 
         PALADIN_CHECK(
-            first->grid().tile({1, 18})->terrain
-            == Paladin::TerrainType::Water
+            first->grid().tile({1, 18})->terrain == Paladin::TerrainType::Water
         );
 
         PALADIN_CHECK(
-            first->grid().tile({34, 18})->terrain
-            == Paladin::TerrainType::Land
+            first->grid().tile({34, 18})->terrain == Paladin::TerrainType::Land
         );
 
-        const auto defaults =
-            Paladin::defaultSettlementMapGenerationSettings();
+        const auto defaults = Paladin::defaultSettlementMapGenerationSettings();
 
         PALADIN_CHECK(defaults.localTilesPerWorldTile == 64);
         PALADIN_CHECK(9 * defaults.localTilesPerWorldTile == 576);
     }
-}
+} // namespace
 
 void runWorldGenerationTests()
 {
@@ -306,12 +257,10 @@ void runWorldGenerationTests()
     const Paladin::WorldGenerationSettings secondRandomSettings =
         Paladin::withRandomWorldSeed();
 
+    PALADIN_CHECK(firstRandomSettings.seed != secondRandomSettings.seed);
     PALADIN_CHECK(
-        firstRandomSettings.seed != secondRandomSettings.seed
-    );
-    PALADIN_CHECK(
-        firstRandomSettings.landmassTemplateId
-        == secondRandomSettings.landmassTemplateId
+        firstRandomSettings.landmassTemplateId ==
+        secondRandomSettings.landmassTemplateId
     );
 
     testDeterministicWorldGeneration();

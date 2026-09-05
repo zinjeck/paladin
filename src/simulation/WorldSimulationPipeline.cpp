@@ -20,20 +20,17 @@ namespace Paladin
         if (!policies_.isValid())
         {
             throw std::invalid_argument(
-                "Settlement simulation policies must use valid resolutions and positive cadences."
+                "Settlement simulation policies must use valid resolutions and "
+                "positive cadences."
             );
         }
 
         static_cast<void>(
-            addSystem(
-                std::make_unique<SettlementEconomySystem>()
-            )
+            addSystem(std::make_unique<SettlementEconomySystem>())
         );
 
         static_cast<void>(
-            addSystem(
-                std::make_unique<SettlementPopulationSystem>()
-            )
+            addSystem(std::make_unique<SettlementPopulationSystem>())
         );
     }
 
@@ -53,10 +50,7 @@ namespace Paladin
         return true;
     }
 
-    void WorldSimulationPipeline::tick(
-        World& world,
-        std::uint64_t gameMinutes
-    )
+    void WorldSimulationPipeline::tick(World& world, std::uint64_t gameMinutes)
     {
         if (gameMinutes == 0)
         {
@@ -68,20 +62,14 @@ namespace Paladin
 
         for (Settlement& settlement : world.settlements())
         {
-            SettlementSimulationState& state =
-                settlement.simulationState();
+            SettlementSimulationState& state = settlement.simulationState();
 
-            const SettlementSimulationTier tier =
-                state.simulationTier();
+            const SettlementSimulationTier tier = state.simulationTier();
 
-            const SettlementSimulationPolicy& policy =
-                policies_.forTier(tier);
+            const SettlementSimulationPolicy& policy = policies_.forTier(tier);
 
             const std::uint64_t dueMinutes =
-                state.takeDueSimulationMinutes(
-                    gameMinutes,
-                    policy
-                );
+                state.takeDueSimulationMinutes(gameMinutes, policy);
 
             if (dueMinutes == 0)
             {
@@ -89,12 +77,7 @@ namespace Paladin
             }
 
             settlementSteps_.push_back(
-                {
-                    settlement.id(),
-                    tier,
-                    policy.resolution,
-                    dueMinutes
-                }
+                {settlement.id(), tier, policy.resolution, dueMinutes}
             );
         }
 
@@ -120,16 +103,14 @@ namespace Paladin
             return false;
         }
 
-        SettlementSimulationState& state =
-            settlement->simulationState();
+        SettlementSimulationState& state = settlement->simulationState();
 
         if (!state.isInitialized())
         {
             return false;
         }
 
-        const SettlementSimulationTier previousTier =
-            state.simulationTier();
+        const SettlementSimulationTier previousTier = state.simulationTier();
 
         if (previousTier == targetTier)
         {
@@ -167,10 +148,7 @@ namespace Paladin
         std::span<const SettlementSimulationStep> settlementSteps
     )
     {
-        const WorldSimulationStep step{
-            gameMinutes,
-            settlementSteps
-        };
+        const WorldSimulationStep step{gameMinutes, settlementSteps};
 
         for (std::size_t i = 0; i < systems_.size(); ++i)
         {
@@ -185,9 +163,9 @@ namespace Paladin
     }
 
 
-    const SettlementSimulationPolicies&
-    WorldSimulationPipeline::policies() const noexcept
+    const SettlementSimulationPolicies& WorldSimulationPipeline::
+        policies() const noexcept
     {
         return policies_;
     }
-}
+} // namespace Paladin

@@ -25,7 +25,6 @@ namespace Paladin
         std::uint8_t blue = 255;
 
         std::uint8_t alpha = 255;
-
     };
 
     struct RenderRectangle
@@ -41,7 +40,6 @@ namespace Paladin
     {
 
     public:
-
         explicit Renderer(SDL_Window* window);
 
         ~Renderer();
@@ -72,7 +70,13 @@ namespace Paladin
 
         );
 
-        void drawLine(float x1, float y1, float x2, float y2, RenderColor color);
+        void drawLine(
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            RenderColor color
+        );
 
         void fillRectangles(
             std::span<const RenderRectangle> rectangles,
@@ -80,9 +84,7 @@ namespace Paladin
         );
 
         [[nodiscard]]
-        std::unique_ptr<Texture> loadBitmapTexture(
-            const char* filePath
-        );
+        std::unique_ptr<Texture> loadBitmapTexture(const char* filePath);
 
         [[nodiscard]]
         std::unique_ptr<Texture> createTextureFromPixels(
@@ -124,9 +126,7 @@ namespace Paladin
         int outputHeight() const noexcept;
 
     private:
-
         SDL_Renderer* renderer_ = nullptr;
-
     };
 
-}
+} // namespace Paladin

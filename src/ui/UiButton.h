@@ -33,10 +33,7 @@ namespace Paladin
 
         void cancelPress() noexcept;
 
-        void render(
-            Renderer& renderer,
-            const GrayUiRenderer& uiRenderer
-        ) const;
+        void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
     private:
         std::string text_;
@@ -47,4 +44,4 @@ namespace Paladin
         bool selected_ = false;
         bool enabled_ = true;
     };
-}
+} // namespace Paladin

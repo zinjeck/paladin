@@ -71,16 +71,28 @@ namespace Paladin
         [[nodiscard]]
         const SettlementCommandState& commandState() const noexcept;
 
-        SettlementNaturalFeatures& naturalFeatures() noexcept { return naturalFeatures_; }
-        const SettlementNaturalFeatures& naturalFeatures() const noexcept { return naturalFeatures_; }
+        SettlementNaturalFeatures& naturalFeatures() noexcept
+        {
+            return naturalFeatures_;
+        }
+        const SettlementNaturalFeatures& naturalFeatures() const noexcept
+        {
+            return naturalFeatures_;
+        }
 
-        SettlementEmploymentState& employment() noexcept { return employment_; }
-        const SettlementEmploymentState& employment() const noexcept { return employment_; }
+        SettlementEmploymentState& employment() noexcept
+        {
+            return employment_;
+        }
+        const SettlementEmploymentState& employment() const noexcept
+        {
+            return employment_;
+        }
 
         SettlementLogistics logistics;
         SettlementActivitySystem activities;
 
-      private:
+    private:
         const std::uint64_t instanceId_;
         SettlementEmploymentState employment_;
         SettlementGrid grid_;
@@ -93,4 +105,4 @@ namespace Paladin
         std::int32_t localTilesPerWorldTile_ = 0;
         std::uint64_t generationSeed_ = 0;
     };
-}
+} // namespace Paladin

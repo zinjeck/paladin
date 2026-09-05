@@ -46,8 +46,7 @@ namespace Paladin
     {
         std::string_view id;
         std::string_view displayName;
-        SettlementObjectCategory category =
-            SettlementObjectCategory::Housing;
+        SettlementObjectCategory category = SettlementObjectCategory::Housing;
         std::int32_t menuOrder = 0;
         SettlementFootprintSelectionMode selectionMode =
             SettlementFootprintSelectionMode::Fixed;
@@ -64,6 +63,7 @@ namespace Paladin
         SettlementObjectVisualStyle visual;
         std::span<const SettlementConstructionResourceCost>
             constructionResourceCosts;
+        bool hasDoor = true;
     };
 
     namespace SettlementObjectTypes
@@ -72,23 +72,22 @@ namespace Paladin
         inline constexpr std::string_view Road = "road";
         inline constexpr std::string_view House = "house";
         inline constexpr std::string_view Stockpile = "stockpile";
-        inline constexpr std::string_view FishingGrounds =
-            "fishing_grounds";
+        inline constexpr std::string_view FishingGrounds = "fishing_grounds";
         inline constexpr std::string_view WheatFarm = "wheat_farm";
         inline constexpr std::string_view Pastureland = "pastureland";
         inline constexpr std::string_view Bakery = "bakery";
-    }
+    } // namespace SettlementObjectTypes
 
     class SettlementObjectCatalog
     {
     public:
         [[nodiscard]]
-        static std::span<const SettlementObjectDefinition>
-        definitions() noexcept;
+        static std::span<
+            const SettlementObjectDefinition> definitions() noexcept;
 
         [[nodiscard]]
         static const SettlementObjectDefinition* definition(
             std::string_view objectTypeId
         ) noexcept;
     };
-}
+} // namespace Paladin

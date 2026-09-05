@@ -10,18 +10,13 @@
 
 namespace Paladin
 {
-    class Polity
+    class Realm
     {
     public:
-        explicit Polity(
-            PolityId id
-        ) noexcept
-            : id_(id)
-        {
-        }
+        explicit Realm(RealmId id) noexcept : id_(id) {}
 
         [[nodiscard]]
-        PolityId id() const noexcept
+        RealmId id() const noexcept
         {
             return id_;
         }
@@ -57,7 +52,7 @@ namespace Paladin
         }
 
         [[nodiscard]]
-        const PolityFlag& flag() const noexcept
+        const RealmFlag& flag() const noexcept
         {
             return flag_;
         }
@@ -71,7 +66,7 @@ namespace Paladin
             workDayHours_ = std::clamp(hours, 0, 14);
         }
 
-      private:
+    private:
         int workDayHours_ = 12;
         friend class World;
 
@@ -79,38 +74,38 @@ namespace Paladin
             SettlementId settlementId,
             CultureId cultureId,
             MapColor mapColor,
-            std::string polityName,
+            std::string realmName,
             std::string startingOriginId,
-            PolityFlag flag
+            RealmFlag flag
         )
         {
             capitalSettlementId_ = settlementId;
             primaryCultureId_ = cultureId;
             mapColor_ = mapColor;
-            name_ = std::move(polityName);
+            name_ = std::move(realmName);
             startingOriginId_ = std::move(startingOriginId);
             flag_ = std::move(flag);
         }
 
         void editIdentity(
             MapColor mapColor,
-            std::string polityName,
+            std::string realmName,
             std::string startingOriginId,
-            PolityFlag flag
+            RealmFlag flag
         )
         {
             mapColor_ = mapColor;
-            name_ = std::move(polityName);
+            name_ = std::move(realmName);
             startingOriginId_ = std::move(startingOriginId);
             flag_ = std::move(flag);
         }
 
-        PolityId id_;
+        RealmId id_;
         CultureId primaryCultureId_;
         SettlementId capitalSettlementId_;
         MapColor mapColor_;
         std::string name_;
         std::string startingOriginId_;
-        PolityFlag flag_;
+        RealmFlag flag_;
     };
-}
+} // namespace Paladin

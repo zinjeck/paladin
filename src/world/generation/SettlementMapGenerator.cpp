@@ -1,9 +1,9 @@
 #include "world/generation/SettlementMapGenerator.h"
 
 #include "world/BiomeType.h"
+#include "world/SettlementGrid.h"
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
-#include "world/SettlementGrid.h"
 #include "world/WorldTile.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
@@ -35,27 +35,21 @@ namespace Paladin
         ) noexcept
         {
             return GenerationNoise::mix(
-                worldSeed
-                ^ GenerationNoise::mix(
-                    static_cast<std::uint64_t>(center.x)
-                    * 73'856'093ULL
-                )
-                ^ GenerationNoise::mix(
-                    static_cast<std::uint64_t>(center.y)
-                    * 19'349'663ULL
-                )
-                ^ GenerationNoise::mix(
-                    static_cast<std::uint64_t>(width)
-                    * 83'492'791ULL
-                    + static_cast<std::uint64_t>(height)
+                worldSeed ^
+                GenerationNoise::mix(
+                    static_cast<std::uint64_t>(center.x) * 73'856'093ULL
+                ) ^
+                GenerationNoise::mix(
+                    static_cast<std::uint64_t>(center.y) * 19'349'663ULL
+                ) ^
+                GenerationNoise::mix(
+                    static_cast<std::uint64_t>(width) * 83'492'791ULL +
+                    static_cast<std::uint64_t>(height)
                 )
             );
         }
 
-        double weight(
-            bool condition,
-            double sampleWeight
-        ) noexcept
+        double weight(bool condition, double sampleWeight) noexcept
         {
             return condition ? sampleWeight : 0.0;
         }
@@ -83,19 +77,17 @@ namespace Paladin
             for (std::size_t index = 0; index < landBiomes.size(); ++index)
             {
                 const BiomeType biome = landBiomes[index];
-                const double boundaryNoise =
-                    GenerationNoise::simplexFractal(
-                        static_cast<double>(x) * 0.050,
-                        static_cast<double>(y) * 0.050,
-                        seed + 6'397ULL + index * 1'003ULL,
-                        3,
-                        0.50,
-                        2.0
-                    );
+                const double boundaryNoise = GenerationNoise::simplexFractal(
+                    static_cast<double>(x) * 0.050,
+                    static_cast<double>(y) * 0.050,
+                    seed + 6'397ULL + index * 1'003ULL,
+                    3,
+                    0.50,
+                    2.0
+                );
 
-                const double score =
-                    biomeWeights[biomeIndex(biome)]
-                    + boundaryNoise * boundaryNoiseStrength;
+                const double score = biomeWeights[biomeIndex(biome)] +
+                                     boundaryNoise * boundaryNoiseStrength;
 
                 if (score > bestScore)
                 {
@@ -106,7 +98,7 @@ namespace Paladin
 
             return bestBiome;
         }
-    }
+    } // namespace
 
 
     SettlementMapGenerationSettings
@@ -125,11 +117,8 @@ namespace Paladin
         const SettlementMapGenerationSettings& settings
     ) const
     {
-        if (
-            sourceRegionWidth <= 0 ||
-            sourceRegionHeight <= 0 ||
-            settings.localTilesPerWorldTile <= 0
-        )
+        if (sourceRegionWidth <= 0 || sourceRegionHeight <= 0 ||
+            settings.localTilesPerWorldTile <= 0)
         {
             return nullptr;
         }
@@ -144,10 +133,8 @@ namespace Paladin
             sourceTopLeft.y + sourceRegionHeight - 1
         };
 
-        if (
-            !sourceGrid.isValidPosition(sourceTopLeft) ||
-            !sourceGrid.isValidPosition(sourceBottomRight)
-        )
+        if (!sourceGrid.isValidPosition(sourceTopLeft) ||
+            !sourceGrid.isValidPosition(sourceBottomRight))
         {
             return nullptr;
         }
@@ -171,35 +158,35 @@ namespace Paladin
         {
             for (std::int32_t x = 0; x < cityWidth; ++x)
             {
-                double sourceX =
-                    (static_cast<double>(x) + 0.5)
-                    / static_cast<double>(cityWidth)
-                    * static_cast<double>(sourceRegionWidth)
-                    - 0.5;
+                double sourceX = (static_cast<double>(x) + 0.5) /
+                                     static_cast<double>(cityWidth) *
+                                     static_cast<double>(sourceRegionWidth) -
+                                 0.5;
 
-                double sourceY =
-                    (static_cast<double>(y) + 0.5)
-                    / static_cast<double>(cityHeight)
-                    * static_cast<double>(sourceRegionHeight)
-                    - 0.5;
+                double sourceY = (static_cast<double>(y) + 0.5) /
+                                     static_cast<double>(cityHeight) *
+                                     static_cast<double>(sourceRegionHeight) -
+                                 0.5;
 
                 sourceX += GenerationNoise::simplexFractal(
-                    static_cast<double>(x) * 0.026,
-                    static_cast<double>(y) * 0.026,
-                    seed + 1'771ULL,
-                    3,
-                    0.52,
-                    2.0
-                ) * settings.coordinateWarpStrength;
+                               static_cast<double>(x) * 0.026,
+                               static_cast<double>(y) * 0.026,
+                               seed + 1'771ULL,
+                               3,
+                               0.52,
+                               2.0
+                           ) *
+                           settings.coordinateWarpStrength;
 
                 sourceY += GenerationNoise::simplexFractal(
-                    static_cast<double>(x + 9'173) * 0.026,
-                    static_cast<double>(y - 4'289) * 0.026,
-                    seed + 1'771ULL,
-                    3,
-                    0.52,
-                    2.0
-                ) * settings.coordinateWarpStrength;
+                               static_cast<double>(x + 9'173) * 0.026,
+                               static_cast<double>(y - 4'289) * 0.026,
+                               seed + 1'771ULL,
+                               3,
+                               0.52,
+                               2.0
+                           ) *
+                           settings.coordinateWarpStrength;
 
                 sourceX = std::clamp(
                     sourceX,
@@ -219,8 +206,7 @@ namespace Paladin
                 const std::int32_t y0 =
                     static_cast<std::int32_t>(std::floor(sourceY));
 
-                const std::int32_t x1 =
-                    std::min(x0 + 1, sourceRegionWidth - 1);
+                const std::int32_t x1 = std::min(x0 + 1, sourceRegionWidth - 1);
 
                 const std::int32_t y1 =
                     std::min(y0 + 1, sourceRegionHeight - 1);
@@ -236,10 +222,18 @@ namespace Paladin
                 };
 
                 const std::array<const WorldTile*, 4> samples{
-                    sourceGrid.tile({sourceTopLeft.x + x0, sourceTopLeft.y + y0}),
-                    sourceGrid.tile({sourceTopLeft.x + x1, sourceTopLeft.y + y0}),
-                    sourceGrid.tile({sourceTopLeft.x + x0, sourceTopLeft.y + y1}),
-                    sourceGrid.tile({sourceTopLeft.x + x1, sourceTopLeft.y + y1})
+                    sourceGrid.tile(
+                        {sourceTopLeft.x + x0, sourceTopLeft.y + y0}
+                    ),
+                    sourceGrid.tile(
+                        {sourceTopLeft.x + x1, sourceTopLeft.y + y0}
+                    ),
+                    sourceGrid.tile(
+                        {sourceTopLeft.x + x0, sourceTopLeft.y + y1}
+                    ),
+                    sourceGrid.tile(
+                        {sourceTopLeft.x + x1, sourceTopLeft.y + y1}
+                    )
                 };
 
                 double elevation = 0.0;
@@ -254,17 +248,15 @@ namespace Paladin
                     const WorldTile& sample = *samples[index];
                     const double sampleWeight = sampleWeights[index];
 
-                    elevation +=
-                        static_cast<double>(sample.elevation.value())
-                        * sampleWeight;
+                    elevation += static_cast<double>(sample.elevation.value()) *
+                                 sampleWeight;
 
                     temperature +=
-                        static_cast<double>(sample.temperature.value())
-                        * sampleWeight;
+                        static_cast<double>(sample.temperature.value()) *
+                        sampleWeight;
 
-                    rainfall +=
-                        static_cast<double>(sample.rainfall.value())
-                        * sampleWeight;
+                    rainfall += static_cast<double>(sample.rainfall.value()) *
+                                sampleWeight;
 
                     waterWeight += weight(
                         sample.terrain == TerrainType::Water,
@@ -279,19 +271,17 @@ namespace Paladin
                     biomeWeights[biomeIndex(sample.biome)] += sampleWeight;
                 }
 
-                const double coastNoise =
-                    GenerationNoise::simplexFractal(
-                        static_cast<double>(x) * 0.060,
-                        static_cast<double>(y) * 0.060,
-                        seed + 2'887ULL,
-                        4,
-                        0.52,
-                        2.0
-                    );
+                const double coastNoise = GenerationNoise::simplexFractal(
+                    static_cast<double>(x) * 0.060,
+                    static_cast<double>(y) * 0.060,
+                    seed + 2'887ULL,
+                    4,
+                    0.52,
+                    2.0
+                );
 
                 const double coastlineThreshold =
-                    0.50
-                    + coastNoise * settings.coastlineNoiseStrength;
+                    0.50 + coastNoise * settings.coastlineNoiseStrength;
 
                 WorldTile* output = cityGrid.tile({x, y});
 
@@ -303,19 +293,16 @@ namespace Paladin
                         4,
                         0.50,
                         2.0
-                    ) * settings.localElevationNoiseStrength;
+                    ) *
+                    settings.localElevationNoiseStrength;
 
-                output->elevation = Elevation(
-                    static_cast<float>(elevation + elevationDetail)
-                );
+                output->elevation =
+                    Elevation(static_cast<float>(elevation + elevationDetail));
 
-                output->temperature = Temperature(
-                    static_cast<float>(temperature)
-                );
+                output->temperature =
+                    Temperature(static_cast<float>(temperature));
 
-                output->rainfall = Rainfall(
-                    static_cast<float>(rainfall)
-                );
+                output->rainfall = Rainfall(static_cast<float>(rainfall));
 
                 if (waterWeight > coastlineThreshold)
                 {
@@ -333,19 +320,18 @@ namespace Paladin
                 );
 
                 const double mountainThreshold =
-                    0.50
-                    + GenerationNoise::simplexFractal(
-                        static_cast<double>(x) * 0.050,
-                        static_cast<double>(y) * 0.050,
-                        seed + 7'409ULL,
-                        3,
-                        0.50,
-                        2.0
-                    ) * settings.biomeBoundaryNoiseStrength;
+                    0.50 + GenerationNoise::simplexFractal(
+                               static_cast<double>(x) * 0.050,
+                               static_cast<double>(y) * 0.050,
+                               seed + 7'409ULL,
+                               3,
+                               0.50,
+                               2.0
+                           ) * settings.biomeBoundaryNoiseStrength;
 
                 output->terrain = mountainWeight > mountainThreshold
-                    ? TerrainType::Mountain
-                    : TerrainType::Land;
+                                      ? TerrainType::Mountain
+                                      : TerrainType::Land;
             }
         }
 
@@ -360,4 +346,4 @@ namespace Paladin
         result->naturalFeatures().generate(result->grid(), seed);
         return result;
     }
-}
+} // namespace Paladin

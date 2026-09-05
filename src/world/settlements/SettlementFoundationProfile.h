@@ -24,5 +24,7 @@ namespace Paladin
 
     [[nodiscard]]
     SettlementFoundationProfile defaultSettlementFoundationProfile();
-    SettlementFoundationProfile playerSettlementFoundationProfile(std::uint64_t seed);
-}
+    SettlementFoundationProfile playerSettlementFoundationProfile(
+        std::uint64_t seed
+    );
+} // namespace Paladin

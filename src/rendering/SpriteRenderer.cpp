@@ -14,11 +14,9 @@ namespace Paladin
         const TileRenderMetrics& metrics
     ) const
     {
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
-        const float viewportWidth =
-            static_cast<float>(renderer.outputWidth());
+        const float viewportWidth = static_cast<float>(renderer.outputWidth());
 
         const float viewportHeight =
             static_cast<float>(renderer.outputHeight());
@@ -41,43 +39,33 @@ namespace Paladin
                     : static_cast<float>(sprite.texture->height());
 
             const float width =
-                (sprite.displayWidthPixels > 0.0F
-                    ? sprite.displayWidthPixels
-                    : sourceWidth)
-                * static_cast<float>(camera.zoom());
+                (sprite.displayWidthPixels > 0.0F ? sprite.displayWidthPixels
+                                                  : sourceWidth) *
+                static_cast<float>(camera.zoom());
 
             const float height =
-                (sprite.displayHeightPixels > 0.0F
-                    ? sprite.displayHeightPixels
-                    : sourceHeight)
-                * static_cast<float>(camera.zoom());
+                (sprite.displayHeightPixels > 0.0F ? sprite.displayHeightPixels
+                                                   : sourceHeight) *
+                static_cast<float>(camera.zoom());
 
             const float anchorScreenX =
-                viewportWidth * 0.5F
-                + static_cast<float>(
-                    (sprite.tileX - camera.tileX())
-                    * tilePixels
+                viewportWidth * 0.5F +
+                static_cast<float>(
+                    (sprite.tileX - camera.tileX()) * tilePixels
                 );
 
             const float anchorScreenY =
-                viewportHeight * 0.5F
-                + static_cast<float>(
-                    (sprite.tileY - camera.tileY())
-                    * tilePixels
+                viewportHeight * 0.5F +
+                static_cast<float>(
+                    (sprite.tileY - camera.tileY()) * tilePixels
                 );
 
-            const float destinationX =
-                anchorScreenX - width * sprite.anchorX;
+            const float destinationX = anchorScreenX - width * sprite.anchorX;
 
-            const float destinationY =
-                anchorScreenY - height * sprite.anchorY;
+            const float destinationY = anchorScreenY - height * sprite.anchorY;
 
-            if (
-                destinationX + width < 0.0F ||
-                destinationY + height < 0.0F ||
-                destinationX > viewportWidth ||
-                destinationY > viewportHeight
-            )
+            if (destinationX + width < 0.0F || destinationY + height < 0.0F ||
+                destinationX > viewportWidth || destinationY > viewportHeight)
             {
                 continue;
             }
@@ -95,4 +83,4 @@ namespace Paladin
             );
         }
     }
-}
+} // namespace Paladin

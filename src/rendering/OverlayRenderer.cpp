@@ -15,8 +15,7 @@ namespace Paladin
         const TileRenderMetrics& metrics
     ) const
     {
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
         const double viewportWidth =
             static_cast<double>(renderer.outputWidth());
@@ -28,21 +27,15 @@ namespace Paladin
         {
             renderer.fillRectangle(
                 static_cast<float>(
-                    viewportWidth * 0.5
-                    + (overlay.tileX - camera.tileX())
-                        * tilePixels
+                    viewportWidth * 0.5 +
+                    (overlay.tileX - camera.tileX()) * tilePixels
                 ),
                 static_cast<float>(
-                    viewportHeight * 0.5
-                    + (overlay.tileY - camera.tileY())
-                        * tilePixels
+                    viewportHeight * 0.5 +
+                    (overlay.tileY - camera.tileY()) * tilePixels
                 ),
-                static_cast<float>(
-                    overlay.widthTiles * tilePixels
-                ),
-                static_cast<float>(
-                    overlay.heightTiles * tilePixels
-                ),
+                static_cast<float>(overlay.widthTiles * tilePixels),
+                static_cast<float>(overlay.heightTiles * tilePixels),
                 overlay.color
             );
         }
@@ -56,8 +49,7 @@ namespace Paladin
         const TileRenderMetrics& metrics
     ) const
     {
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
         const double viewportWidth =
             static_cast<double>(renderer.outputWidth());
@@ -68,24 +60,20 @@ namespace Paladin
         for (const TileOutlineRenderItem& outline : outlines)
         {
             const float x = static_cast<float>(
-                viewportWidth * 0.5
-                + (outline.tileX - camera.tileX())
-                    * tilePixels
+                viewportWidth * 0.5 +
+                (outline.tileX - camera.tileX()) * tilePixels
             );
 
             const float y = static_cast<float>(
-                viewportHeight * 0.5
-                + (outline.tileY - camera.tileY())
-                    * tilePixels
+                viewportHeight * 0.5 +
+                (outline.tileY - camera.tileY()) * tilePixels
             );
 
-            const float width = static_cast<float>(
-                outline.widthTiles * tilePixels
-            );
+            const float width =
+                static_cast<float>(outline.widthTiles * tilePixels);
 
-            const float height = static_cast<float>(
-                outline.heightTiles * tilePixels
-            );
+            const float height =
+                static_cast<float>(outline.heightTiles * tilePixels);
 
             const float lineWidth = std::clamp(
                 outline.lineWidthPixels,
@@ -95,22 +83,12 @@ namespace Paladin
 
             const std::array<RenderRectangle, 4> border{
                 RenderRectangle{x, y, width, lineWidth},
-                RenderRectangle{
-                    x,
-                    y + height - lineWidth,
-                    width,
-                    lineWidth
-                },
+                RenderRectangle{x, y + height - lineWidth, width, lineWidth},
                 RenderRectangle{x, y, lineWidth, height},
-                RenderRectangle{
-                    x + width - lineWidth,
-                    y,
-                    lineWidth,
-                    height
-                }
+                RenderRectangle{x + width - lineWidth, y, lineWidth, height}
             };
 
             renderer.fillRectangles(border, outline.color);
         }
     }
-}
+} // namespace Paladin

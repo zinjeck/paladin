@@ -6,28 +6,26 @@
 
 namespace Paladin
 {
-bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
-{
-    if (!initialized_ || count > UINT64_MAX - population_.residents())
+    bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
     {
-        return false;
+        if (!initialized_ || count > UINT64_MAX - population_.residents())
+        {
+            return false;
+        }
+        if (!citizens_.spawn(count))
+        {
+            return false;
+        }
+        population_.applyNetChange(static_cast<double>(count));
+        return true;
     }
-    if (!citizens_.spawn(count))
-    {
-        return false;
-    }
-    population_.applyNetChange(static_cast<double>(count));
-    return true;
-}
 
     bool SettlementSimulationState::bootstrap(
         const SettlementFoundationProfile& profile
     )
     {
-        if (
-            initialized_ ||
-            !isSettlementSimulationTier(profile.initialSimulationTier)
-        )
+        if (initialized_ ||
+            !isSettlementSimulationTier(profile.initialSimulationTier))
         {
             return false;
         }
@@ -42,29 +40,20 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
 
         for (const StockpileEntry& entry : profile.initialResources)
         {
-            if (
-                entry.resourceId.empty() ||
-                !std::isfinite(entry.amount) ||
+            if (entry.resourceId.empty() || !std::isfinite(entry.amount) ||
                 entry.amount < 0.0 ||
-                !initialStockpile.setAmount(
-                    entry.resourceId,
-                    entry.amount
-                )
-            )
+                !initialStockpile.setAmount(entry.resourceId, entry.amount))
             {
                 return false;
             }
         }
 
-        for (const ResourceFlowRate& flowRate
-            : initialEconomy.flowRates())
+        for (const ResourceFlowRate& flowRate : initialEconomy.flowRates())
         {
-            if (
-                !initialStockpile.setAmount(
+            if (!initialStockpile.setAmount(
                     flowRate.resourceId,
                     initialStockpile.amount(flowRate.resourceId)
-                )
-            )
+                ))
             {
                 return false;
             }
@@ -75,13 +64,12 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
             profile.demographicRates
         );
 
-        if (
-            profile.initialDetailedCitizenCount > 0 &&
+        if (profile.initialDetailedCitizenCount > 0 &&
             !citizens_.initialize(
                 profile.initialDetailedCitizenCount,
-                profile.citizenSeed ? profile.citizenSeed : profile.initialPopulation
-            )
-        )
+                profile.citizenSeed ? profile.citizenSeed
+                                    : profile.initialPopulation
+            ))
         {
             return false;
         }
@@ -102,52 +90,47 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
         return initialized_;
     }
 
-    SettlementPopulation&
-    SettlementSimulationState::population() noexcept
+    SettlementPopulation& SettlementSimulationState::population() noexcept
     {
         return population_;
     }
 
-    const SettlementPopulation&
-    SettlementSimulationState::population() const noexcept
+    const SettlementPopulation& SettlementSimulationState::
+        population() const noexcept
     {
         return population_;
     }
 
-    ResourceStockpile&
-    SettlementSimulationState::stockpile() noexcept
+    ResourceStockpile& SettlementSimulationState::stockpile() noexcept
     {
         return stockpile_;
     }
 
-    const ResourceStockpile&
-    SettlementSimulationState::stockpile() const noexcept
+    const ResourceStockpile& SettlementSimulationState::
+        stockpile() const noexcept
     {
         return stockpile_;
     }
 
-    SettlementEconomy&
-    SettlementSimulationState::economy() noexcept
+    SettlementEconomy& SettlementSimulationState::economy() noexcept
     {
         return economy_;
     }
 
-    const SettlementEconomy&
-    SettlementSimulationState::economy() const noexcept
+    const SettlementEconomy& SettlementSimulationState::economy() const noexcept
     {
         return economy_;
     }
 
 
-    SettlementCitizenState&
-    SettlementSimulationState::citizens() noexcept
+    SettlementCitizenState& SettlementSimulationState::citizens() noexcept
     {
         return citizens_;
     }
 
 
-    const SettlementCitizenState&
-    SettlementSimulationState::citizens() const noexcept
+    const SettlementCitizenState& SettlementSimulationState::
+        citizens() const noexcept
     {
         return citizens_;
     }
@@ -165,36 +148,35 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
         ++schedulingVersion_;
     }
 
-    SettlementSimulationTier
-    SettlementSimulationState::simulationTier() const noexcept
+    SettlementSimulationTier SettlementSimulationState::
+        simulationTier() const noexcept
     {
         return simulationTier_;
     }
 
 
-    std::uint64_t
-    SettlementSimulationState::pendingSimulationMinutes() const noexcept
+    std::uint64_t SettlementSimulationState::
+        pendingSimulationMinutes() const noexcept
     {
         return pendingSimulationMinutes_;
     }
 
 
-    std::uint64_t
-    SettlementSimulationState::totalSimulatedMinutes() const noexcept
+    std::uint64_t SettlementSimulationState::
+        totalSimulatedMinutes() const noexcept
     {
         return totalSimulatedMinutes_;
     }
 
 
-    std::uint64_t
-    SettlementSimulationState::completedSimulationSteps() const noexcept
+    std::uint64_t SettlementSimulationState::
+        completedSimulationSteps() const noexcept
     {
         return completedSimulationSteps_;
     }
 
 
-    SettlementStateVersions
-    SettlementSimulationState::versions() const noexcept
+    SettlementStateVersions SettlementSimulationState::versions() const noexcept
     {
         return {
             population_.version(),
@@ -254,15 +236,13 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
     }
 
 
-    const SettlementMap*
-    SettlementSimulationState::localMap() const noexcept
+    const SettlementMap* SettlementSimulationState::localMap() const noexcept
     {
         return localMap_.get();
     }
 
 
-    std::uint64_t
-    SettlementSimulationState::takeDueSimulationMinutes(
+    std::uint64_t SettlementSimulationState::takeDueSimulationMinutes(
         std::uint64_t gameMinutes,
         const SettlementSimulationPolicy& policy
     ) noexcept
@@ -311,8 +291,8 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
     }
 
 
-    std::uint64_t
-    SettlementSimulationState::takeAllPendingSimulationMinutes() noexcept
+    std::uint64_t SettlementSimulationState::
+        takeAllPendingSimulationMinutes() noexcept
     {
         const std::uint64_t dueMinutes = pendingSimulationMinutes_;
 
@@ -368,4 +348,4 @@ bool SettlementSimulationState::spawnCitizens(std::uint64_t count)
         localMap_.reset();
         ++localMapVersion_;
     }
-}
+} // namespace Paladin

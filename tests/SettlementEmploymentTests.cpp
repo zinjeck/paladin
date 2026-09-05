@@ -91,7 +91,7 @@ void runSettlementEmploymentTests()
     for (const auto& c : settlementA.citizens().citizens())
     {
         PALADIN_CHECK(spawnedIds.insert(c.id.value()).second);
-        PALADIN_CHECK(c.ageYears == 20 && !c.workplaceId);
+        PALADIN_CHECK((c.ageYears >= 25 && c.ageYears <= 45) && !c.workplaceId);
     }
     const auto profile = playerSettlementFoundationProfile(555);
     PALADIN_CHECK(profile.initialPopulation == 8);
@@ -101,20 +101,26 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(citizens.initialize(8, 555));
     for (const auto& c : citizens.citizens())
     {
-        PALADIN_CHECK(c.ageYears == 20);
+        PALADIN_CHECK((c.ageYears >= 25 && c.ageYears <= 45));
         PALADIN_CHECK(!c.workplaceId);
     }
     SettlementCitizenState sample;
     PALADIN_CHECK(sample.initialize(10000, 711));
     std::size_t males = 0;
     for (const auto& c : sample.citizens())
+    {
         males += c.sex == CitizenSex::Male;
+    }
     PALADIN_CHECK(males > 4700 && males < 5300);
 
     SettlementGrid grid(40, 40);
     for (int y = 0; y < 40; ++y)
+    {
         for (int x = 0; x < 40; ++x)
+        {
             grid.tile({x, y})->terrain = TerrainType::Land;
+        }
+    }
     SettlementMap map(std::move(grid), {0, 0}, 1, 1, 40, 711);
     SettlementObjectPlacementController placement;
     PALADIN_CHECK(placement.beginPlacement(SettlementObjectTypes::House));
@@ -199,7 +205,9 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(jobs.workplace(storeId)->operational);
     jobs.record(360, citizens);
     for (int i = 0; i < 4; ++i)
+    {
         PALADIN_CHECK(jobs.adjust(fishId, 1, citizens));
+    }
     PALADIN_CHECK(!jobs.adjust(fishId, 1, citizens));
     PALADIN_CHECK(jobs.employed(fishId, citizens) == 4);
     PALADIN_CHECK(jobs.workplace(fishId)->capacity == 4);
@@ -211,9 +219,11 @@ void runSettlementEmploymentTests()
     );
     PALADIN_CHECK(!jobs.rename(fishId, "   "));
     for (int i = 0; i < 4; ++i)
+    {
         PALADIN_CHECK(
             jobs.adjustType(SettlementObjectTypes::Stockpile, 1, citizens)
         );
+    }
     PALADIN_CHECK(jobs.unemployed(citizens) == 0);
     PALADIN_CHECK(!jobs.adjust(storeId, 1, citizens));
     PALADIN_CHECK(
@@ -237,13 +247,17 @@ void runSettlementEmploymentTests()
         const double minute = 9 * 60 + tick * .1;
         map.activities.tick(map, citizens, minute, .1);
         for (const auto& c : citizens.citizens())
+        {
             arrived = arrived || (c.workplaceId == storeId &&
                                   c.activity == CitizenActivity::AtWork);
+        }
     }
     PALADIN_CHECK(arrived);
     map.activities.tick(map, citizens, 18 * 60, 1);
     for (const auto& c : citizens.citizens())
+    {
         PALADIN_CHECK(c.activity != CitizenActivity::AtWork);
+    }
     // Larger footprints raise the ceiling without opening staffing slots.
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
@@ -279,5 +293,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(jobs.workplaces().empty());
     PALADIN_CHECK(jobs.unemployed(citizens) == 8);
     for (const auto& c : citizens.citizens())
-        PALADIN_CHECK(c.ageYears == 20);
+    {
+        PALADIN_CHECK((c.ageYears >= 25 && c.ageYears <= 45));
+    }
 }

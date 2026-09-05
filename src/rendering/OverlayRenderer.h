@@ -46,4 +46,4 @@ namespace Paladin
             const TileRenderMetrics& metrics
         ) const;
     };
-}
+} // namespace Paladin

@@ -13,4 +13,4 @@ namespace Paladin
     WorldGenerationSettings withRandomWorldSeed(
         WorldGenerationSettings settings = {}
     );
-}
+} // namespace Paladin

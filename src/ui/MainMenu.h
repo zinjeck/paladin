@@ -26,19 +26,13 @@ namespace Paladin
         void pointerPressed(float x, float y) noexcept;
 
         [[nodiscard]]
-        MainMenuAction pointerReleased(
-            float x,
-            float y
-        ) noexcept;
+        MainMenuAction pointerReleased(float x, float y) noexcept;
 
-        void render(
-            Renderer& renderer,
-            const GrayUiRenderer& uiRenderer
-        ) const;
+        void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
     private:
         UiButton playButton_;
         UiButton tutorialButton_;
         UiButton exitButton_;
     };
-}
+} // namespace Paladin

@@ -13,4 +13,4 @@ namespace Paladin
             const WorldGenerationSettings& settings
         ) const;
     };
-}
+} // namespace Paladin

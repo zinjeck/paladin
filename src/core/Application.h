@@ -6,8 +6,8 @@
 
 #include "core/StrongId.h"
 #include "interaction/CameraNavigationPolicy.h"
-#include "world/WorldTilePosition.h"
 #include "world/SettlementTilePosition.h"
+#include "world/WorldTilePosition.h"
 
 #include <memory>
 #include <optional>
@@ -83,16 +83,9 @@ namespace Paladin
             double screenY
         ) const noexcept;
 
-        void updateSettlementPlacementHover(
-            double screenX,
-            double screenY
-        );
+        void updateSettlementPlacementHover(double screenX, double screenY);
 
-        void applyCameraZoom(
-            double multiplier,
-            double screenX,
-            double screenY
-        );
+        void applyCameraZoom(double multiplier, double screenX, double screenY);
 
         bool sdlInitialized_ = false;
         Screen screen_ = Screen::MainMenu;
@@ -112,8 +105,7 @@ namespace Paladin
         std::string cachedStats_;
         std::uint64_t nextStatsRefresh_ = 0;
         bool employmentCapturedPointer_ = false;
-        std::unique_ptr<SimulationSpeedControls>
-            simulationSpeedControls_;
+        std::unique_ptr<SimulationSpeedControls> simulationSpeedControls_;
         std::unique_ptr<FoundingPanel> foundingPanel_;
 
         std::unique_ptr<Simulation> simulation_;
@@ -126,12 +118,10 @@ namespace Paladin
             settlementCommandController_;
         std::unique_ptr<SettlementInspectionController>
             settlementInspectionController_;
-        std::unique_ptr<SettlementInspectionPanel>
-            settlementInspectionPanel_;
+        std::unique_ptr<SettlementInspectionPanel> settlementInspectionPanel_;
         std::unique_ptr<WorldRenderer> worldRenderer_;
         std::unique_ptr<CityRenderer> cityRenderer_;
-        std::unique_ptr<TileRenderMetrics>
-            tileRenderMetrics_;
+        std::unique_ptr<TileRenderMetrics> tileRenderMetrics_;
 
         CameraNavigationPolicy cameraNavigationPolicy_ =
             defaultCameraNavigationPolicy();
@@ -146,4 +136,4 @@ namespace Paladin
         bool simulationControlsUnlocked_ = false;
         bool simulationControlsCapturedPointer_ = false;
     };
-}
+} // namespace Paladin

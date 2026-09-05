@@ -10,4 +10,4 @@ namespace Paladin
     public:
         using TileGrid<WorldTilePosition>::TileGrid;
     };
-}
+} // namespace Paladin

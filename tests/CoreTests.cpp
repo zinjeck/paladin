@@ -10,18 +10,12 @@ namespace
 {
     struct TestEntityIdTag;
 
-    using TestEntityId =
-        Paladin::StrongId<TestEntityIdTag>;
+    using TestEntityId = Paladin::StrongId<TestEntityIdTag>;
 
     class TestEntity
     {
     public:
-        TestEntity(
-            TestEntityId id,
-            int value
-        ) noexcept
-            : id_(id),
-              value_(value)
+        TestEntity(TestEntityId id, int value) noexcept : id_(id), value_(value)
         {
         }
 
@@ -46,10 +40,7 @@ namespace
     void testStrongIds()
     {
         static_assert(
-            !std::is_assignable_v<
-                Paladin::SettlementId&,
-                Paladin::ArmyId
-            >
+            !std::is_assignable_v<Paladin::SettlementId&, Paladin::ArmyId>
         );
 
         const Paladin::SettlementId invalidId;
@@ -61,19 +52,13 @@ namespace
 
     void testEntityRegistry()
     {
-        Paladin::EntityRegistry<
-            TestEntity,
-            TestEntityId
-        > registry;
+        Paladin::EntityRegistry<TestEntity, TestEntityId> registry;
 
-        const TestEntityId firstId =
-            registry.create(10);
+        const TestEntityId firstId = registry.create(10);
 
-        const TestEntityId secondId =
-            registry.create(20);
+        const TestEntityId secondId = registry.create(20);
 
-        const TestEntityId thirdId =
-            registry.create(30);
+        const TestEntityId thirdId = registry.create(30);
 
         PALADIN_CHECK(firstId != secondId);
         PALADIN_CHECK(secondId != thirdId);
@@ -81,26 +66,19 @@ namespace
 
         PALADIN_CHECK(registry.size() == 3);
 
-        TestEntity* second =
-            registry.find(secondId);
+        TestEntity* second = registry.find(secondId);
 
         PALADIN_CHECK(second != nullptr);
         PALADIN_CHECK(second->value() == 20);
 
-        PALADIN_CHECK(
-            registry.erase(secondId)
-        );
+        PALADIN_CHECK(registry.erase(secondId));
 
         PALADIN_CHECK(registry.size() == 2);
-        PALADIN_CHECK(
-            registry.find(secondId) == nullptr
-        );
+        PALADIN_CHECK(registry.find(secondId) == nullptr);
 
-        const TestEntity* first =
-            registry.find(firstId);
+        const TestEntity* first = registry.find(firstId);
 
-        const TestEntity* third =
-            registry.find(thirdId);
+        const TestEntity* third = registry.find(thirdId);
 
         PALADIN_CHECK(first != nullptr);
         PALADIN_CHECK(third != nullptr);
@@ -120,7 +98,7 @@ namespace
         camera.setZoom(100.0);
         PALADIN_CHECK(camera.zoom() == 80.0);
     }
-}
+} // namespace
 
 
 void runCoreTests()

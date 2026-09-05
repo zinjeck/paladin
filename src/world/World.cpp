@@ -1,6 +1,6 @@
 #include "world/World.h"
+#include "world/RealmOrigin.h"
 #include "world/TerrainType.h"
-#include "world/PolityOrigin.h"
 #include "world/generation/WorldGenerator.h"
 #include "world/territory/TerritoryFoundationSystem.h"
 
@@ -9,21 +9,13 @@
 namespace Paladin
 {
     World::World()
-        : World(
-              WorldGenerationSettings{},
-              defaultTerritoryFoundationPolicy()
-          )
+        : World(WorldGenerationSettings{}, defaultTerritoryFoundationPolicy())
     {
     }
 
 
-    World::World(
-        const WorldGenerationSettings& generationSettings
-    )
-        : World(
-              generationSettings,
-              defaultTerritoryFoundationPolicy()
-          )
+    World::World(const WorldGenerationSettings& generationSettings)
+        : World(generationSettings, defaultTerritoryFoundationPolicy())
     {
     }
 
@@ -33,30 +25,17 @@ namespace Paladin
         TerritoryFoundationPolicy territoryFoundationPolicy
     )
         : generationSeed_(generationSettings.seed),
-          grid_(
-              generationSettings.width,
-              generationSettings.height
-          ),
-          territory_(
-              generationSettings.width,
-              generationSettings.height
-          ),
-          territoryFoundationPolicy_(
-              std::move(territoryFoundationPolicy)
-          )
+          grid_(generationSettings.width, generationSettings.height),
+          territory_(generationSettings.width, generationSettings.height),
+          territoryFoundationPolicy_(std::move(territoryFoundationPolicy))
     {
-        WorldGenerator{}.generate(
-            grid_,
-            generationSettings
-        );
+        WorldGenerator{}.generate(grid_, generationSettings);
     }
 
     World::~World() = default;
 
 
-    void World::advanceTime(
-        std::uint64_t gameMinutes
-    ) noexcept
+    void World::advanceTime(std::uint64_t gameMinutes) noexcept
     {
         time_.advanceMinutes(gameMinutes);
     }
@@ -65,8 +44,8 @@ namespace Paladin
     {
         return time_;
     }
-    
-    
+
+
     const WorldTime& World::time() const noexcept
     {
         return time_;
@@ -76,8 +55,8 @@ namespace Paladin
     {
         return grid_;
     }
-    
-    
+
+
     const WorldGrid& World::grid() const noexcept
     {
         return grid_;
@@ -90,8 +69,8 @@ namespace Paladin
     }
 
 
-    const TerritoryFoundationPolicy&
-    World::territoryFoundationPolicy() const noexcept
+    const TerritoryFoundationPolicy& World::
+        territoryFoundationPolicy() const noexcept
     {
         return territoryFoundationPolicy_;
     }
@@ -121,55 +100,45 @@ namespace Paladin
     }
 
 
-    std::span<const Polity> World::polities() const noexcept
+    std::span<const Realm> World::realms() const noexcept
     {
-        return polities_.entities();
+        return realms_.entities();
     }
 
     // ========================================================
     // Creation
     // ========================================================
 
-    SettlementId World::createSettlement(
-        WorldTilePosition position
-    )
+    SettlementId World::createSettlement(WorldTilePosition position)
     {
         return settlements_.create(position);
     }
 
 
-    PolityId World::createPolity()
+    RealmId World::createRealm()
     {
-        return polities_.create();
+        return realms_.create();
     }
 
 
-    CultureId World::createCulture(
-        std::string name
-    )
+    CultureId World::createCulture(std::string name)
     {
         if (!isValidFoundingName(name))
         {
             return {};
         }
 
-        return cultures_.create(
-            trimFoundingName(name)
-        );
+        return cultures_.create(trimFoundingName(name));
     }
 
 
-    ArmyId World::createArmy(
-        WorldTilePosition position
-    )
+    ArmyId World::createArmy(WorldTilePosition position)
     {
         return armies_.create(position);
     }
 
 
-    bool World::canFoundSettlementAt(
-        WorldTilePosition position
-    ) const noexcept
+    bool World::canFoundSettlementAt(WorldTilePosition position) const noexcept
     {
         return canFoundSettlementAt(position, {});
     }
@@ -177,64 +146,44 @@ namespace Paladin
 
     bool World::canFoundSettlementAt(
         WorldTilePosition position,
-        PolityId ownerPolityId
+        RealmId ownerRealmId
     ) const noexcept
     {
-        const WorldTile* tile =
-            grid_.tile({
-                position.x,
-                position.y
-            });
+        const WorldTile* tile = grid_.tile({position.x, position.y});
 
         if (!tile || tile->terrain != TerrainType::Land)
         {
             return false;
         }
 
-        if (
-            territoryFoundationPolicy_.settlementRegionWidth <= 0 ||
-            territoryFoundationPolicy_.settlementRegionHeight <= 0
-        )
+        if (territoryFoundationPolicy_.settlementRegionWidth <= 0 ||
+            territoryFoundationPolicy_.settlementRegionHeight <= 0)
         {
             return false;
         }
 
         const WorldTilePosition regionTopLeft{
-            position.x
-                - territoryFoundationPolicy_
-                    .settlementRegionWidth / 2,
-            position.y
-                - territoryFoundationPolicy_
-                    .settlementRegionHeight / 2
+            position.x - territoryFoundationPolicy_.settlementRegionWidth / 2,
+            position.y - territoryFoundationPolicy_.settlementRegionHeight / 2
         };
 
         const WorldTilePosition regionBottomRight{
-            regionTopLeft.x
-                + territoryFoundationPolicy_
-                    .settlementRegionWidth - 1,
-            regionTopLeft.y
-                + territoryFoundationPolicy_
-                    .settlementRegionHeight - 1
+            regionTopLeft.x + territoryFoundationPolicy_.settlementRegionWidth -
+                1,
+            regionTopLeft.y +
+                territoryFoundationPolicy_.settlementRegionHeight - 1
         };
 
-        if (
-            !grid_.isValidPosition(regionTopLeft) ||
-            !grid_.isValidPosition(regionBottomRight)
-        )
+        if (!grid_.isValidPosition(regionTopLeft) ||
+            !grid_.isValidPosition(regionBottomRight))
         {
             return false;
         }
 
-        const PolityId existingController =
-            territory_.controllerAt({
-                position.x,
-                position.y
-            });
+        const RealmId existingController =
+            territory_.controllerAt({position.x, position.y});
 
-        if (
-            existingController.isValid() &&
-            existingController != ownerPolityId
-        )
+        if (existingController.isValid() && existingController != ownerRealmId)
         {
             return false;
         }
@@ -251,40 +200,69 @@ namespace Paladin
     }
 
 
-    bool World::canFoundAdditionalSettlementAt(WorldTilePosition position, PolityId owner) const noexcept
+    bool World::canFoundAdditionalSettlementAt(
+        WorldTilePosition position,
+        RealmId owner
+    ) const noexcept
     {
-        if (!canFoundSettlementAt(position,owner)) return false;
-        const auto* polity=polities_.find(owner);
-        const auto* capital=polity ? settlements_.find(polity->capitalSettlementId()) : nullptr;
-        if (!capital) return false;
-        const auto dx=std::int64_t(position.x)-capital->position().x;
-        const auto dy=std::int64_t(position.y)-capital->position().y;
-        if (dx*dx+dy*dy>48*48) return false;
-        const int width=territoryFoundationPolicy_.settlementRegionWidth;
-        const int height=territoryFoundationPolicy_.settlementRegionHeight;
-        for (const auto& settlement:settlements_.entities())
+        if (!canFoundSettlementAt(position, owner))
         {
-            if (std::abs(position.x-settlement.position().x)<width && std::abs(position.y-settlement.position().y)<height) return false;
+            return false;
         }
-        int water=0;
-        for (int y=position.y-height/2;y<position.y-height/2+height;++y)
-        for (int x=position.x-width/2;x<position.x-width/2+width;++x)
+        const auto* realm = realms_.find(owner);
+        const auto* capital =
+            realm ? settlements_.find(realm->capitalSettlementId()) : nullptr;
+        if (!capital)
         {
-            const auto controller=territory_.controllerAt({x,y});
-            if (controller && controller!=owner) return false;
-            if (grid_.tile({x,y})->terrain==TerrainType::Water) ++water;
+            return false;
         }
-        return water*2<width*height;
+        const auto dx = std::int64_t(position.x) - capital->position().x;
+        const auto dy = std::int64_t(position.y) - capital->position().y;
+        if (dx * dx + dy * dy > 48 * 48)
+        {
+            return false;
+        }
+        const int width = territoryFoundationPolicy_.settlementRegionWidth;
+        const int height = territoryFoundationPolicy_.settlementRegionHeight;
+        for (const auto& settlement : settlements_.entities())
+        {
+            if (std::abs(position.x - settlement.position().x) < width &&
+                std::abs(position.y - settlement.position().y) < height)
+            {
+                return false;
+            }
+        }
+        int water = 0;
+        for (int y = position.y - height / 2;
+             y < position.y - height / 2 + height;
+             ++y)
+        {
+            for (int x = position.x - width / 2;
+                 x < position.x - width / 2 + width;
+                 ++x)
+            {
+                const auto controller = territory_.controllerAt({x, y});
+                if (controller && controller != owner)
+                {
+                    return false;
+                }
+                if (grid_.tile({x, y})->terrain == TerrainType::Water)
+                {
+                    ++water;
+                }
+            }
+        }
+        return water * 2 < width * height;
     }
 
     SettlementId World::foundSettlement(
         WorldTilePosition position,
-        PolityId ownerPolityId
+        RealmId ownerRealmId
     )
     {
         return foundSettlement(
             position,
-            ownerPolityId,
+            ownerRealmId,
             defaultSettlementFoundationProfile()
         );
     }
@@ -292,14 +270,12 @@ namespace Paladin
 
     SettlementId World::foundSettlement(
         WorldTilePosition position,
-        PolityId ownerPolityId,
+        RealmId ownerRealmId,
         const SettlementFoundationProfile& foundationProfile
     )
     {
-        if (
-            !canFoundSettlementAt(position, ownerPolityId) ||
-            !polities_.contains(ownerPolityId)
-        )
+        if (!canFoundSettlementAt(position, ownerRealmId) ||
+            !realms_.contains(ownerRealmId))
         {
             return {};
         }
@@ -307,22 +283,20 @@ namespace Paladin
         const SettlementId settlementId = settlements_.create(
             position,
             std::string{},
-            ownerPolityId,
-            polities_.find(ownerPolityId)->primaryCultureId(),
+            ownerRealmId,
+            realms_.find(ownerRealmId)->primaryCultureId(),
             foundationProfile
         );
 
         static_cast<void>(
-            TerritoryFoundationSystem{}
-                .establishSettlementTerritory(
-                    grid_,
-                    territory_,
-                    position,
-                    ownerPolityId,
-                    territoryFoundationPolicy_,
-                    territoryFoundationPolicy_
-                        .settlementBorderlandTraversalBudget
-                )
+            TerritoryFoundationSystem{}.establishSettlementTerritory(
+                grid_,
+                territory_,
+                position,
+                ownerRealmId,
+                territoryFoundationPolicy_,
+                territoryFoundationPolicy_.settlementBorderlandTraversalBudget
+            )
         );
 
         return settlementId;
@@ -331,13 +305,13 @@ namespace Paladin
 
     SettlementId World::foundCapitalSettlement(
         WorldTilePosition position,
-        PolityId ownerPolityId,
+        RealmId ownerRealmId,
         const FoundingIdentity& identity
     )
     {
         return foundCapitalSettlement(
             position,
-            ownerPolityId,
+            ownerRealmId,
             identity,
             defaultSettlementFoundationProfile()
         );
@@ -346,42 +320,33 @@ namespace Paladin
 
     SettlementId World::foundCapitalSettlement(
         WorldTilePosition position,
-        PolityId ownerPolityId,
+        RealmId ownerRealmId,
         const FoundingIdentity& identity,
         const SettlementFoundationProfile& foundationProfile
     )
     {
-        Polity* ownerPolity = polities_.find(ownerPolityId);
+        Realm* ownerRealm = realms_.find(ownerRealmId);
 
-        if (
-            !ownerPolity ||
-            ownerPolity->capitalSettlementId().isValid() ||
-            !canFoundSettlementAt(position, ownerPolityId) ||
-            !isValidFoundingName(identity.polityName) ||
+        if (!ownerRealm || ownerRealm->capitalSettlementId().isValid() ||
+            !canFoundSettlementAt(position, ownerRealmId) ||
+            !isValidFoundingName(identity.realmName) ||
             !isValidFoundingName(identity.cultureName) ||
             !isValidFoundingName(identity.capitalName) ||
-            !isKnownPolityOrigin(identity.polityOriginId) ||
-            !identity.flag.isValid()
-        )
+            !isKnownRealmOrigin(identity.realmOriginId) ||
+            !identity.flag.isValid())
         {
             return {};
         }
 
-        std::string polityName =
-            trimFoundingName(identity.polityName);
+        std::string realmName = trimFoundingName(identity.realmName);
 
-        std::string cultureName =
-            trimFoundingName(identity.cultureName);
+        std::string cultureName = trimFoundingName(identity.cultureName);
 
-        std::string capitalName =
-            trimFoundingName(identity.capitalName);
+        std::string capitalName = trimFoundingName(identity.capitalName);
 
-        std::string originId = identity.polityOriginId;
+        std::string originId = identity.realmOriginId;
 
-        const CultureId cultureId =
-            cultures_.create(
-                std::move(cultureName)
-            );
+        const CultureId cultureId = cultures_.create(std::move(cultureName));
 
         SettlementId settlementId;
 
@@ -390,7 +355,7 @@ namespace Paladin
             settlementId = settlements_.create(
                 position,
                 std::move(capitalName),
-                ownerPolityId,
+                ownerRealmId,
                 cultureId,
                 foundationProfile
             );
@@ -401,26 +366,24 @@ namespace Paladin
             throw;
         }
 
-        ownerPolity->establishCapital(
+        ownerRealm->establishCapital(
             settlementId,
             cultureId,
             identity.mapColor,
-            std::move(polityName),
+            std::move(realmName),
             std::move(originId),
             identity.flag
         );
 
         static_cast<void>(
-            TerritoryFoundationSystem{}
-                .establishSettlementTerritory(
-                    grid_,
-                    territory_,
-                    position,
-                    ownerPolityId,
-                    territoryFoundationPolicy_,
-                    territoryFoundationPolicy_
-                        .capitalBorderlandTraversalBudget
-                )
+            TerritoryFoundationSystem{}.establishSettlementTerritory(
+                grid_,
+                territory_,
+                position,
+                ownerRealmId,
+                territoryFoundationPolicy_,
+                territoryFoundationPolicy_.capitalBorderlandTraversalBudget
+            )
         );
 
         return settlementId;
@@ -431,65 +394,49 @@ namespace Paladin
     // Lookup
     // ========================================================
 
-    Settlement* World::settlement(
-        SettlementId id
-    ) noexcept
+    Settlement* World::settlement(SettlementId id) noexcept
     {
         return settlements_.find(id);
     }
 
 
-    const Settlement* World::settlement(
-        SettlementId id
-    ) const noexcept
+    const Settlement* World::settlement(SettlementId id) const noexcept
     {
         return settlements_.find(id);
     }
 
 
-    Polity* World::polity(
-        PolityId id
-    ) noexcept
+    Realm* World::realm(RealmId id) noexcept
     {
-        return polities_.find(id);
+        return realms_.find(id);
     }
 
 
-    const Polity* World::polity(
-        PolityId id
-    ) const noexcept
+    const Realm* World::realm(RealmId id) const noexcept
     {
-        return polities_.find(id);
+        return realms_.find(id);
     }
 
 
-    Culture* World::culture(
-        CultureId id
-    ) noexcept
+    Culture* World::culture(CultureId id) noexcept
     {
         return cultures_.find(id);
     }
 
 
-    const Culture* World::culture(
-        CultureId id
-    ) const noexcept
+    const Culture* World::culture(CultureId id) const noexcept
     {
         return cultures_.find(id);
     }
 
 
-    Army* World::army(
-        ArmyId id
-    ) noexcept
+    Army* World::army(ArmyId id) noexcept
     {
         return armies_.find(id);
     }
 
 
-    const Army* World::army(
-        ArmyId id
-    ) const noexcept
+    const Army* World::army(ArmyId id) const noexcept
     {
         return armies_.find(id);
     }
@@ -499,43 +446,36 @@ namespace Paladin
     // Settlement relationships
     // ========================================================
 
-    bool World::assignSettlementToPolity(
+    bool World::assignSettlementToRealm(
         SettlementId settlementId,
-        PolityId polityId
+        RealmId realmId
     ) noexcept
     {
-        Settlement* targetSettlement =
-            settlements_.find(settlementId);
+        Settlement* targetSettlement = settlements_.find(settlementId);
 
-        const Polity* targetPolity =
-            polities_.find(polityId);
+        const Realm* targetRealm = realms_.find(realmId);
 
-        if (!targetSettlement || !targetPolity)
+        if (!targetSettlement || !targetRealm)
         {
             return false;
         }
 
-        targetSettlement->setOwnerPolity(polityId);
+        targetSettlement->setOwnerRealm(realmId);
 
         return true;
     }
 
 
-    bool World::makeSettlementIndependent(
-        SettlementId settlementId
-    ) noexcept
+    bool World::makeSettlementIndependent(SettlementId settlementId) noexcept
     {
-        Settlement* targetSettlement =
-            settlements_.find(settlementId);
+        Settlement* targetSettlement = settlements_.find(settlementId);
 
         if (!targetSettlement)
         {
             return false;
         }
 
-        targetSettlement->setOwnerPolity(
-            PolityId{}
-        );
+        targetSettlement->setOwnerRealm(RealmId{});
 
         return true;
     }
@@ -546,8 +486,7 @@ namespace Paladin
         WorldTilePosition position
     ) noexcept
     {
-        Settlement* targetSettlement =
-            settlements_.find(settlementId);
+        Settlement* targetSettlement = settlements_.find(settlementId);
 
         if (!targetSettlement)
         {
@@ -560,10 +499,7 @@ namespace Paladin
     }
 
 
-    bool World::renameSettlement(
-        SettlementId settlementId,
-        std::string name
-    )
+    bool World::renameSettlement(SettlementId settlementId, std::string name)
     {
         Settlement* targetSettlement = settlements_.find(settlementId);
 
@@ -577,41 +513,35 @@ namespace Paladin
     }
 
 
-    bool World::editPolityIdentity(
-        PolityId polityId,
+    bool World::editRealmIdentity(
+        RealmId realmId,
         const FoundingIdentity& identity
     )
     {
-        Polity* targetPolity = polities_.find(polityId);
+        Realm* targetRealm = realms_.find(realmId);
 
-        if (
-            !targetPolity ||
-            !isValidFoundingName(identity.polityName) ||
+        if (!targetRealm || !isValidFoundingName(identity.realmName) ||
             !isValidFoundingName(identity.cultureName) ||
-            !isKnownPolityOrigin(identity.polityOriginId) ||
-            !identity.flag.isValid()
-        )
+            !isKnownRealmOrigin(identity.realmOriginId) ||
+            !identity.flag.isValid())
         {
             return false;
         }
 
-        Culture* primaryCulture = cultures_.find(
-            targetPolity->primaryCultureId()
-        );
+        Culture* primaryCulture =
+            cultures_.find(targetRealm->primaryCultureId());
 
         if (!primaryCulture)
         {
             return false;
         }
 
-        primaryCulture->setName(
-            trimFoundingName(identity.cultureName)
-        );
+        primaryCulture->setName(trimFoundingName(identity.cultureName));
 
-        targetPolity->editIdentity(
+        targetRealm->editIdentity(
             identity.mapColor,
-            trimFoundingName(identity.polityName),
-            identity.polityOriginId,
+            trimFoundingName(identity.realmName),
+            identity.realmOriginId,
             identity.flag
         );
 
@@ -619,21 +549,17 @@ namespace Paladin
     }
 
 
-    bool World::relocateSoleCapital(
-        PolityId polityId,
-        WorldTilePosition position
-    )
+    bool World::relocateSoleCapital(RealmId realmId, WorldTilePosition position)
     {
-        Polity* targetPolity = polities_.find(polityId);
+        Realm* targetRealm = realms_.find(realmId);
 
-        if (!targetPolity || !canFoundSettlementAt(position, polityId))
+        if (!targetRealm || !canFoundSettlementAt(position, realmId))
         {
             return false;
         }
 
-        Settlement* capital = settlements_.find(
-            targetPolity->capitalSettlementId()
-        );
+        Settlement* capital =
+            settlements_.find(targetRealm->capitalSettlementId());
 
         if (!capital)
         {
@@ -644,7 +570,7 @@ namespace Paladin
 
         for (const Settlement& settlement : settlements_.entities())
         {
-            if (settlement.ownerPolityId() == polityId)
+            if (settlement.ownerRealmId() == realmId)
             {
                 ++ownedSettlementCount;
             }
@@ -652,26 +578,24 @@ namespace Paladin
 
         // This setup operation deliberately cannot erase territory belonging
         // to additional settlements. A later colony/capital-transfer system
-        // can provide territory provenance for established polities.
+        // can provide territory provenance for established realms.
         if (ownedSettlementCount != 1)
         {
             return false;
         }
 
-        territory_.clearController(polityId);
+        territory_.clearController(realmId);
         capital->setPosition(position);
 
         static_cast<void>(
-            TerritoryFoundationSystem{}
-                .establishSettlementTerritory(
-                    grid_,
-                    territory_,
-                    position,
-                    polityId,
-                    territoryFoundationPolicy_,
-                    territoryFoundationPolicy_
-                        .capitalBorderlandTraversalBudget
-                )
+            TerritoryFoundationSystem{}.establishSettlementTerritory(
+                grid_,
+                territory_,
+                position,
+                realmId,
+                territoryFoundationPolicy_,
+                territoryFoundationPolicy_.capitalBorderlandTraversalBudget
+            )
         );
 
         return true;
@@ -682,43 +606,33 @@ namespace Paladin
     // Army relationships
     // ========================================================
 
-    bool World::assignArmyToPolity(
-        ArmyId armyId,
-        PolityId polityId
-    ) noexcept
+    bool World::assignArmyToRealm(ArmyId armyId, RealmId realmId) noexcept
     {
-        Army* targetArmy =
-            armies_.find(armyId);
+        Army* targetArmy = armies_.find(armyId);
 
-        const Polity* targetPolity =
-            polities_.find(polityId);
+        const Realm* targetRealm = realms_.find(realmId);
 
-        if (!targetArmy || !targetPolity)
+        if (!targetArmy || !targetRealm)
         {
             return false;
         }
 
-        targetArmy->setOwnerPolity(polityId);
+        targetArmy->setOwnerRealm(realmId);
 
         return true;
     }
 
 
-    bool World::makeArmyIndependent(
-        ArmyId armyId
-    ) noexcept
+    bool World::makeArmyIndependent(ArmyId armyId) noexcept
     {
-        Army* targetArmy =
-            armies_.find(armyId);
+        Army* targetArmy = armies_.find(armyId);
 
         if (!targetArmy)
         {
             return false;
         }
 
-        targetArmy->setOwnerPolity(
-            PolityId{}
-        );
+        targetArmy->setOwnerRealm(RealmId{});
 
         return true;
     }
@@ -729,8 +643,7 @@ namespace Paladin
         WorldTilePosition position
     ) noexcept
     {
-        Army* targetArmy =
-            armies_.find(armyId);
+        Army* targetArmy = armies_.find(armyId);
 
         if (!targetArmy)
         {
@@ -753,9 +666,9 @@ namespace Paladin
     }
 
 
-    std::size_t World::polityCount() const noexcept
+    std::size_t World::realmCount() const noexcept
     {
-        return polities_.size();
+        return realms_.size();
     }
 
 
@@ -769,4 +682,4 @@ namespace Paladin
     {
         return armies_.size();
     }
-}
+} // namespace Paladin

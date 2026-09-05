@@ -28,9 +28,7 @@ namespace Paladin
         ) noexcept;
 
         [[nodiscard]]
-        static std::uint64_t mix(
-            std::uint64_t value
-        ) noexcept;
+        static std::uint64_t mix(std::uint64_t value) noexcept;
 
     private:
         [[nodiscard]]
@@ -47,4 +45,4 @@ namespace Paladin
             std::uint64_t seed
         ) noexcept;
     };
-}
+} // namespace Paladin

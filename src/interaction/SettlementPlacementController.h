@@ -7,45 +7,47 @@
 
 namespace Paladin
 {
-class World;
+    class World;
 
-class SettlementPlacementController
-{
-  public:
-    void beginSelection(
-        PolityId ownerPolityId = {},
-        bool additional = false
-    ) noexcept;
-    void cancelSelection() noexcept;
+    class SettlementPlacementController
+    {
+    public:
+        void beginSelection(
+            RealmId ownerRealmId = {},
+            bool additional = false
+        ) noexcept;
+        void cancelSelection() noexcept;
 
-    [[nodiscard]]
-    bool isSelecting() const noexcept;
+        [[nodiscard]]
+        bool isSelecting() const noexcept;
 
-    [[nodiscard]]
-    bool hasLockedSelection() const noexcept;
+        [[nodiscard]]
+        bool hasLockedSelection() const noexcept;
 
-    [[nodiscard]]
-    bool isActive() const noexcept;
+        [[nodiscard]]
+        bool isActive() const noexcept;
 
-    void setHoveredPosition(std::optional<WorldTilePosition> position) noexcept;
+        void setHoveredPosition(
+            std::optional<WorldTilePosition> position
+        ) noexcept;
 
-    [[nodiscard]]
-    std::optional<WorldTilePosition> hoveredPosition() const noexcept;
+        [[nodiscard]]
+        std::optional<WorldTilePosition> hoveredPosition() const noexcept;
 
-    [[nodiscard]]
-    bool hasValidPlacement(const World& world) const noexcept;
+        [[nodiscard]]
+        bool hasValidPlacement(const World& world) const noexcept;
 
-    [[nodiscard]]
-    bool lockHoveredSelection(const World& world) noexcept;
+        [[nodiscard]]
+        bool lockHoveredSelection(const World& world) noexcept;
 
-    [[nodiscard]]
-    std::optional<WorldTilePosition> lockedPosition() const noexcept;
+        [[nodiscard]]
+        std::optional<WorldTilePosition> lockedPosition() const noexcept;
 
-  private:
-    bool selecting_ = false;
-    bool additional_ = false;
-    std::optional<WorldTilePosition> hoveredPosition_;
-    std::optional<WorldTilePosition> lockedPosition_;
-    PolityId ownerPolityId_;
-};
+    private:
+        bool selecting_ = false;
+        bool additional_ = false;
+        std::optional<WorldTilePosition> hoveredPosition_;
+        std::optional<WorldTilePosition> lockedPosition_;
+        RealmId ownerRealmId_;
+    };
 } // namespace Paladin

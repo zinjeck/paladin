@@ -17,8 +17,7 @@ namespace Paladin
         const TileRenderMetrics& metrics
     ) const
     {
-        const double tilePixels =
-            metrics.scaledTilePixels(camera.zoom());
+        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
         const double viewportWidth =
             static_cast<double>(renderer.outputWidth());
@@ -31,33 +30,23 @@ namespace Paladin
 
         for (const Settlement& settlement : world.settlements())
         {
-            const WorldTilePosition position =
-                settlement.position();
+            const WorldTilePosition position = settlement.position();
 
-            const float centerX =
-                static_cast<float>(
-                    viewportWidth * 0.5
-                    + (
-                        static_cast<double>(position.x) + 0.5
-                        - camera.tileX()
-                    ) * tilePixels
-                );
+            const float centerX = static_cast<float>(
+                viewportWidth * 0.5 +
+                (static_cast<double>(position.x) + 0.5 - camera.tileX()) *
+                    tilePixels
+            );
 
-            const float centerY =
-                static_cast<float>(
-                    viewportHeight * 0.5
-                    + (
-                        static_cast<double>(position.y) + 0.5
-                        - camera.tileY()
-                    ) * tilePixels
-                );
+            const float centerY = static_cast<float>(
+                viewportHeight * 0.5 +
+                (static_cast<double>(position.y) + 0.5 - camera.tileY()) *
+                    tilePixels
+            );
 
-            if (
-                centerX < -outerMarkerSize ||
-                centerY < -outerMarkerSize ||
+            if (centerX < -outerMarkerSize || centerY < -outerMarkerSize ||
                 centerX > viewportWidth + outerMarkerSize ||
-                centerY > viewportHeight + outerMarkerSize
-            )
+                centerY > viewportHeight + outerMarkerSize)
             {
                 continue;
             }
@@ -72,16 +61,11 @@ namespace Paladin
 
             RenderColor markerColor{244, 197, 72, 255};
 
-            if (const Polity* polity =
-                    world.polity(settlement.ownerPolityId()))
+            if (const Realm* realm = world.realm(settlement.ownerRealmId()))
             {
-                const MapColor mapColor = polity->mapColor();
-                markerColor = {
-                    mapColor.red,
-                    mapColor.green,
-                    mapColor.blue,
-                    255
-                };
+                const MapColor mapColor = realm->mapColor();
+                markerColor =
+                    {mapColor.red, mapColor.green, mapColor.blue, 255};
             }
 
             renderer.fillRectangle(
@@ -100,31 +84,23 @@ namespace Paladin
             constexpr float preferredPixelSize = 2.0F;
             constexpr float maximumLabelWidth = 180.0F;
 
-            const float preferredLabelWidth =
-                fontRenderer_.measureWidth(
-                    settlement.name(),
-                    preferredPixelSize
-                );
+            const float preferredLabelWidth = fontRenderer_.measureWidth(
+                settlement.name(),
+                preferredPixelSize
+            );
 
-            const float pixelSize =
-                preferredLabelWidth > maximumLabelWidth
-                    ? preferredPixelSize
-                        * maximumLabelWidth
-                        / preferredLabelWidth
-                    : preferredPixelSize;
+            const float pixelSize = preferredLabelWidth > maximumLabelWidth
+                                        ? preferredPixelSize *
+                                              maximumLabelWidth /
+                                              preferredLabelWidth
+                                        : preferredPixelSize;
 
             const float labelWidth =
-                fontRenderer_.measureWidth(
-                    settlement.name(),
-                    pixelSize
-                );
+                fontRenderer_.measureWidth(settlement.name(), pixelSize);
 
             const float labelX = centerX - labelWidth * 0.5F;
             const float labelY =
-                centerY
-                - outerMarkerSize * 0.5F
-                - 7.0F * pixelSize
-                - 5.0F;
+                centerY - outerMarkerSize * 0.5F - 7.0F * pixelSize - 5.0F;
 
             fontRenderer_.drawText(
                 renderer,
@@ -145,4 +121,4 @@ namespace Paladin
             );
         }
     }
-}
+} // namespace Paladin

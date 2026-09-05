@@ -28,10 +28,7 @@ namespace Paladin
 
         void layout(int viewportWidth) noexcept;
 
-        void setPlaybackState(
-            bool paused,
-            double speedMultiplier
-        );
+        void setPlaybackState(bool paused, double speedMultiplier);
 
         void pointerMoved(float x, float y) noexcept;
 
@@ -42,15 +39,9 @@ namespace Paladin
         bool containsInteractivePoint(float x, float y) const noexcept;
 
         [[nodiscard]]
-        SimulationSpeedControlAction pointerReleased(
-            float x,
-            float y
-        ) noexcept;
+        SimulationSpeedControlAction pointerReleased(float x, float y) noexcept;
 
-        void render(
-            Renderer& renderer,
-            const GrayUiRenderer& uiRenderer
-        ) const;
+        void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
     private:
         static constexpr std::size_t ButtonCount = 4;
@@ -58,4 +49,4 @@ namespace Paladin
         std::array<UiButton, ButtonCount> buttons_;
         std::array<UiRectangle, ButtonCount> bounds_{};
     };
-}
+} // namespace Paladin

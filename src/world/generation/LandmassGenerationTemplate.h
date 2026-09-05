@@ -8,8 +8,7 @@
 
 namespace Paladin
 {
-    inline constexpr std::string_view defaultLandmassTemplateId =
-        "godot_base";
+    inline constexpr std::string_view defaultLandmassTemplateId = "godot_base";
 
     struct NormalizedMapPoint
     {
@@ -104,8 +103,7 @@ namespace Paladin
     };
 
     [[nodiscard]]
-    std::span<const LandmassGenerationTemplate>
-    landmassGenerationTemplates();
+    std::span<const LandmassGenerationTemplate> landmassGenerationTemplates();
 
     [[nodiscard]]
     const LandmassGenerationTemplate* findLandmassGenerationTemplate(
@@ -123,4 +121,4 @@ namespace Paladin
     bool isValidLandmassGenerationTemplate(
         const LandmassGenerationTemplate& definition
     ) noexcept;
-}
+} // namespace Paladin

@@ -24,7 +24,6 @@ namespace Paladin
         case SettlementPlacementVisualState::Invalid:
             return {232, 70, 70, 255};
         case SettlementPlacementVisualState::ReadyToBuild:
-            return {55, 135, 225, 255};
         case SettlementPlacementVisualState::Valid:
         case SettlementPlacementVisualState::AwaitingMaterials:
         default:
@@ -41,4 +40,4 @@ namespace Paladin
         color.alpha = 145;
         return color;
     }
-}
+} // namespace Paladin

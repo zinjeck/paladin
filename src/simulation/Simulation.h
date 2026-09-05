@@ -62,9 +62,7 @@ namespace Paladin
                    timingSettings_.realSecondsPerStep;
         }
 
-        void setSpeed(
-            SimulationSpeed speed
-        ) noexcept;
+        void setSpeed(SimulationSpeed speed) noexcept;
 
         [[nodiscard]]
         SimulationSpeed speed() const noexcept;
@@ -82,7 +80,7 @@ namespace Paladin
         std::uint64_t tickCount() const noexcept;
 
         [[nodiscard]]
-        PolityId playerPolityId() const noexcept;
+        RealmId playerRealmId() const noexcept;
 
         [[nodiscard]]
         SettlementId presentedSettlementId() const noexcept;
@@ -91,14 +89,10 @@ namespace Paladin
         SettlementId detailedSimulationSettlementId() const noexcept;
 
         [[nodiscard]]
-        bool setPresentedSettlement(
-            SettlementId settlementId
-        ) noexcept;
+        bool setPresentedSettlement(SettlementId settlementId) noexcept;
 
         [[nodiscard]]
-        bool setDetailedSimulationSettlement(
-            SettlementId settlementId
-        );
+        bool setDetailedSimulationSettlement(SettlementId settlementId);
 
         [[nodiscard]]
         bool clearDetailedSimulationSettlement();
@@ -111,9 +105,7 @@ namespace Paladin
         );
 
         [[nodiscard]]
-        SettlementMap* settlementMap(
-            SettlementId settlementId
-        ) noexcept;
+        SettlementMap* settlementMap(SettlementId settlementId) noexcept;
 
         [[nodiscard]]
         const SettlementMap* settlementMap(
@@ -121,7 +113,10 @@ namespace Paladin
         ) const noexcept;
 
         [[nodiscard]]
-        SettlementId foundPlayerSettlement(WorldTilePosition position, std::string name);
+        SettlementId foundPlayerSettlement(
+            WorldTilePosition position,
+            std::string name
+        );
 
         SettlementId foundPlayerCapital(
             WorldTilePosition position,
@@ -132,7 +127,7 @@ namespace Paladin
         bool renamePlayerCapital(std::string name);
 
         [[nodiscard]]
-        bool editPlayerPolity(const FoundingIdentity& identity);
+        bool editPlayerRealm(const FoundingIdentity& identity);
 
         [[nodiscard]]
         bool movePlayerCapital(WorldTilePosition position);
@@ -145,15 +140,13 @@ namespace Paladin
         bool synchronizeSettlementSimulationTiers();
 
         std::unique_ptr<World> world_;
-        std::unique_ptr<WorldSimulationPipeline>
-            worldSimulationPipeline_;
+        std::unique_ptr<WorldSimulationPipeline> worldSimulationPipeline_;
 
-        PolityId playerPolityId_;
+        RealmId playerRealmId_;
         SettlementId presentedSettlementId_;
         SettlementId detailedSimulationSettlementId_;
 
-        SimulationSpeed speed_ =
-            SimulationSpeed::Normal;
+        SimulationSpeed speed_ = SimulationSpeed::Normal;
 
         std::uint64_t tickCount_ = 0;
         double pendingGameMinutes_ = 0.0;
@@ -161,4 +154,4 @@ namespace Paladin
             defaultSimulationTimingSettings();
         SettlementMapGenerator settlementMapGenerator_;
     };
-}
+} // namespace Paladin

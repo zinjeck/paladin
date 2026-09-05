@@ -21,8 +21,7 @@ namespace Paladin
 {
     namespace
     {
-        constexpr double pi =
-            3.14159265358979323846;
+        constexpr double pi = 3.14159265358979323846;
 
         struct Point
         {
@@ -50,9 +49,7 @@ namespace Paladin
         class GenerationRandom
         {
         public:
-            explicit GenerationRandom(
-                std::uint64_t seed
-            ) noexcept
+            explicit GenerationRandom(std::uint64_t seed) noexcept
                 : state_(seed)
             {
             }
@@ -64,20 +61,13 @@ namespace Paladin
             ) noexcept
             {
                 const auto range =
-                    static_cast<std::uint64_t>(
-                        maximum - minimum + 1
-                    );
+                    static_cast<std::uint64_t>(maximum - minimum + 1);
 
-                return minimum + static_cast<std::int32_t>(
-                    next() % range
-                );
+                return minimum + static_cast<std::int32_t>(next() % range);
             }
 
             [[nodiscard]]
-            double range(
-                double minimum,
-                double maximum
-            ) noexcept
+            double range(double minimum, double maximum) noexcept
             {
                 return minimum + (maximum - minimum) * unit();
             }
@@ -93,12 +83,9 @@ namespace Paladin
             [[nodiscard]]
             double unit() noexcept
             {
-                constexpr double inverse53Bits =
-                    1.0 / 9'007'199'254'740'992.0;
+                constexpr double inverse53Bits = 1.0 / 9'007'199'254'740'992.0;
 
-                return
-                    static_cast<double>(next() >> 11)
-                    * inverse53Bits;
+                return static_cast<double>(next() >> 11) * inverse53Bits;
             }
 
             std::uint64_t state_ = 0;
@@ -113,27 +100,25 @@ namespace Paladin
         {
             const double sampleX = x * definition.frequency;
             const double sampleY = y * definition.frequency;
-            const std::uint64_t seed =
-                worldSeed + definition.seedOffset;
+            const std::uint64_t seed = worldSeed + definition.seedOffset;
 
-            const double noise =
-                definition.type == ShapeNoiseType::Value
-                    ? GenerationNoise::fractal(
-                        sampleX,
-                        sampleY,
-                        seed,
-                        definition.octaveCount,
-                        definition.gain,
-                        definition.lacunarity
-                    )
-                    : GenerationNoise::simplexFractal(
-                        sampleX,
-                        sampleY,
-                        seed,
-                        definition.octaveCount,
-                        definition.gain,
-                        definition.lacunarity
-                    );
+            const double noise = definition.type == ShapeNoiseType::Value
+                                     ? GenerationNoise::fractal(
+                                           sampleX,
+                                           sampleY,
+                                           seed,
+                                           definition.octaveCount,
+                                           definition.gain,
+                                           definition.lacunarity
+                                       )
+                                     : GenerationNoise::simplexFractal(
+                                           sampleX,
+                                           sampleY,
+                                           seed,
+                                           definition.octaveCount,
+                                           definition.gain,
+                                           definition.lacunarity
+                                       );
 
             return noise * definition.amplitude;
         }
@@ -154,61 +139,44 @@ namespace Paladin
                 definition.maximumCount
             );
 
-            continent.lobes.reserve(
-                static_cast<std::size_t>(lobeCount)
-            );
+            continent.lobes.reserve(static_cast<std::size_t>(lobeCount));
 
-            for (
-                std::int32_t index = 0;
-                index < lobeCount;
-                ++index
-            )
+            for (std::int32_t index = 0; index < lobeCount; ++index)
             {
                 const double offsetX = random.range(
-                    -worldWidth
-                        * definition.maximumOffsetWidthFraction,
-                    worldWidth
-                        * definition.maximumOffsetWidthFraction
+                    -worldWidth * definition.maximumOffsetWidthFraction,
+                    worldWidth * definition.maximumOffsetWidthFraction
                 );
 
                 const double offsetY = random.range(
-                    -worldHeight
-                        * definition.maximumOffsetHeightFraction,
-                    worldHeight
-                        * definition.maximumOffsetHeightFraction
+                    -worldHeight * definition.maximumOffsetHeightFraction,
+                    worldHeight * definition.maximumOffsetHeightFraction
                 );
 
                 const double radiusX = random.range(
-                    worldWidth
-                        * definition.minimumRadiusWidthFraction,
-                    worldWidth
-                        * definition.maximumRadiusWidthFraction
+                    worldWidth * definition.minimumRadiusWidthFraction,
+                    worldWidth * definition.maximumRadiusWidthFraction
                 );
 
                 const double radiusY = random.range(
-                    worldHeight
-                        * definition.minimumRadiusHeightFraction,
-                    worldHeight
-                        * definition.maximumRadiusHeightFraction
+                    worldHeight * definition.minimumRadiusHeightFraction,
+                    worldHeight * definition.maximumRadiusHeightFraction
                 );
 
-                const double angle = random.range(
-                    0.0,
-                    2.0 * pi
-                );
+                const double angle = random.range(0.0, 2.0 * pi);
 
-                continent.lobes.push_back({
-                    offsetX,
-                    offsetY,
-                    1.0 / radiusX,
-                    1.0 / radiusY,
-                    random.range(
-                        definition.minimumStrength,
-                        definition.maximumStrength
-                    ),
-                    std::cos(angle),
-                    std::sin(angle)
-                });
+                continent.lobes.push_back(
+                    {offsetX,
+                     offsetY,
+                     1.0 / radiusX,
+                     1.0 / radiusY,
+                     random.range(
+                         definition.minimumStrength,
+                         definition.maximumStrength
+                     ),
+                     std::cos(angle),
+                     std::sin(angle)}
+                );
             }
 
             return continent;
@@ -228,79 +196,58 @@ namespace Paladin
                     settings.maximumContinentCount
                 );
 
-            const std::int32_t continentCount = random.integer(
-                countRange.minimum,
-                countRange.maximum
-            );
+            const std::int32_t continentCount =
+                random.integer(countRange.minimum, countRange.maximum);
 
-            std::vector<NormalizedMapPoint> slots =
-                definition.continentSlots;
+            std::vector<NormalizedMapPoint> slots = definition.continentSlots;
 
-            for (
-                std::size_t index = slots.size() - 1;
-                index > 0;
-                --index
-            )
+            for (std::size_t index = slots.size() - 1; index > 0; --index)
             {
-                const auto swapIndex =
-                    static_cast<std::size_t>(
-                        random.integer(
-                            0,
-                            static_cast<std::int32_t>(index)
-                        )
-                    );
+                const auto swapIndex = static_cast<std::size_t>(
+                    random.integer(0, static_cast<std::int32_t>(index))
+                );
 
                 std::swap(slots[index], slots[swapIndex]);
             }
 
             std::vector<ContinentShape> continents;
-            continents.reserve(
-                static_cast<std::size_t>(continentCount)
-            );
+            continents.reserve(static_cast<std::size_t>(continentCount));
 
-            const double worldWidth =
-                static_cast<double>(settings.width);
+            const double worldWidth = static_cast<double>(settings.width);
 
-            const double worldHeight =
-                static_cast<double>(settings.height);
+            const double worldHeight = static_cast<double>(settings.height);
 
-            for (
-                std::int32_t index = 0;
-                index < continentCount;
-                ++index
-            )
+            for (std::int32_t index = 0; index < continentCount; ++index)
             {
                 const NormalizedMapPoint slot =
                     slots[static_cast<std::size_t>(index)];
 
                 const Point position{
                     worldWidth * std::clamp(
-                        slot.x + random.range(
-                            -definition.centerJitterX,
-                            definition.centerJitterX
-                        ),
-                        definition.minimumCenterX,
-                        definition.maximumCenterX
-                    ),
+                                     slot.x + random.range(
+                                                  -definition.centerJitterX,
+                                                  definition.centerJitterX
+                                              ),
+                                     definition.minimumCenterX,
+                                     definition.maximumCenterX
+                                 ),
                     worldHeight * std::clamp(
-                        slot.y + random.range(
-                            -definition.centerJitterY,
-                            definition.centerJitterY
-                        ),
-                        definition.minimumCenterY,
-                        definition.maximumCenterY
-                    )
+                                      slot.y + random.range(
+                                                   -definition.centerJitterY,
+                                                   definition.centerJitterY
+                                               ),
+                                      definition.minimumCenterY,
+                                      definition.maximumCenterY
+                                  )
                 };
 
-                continents.push_back(
-                    createContinent(
-                        position,
-                        random,
-                        worldWidth,
-                        worldHeight,
-                        definition.continentLobes
-                    )
-                );
+                continents.push_back(createContinent(
+                    position,
+                    random,
+                    worldWidth,
+                    worldHeight,
+                    definition.continentLobes
+                ));
             }
 
             return continents;
@@ -328,12 +275,10 @@ namespace Paladin
                         y - (continent.position.y + lobe.offsetY);
 
                     const double rotatedX =
-                        offsetX * lobe.cosine
-                        - offsetY * lobe.sine;
+                        offsetX * lobe.cosine - offsetY * lobe.sine;
 
                     const double rotatedY =
-                        offsetX * lobe.sine
-                        + offsetY * lobe.cosine;
+                        offsetX * lobe.sine + offsetY * lobe.cosine;
 
                     const double normalizedX =
                         std::abs(rotatedX) * lobe.inverseRadiusX;
@@ -345,35 +290,26 @@ namespace Paladin
                         std::pow(
                             normalizedX,
                             definition.continentLobes.distanceExponent
-                        )
-                            + std::pow(
+                        ) +
+                            std::pow(
                                 normalizedY,
                                 definition.continentLobes.distanceExponent
                             ),
-                        1.0 /
-                            definition.continentLobes.distanceExponent
+                        1.0 / definition.continentLobes.distanceExponent
                     );
 
-                    double bias = std::clamp(
-                        1.0 - distance,
-                        0.0,
-                        1.0
-                    );
+                    double bias = std::clamp(1.0 - distance, 0.0, 1.0);
 
-                    bias =
-                        std::pow(
-                            bias,
-                            definition.continentLobes.falloffExponent
-                        )
-                        * lobe.strength;
+                    bias = std::pow(
+                               bias,
+                               definition.continentLobes.falloffExponent
+                           ) *
+                           lobe.strength;
 
                     continentBias += bias;
                 }
 
-                strongestBias = std::max(
-                    strongestBias,
-                    continentBias
-                );
+                strongestBias = std::max(strongestBias, continentBias);
             }
 
             return std::clamp(
@@ -391,12 +327,7 @@ namespace Paladin
             const CoastlineBreakupTemplate& definition
         ) noexcept
         {
-            const double noise = sampleShapeNoise(
-                definition.noise,
-                x,
-                y,
-                seed
-            );
+            const double noise = sampleShapeNoise(definition.noise, x, y, seed);
 
             if (continentCore > definition.interiorCoreThreshold)
             {
@@ -424,17 +355,12 @@ namespace Paladin
                 return 0.0;
             }
 
-            const double noise = sampleShapeNoise(
-                definition.noise,
-                x,
-                y,
-                seed
-            );
+            const double noise = sampleShapeNoise(definition.noise, x, y, seed);
 
             return noise > definition.noiseThreshold
-                ? (noise - definition.noiseThreshold)
-                    * definition.amplitude
-                : 0.0;
+                       ? (noise - definition.noiseThreshold) *
+                             definition.amplitude
+                       : 0.0;
         }
 
         double edgeFalloff(
@@ -445,28 +371,23 @@ namespace Paladin
             const EdgeFalloffTemplate& definition
         ) noexcept
         {
-            const double normalizedX = width > 1
-                ? std::abs(
-                    (x / static_cast<double>(width - 1))
-                        * 2.0
-                        - 1.0
-                )
-                : 0.0;
+            const double normalizedX =
+                width > 1
+                    ? std::abs((x / static_cast<double>(width - 1)) * 2.0 - 1.0)
+                    : 0.0;
 
-            const double normalizedY = height > 1
-                ? std::abs(
-                    (y / static_cast<double>(height - 1))
-                        * 2.0
-                        - 1.0
-                )
-                : 0.0;
+            const double normalizedY =
+                height > 1
+                    ? std::abs(
+                          (y / static_cast<double>(height - 1)) * 2.0 - 1.0
+                      )
+                    : 0.0;
 
-            return
-                std::pow(
-                    std::max(normalizedX, normalizedY),
-                    definition.exponent
-                )
-                * definition.strength;
+            return std::pow(
+                       std::max(normalizedX, normalizedY),
+                       definition.exponent
+                   ) *
+                   definition.strength;
         }
 
         double normalizedElevation(
@@ -475,12 +396,10 @@ namespace Paladin
         ) noexcept
         {
             return rawElevation >= 0.0
-                ? seaLevel
-                    + rawElevation * (1.0 - seaLevel)
-                : seaLevel
-                    + rawElevation * seaLevel;
+                       ? seaLevel + rawElevation * (1.0 - seaLevel)
+                       : seaLevel + rawElevation * seaLevel;
         }
-    }
+    } // namespace
 
     void LandmassGenerator::generate(
         WorldGrid& grid,
@@ -488,9 +407,7 @@ namespace Paladin
     ) const
     {
         const LandmassGenerationTemplate* definition =
-            findLandmassGenerationTemplate(
-                settings.landmassTemplateId
-            );
+            findLandmassGenerationTemplate(settings.landmassTemplateId);
 
         if (!definition)
         {
@@ -506,13 +423,11 @@ namespace Paladin
                 settings.maximumContinentCount
             );
 
-        if (
-            !isValidLandmassGenerationTemplate(*definition) ||
+        if (!isValidLandmassGenerationTemplate(*definition) ||
             countRange.minimum <= 0 ||
             countRange.maximum < countRange.minimum ||
             static_cast<std::size_t>(countRange.maximum) >
-                definition->continentSlots.size()
-        )
+                definition->continentSlots.size())
         {
             throw std::invalid_argument(
                 "Invalid settings for the selected landmass template."
@@ -526,11 +441,9 @@ namespace Paladin
         {
             for (std::int32_t x = 0; x < grid.width(); ++x)
             {
-                const double positionX =
-                    static_cast<double>(x);
+                const double positionX = static_cast<double>(x);
 
-                const double positionY =
-                    static_cast<double>(y);
+                const double positionY = static_cast<double>(y);
 
                 const double continentCore = continentCenterBias(
                     positionX,
@@ -539,67 +452,59 @@ namespace Paladin
                     *definition
                 );
 
-                const double rawElevation =
-                    continentCore
-                    + sampleShapeNoise(
-                        definition->continentNoise,
-                        positionX,
-                        positionY,
-                        settings.seed
-                    ) * continentCore
-                    + sampleShapeNoise(
-                        definition->regionalNoise,
-                        positionX,
-                        positionY,
-                        settings.seed
-                    )
-                    + coastlineBreakup(
-                        positionX,
-                        positionY,
-                        continentCore,
-                        settings.seed,
-                        definition->coastline
-                    )
-                    + islandValue(
-                        positionX,
-                        positionY,
-                        continentCore,
-                        settings.seed,
-                        definition->islands
-                    )
-                    - edgeFalloff(
-                        positionX,
-                        positionY,
-                        grid.width(),
-                        grid.height(),
-                        definition->edgeFalloff
-                    )
-                    + definition->elevationBias;
+                const double rawElevation = continentCore +
+                                            sampleShapeNoise(
+                                                definition->continentNoise,
+                                                positionX,
+                                                positionY,
+                                                settings.seed
+                                            ) * continentCore +
+                                            sampleShapeNoise(
+                                                definition->regionalNoise,
+                                                positionX,
+                                                positionY,
+                                                settings.seed
+                                            ) +
+                                            coastlineBreakup(
+                                                positionX,
+                                                positionY,
+                                                continentCore,
+                                                settings.seed,
+                                                definition->coastline
+                                            ) +
+                                            islandValue(
+                                                positionX,
+                                                positionY,
+                                                continentCore,
+                                                settings.seed,
+                                                definition->islands
+                                            ) -
+                                            edgeFalloff(
+                                                positionX,
+                                                positionY,
+                                                grid.width(),
+                                                grid.height(),
+                                                definition->edgeFalloff
+                                            ) +
+                                            definition->elevationBias;
 
                 WorldTile* tile = grid.tile({x, y});
 
-                tile->elevation = Elevation{
-                    static_cast<float>(
-                        normalizedElevation(
-                            rawElevation,
-                            static_cast<double>(settings.seaLevel)
-                        )
-                    )
-                };
+                tile->elevation =
+                    Elevation{static_cast<float>(normalizedElevation(
+                        rawElevation,
+                        static_cast<double>(settings.seaLevel)
+                    ))};
 
                 tile->temperature = Temperature{};
                 tile->rainfall = Rainfall{};
 
                 const bool isLand = rawElevation > 0.0;
 
-                tile->terrain = isLand
-                    ? TerrainType::Land
-                    : TerrainType::Water;
+                tile->terrain = isLand ? TerrainType::Land : TerrainType::Water;
 
-                tile->biome = isLand
-                    ? BiomeType::Plain
-                    : BiomeType::Ocean;
+                tile->biome = isLand ? BiomeType::Plain : BiomeType::Ocean;
             }
         }
     }
-}
+} // namespace Paladin

@@ -11,296 +11,482 @@
 
 namespace Paladin
 {
-void SettlementCitizenState::recordPopulation(double minute)
-{
-    if (!std::isfinite(minute))
+    void SettlementCitizenState::recordPopulation(double minute)
     {
-        return;
+        if (!std::isfinite(minute))
+        {
+            return;
+        }
+        // Record on the simulation clock, even when no panel is visible.
+        const double boundary = std::floor(minute / 240) * 240;
+        if (populationHistory_.empty())
+        {
+            populationHistory_.push_back({minute, citizens_.size()});
+        }
+        else if (boundary > populationHistory_.back().gameMinute)
+        {
+            populationHistory_.push_back({boundary, citizens_.size()});
+        }
+        while (populationHistory_.size() > 97)
+        {
+            populationHistory_.pop_front();
+        }
     }
-    // Record on the simulation clock, even when no panel is visible.
-    const double boundary = std::floor(minute / 240) * 240;
-    if (populationHistory_.empty())
-    {
-        populationHistory_.push_back({minute, citizens_.size()});
-    }
-    else if (boundary > populationHistory_.back().gameMinute)
-    {
-        populationHistory_.push_back({boundary, citizens_.size()});
-    }
-    while (populationHistory_.size() > 97)
-    {
-        populationHistory_.pop_front();
-    }
-}
 
-void SettlementActivitySystem::planMeal(
-    SettlementCitizen& c,
-    const SettlementMap& map
-)
-{
-    const auto random = GenerationNoise::mix(
-        c.id.value() ^ map.instanceId() ^ GenerationNoise::mix(++c.mealSequence)
-    );
-    const double fraction = double(random >> 11) / 9007199254740992.0;
-    c.foodSeekHunger =
-        policy.foodSeekThreshold +
-        fraction * (policy.urgentFoodThreshold - policy.foodSeekThreshold);
-}
-void SettlementActivitySystem::planSleep(
-    SettlementMap& map,
-    SettlementCitizen& c,
-    double minute
-)
-{
-    const auto cycle = std::int64_t(std::floor((minute + 720) / 1440));
-    if (cycle == c.sleepCycle)
-        return;
-    c.sleepCycle = cycle;
-    c.sleptMinutes = 0;
-    const double day = double(cycle - 1) * 1440;
-    const auto& season =
-        seasonDefinition(seasonAtMinute(std::max(0.0, day + 720)));
-    double earliest = day + season.sunsetMinute;
-    double latest =
-        day + 1440 + season.sunriseMinute - policy.requiredSleepMinutes;
-    if (c.workplaceId && policy.shiftEndMinute > policy.shiftStartMinute)
+    void SettlementActivitySystem::planMeal(
+        SettlementCitizen& c,
+        const SettlementMap& map
+    )
     {
-        earliest = std::max(earliest, day + policy.shiftEndMinute);
-        latest = std::min(
-            latest,
-            day + 1440 + policy.shiftStartMinute - policy.requiredSleepMinutes
+        const auto random = GenerationNoise::mix(
+            c.id.value() ^ map.instanceId() ^
+            GenerationNoise::mix(++c.mealSequence)
         );
+        const double fraction = double(random >> 11) / 9007199254740992.0;
+        c.foodSeekHunger =
+            policy.foodSeekThreshold +
+            fraction * (policy.urgentFoodThreshold - policy.foodSeekThreshold);
     }
-    latest = std::max(earliest, latest);
-    const auto random = GenerationNoise::mix(
-        c.id.value() ^ map.instanceId() ^
-        GenerationNoise::mix(std::uint64_t(cycle))
-    );
-    c.sleepStartMinute =
-        earliest + (latest - earliest) * double(random % 10001) / 10000;
-}
-bool SettlementActivitySystem::shouldSleep(
-    const SettlementCitizen& c,
-    double minute
-) const
-{
-    if (!c.homeId || c.sleptMinutes >= policy.requiredSleepMinutes ||
-        (c.workplaceId && policy.isWorkTime(minute)))
-        return false;
-    return minute >= c.sleepStartMinute;
-}
-bool SettlementActivitySystem::enterHome(
-    SettlementMap& map,
-    SettlementCitizen& c
-)
-{
-    const auto* home = map.objectState().completedObject(c.homeId);
-    if (!home || home->objectTypeId != SettlementObjectTypes::House)
-        return false;
-    if (c.insideHome)
-        return home->footprint.contains(c.tilePosition);
-    if (!home->door)
-        return false;
-    const auto entrance = outsideDoor(home->footprint, *home->door);
-    if (c.tilePosition != entrance)
-        return false;
-    c.homeEntrance = entrance;
-    const auto interior = *home->door;
-    c.insideHome = interior == c.tilePosition;
-    c.destination = interior;
-    if (interior != c.tilePosition)
+    void SettlementActivitySystem::planSleep(
+        SettlementMap& map,
+        SettlementCitizen& c,
+        double /*minute*/
+    )
     {
-        c.path = {interior};
-        c.pathIndex = 0;
-        c.stepProgress = 0;
-        c.explicitMovement = true;
-        return false;
+        if (c.restThreshold > 0)
+        {
+            return;
+        }
+        const auto random =
+            GenerationNoise::mix(c.id.value() ^ map.instanceId());
+        c.restThreshold = policy.fatigueEnergy - double(random % 501) / 100;
     }
-    return true;
-}
-bool SettlementActivitySystem::chooseSleep(
-    SettlementMap& map,
-    SettlementCitizenState& citizens,
-    SettlementCitizen& c,
-    double minute
-)
-{
-    if (!c.homeId || !shouldSleep(c, minute))
-        return false;
-    if (c.task.kind == CitizenTaskKind::Sleep)
-        return true;
-    if (c.insideHome && c.task.object == c.homeId)
+    bool SettlementActivitySystem::shouldSleep(
+        const SettlementCitizen& c,
+        double minute
+    ) const
     {
-        c.path.clear();
-        c.pathIndex = 0;
-        c.stepProgress = 0;
-        c.destination = c.tilePosition;
-        c.task = {};
-        c.task.kind = CitizenTaskKind::Sleep;
-        c.task.object = c.homeId;
-        c.activity = CitizenActivity::Sleeping;
-        return true;
-    }
-    if (c.carriedAmount > 0 || c.task.kind == CitizenTaskKind::Eat)
-        return false;
-    auto planned = c;
-    bool atHome = false;
-    if (const auto* home = map.objectState().completedObject(c.homeId))
-    {
-        atHome = route(map, citizens, planned, home->footprint, false);
-        if (!atHome && routeBudgetLimited_)
+        const bool shift = c.workplaceId && policy.isWorkTime(minute);
+        if (c.task.kind == CitizenTaskKind::Sleep)
+        {
+            return c.energy < policy.fullRestEnergy &&
+                   (!shift || c.energy < policy.fatigueEnergy);
+        }
+        // Forecasts and leisure preferences may never initiate nearly-full
+        // rest. Only an already sleeping citizen can continue recovering
+        // above 50.
+        if (c.energy >= policy.fatigueEnergy)
+        {
             return false;
+        }
+        if (c.energy <= policy.criticalRestEnergy)
+        {
+            return true;
+        }
+        if (shift)
+        {
+            return false;
+        }
+        const auto& season = seasonDefinition(seasonAtMinute(minute));
+        const double time = std::fmod(minute, 1440.0);
+        const double recoveryMinutes =
+            (policy.fullRestEnergy - c.energy) / policy.sleepEnergyPerMinute;
+        if (c.workplaceId && policy.shiftEndMinute > policy.shiftStartMinute)
+        {
+            const double workMinutes =
+                policy.shiftEndMinute - policy.shiftStartMinute;
+            const double offMinutes = 1440 - workMinutes;
+            const double sinceShiftEnd =
+                std::fmod(time - policy.shiftEndMinute + 1440, 1440.0);
+            const double untilShift = offMinutes - sinceShiftEnd;
+            // Allocate available leisure before bed, without delaying needed
+            // recovery. Changing the workday or energy rates changes this
+            // window.
+            const double leisure =
+                std::max(
+                    0.0,
+                    offMinutes -
+                        std::max(policy.requiredSleepMinutes, recoveryMinutes)
+                ) *
+                policy.postWorkLeisureShare;
+            if (sinceShiftEnd < leisure && c.energy > policy.fatigueEnergy)
+            {
+                return false;
+            }
+            const double nextShiftCost =
+                policy.awakeEnergyPerMinute * (untilShift + workMinutes) +
+                policy.workEnergyPerMinute * workMinutes;
+            if (untilShift <=
+                    std::max(policy.requiredSleepMinutes, recoveryMinutes) &&
+                c.energy - nextShiftCost < policy.fatigueEnergy)
+            {
+                return true;
+            }
+        }
+        const bool night =
+            time < season.sunriseMinute || time >= season.sunsetMinute;
+        return c.energy <=
+               (night ? c.restThreshold : policy.fatigueEnergy - 10);
     }
-    if (!atHome)
-        return false;
-    finish(map, c, minute);
-    if (atHome)
-    {
-        c.path = std::move(planned.path);
-        c.pathIndex = planned.pathIndex;
-        c.stepProgress = planned.stepProgress;
-        c.stepDuration = planned.stepDuration;
-        c.destination = planned.destination;
-        c.explicitMovement = planned.explicitMovement;
-    }
-    else
-        c.destination = c.tilePosition;
-    c.task.kind = CitizenTaskKind::Sleep;
-    c.task.object = c.homeId;
-    c.task.startedMinute = minute;
-    c.activity = CitizenActivity::ReturningHome;
-    return true;
-}
-
-void SettlementActivitySystem::needs(SettlementCitizen& c, double elapsed)
-{
-    const double days = elapsed / 1440;
-    const double before = c.hunger;
-    c.hunger = std::min(100.0, before + policy.hungerPerDay * days);
-    // Scale damage with depletion: reaching 100 from 75 costs 100 health.
-    const auto primitive = [&](double hunger)
-    {
-        const double above = std::max(0.0, hunger - policy.starvationThreshold);
-        return above * above / (2 * (100 - policy.starvationThreshold));
-    };
-    const double risingDays = (c.hunger - before) / policy.hungerPerDay;
-    const double damage =
-        (8 * policy.hungerPerDay) *
-        ((primitive(c.hunger) - primitive(before)) / policy.hungerPerDay +
-         std::max(0.0, days - risingDays));
-    c.health = std::max(0.0, c.health - damage);
-    if (c.hunger < policy.foodSeekThreshold)
-    {
-        c.health =
-            std::min(100.0, c.health + policy.healthRecoveryPerDay * days);
-    }
-    if (c.homeId)
-    {
-        c.homelessMinutes = 0;
-    }
-    else
-    {
-        c.homelessMinutes += elapsed;
-    }
-    const double hungerPressure = std::max(0.0, (c.hunger - 25) / 75) * 12;
-    const double healthPressure = (100 - c.health) / 100 * 24;
-    const double homelessPressure =
-        c.homeId ? 0
-                 : std::min(16.0, .5 + std::pow(c.homelessMinutes / 1440, 2));
-    const double recovery =
-        c.hunger < 50 && c.homeId ? policy.happinessRecoveryPerDay : 0;
-    const int workHours =
-        (policy.shiftEndMinute - policy.shiftStartMinute) / 60;
-    const double workdayEffect =
-        c.workplaceId ? std::clamp(12.0 - workHours, -2.0, 3.0) : 0;
-    c.happiness = std::clamp(
-        c.happiness + days * (recovery + workdayEffect - hungerPressure -
-                              healthPressure - homelessPressure),
-        0.0,
-        100.0
-    );
-}
-void SettlementActivitySystem::assignHomes(
-    const SettlementMap& map,
-    SettlementCitizenState& citizens
-)
-{
-    if (housingTopology_ == map.objectState().navigationVersion() &&
-        housedPopulation_ == citizens.citizens_.size())
-    {
-        return;
-    }
-    housingTopology_ = map.objectState().navigationVersion();
-    housedPopulation_ = citizens.citizens_.size();
-    std::unordered_map<SettlementObjectId, int, StrongIdHash> occupants;
-    for (auto& c : citizens.citizens_)
+    bool SettlementActivitySystem::enterHome(
+        SettlementMap& map,
+        SettlementCitizen& c
+    )
     {
         const auto* home = map.objectState().completedObject(c.homeId);
         if (!home || home->objectTypeId != SettlementObjectTypes::House)
         {
-            c.homeId = {};
+            return false;
         }
-        else if (occupants[c.homeId] < 4)
+        if (c.insideHome)
         {
-            ++occupants[c.homeId];
+            return home->footprint.contains(c.tilePosition);
+        }
+        if (!home->door)
+        {
+            return false;
+        }
+        const auto entrance = outsideDoor(home->footprint, *home->door);
+        if (c.tilePosition != entrance)
+        {
+            return false;
+        }
+        c.homeEntrance = entrance;
+        const auto interior = *home->door;
+        c.insideHome = interior == c.tilePosition;
+        c.destination = interior;
+        if (interior != c.tilePosition)
+        {
+            c.path = {interior};
+            c.pathIndex = 0;
+            c.stepProgress = 0;
+            c.explicitMovement = true;
+            return false;
+        }
+        return true;
+    }
+    SettlementTilePosition SettlementActivitySystem::sleepingPosition(
+        const SettlementMap& map,
+        const SettlementCitizenState& citizens,
+        const SettlementCitizen& c
+    ) const
+    {
+        const auto* home = map.objectState().completedObject(c.homeId);
+        if (!home)
+        {
+            return {-1, -1};
+        }
+        auto best = c.tilePosition;
+        int bestScore = -1000000;
+        const auto& f = home->footprint;
+        for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
+        {
+            for (int x = f.topLeft.x; x < f.topLeft.x + f.width; ++x)
+            {
+                const SettlementTilePosition p{x, y};
+                int reserved = 0, occupied = 0;
+                for (const auto& other : citizens.citizens())
+                {
+                    if (other.id == c.id)
+                    {
+                        continue;
+                    }
+                    occupied += other.tilePosition == p;
+                    reserved += other.task.kind == CitizenTaskKind::Sleep &&
+                                other.homeId == c.homeId &&
+                                other.task.target == p;
+                }
+                // Reservations dominate temporary occupancy. Prefer clear
+                // interior tiles, leaving the doorway free. Sharing is a last
+                // resort only.
+                int score = -reserved * 10000 - occupied * 1000;
+                if (home->door)
+                {
+                    score += (std::abs(x - home->door->x) +
+                              std::abs(y - home->door->y)) *
+                             10;
+                }
+                if (p == c.tilePosition)
+                {
+                    ++score;
+                }
+                if (score > bestScore)
+                {
+                    best = p;
+                    bestScore = score;
+                }
+            }
+        }
+        return best;
+    }
+    bool SettlementActivitySystem::chooseSleep(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& c,
+        double minute
+    )
+    {
+        if (!shouldSleep(c, minute))
+        {
+            return false;
+        }
+        if (c.task.kind == CitizenTaskKind::Sleep)
+        {
+            return true;
+        }
+        if (c.insideHome && !c.path.empty())
+        {
+            return false;
+        }
+        if (c.insideHome)
+        {
+            const auto* home = map.objectState().completedObject(c.homeId);
+            if (home && home->footprint.contains(c.tilePosition) &&
+                c.carriedAmount == 0 && c.task.kind != CitizenTaskKind::Eat)
+            {
+                finish(map, c, minute);
+                c.destination = c.tilePosition;
+                c.sleptMinutes = 0;
+                c.task.kind = CitizenTaskKind::Sleep;
+                c.task.object = c.homeId;
+                c.task.target = sleepingPosition(map, citizens, c);
+                c.activity = CitizenActivity::ReturningHome;
+                return true;
+            }
+        }
+        if (c.carriedAmount > 0 || c.task.kind == CitizenTaskKind::Eat)
+        {
+            return false;
+        }
+        auto planned = c;
+        bool atHome = false;
+        if (const auto* home = map.objectState().completedObject(c.homeId))
+        {
+            atHome = route(map, citizens, planned, home->footprint, false);
+            if (!atHome && routeBudgetLimited_)
+            {
+                return false;
+            }
+        }
+        if (!atHome)
+        {
+            // Bounded local search. Reserve a distinct, reachable outdoor spot.
+            bool found = false;
+            for (int radius = 0; radius <= 4 && !found; ++radius)
+            {
+                for (int y = -radius; y <= radius && !found; ++y)
+                {
+                    for (int x = -radius; x <= radius && !found; ++x)
+                    {
+                        if (std::max(std::abs(x), std::abs(y)) != radius)
+                        {
+                            continue;
+                        }
+                        const SettlementTilePosition target{
+                            c.tilePosition.x + x,
+                            c.tilePosition.y + y
+                        };
+                        if (!citizens.navigation_.walkable(map, target))
+                        {
+                            continue;
+                        }
+                        const bool occupied = std::any_of(
+                            citizens.citizens().begin(),
+                            citizens.citizens().end(),
+                            [&](const auto& other)
+                            {
+                                return other.id != c.id &&
+                                       (other.tilePosition == target ||
+                                        (other.task.kind ==
+                                             CitizenTaskKind::Sleep &&
+                                         other.task.target == target));
+                            }
+                        );
+                        if (occupied)
+                        {
+                            continue;
+                        }
+                        planned = c;
+                        found =
+                            route(map, citizens, planned, {target, 1, 1}, true);
+                        if (!found && routeBudgetLimited_)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+            if (!found)
+            {
+                // Sharing is permitted only when the citizen has no way off
+                // this single tile. Crowding alone does not justify stacking.
+                bool confined =
+                    citizens.navigation_.walkable(map, c.tilePosition);
+                for (int y = -1; y <= 1; ++y)
+                {
+                    for (int x = -1; x <= 1; ++x)
+                    {
+                        if ((x || y) &&
+                            citizens.navigation_.walkable(
+                                map,
+                                {c.tilePosition.x + x, c.tilePosition.y + y}
+                            ))
+                        {
+                            confined = false;
+                        }
+                    }
+                }
+                if (!confined)
+                {
+                    return false;
+                }
+                planned = c;
+                planned.path.clear();
+                planned.pathIndex = 0;
+                planned.stepProgress = 0;
+                planned.destination = c.tilePosition;
+            }
+        }
+        finish(map, c, minute);
+        {
+            c.path = std::move(planned.path);
+            c.pathIndex = planned.pathIndex;
+            c.stepProgress = planned.stepProgress;
+            c.stepDuration = planned.stepDuration;
+            c.destination = planned.destination;
+            c.explicitMovement = planned.explicitMovement;
+        }
+        c.sleptMinutes = 0;
+        c.task.kind = CitizenTaskKind::Sleep;
+        c.task.object = atHome ? c.homeId : SettlementObjectId{};
+        c.task.target =
+            atHome ? sleepingPosition(map, citizens, c) : c.destination;
+        c.task.startedMinute = minute;
+        c.activity = CitizenActivity::ReturningHome;
+        return true;
+    }
+
+    void SettlementActivitySystem::needs(
+        SettlementCitizen& c,
+        double elapsed,
+        double minute
+    )
+    {
+        const double days = elapsed / 1440;
+        const bool sleeping = c.task.kind == CitizenTaskKind::Sleep &&
+                              c.activity == CitizenActivity::Sleeping &&
+                              c.path.empty();
+        if (!sleeping)
+        {
+            const bool labor = c.task.kind == CitizenTaskKind::Haul ||
+                               c.task.kind == CitizenTaskKind::Gather ||
+                               c.task.kind == CitizenTaskKind::Demolish ||
+                               c.task.kind == CitizenTaskKind::Build ||
+                               (c.task.kind == CitizenTaskKind::Work &&
+                                policy.isWorkTime(minute));
+            c.energy = std::max(
+                0.0,
+                c.energy - policy.awakeEnergyPerMinute * elapsed -
+                    (labor ? policy.workEnergyPerMinute * elapsed : 0)
+            );
+        }
+        c.health = std::max(
+            0.0,
+            c.health -
+                policy.fatigueHealthPerDay * days *
+                    std::max(
+                        0.0,
+                        (policy.fatigueEnergy - c.energy) / policy.fatigueEnergy
+                    )
+        );
+        const double before = c.hunger;
+        c.hunger = std::min(100.0, before + policy.hungerPerDay * days);
+        // Scale damage with depletion: reaching 100 from 75 costs 100 health.
+        const auto primitive = [&](double hunger)
+        {
+            const double above =
+                std::max(0.0, hunger - policy.starvationThreshold);
+            return above * above / (2 * (100 - policy.starvationThreshold));
+        };
+        const double risingDays = (c.hunger - before) / policy.hungerPerDay;
+        const double damage =
+            (8 * policy.hungerPerDay) *
+            ((primitive(c.hunger) - primitive(before)) / policy.hungerPerDay +
+             std::max(0.0, days - risingDays));
+        c.health = std::max(0.0, c.health - damage);
+        if (c.hunger < policy.foodSeekThreshold &&
+            c.energy >= policy.fatigueEnergy)
+        {
+            c.health =
+                std::min(100.0, c.health + policy.healthRecoveryPerDay * days);
+        }
+        if (c.homeId)
+        {
+            c.homelessMinutes = 0;
         }
         else
-            c.homeId = {};
-    }
-    for (const auto& object : map.objectState().completedObjects())
-    {
-        if (object.objectTypeId != SettlementObjectTypes::House)
         {
-            continue;
+            c.homelessMinutes += elapsed;
         }
-        for (auto& c : citizens.citizens_)
+        const double hungerPressure = std::max(0.0, (c.hunger - 25) / 75) * 12;
+        const double healthPressure = (100 - c.health) / 100 * 24;
+        const double homelessPressure =
+            c.homeId
+                ? 0
+                : std::min(16.0, .5 + std::pow(c.homelessMinutes / 1440, 2));
+        const double recovery =
+            c.hunger < 50 && c.homeId ? policy.happinessRecoveryPerDay : 0;
+        const int workHours =
+            (policy.shiftEndMinute - policy.shiftStartMinute) / 60;
+        const double unemploymentPressure =
+            (c.child || c.workplaceId) ? 0 : policy.unemploymentHappinessPerDay;
+        const double workdayEffect =
+            c.workplaceId ? std::clamp(12.0 - workHours, -2.0, 3.0) : 0;
+        c.happiness = std::clamp(
+            c.happiness + days * (recovery + workdayEffect - hungerPressure -
+                                  healthPressure - homelessPressure -
+                                  unemploymentPressure),
+            0.0,
+            100.0
+        );
+    }
+    std::string SettlementActivitySystem::activityLabel(
+        const SettlementCitizen& c
+    )
+    {
+        if (c.hunger > 75)
         {
-            if (occupants[object.id] >= 4)
-            {
-                break;
-            }
-            if (!c.homeId)
-            {
-                c.homeId = object.id;
-                c.homelessMinutes = 0;
-                ++occupants[object.id];
-            }
+            return "Starving";
+        }
+        switch (c.task.kind)
+        {
+        case CitizenTaskKind::Eat:
+            return "Finding food";
+        case CitizenTaskKind::Haul:
+            return c.task.delivering ? "Delivering" : "Collecting goods";
+        case CitizenTaskKind::Gather:
+            return "Gathering";
+        case CitizenTaskKind::Demolish:
+            return "Demolishing";
+        case CitizenTaskKind::Build:
+            return "Constructing";
+        case CitizenTaskKind::Work:
+            return c.path.empty()
+                       ? (c.activity == CitizenActivity::Fishing ? "Fishing"
+                                                                 : "Working")
+                       : "Going to work";
+        case CitizenTaskKind::Break:
+            return c.breakReturning ? "Returning from break" : "On break";
+        case CitizenTaskKind::Talk:
+            return "Talking to " + c.task.partnerName;
+        case CitizenTaskKind::Sleep:
+            return c.activity == CitizenActivity::Sleeping && c.path.empty()
+                       ? "Sleeping"
+                       : "Going to sleep";
+        case CitizenTaskKind::Home:
+            return c.insideHome ? "At home" : "Going home";
+        default:
+            return "Idle";
         }
     }
-}
-std::string SettlementActivitySystem::activityLabel(const SettlementCitizen& c)
-{
-    if (c.hunger > 75)
-    {
-        return "Starving";
-    }
-    switch (c.task.kind)
-    {
-    case CitizenTaskKind::Eat:
-        return "Finding food";
-    case CitizenTaskKind::Haul:
-        return c.task.delivering ? "Delivering" : "Collecting goods";
-    case CitizenTaskKind::Gather:
-        return "Gathering";
-    case CitizenTaskKind::Demolish:
-        return "Demolishing";
-    case CitizenTaskKind::Build:
-        return "Constructing";
-    case CitizenTaskKind::Work:
-        return c.path.empty()
-                   ? (c.activity == CitizenActivity::Fishing ? "Fishing"
-                                                             : "Working")
-                   : "Going to work";
-    case CitizenTaskKind::Break:
-        return c.breakReturning ? "Returning from break" : "On break";
-    case CitizenTaskKind::Talk:
-        return "Talking to " + c.task.partnerName;
-    case CitizenTaskKind::Sleep:
-        return c.insideHome && c.path.empty() ? "Sleeping" : "Going to sleep";
-    case CitizenTaskKind::Home:
-        return c.insideHome ? "At home" : "Going home";
-    default:
-        return "Idle";
-    }
-}
 } // namespace Paladin

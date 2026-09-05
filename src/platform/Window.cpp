@@ -4,25 +4,13 @@
 
 namespace Paladin
 {
-    Window::Window(
-        const char* title,
-        int width,
-        int height
-    )
+    Window::Window(const char* title, int width, int height)
     {
-        window_ = SDL_CreateWindow(
-            title,
-            width,
-            height,
-            SDL_WINDOW_RESIZABLE
-        );
+        window_ = SDL_CreateWindow(title, width, height, SDL_WINDOW_RESIZABLE);
 
         if (!window_)
         {
-            SDL_Log(
-                "SDL_CreateWindow failed: %s",
-                SDL_GetError()
-            );
+            SDL_Log("SDL_CreateWindow failed: %s", SDL_GetError());
         }
     }
 
@@ -43,4 +31,4 @@ namespace Paladin
     {
         return window_;
     }
-}
+} // namespace Paladin

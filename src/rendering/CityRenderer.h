@@ -22,24 +22,24 @@ namespace Paladin
     class CityRenderer
     {
     public:
-      void render(
-          Renderer& renderer,
-          const SettlementMap& settlementMap,
-          const Camera2D& camera,
-          const TileRenderMetrics& metrics,
-          const SettlementObjectPlacementController& placementController,
-          const SettlementCommandController& commandController,
-          const SettlementCitizenState& citizens,
-          const SettlementInspectionController& inspection
-      ) const;
+        void render(
+            Renderer& renderer,
+            const SettlementMap& settlementMap,
+            const Camera2D& camera,
+            const TileRenderMetrics& metrics,
+            const SettlementObjectPlacementController& placementController,
+            const SettlementCommandController& commandController,
+            const SettlementCitizenState& citizens,
+            const SettlementInspectionController& inspection
+        ) const;
 
-      void renderMinimap(
-          Renderer& renderer,
-          const SettlementMap& settlementMap,
-          const Camera2D& camera,
-          const TileRenderMetrics& metrics,
-          const UiRectangle& bounds
-      ) const;
+        void renderMinimap(
+            Renderer& renderer,
+            const SettlementMap& settlementMap,
+            const Camera2D& camera,
+            const TileRenderMetrics& metrics,
+            const UiRectangle& bounds
+        ) const;
 
     private:
         WorldGridRenderer gridRenderer_;
@@ -49,4 +49,4 @@ namespace Paladin
         SettlementCommandRenderer commandRenderer_;
         SettlementCitizenRenderer citizenRenderer_;
     };
-}
+} // namespace Paladin

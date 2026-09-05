@@ -34,8 +34,7 @@ namespace Paladin
     ) noexcept
     {
         return static_cast<SettlementStateDomain>(
-            static_cast<std::uint8_t>(first) |
-            static_cast<std::uint8_t>(second)
+            static_cast<std::uint8_t>(first) | static_cast<std::uint8_t>(second)
         );
     }
 
@@ -59,10 +58,8 @@ namespace Paladin
         [[nodiscard]]
         bool has(SettlementStateDomain domain) const noexcept
         {
-            return (
-                static_cast<std::uint8_t>(domains) &
-                static_cast<std::uint8_t>(domain)
-            ) != 0;
+            return (static_cast<std::uint8_t>(domains) &
+                    static_cast<std::uint8_t>(domain)) != 0;
         }
 
         [[nodiscard]]
@@ -76,9 +73,7 @@ namespace Paladin
     {
     public:
         [[nodiscard]]
-        bool bootstrap(
-            const SettlementFoundationProfile& profile
-        );
+        bool bootstrap(const SettlementFoundationProfile& profile);
 
         [[nodiscard]]
         bool isInitialized() const noexcept;
@@ -146,9 +141,7 @@ namespace Paladin
         friend class WorldSimulationPipeline;
         friend class Simulation;
 
-        void setSimulationTier(
-            SettlementSimulationTier tier
-        ) noexcept;
+        void setSimulationTier(SettlementSimulationTier tier) noexcept;
 
         [[nodiscard]]
         std::uint64_t takeDueSimulationMinutes(
@@ -159,9 +152,7 @@ namespace Paladin
         [[nodiscard]]
         std::uint64_t takeAllPendingSimulationMinutes() noexcept;
 
-        void setLocalMap(
-            std::unique_ptr<SettlementMap> localMap
-        ) noexcept;
+        void setLocalMap(std::unique_ptr<SettlementMap> localMap) noexcept;
 
         void clearLocalMap() noexcept;
 
@@ -179,4 +170,4 @@ namespace Paladin
         std::unique_ptr<SettlementMap> localMap_;
         std::uint64_t localMapVersion_ = 0;
     };
-}
+} // namespace Paladin

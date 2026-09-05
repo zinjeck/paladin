@@ -10,13 +10,10 @@ namespace Paladin
         const WorldSimulationStep& step
     )
     {
-        constexpr double gameMinutesPerDay =
-            24.0 * 60.0;
+        constexpr double gameMinutesPerDay = 24.0 * 60.0;
 
-        for (
-            const SettlementSimulationStep& settlementStep
-            : step.settlementSteps
-        )
+        for (const SettlementSimulationStep& settlementStep :
+             step.settlementSteps)
         {
             Settlement* settlement =
                 world.settlement(settlementStep.settlementId);
@@ -26,8 +23,7 @@ namespace Paladin
                 continue;
             }
 
-            SettlementSimulationState& state =
-                settlement->simulationState();
+            SettlementSimulationState& state = settlement->simulationState();
 
             if (state.hasLocalMap())
             {
@@ -42,4 +38,4 @@ namespace Paladin
             );
         }
     }
-}
+} // namespace Paladin

@@ -15,10 +15,7 @@ namespace Paladin
     class TerritoryMap
     {
     public:
-        TerritoryMap(
-            std::int32_t width,
-            std::int32_t height
-        );
+        TerritoryMap(std::int32_t width, std::int32_t height);
 
         [[nodiscard]]
         std::int32_t width() const noexcept;
@@ -27,31 +24,22 @@ namespace Paladin
         std::int32_t height() const noexcept;
 
         [[nodiscard]]
-        bool isValidPosition(
-            WorldTilePosition position
-        ) const noexcept;
+        bool isValidPosition(WorldTilePosition position) const noexcept;
 
         [[nodiscard]]
-        PolityId controllerAt(
-            WorldTilePosition position
-        ) const noexcept;
+        RealmId controllerAt(WorldTilePosition position) const noexcept;
 
         [[nodiscard]]
-        bool isControlled(
-            WorldTilePosition position
-        ) const noexcept;
+        bool isControlled(WorldTilePosition position) const noexcept;
 
         [[nodiscard]]
         std::size_t controlledTileCount() const noexcept;
 
         [[nodiscard]]
-        std::size_t controlledTileCount(
-            PolityId polityId
-        ) const noexcept;
+        std::size_t controlledTileCount(RealmId realmId) const noexcept;
 
         [[nodiscard]]
-        std::span<const WorldTilePosition>
-        controlledPositions() const noexcept;
+        std::span<const WorldTilePosition> controlledPositions() const noexcept;
 
         [[nodiscard]]
         std::uint64_t revision() const noexcept;
@@ -60,24 +48,19 @@ namespace Paladin
         friend class TerritoryFoundationSystem;
         friend class World;
 
-        std::size_t clearController(PolityId polityId);
+        std::size_t clearController(RealmId realmId);
 
         [[nodiscard]]
-        bool claimIfUncontrolled(
-            WorldTilePosition position,
-            PolityId polityId
-        );
+        bool claimIfUncontrolled(WorldTilePosition position, RealmId realmId);
 
         [[nodiscard]]
-        std::size_t indexOf(
-            WorldTilePosition position
-        ) const noexcept;
+        std::size_t indexOf(WorldTilePosition position) const noexcept;
 
         std::int32_t width_ = 0;
         std::int32_t height_ = 0;
-        std::vector<PolityId> controllers_;
+        std::vector<RealmId> controllers_;
         std::vector<WorldTilePosition> controlledPositions_;
         std::size_t controlledTileCount_ = 0;
         std::uint64_t revision_ = 0;
     };
-}
+} // namespace Paladin

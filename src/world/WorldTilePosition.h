@@ -6,4 +6,4 @@ namespace Paladin
 {
     struct WorldTileSpaceTag;
     using WorldTilePosition = TilePosition<WorldTileSpaceTag>;
-}
+} // namespace Paladin

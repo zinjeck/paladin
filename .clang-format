@@ -4,6 +4,11 @@ BasedOnStyle: Microsoft
 Standard: Latest
 
 IndentWidth: 4
+NamespaceIndentation: All
+SpaceAfterTemplateKeyword: false
+MaxEmptyLinesToKeep: 2
+AccessModifierOffset: -4
+InsertBraces: true
 TabWidth: 4
 UseTab: Never
 ColumnLimit: 80
@@ -24,7 +29,7 @@ AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveAssignments: None
 AlignConsecutiveDeclarations: None
 AlignOperands: Align
-BreakConstructorInitializers: AfterColon
+BreakConstructorInitializers: BeforeColon
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 

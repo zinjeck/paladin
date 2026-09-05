@@ -10,8 +10,7 @@
 
 namespace Paladin
 {
-    template<typename EntityType, typename IdType>
-    class EntityRegistry
+    template<typename EntityType, typename IdType> class EntityRegistry
     {
     public:
         template<typename... Args>
@@ -21,10 +20,7 @@ namespace Paladin
             const IdType id = idGenerator_.generate();
             const std::size_t index = entities_.size();
 
-            entities_.emplace_back(
-                id,
-                std::forward<Args>(args)...
-            );
+            entities_.emplace_back(id, std::forward<Args>(args)...);
 
             try
             {
@@ -81,15 +77,11 @@ namespace Paladin
             }
 
             const std::size_t index = iterator->second;
-            const std::size_t lastIndex =
-                entities_.size() - 1;
+            const std::size_t lastIndex = entities_.size() - 1;
 
             if (index != lastIndex)
             {
-                std::swap(
-                    entities_[index],
-                    entities_[lastIndex]
-                );
+                std::swap(entities_[index], entities_[lastIndex]);
 
                 indexById_[entities_[index].id()] = index;
             }
@@ -115,19 +107,13 @@ namespace Paladin
         [[nodiscard]]
         std::span<EntityType> entities() noexcept
         {
-            return {
-                entities_.data(),
-                entities_.size()
-            };
+            return {entities_.data(), entities_.size()};
         }
 
         [[nodiscard]]
         std::span<const EntityType> entities() const noexcept
         {
-            return {
-                entities_.data(),
-                entities_.size()
-            };
+            return {entities_.data(), entities_.size()};
         }
 
     private:
@@ -138,10 +124,6 @@ namespace Paladin
 
         // This map has exactly one job:
         // stable ID -> current dense-array position.
-        std::unordered_map<
-            IdType,
-            std::size_t,
-            StrongIdHash
-        > indexById_;
+        std::unordered_map<IdType, std::size_t, StrongIdHash> indexById_;
     };
-}
+} // namespace Paladin

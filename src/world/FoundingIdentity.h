@@ -25,31 +25,23 @@ namespace Paladin
         {
             std::size_t first = 0;
 
-            while (
-                first < name.size() &&
-                std::isspace(
-                    static_cast<unsigned char>(name[first])
-                )
-            )
+            while (first < name.size() &&
+                   std::isspace(static_cast<unsigned char>(name[first])))
             {
                 ++first;
             }
 
             std::size_t last = name.size();
 
-            while (
-                last > first &&
-                std::isspace(
-                    static_cast<unsigned char>(name[last - 1])
-                )
-            )
+            while (last > first &&
+                   std::isspace(static_cast<unsigned char>(name[last - 1])))
             {
                 --last;
             }
 
             return {first, last};
         }
-    }
+    } // namespace Detail
 
     struct MapColor
     {
@@ -74,7 +66,7 @@ namespace Paladin
         ) noexcept = default;
     };
 
-    struct PolityFlag
+    struct RealmFlag
     {
         static constexpr std::size_t defaultWidth = 7;
         static constexpr std::size_t defaultHeight = 9;
@@ -82,61 +74,44 @@ namespace Paladin
         std::size_t width = defaultWidth;
         std::size_t height = defaultHeight;
         MapColor primaryColor{210, 54, 54};
-        std::vector<FlagCell> cells = std::vector<FlagCell>(
-            defaultWidth * defaultHeight,
-            FlagCell{}
-        );
+        std::vector<FlagCell> cells =
+            std::vector<FlagCell>(defaultWidth * defaultHeight, FlagCell{});
 
         [[nodiscard]]
         bool isValid() const noexcept
         {
-            return
-                width > 0 &&
-                height > 0 &&
-                cells.size() == width * height;
+            return width > 0 && height > 0 && cells.size() == width * height;
         }
 
-        friend bool operator==(
-            const PolityFlag&,
-            const PolityFlag&
-        ) = default;
+        friend bool operator==(const RealmFlag&, const RealmFlag&) = default;
     };
 
-    inline std::string trimFoundingName(
-        std::string_view name
-    )
+    inline std::string trimFoundingName(std::string_view name)
     {
         const Detail::FoundingNameBounds bounds =
             Detail::foundingNameBounds(name);
 
         return std::string(
-            name.substr(
-                bounds.first,
-                bounds.last - bounds.first
-            )
+            name.substr(bounds.first, bounds.last - bounds.first)
         );
     }
 
-    inline bool isValidFoundingName(
-        std::string_view name
-    ) noexcept
+    inline bool isValidFoundingName(std::string_view name) noexcept
     {
         const Detail::FoundingNameBounds bounds =
             Detail::foundingNameBounds(name);
 
-        return
-            bounds.last > bounds.first &&
-            bounds.last - bounds.first <=
-                maximumFoundingNameLength;
+        return bounds.last > bounds.first &&
+               bounds.last - bounds.first <= maximumFoundingNameLength;
     }
 
     struct FoundingIdentity
     {
-        std::string polityName;
+        std::string realmName;
         std::string cultureName;
         std::string capitalName;
         MapColor mapColor;
-        std::string polityOriginId;
-        PolityFlag flag;
+        std::string realmOriginId;
+        RealmFlag flag;
     };
-}
+} // namespace Paladin

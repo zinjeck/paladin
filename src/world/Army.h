@@ -10,12 +10,8 @@ namespace Paladin
     class Army
     {
     public:
-        Army(
-            ArmyId id,
-            WorldTilePosition position
-        ) noexcept
-            : id_(id),
-              position_(position)
+        Army(ArmyId id, WorldTilePosition position) noexcept
+            : id_(id), position_(position)
         {
         }
 
@@ -32,38 +28,34 @@ namespace Paladin
         }
 
         [[nodiscard]]
-        PolityId ownerPolityId() const noexcept
+        RealmId ownerRealmId() const noexcept
         {
-            return ownerPolityId_;
+            return ownerRealmId_;
         }
 
         [[nodiscard]]
-        bool hasOwnerPolity() const noexcept
+        bool hasOwnerRealm() const noexcept
         {
-            return ownerPolityId_.isValid();
+            return ownerRealmId_.isValid();
         }
 
     private:
         friend class World;
 
-        void setPosition(
-            WorldTilePosition position
-        ) noexcept
+        void setPosition(WorldTilePosition position) noexcept
         {
             position_ = position;
         }
 
-        void setOwnerPolity(
-            PolityId polityId
-        ) noexcept
+        void setOwnerRealm(RealmId realmId) noexcept
         {
-            ownerPolityId_ = polityId;
+            ownerRealmId_ = realmId;
         }
 
         ArmyId id_;
 
         WorldTilePosition position_;
 
-        PolityId ownerPolityId_;
+        RealmId ownerRealmId_;
     };
-}
+} // namespace Paladin

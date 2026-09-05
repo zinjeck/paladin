@@ -21,9 +21,7 @@ namespace Paladin
         ~TerritoryRenderer();
 
         TerritoryRenderer(const TerritoryRenderer&) = delete;
-        TerritoryRenderer& operator=(
-            const TerritoryRenderer&
-        ) = delete;
+        TerritoryRenderer& operator=(const TerritoryRenderer&) = delete;
 
         void render(
             Renderer& renderer,
@@ -38,4 +36,4 @@ namespace Paladin
         BitmapFontRenderer fontRenderer_;
         mutable std::unique_ptr<TerritoryRendererCache> cache_;
     };
-}
+} // namespace Paladin

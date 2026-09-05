@@ -4,13 +4,9 @@
 
 namespace Paladin
 {
-    class SettlementEconomySystem final
-        : public WorldSimulationSystem
+    class SettlementEconomySystem final : public WorldSimulationSystem
     {
     public:
-        void tick(
-            World& world,
-            const WorldSimulationStep& step
-        ) override;
+        void tick(World& world, const WorldSimulationStep& step) override;
     };
-}
+} // namespace Paladin

@@ -34,4 +34,4 @@ namespace Paladin
         struct Implementation;
         std::unique_ptr<Implementation> implementation_;
     };
-}
+} // namespace Paladin

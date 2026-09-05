@@ -41,12 +41,12 @@ namespace Paladin
         );
 
         [[nodiscard]]
-        std::optional<SettlementObjectFootprint>
-        visibleFootprint() const noexcept;
+        std::optional<
+            SettlementObjectFootprint> visibleFootprint() const noexcept;
 
     private:
         std::string commandTypeId_;
         std::optional<SettlementTilePosition> dragStart_;
         std::optional<SettlementTilePosition> hoveredPosition_;
     };
-}
+} // namespace Paladin

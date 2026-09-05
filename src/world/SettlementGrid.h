@@ -10,4 +10,4 @@ namespace Paladin
     public:
         using TileGrid<SettlementTilePosition>::TileGrid;
     };
-}
+} // namespace Paladin

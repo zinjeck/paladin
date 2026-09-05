@@ -6,30 +6,30 @@ namespace Paladin
 {
     namespace
     {
-    constexpr std::array<SettlementResourceDefinition, 5> resourceDefinitions{
-        {{SettlementResourceTypes::Fish, "Fish", true},
-         {SettlementResourceTypes::Food, "Food", true},
-         {SettlementResourceTypes::Materials, "Materials"},
-         {SettlementResourceTypes::Stone, "Stone"},
-         {SettlementResourceTypes::Lumber, "Lumber"}}
-    };
+        constexpr std::array<SettlementResourceDefinition, 5>
+            resourceDefinitions{
+                {{SettlementResourceTypes::Fish, "Fish", true},
+                 {SettlementResourceTypes::Food, "Food", true},
+                 {SettlementResourceTypes::Materials, "Materials"},
+                 {SettlementResourceTypes::Stone, "Stone"},
+                 {SettlementResourceTypes::Lumber, "Lumber"}}
+            };
     }
 
 
-    std::span<const SettlementResourceDefinition>
-    SettlementResourceCatalog::definitions() noexcept
+    std::span<const SettlementResourceDefinition> SettlementResourceCatalog::
+        definitions() noexcept
     {
         return resourceDefinitions;
     }
 
 
-    const SettlementResourceDefinition*
-    SettlementResourceCatalog::definition(
+    const SettlementResourceDefinition* SettlementResourceCatalog::definition(
         std::string_view resourceId
     ) noexcept
     {
         for (const SettlementResourceDefinition& definition :
-            resourceDefinitions)
+             resourceDefinitions)
         {
             if (definition.id == resourceId)
             {
@@ -39,4 +39,4 @@ namespace Paladin
 
         return nullptr;
     }
-}
+} // namespace Paladin

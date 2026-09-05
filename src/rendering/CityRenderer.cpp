@@ -3,8 +3,8 @@
 
 #include <algorithm>
 
-#include "interaction/SettlementObjectPlacementController.h"
 #include "interaction/SettlementCommandController.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
@@ -45,13 +45,25 @@ namespace Paladin
         const double halfWidth = renderer.outputWidth() / tilePixels * 0.5;
         const double halfHeight = renderer.outputHeight() / tilePixels * 0.5;
         const float left = x + static_cast<float>(std::clamp(
-            camera.tileX() - halfWidth, 0.0, double(grid.width()))) * scale;
+                                   camera.tileX() - halfWidth,
+                                   0.0,
+                                   double(grid.width())
+                               )) * scale;
         const float right = x + static_cast<float>(std::clamp(
-            camera.tileX() + halfWidth, 0.0, double(grid.width()))) * scale;
+                                    camera.tileX() + halfWidth,
+                                    0.0,
+                                    double(grid.width())
+                                )) * scale;
         const float top = y + static_cast<float>(std::clamp(
-            camera.tileY() - halfHeight, 0.0, double(grid.height()))) * scale;
+                                  camera.tileY() - halfHeight,
+                                  0.0,
+                                  double(grid.height())
+                              )) * scale;
         const float bottom = y + static_cast<float>(std::clamp(
-            camera.tileY() + halfHeight, 0.0, double(grid.height()))) * scale;
+                                     camera.tileY() + halfHeight,
+                                     0.0,
+                                     double(grid.height())
+                                 )) * scale;
         if (right <= left || bottom <= top)
         {
             return;
@@ -59,9 +71,16 @@ namespace Paladin
         const RenderColor outline{255, 255, 255, 255};
         const float stroke = std::min({1.5F, right - left, bottom - top});
         renderer.fillRectangle(left, top, right - left, stroke, outline);
-        renderer.fillRectangle(left, bottom - stroke, right - left, stroke, outline);
+        renderer.fillRectangle(
+            left,
+            bottom - stroke,
+            right - left,
+            stroke,
+            outline
+        );
         renderer.fillRectangle(left, top, stroke, bottom - top, outline);
-        renderer.fillRectangle(right - stroke, top, stroke, bottom - top, outline);
+        renderer
+            .fillRectangle(right - stroke, top, stroke, bottom - top, outline);
     }
 
     void CityRenderer::render(
@@ -75,14 +94,10 @@ namespace Paladin
         const SettlementInspectionController& inspection
     ) const
     {
-        gridRenderer_.render(
-            renderer,
-            settlementMap.grid(),
-            camera,
-            metrics
-        );
+        gridRenderer_.render(renderer, settlementMap.grid(), camera, metrics);
 
-        naturalFeatureRenderer_.render(renderer, settlementMap, camera, metrics);
+        naturalFeatureRenderer_
+            .render(renderer, settlementMap, camera, metrics);
 
         objectRenderer_.render(
             renderer,
@@ -110,4 +125,4 @@ namespace Paladin
         );
         citizenRenderer_.render(renderer, citizens, camera, metrics);
     }
-}
+} // namespace Paladin
