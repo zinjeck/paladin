@@ -11,6 +11,24 @@
 
 namespace Paladin
 {
+    bool SettlementActivitySystem::caregivingAtWorkTime(
+        const SettlementMap& map,
+        const SettlementCitizen& citizen,
+        double minute
+    ) const
+    {
+        if (citizen.child || citizen.health <= 0 ||
+            citizen.youngDependents <= 0 || !citizen.insideHome ||
+            citizen.task.kind != CitizenTaskKind::Care ||
+            !policy.isWorkTime(minute))
+        {
+            return false;
+        }
+        const auto* home = map.objectState().completedObject(citizen.homeId);
+        const auto* workplace = map.employment().workplace(citizen.workplaceId);
+        return home && home->footprint.contains(citizen.tilePosition) &&
+               workplace && workplace->operational && workplace->objectId;
+    }
     void SettlementCitizenState::matchSingles()
     {
         std::array<std::vector<std::size_t>, 2> singles;
@@ -161,7 +179,11 @@ namespace Paladin
         for (auto& c : people)
         {
             c.youngDependents = 0;
-            c.caregiverId = {};
+            if (!c.child || c.ageYears >= policy.independentEatingAge)
+            {
+                c.caregiverId = {};
+                c.unsupervisedMinutes = 0;
+            }
         }
         for (auto& c : people)
         {
@@ -172,18 +194,135 @@ namespace Paladin
             }
             const auto mother = index.find(c.motherId);
             const auto father = index.find(c.fatherId);
-            const auto guardian = mother != index.end() ? mother : father;
-            if (guardian != index.end())
+            const auto eligible = [&](const auto parent)
+            {
+                return parent != index.end() && !people[parent->second].child &&
+                       people[parent->second].homeId == c.homeId;
+            };
+            auto guardian = eligible(mother) ? mother : father;
+            // Mother is always primary; father covers an essential absence
+            // or incapacity and returns the role when she is available again.
+            if (eligible(guardian))
+            {
+                const auto& current = people[guardian->second];
+                const auto alternate = guardian == mother ? father : mother;
+                if (eligible(alternate))
+                {
+                    const auto& backup = people[alternate->second];
+                    const bool unavailable =
+                        current.energy <= policy.criticalRestEnergy ||
+                        current.health <= policy.caregiverMinimumHealth ||
+                        (current.task.kind == CitizenTaskKind::Sleep &&
+                         c.task.kind != CitizenTaskKind::Sleep) ||
+                        (!current.insideHome &&
+                         current.task.kind == CitizenTaskKind::Eat);
+                    if (unavailable && backup.energy > policy.fatigueEnergy &&
+                        backup.health > policy.caregiverMinimumHealth &&
+                        (backup.insideHome ||
+                         current.energy <= policy.criticalRestEnergy ||
+                         current.health <= policy.caregiverMinimumHealth ||
+                         current.task.kind == CitizenTaskKind::Sleep))
+                    {
+                        guardian = alternate;
+                    }
+                }
+            }
+            // Care is expressed through existing wellbeing, not a separate
+            // stat. Sharing the home is sufficient: neither person must chase
+            // the other.
+            const auto caringParent = [&](const auto parent)
+            {
+                if (parent == index.end())
+                {
+                    return false;
+                }
+                const auto& adult = people[parent->second];
+                return !adult.child && adult.homeId &&
+                       adult.homeId == c.homeId && adult.insideHome &&
+                       c.insideHome &&
+                       (adult.task.kind == CitizenTaskKind::Care ||
+                        (adult.task.kind == CitizenTaskKind::Sleep &&
+                         c.task.kind == CitizenTaskKind::Sleep) ||
+                        adult.task.kind == CitizenTaskKind::Home);
+            };
+            const bool caredFor = caringParent(mother) || caringParent(father);
+            const double days = dt / 1440;
+            const double previousAbsence = c.unsupervisedMinutes;
+            c.unsupervisedMinutes =
+                caredFor ? std::max(
+                               0.0,
+                               previousAbsence -
+                                   dt * policy.childcareRecoveryMinutesPerMinute
+                           )
+                         : previousAbsence + dt;
+            // Integrate only the part of this interval beyond the grace period.
+            const auto neglectedDays = [&](double grace)
+            {
+                return caredFor
+                           ? 0.0
+                           : (std::max(0.0, c.unsupervisedMinutes - grace) -
+                              std::max(0.0, previousAbsence - grace)) /
+                                 1440;
+            };
+            c.happiness = std::clamp(
+                c.happiness +
+                    (caredFor
+                         ? days * policy.toddlerCareHappinessPerDay
+                         : -neglectedDays(policy.childcareAbsenceGraceMinutes) *
+                               policy.toddlerNeglectHappinessPerDay),
+                0.0,
+                100.0
+            );
+            if (!caredFor)
+            {
+                c.health = std::max(
+                    0.0,
+                    c.health -
+                        neglectedDays(policy.childcareHealthGraceMinutes) *
+                            policy.toddlerNeglectHealthPerDay
+                );
+            }
+            else if (
+                c.hunger < policy.starvationThreshold &&
+                c.energy > policy.criticalRestEnergy
+            )
+            {
+                c.health = std::min(
+                    100.0,
+                    c.health + days * policy.toddlerCareHealthPerDay
+                );
+            }
+            c.caregiverId = {};
+            if (eligible(guardian))
             {
                 auto& carer = people[guardian->second];
                 c.caregiverId = carer.id;
                 ++carer.youngDependents;
+            }
+            // Either awake parent can feed; the primary role only reserves
+            // someone's day for care. Do not charge both parents for a meal.
+            auto feeder = index.end();
+            for (const auto parent : {mother, father})
+            {
+                if (caringParent(parent) &&
+                    people[parent->second].task.kind !=
+                        CitizenTaskKind::Sleep &&
+                    people[parent->second].hunger < 50)
+                {
+                    feeder = parent;
+                    break;
+                }
+            }
+            if (feeder != index.end())
+            {
+                auto& carer = people[feeder->second];
                 // A feeding transfers a small nutritional demand to the
                 // parent. It cannot restore the child when the parent is
                 // hungry, absent, or has not physically reached home.
                 if (carer.homeId && c.homeId == carer.homeId &&
                     carer.insideHome && c.insideHome && carer.hunger < 50 &&
-                    carer.task.kind == CitizenTaskKind::Care)
+                    (carer.task.kind == CitizenTaskKind::Care ||
+                     carer.task.kind == CitizenTaskKind::Home))
                 {
                     const double fed =
                         std::min(c.hunger, policy.nursingHungerPerMinute * dt);
@@ -208,6 +347,23 @@ namespace Paladin
             }
         }
         std::vector<std::pair<CitizenId, CitizenId>> births;
+        std::unordered_map<CitizenId, std::vector<CitizenId>, StrongIdHash>
+            dependentChildren;
+        for (const auto& child : people)
+        {
+            if (!child.child || child.health <= 0)
+            {
+                continue;
+            }
+            if (child.motherId)
+            {
+                dependentChildren[child.motherId].push_back(child.id);
+            }
+            if (child.fatherId)
+            {
+                dependentChildren[child.fatherId].push_back(child.id);
+            }
+        }
         const double chance =
             std::isfinite(policy.dailyBirthChance)
                 ? std::clamp(policy.dailyBirthChance, 0.0, 1.0)
@@ -238,6 +394,21 @@ namespace Paladin
                 continue;
             }
             const auto& household = residents[mother.homeId];
+            const auto& maternal = dependentChildren[mother.id];
+            const auto& paternal = dependentChildren[father.id];
+            std::size_t dependentCount = maternal.size();
+            for (const auto id : paternal)
+            {
+                if (std::find(maternal.begin(), maternal.end(), id) ==
+                    maternal.end())
+                {
+                    ++dependentCount;
+                }
+            }
+            if (dependentCount >= policy.maximumDependentChildrenPerCouple)
+            {
+                continue;
+            }
             const bool room = household.size() < 4 ||
                               std::any_of(
                                   household.begin(),
@@ -523,5 +694,141 @@ namespace Paladin
                 c.homelessMinutes = 0;
             }
         }
+    }
+    bool SettlementActivitySystem::inChildNeighborhood(
+        const SettlementMap& map,
+        const SettlementCitizen& c,
+        SettlementTilePosition p
+    ) const
+    {
+        if (!c.child)
+        {
+            return true;
+        }
+        const auto* home = map.objectState().completedObject(c.homeId);
+        if (!home || !home->door)
+        {
+            return false;
+        }
+        if (home->footprint.contains(p))
+        {
+            return true;
+        }
+        const auto center = outsideDoor(home->footprint, *home->door);
+        return std::max(std::abs(p.x - center.x), std::abs(p.y - center.y)) <=
+               policy.childNeighborhoodRadius;
+    }
+    bool SettlementActivitySystem::childRouteIsLocal(
+        const SettlementMap& map,
+        const SettlementCitizen& c
+    ) const
+    {
+        return !c.child ||
+               (inChildNeighborhood(map, c, c.destination) &&
+                std::all_of(
+                    c.path.begin(),
+                    c.path.end(),
+                    [&](auto p) { return inChildNeighborhood(map, c, p); }
+                ));
+    }
+    bool SettlementActivitySystem::manageToddler(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& c,
+        double minute
+    )
+    {
+        if (!c.child || c.ageYears >= policy.independentEatingAge)
+        {
+            return false;
+        }
+        const auto* home = map.objectState().completedObject(c.homeId);
+        if (home && c.insideHome &&
+            (c.exitingHomeId ||
+             std::any_of(
+                 c.path.begin(),
+                 c.path.end(),
+                 [&](auto tile) { return !home->footprint.contains(tile); }
+             )))
+        {
+            c.path.clear();
+            c.pathIndex = 0;
+            c.stepProgress = 0;
+            c.exitingHomeId = {};
+            c.explicitMovement = false;
+            c.task = {};
+            c.destination = c.tilePosition;
+        }
+        // No independent wandering, commands, or trips to a parent's workplace.
+        if (c.task.kind == CitizenTaskKind::Sleep && c.homeId &&
+            !c.task.partner)
+        {
+            return true;
+        }
+        if (home && c.insideHome && home->footprint.contains(c.tilePosition))
+        {
+            if (!c.path.empty())
+            {
+                return true;
+            }
+            if (chooseSleep(map, citizens, c, minute))
+            {
+                return true;
+            }
+            finish(map, c, minute);
+            c.task.kind = CitizenTaskKind::Care;
+            c.task.object = c.homeId;
+            c.activity = CitizenActivity::AtHome;
+            if (minute >= c.nextHomeWander)
+            {
+                c.nextHomeWander = minute + policy.childcareWanderMinutes;
+                const auto random =
+                    GenerationNoise::mix(c.id.value() ^ ++c.choiceSequence);
+                constexpr SettlementTilePosition
+                    offsets[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+                for (int i = 0; i < 4; ++i)
+                {
+                    const auto offset = offsets[(random + i) % 4];
+                    const SettlementTilePosition next{
+                        c.tilePosition.x + offset.x,
+                        c.tilePosition.y + offset.y
+                    };
+                    if (!home->footprint.contains(next))
+                    {
+                        continue;
+                    }
+                    c.path = {next};
+                    c.pathIndex = 0;
+                    c.stepProgress = 0;
+                    c.destination = next;
+                    c.explicitMovement = true;
+                    break;
+                }
+            }
+            return true;
+        }
+        if (home && c.task.kind == CitizenTaskKind::Care && !c.task.partner &&
+            !c.path.empty())
+        {
+            return true;
+        }
+        auto planned = c;
+        if (home && route(map, citizens, planned, home->footprint, false))
+        {
+            finish(map, c, minute);
+            c.path = std::move(planned.path);
+            c.pathIndex = planned.pathIndex;
+            c.stepProgress = planned.stepProgress;
+            c.stepDuration = planned.stepDuration;
+            c.destination = planned.destination;
+            c.task.kind = CitizenTaskKind::Care;
+            c.task.object = c.homeId;
+        }
+        else
+        {
+            finish(map, c, minute);
+            c.activity = CitizenActivity::Idle;
+        }
+        return true;
     }
 } // namespace Paladin

@@ -121,6 +121,10 @@ namespace Paladin
         {
             if (c.health <= 1e-7)
             {
+                for (auto& survivor : citizens.citizens_)
+                {
+                    survivor.familiarities.erase(c.id);
+                }
                 map.commerce.citizenDeparted(c.id);
                 map.employment().citizenDeparted(c.workplaceId);
                 c.workplaceId = {};
@@ -306,6 +310,10 @@ namespace Paladin
                 citizens
                     .citizens_[decisionCursor_++ % citizens.citizens_.size()];
             if (!map.grid().isValidPosition(c.tilePosition))
+            {
+                continue;
+            }
+            if (manageToddler(map, citizens, c, minute))
             {
                 continue;
             }
@@ -927,16 +935,50 @@ namespace Paladin
             if (enterHome(map, c))
             {
                 c.activity = CitizenActivity::AtHome;
+                if (!c.child && c.youngDependents > 0 &&
+                    minute >= c.nextHomeWander)
+                {
+                    const auto* home =
+                        map.objectState().completedObject(c.homeId);
+                    const auto random =
+                        GenerationNoise::mix(c.id.value() ^ ++c.choiceSequence);
+                    constexpr SettlementTilePosition
+                        offsets[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+                    c.nextHomeWander = minute + policy.childcareWanderMinutes;
+                    for (int i = 0; home && i < 4; ++i)
+                    {
+                        const auto offset = offsets[(random + i) % 4];
+                        const SettlementTilePosition next{
+                            c.tilePosition.x + offset.x,
+                            c.tilePosition.y + offset.y
+                        };
+                        if (!home->footprint.contains(next))
+                        {
+                            continue;
+                        }
+                        c.path = {next};
+                        c.pathIndex = 0;
+                        c.stepProgress = 0;
+                        c.destination = next;
+                        c.explicitMovement = true;
+                        break;
+                    }
+                }
             }
         }
         else if (c.task.kind == CitizenTaskKind::Home)
         {
+            if (c.child && c.ageYears < policy.independentEatingAge)
+            {
+                return;
+            }
             if (c.task.endMinute > minute)
             {
                 return;
             }
             if (c.task.endMinute > 0)
             {
+                c.task.endMinute = 0;
                 const auto* home = map.objectState().completedObject(c.homeId);
                 if (home && route(map, citizens, c, home->footprint, false))
                 {
@@ -946,6 +988,18 @@ namespace Paladin
             }
             if (!enterHome(map, c))
             {
+                // A failed/invalidated return route must retry, not leave a
+                // permanent Home task standing outside with no path.
+                if (minute >= c.nextDecisionMinute)
+                {
+                    const auto* home =
+                        map.objectState().completedObject(c.homeId);
+                    if (home)
+                    {
+                        route(map, citizens, c, home->footprint, false);
+                    }
+                    c.nextDecisionMinute = minute + policy.retryMinutes;
+                }
                 return;
             }
             c.activity = CitizenActivity::AtHome;
@@ -959,17 +1013,23 @@ namespace Paladin
                 {
                     const auto outside =
                         outsideDoor(home->footprint, *home->door);
+                    const int radius = c.child ? policy.childNeighborhoodRadius
+                                               : policy.leisureRadius;
                     const SettlementTilePosition nearby{
-                        outside.x +
-                            int(random % (2 * policy.leisureRadius + 1)) -
-                            policy.leisureRadius,
-                        outside.y +
-                            int((random >> 8) %
-                                (2 * policy.leisureRadius + 1)) -
-                            policy.leisureRadius
+                        outside.x + int(random % (2 * radius + 1)) - radius,
+                        outside.y + int((random >> 8) % (2 * radius + 1)) -
+                            radius
                     };
-                    if (route(map, citizens, c, {nearby, 1, 1}, true))
+                    auto planned = c;
+                    if (route(map, citizens, planned, {nearby, 1, 1}, true) &&
+                        childRouteIsLocal(map, planned))
                     {
+                        c.path = std::move(planned.path);
+                        c.pathIndex = planned.pathIndex;
+                        c.stepProgress = planned.stepProgress;
+                        c.stepDuration = planned.stepDuration;
+                        c.destination = planned.destination;
+                        c.explicitMovement = planned.explicitMovement;
                         c.task.endMinute = minute + 30 + random % 31;
                         return;
                     }
@@ -1027,6 +1087,17 @@ namespace Paladin
                     ),
                     c.happiness + policy.talkingHappinessPerMinute * elapsed
                 );
+                if (c.id < other->id)
+                {
+                    const double gain =
+                        policy.familiarityPerTalkMinute *
+                        std::min(elapsed, c.task.endMinute - minute);
+                    c.familiarities[other->id] = std::min(
+                        policy.maximumFamiliarity,
+                        c.familiarityWith(other->id) + gain
+                    );
+                    other->familiarities[c.id] = c.familiarities[other->id];
+                }
             }
             if (c.task.endMinute > 0 && minute >= c.task.endMinute)
             {
@@ -1046,6 +1117,11 @@ namespace Paladin
             if (object->objectTypeId == SettlementObjectTypes::FishingGrounds)
             {
                 c.activity = CitizenActivity::Fishing;
+            }
+            if (object->objectTypeId == SettlementObjectTypes::Pastureland)
+            {
+                executePastureWork(map, citizens, c, minute, elapsed);
+                return;
             }
             if (object->objectTypeId == SettlementObjectTypes::Market)
             {
@@ -1084,10 +1160,35 @@ namespace Paladin
         std::unordered_map<SettlementObjectId, int, StrongIdHash> attendance;
         for (const auto& c : citizens.citizens())
         {
-            if (policy.isWorkTime(minute) && c.breakUntil <= minute &&
-                c.task.kind == CitizenTaskKind::Work && c.path.empty() &&
-                c.tilePosition == c.destination)
+            if (caregivingAtWorkTime(map, c, minute))
             {
+                const auto* workplace =
+                    map.employment().workplace(c.workplaceId);
+                ++attendance[workplace->objectId];
+                continue;
+            }
+            if (policy.isWorkTime(minute) && c.breakUntil <= minute &&
+                c.task.kind == CitizenTaskKind::Work)
+            {
+                const auto* object =
+                    map.objectState().completedObject(c.task.object);
+                if (object &&
+                    object->objectTypeId == SettlementObjectTypes::Pastureland)
+                {
+                    const auto* animal = map.animals.find(c.task.animal);
+                    if (!animal || animal->tender != c.id ||
+                        animal->pasture != object->id ||
+                        !object->footprint.contains(c.tilePosition))
+                    {
+                        continue;
+                    }
+                }
+                // Moving between livestock inside the pasture is productive
+                // husbandry too. Commuting, breaks and unrelated tasks are not.
+                else if (!c.path.empty() || c.tilePosition != c.destination)
+                {
+                    continue;
+                }
                 ++attendance[c.task.object];
             }
         }

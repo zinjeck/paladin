@@ -1,6 +1,8 @@
 #include "rendering/CityRenderer.h"
 #include "ui/UiTypes.h"
 
+#include "interaction/SettlementInspectionController.h"
+#include <SDL3/SDL.h>
 #include <algorithm>
 
 #include "interaction/SettlementCommandController.h"
@@ -91,13 +93,34 @@ namespace Paladin
         const SettlementObjectPlacementController& placementController,
         const SettlementCommandController& commandController,
         const SettlementCitizenState& citizens,
-        const SettlementInspectionController& inspection
+        const SettlementInspectionController& inspection,
+        double interpolationAlpha,
+        double hour
     ) const
     {
         gridRenderer_.render(renderer, settlementMap.grid(), camera, metrics);
 
-        naturalFeatureRenderer_
-            .render(renderer, settlementMap, camera, metrics);
+        sprites_.load(
+            renderer,
+            std::string(SDL_GetBasePath()) + "assets/sprites"
+        );
+        raised_.clear();
+        const SceneProjection projection{
+            camera.tileX(),
+            camera.tileY(),
+            metrics.scaledTilePixels(camera.zoom()),
+            renderer.outputWidth(),
+            renderer.outputHeight()
+        };
+        naturalFeatureRenderer_.render(
+            renderer,
+            settlementMap,
+            camera,
+            metrics,
+            &raised_,
+            &sprites_,
+            &presentation
+        );
 
         objectRenderer_.render(
             renderer,
@@ -107,14 +130,20 @@ namespace Paladin
             placementController
         );
 
-        commandRenderer_.render(
+        structures_
+            .submit(raised_, projection, settlementMap, presentation, sprites_);
+        citizenRenderer_.render(
             renderer,
-            settlementMap.commandState(),
-            commandController,
+            citizens,
             camera,
-            metrics
+            metrics,
+            &settlementMap.animals,
+            interpolationAlpha,
+            &raised_,
+            &sprites_,
+            &presentation
         );
-
+        raised_.render(renderer, -2, -1);
         logisticsRenderer_.render(
             renderer,
             settlementMap,
@@ -123,12 +152,65 @@ namespace Paladin
             placementController,
             inspection
         );
-        citizenRenderer_.render(
+        raised_.render(renderer, 0);
+        const auto tint = presentation.ambient(hour);
+        if (tint.alpha)
+        {
+            renderer.fillRectangle(
+                0,
+                0,
+                float(renderer.outputWidth()),
+                float(renderer.outputHeight()),
+                tint
+            );
+        }
+        objectRenderer_.renderOverlay(
             renderer,
-            citizens,
+            settlementMap,
             camera,
             metrics,
-            &settlementMap.animals
+            placementController
         );
+        commandRenderer_.render(
+            renderer,
+            settlementMap.commandState(),
+            commandController,
+            camera,
+            metrics
+        );
+        citizenRenderer_.renderAnnotations(
+            renderer,
+            metrics.scaledTilePixels(camera.zoom())
+        );
+        // Keep a selected citizen locatable even under an opaque roof/canopy.
+        if (const auto* c = inspection.selectedCitizen(citizens))
+        {
+            const auto b = projection.bounds(
+                {c->renderX(c->visualX(), interpolationAlpha) + .5,
+                 c->renderY(c->visualY(), interpolationAlpha) + .5,
+                 0,
+                 .65,
+                 .65,
+                 .5,
+                 .5}
+            );
+            const RenderColor selected{255, 235, 155, 255};
+            renderer.drawLine(b.x, b.y, b.x + b.width, b.y, selected);
+            renderer.drawLine(
+                b.x,
+                b.y + b.height,
+                b.x + b.width,
+                b.y + b.height,
+                selected
+            );
+            renderer.drawLine(b.x, b.y, b.x, b.y + b.height, selected);
+            renderer.drawLine(
+                b.x + b.width,
+                b.y,
+                b.x + b.width,
+                b.y + b.height,
+                selected
+            );
+        }
     }
 } // namespace Paladin

@@ -36,6 +36,14 @@ namespace Paladin
             const SettlementObjectPlacementController& placementController
         ) const;
 
+        void renderOverlay(
+            Renderer&,
+            const SettlementMap&,
+            const Camera2D&,
+            const TileRenderMetrics&,
+            const SettlementObjectPlacementController&
+        ) const;
+
     private:
         mutable std::uint64_t cachedMapInstance_ = 0;
         mutable std::uint64_t cachedVersion_ = 0;

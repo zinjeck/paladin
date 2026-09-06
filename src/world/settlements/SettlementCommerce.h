@@ -72,6 +72,15 @@ namespace Paladin
     class SettlementCommerce
     {
     public:
+        struct ResourceTotals
+        {
+            double produced = 0, consumed = 0;
+        };
+        const std::unordered_map<std::string, ResourceTotals>&
+        resourceTotals() const
+        {
+            return resourceTotals_;
+        }
         CommercePolicy policy;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
         bool keepFoodSalesEnabled = false;
@@ -191,6 +200,7 @@ namespace Paladin
         static bool transfer(Money& from, Money& to, Money amount);
 
     private:
+        std::unordered_map<std::string, ResourceTotals> resourceTotals_;
         struct FrozenFlow
         {
             InventoryId source, destination;

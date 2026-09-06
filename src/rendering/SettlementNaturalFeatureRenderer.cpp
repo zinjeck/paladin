@@ -71,7 +71,10 @@ namespace Paladin
         Renderer& renderer,
         const SettlementMap& map,
         const Camera2D& camera,
-        const TileRenderMetrics& metrics
+        const TileRenderMetrics& metrics,
+        SceneDrawQueue* shared,
+        const SceneSpriteLibrary* sprites,
+        const CityPresentation* policy
     ) const
     {
         constexpr int side = SettlementNaturalFeatures::ChunkSide;
@@ -87,6 +90,22 @@ namespace Paladin
             chunks_.resize(std::size_t(columns) * rows);
         }
         const double tp = metrics.scaledTilePixels(camera.zoom());
+        if (shared && sprites && policy && tp >= policy->detailTilePixels)
+        {
+            submitDetailed(
+                renderer,
+                map,
+                {camera.tileX(),
+                 camera.tileY(),
+                 tp,
+                 renderer.outputWidth(),
+                 renderer.outputHeight()},
+                *shared,
+                *sprites,
+                *policy
+            );
+            return;
+        }
         const double originX =
             renderer.outputWidth() * .5 - camera.tileX() * tp;
         const double originY =
@@ -237,6 +256,228 @@ namespace Paladin
                         float(textureSide * tp / pixelsPerTile),
                         float(textureSide * tp / pixelsPerTile)
                     );
+                }
+            }
+        }
+    }
+    void SettlementNaturalFeatureRenderer::submitDetailed(
+        Renderer& renderer,
+        const SettlementMap& map,
+        const SceneProjection& projection,
+        SceneDrawQueue& queue,
+        const SceneSpriteLibrary& sprites,
+        const CityPresentation& policy
+    ) const
+    {
+        // Reuse the pre-existing tree/rock masks and palette, packed once.
+        constexpr int variants = 7, shades = 17, frames = variants * shades * 2;
+        constexpr int atlasWidth = frames * spriteSide;
+        if (!placeholderAtlas_)
+        {
+            std::vector<RenderColor> pixels(
+                atlasWidth * spriteSide,
+                {0, 0, 0, 0}
+            );
+            for (int variant = 0; variant < variants; ++variant)
+            {
+                for (int shade = 0; shade < shades; ++shade)
+                {
+                    for (int marked = 0; marked < 2; ++marked)
+                    {
+                        const int frame =
+                            (variant * shades + shade) * 2 + marked;
+                        RenderColor fill =
+                            variant >= 3   ? RenderColor{155, 157, 162, 255}
+                            : variant == 1 ? RenderColor{62, 112, 85, 255}
+                            : variant == 2 ? RenderColor{32, 117, 43, 255}
+                                           : RenderColor{67, 153, 62, 255};
+                        const double factor = .92 + shade * .01;
+                        fill.red = std::uint8_t(fill.red * factor);
+                        fill.green = std::uint8_t(fill.green * factor);
+                        fill.blue = std::uint8_t(fill.blue * factor);
+                        const RenderColor border =
+                            marked         ? RenderColor{255, 215, 50, 255}
+                            : variant >= 3 ? RenderColor{70, 72, 78, 255}
+                                           : RenderColor{18, 57, 25, 255};
+                        for (int y = 0; y < spriteSide; ++y)
+                        {
+                            for (int x = 0; x < spriteSide; ++x)
+                            {
+                                const auto mask = spriteMasks()
+                                    [variant >= 3 ? variant - 2 : 0]
+                                    [y * spriteSide + x];
+                                if (mask)
+                                {
+                                    pixels
+                                        [y * atlasWidth + frame * spriteSide +
+                                         x] = mask == 2 ? border : fill;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            placeholderAtlas_ = renderer.createTextureFromPixels(
+                atlasWidth,
+                spriteSide,
+                pixels
+            );
+        }
+        if (!placeholderAtlas_)
+        {
+            return;
+        }
+        constexpr int side = SettlementNaturalFeatures::ChunkSide;
+        const int columns = (map.grid().width() + side - 1) / side;
+        const int rows = (map.grid().height() + side - 1) / side;
+        // Catalog bounds are limited to 64 tiles, including pivot/elevation.
+        // Expand candidate chunks so offscreen bases cannot clip tall artwork.
+        const double pad =
+            (sprites.find("tree") || sprites.find("rock")) ? 128 : 2;
+        const double halfW =
+            projection.screenWidth * .5 / projection.tilePixels;
+        const double halfH =
+            projection.screenHeight * .5 / projection.tilePixels;
+        const int x0 = std::clamp(
+            int(std::floor((projection.cameraX - halfW - pad) / side)),
+            0,
+            columns
+        );
+        const int y0 = std::clamp(
+            int(std::floor((projection.cameraY - halfH - pad) / side)),
+            0,
+            rows
+        );
+        const int x1 = std::clamp(
+            int(std::ceil((projection.cameraX + halfW + pad) / side)),
+            0,
+            columns
+        );
+        const int y1 = std::clamp(
+            int(std::ceil((projection.cameraY + halfH + pad) / side)),
+            0,
+            rows
+        );
+        for (int cy = y0; cy < y1; ++cy)
+        {
+            for (int cx = x0; cx < x1; ++cx)
+            {
+                auto& chunk = chunks_[std::size_t(cy) * columns + cx];
+                const auto version = map.naturalFeatures().chunkVersion(cx, cy);
+                if (chunk.spriteVersion != version)
+                {
+                    chunk.sprites.clear();
+                    if (map.naturalFeatures().countIn(
+                            {{cx * side, cy * side}, side, side}
+                        ))
+                    {
+                        for (int y = cy * side;
+                             y < std::min((cy + 1) * side, map.grid().height());
+                             ++y)
+                        {
+                            for (int x = cx * side;
+                                 x <
+                                 std::min((cx + 1) * side, map.grid().width());
+                                 ++x)
+                            {
+                                const auto f = map.naturalFeatures().at({x, y});
+                                if (f.kind == NaturalFeatureKind::None)
+                                {
+                                    continue;
+                                }
+                                const auto variation = GenerationNoise::mix(
+                                    map.generationSeed() ^
+                                    (std::uint64_t(x) << 32) ^ std::uint64_t(y)
+                                );
+                                const auto biome =
+                                    map.grid().tile({x, y})->biome;
+                                const bool tree =
+                                    f.kind == NaturalFeatureKind::Tree;
+                                const int variant =
+                                    !tree ? 3 + int(variation % 4)
+                                    : biome == BiomeType::Taiga  ? 1
+                                    : biome == BiomeType::Jungle ? 2
+                                                                 : 0;
+                                chunk.sprites.push_back(
+                                    {{x, y},
+                                     (variant * shades + int(variation % 17)) *
+                                             2 +
+                                         int(f.marked),
+                                     tree}
+                                );
+                            }
+                        }
+                    }
+                    chunk.spriteVersion = version;
+                }
+                for (const auto& f : chunk.sprites)
+                {
+                    const double x = f.tile.x + .5, y = f.tile.y + .5;
+                    const auto id =
+                        ((std::uint64_t(f.tile.y) * map.grid().width() +
+                          f.tile.x)
+                         << 3) |
+                        4;
+                    const bool custom = sprites.submit(
+                        queue,
+                        projection,
+                        f.tree ? "tree" : "rock",
+                        x,
+                        y,
+                        id
+                    );
+                    const auto b = projection.bounds(
+                        {x,
+                         y,
+                         f.tree ? policy.treeElevation : 0,
+                         1.3,
+                         1.3,
+                         .5,
+                         .5}
+                    );
+                    if (!projection.visible(b))
+                    {
+                        continue;
+                    }
+                    if (policy.shadowsVisible)
+                    {
+                        queue.submit(
+                            {projection.bounds(
+                                 {x + .15, y + .15, 0, 1, .35, .5, .5}
+                             ),
+                             policy.shadowColor,
+                             y,
+                             id,
+                             -1}
+                        );
+                    }
+                    if (!custom)
+                    {
+                        queue.submit(
+                            {b,
+                             {},
+                             y,
+                             id,
+                             0,
+                             0,
+                             placeholderAtlas_.get(),
+                             {float(f.frame * spriteSide),
+                              0,
+                              spriteSide,
+                              spriteSide}}
+                        );
+                    }
+                    if (custom && f.frame % 2)
+                    {
+                        queue.submit(
+                            {projection.bounds({x, y, 0, 1, .1, .5, .5}),
+                             {255, 215, 50, 255},
+                             y,
+                             id,
+                             2,
+                             0}
+                        );
+                    }
                 }
             }
         }

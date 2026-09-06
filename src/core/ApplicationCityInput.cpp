@@ -4,6 +4,7 @@
 #include "interaction/SettlementObjectPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
@@ -166,7 +167,8 @@ namespace Paladin
             inspectionPanelCapturedPointer ||
             cityHud_->pointerPressed(event.button.x, event.button.y);
 
-        if (cityHudCapturedPointer_ && !inspectionPanelCapturedPointer)
+        if (cityHudCapturedPointer_ && !inspectionPanelCapturedPointer &&
+            !cityHud_->roofControlAt(event.button.x, event.button.y))
         {
             settlementInspectionController_->clear();
         }
@@ -252,9 +254,31 @@ namespace Paladin
             {
                 SDL_StopTextInput(window_->nativeHandle());
             }
+            if (const auto id =
+                    settlementInspectionPanel_->takeCitizenNavigation())
+            {
+                if (const auto* citizen =
+                        currentSettlement->simulationState().citizens().citizen(
+                            id
+                        ))
+                {
+                    settlementInspectionController_->selectCitizen(id);
+                    settlementInspectionPanel_->clearLayout();
+                    camera_->setPosition(
+                        citizen->visualX() + .5,
+                        citizen->visualY() + .5
+                    );
+                    return;
+                }
+            }
         }
         const CityHudAction action =
             cityHud_->pointerReleased(event.button.x, event.button.y);
+        if (handleReportAction(action))
+        {
+            cityHudCapturedPointer_ = false;
+            return;
+        }
 
         if (action == CityHudAction::Population ||
             action == CityHudAction::Laws ||
@@ -276,6 +300,12 @@ namespace Paladin
             SDL_StopTextInput(window_->nativeHandle());
             settlementObjectPlacementController_->cancelPlacement();
             settlementCommandController_->cancel();
+        }
+        else if (action == CityHudAction::ToggleRoofs)
+        {
+            cityRenderer_->presentation.roofsVisible =
+                !cityRenderer_->presentation.roofsVisible;
+            cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
         }
         else if (action == CityHudAction::Back)
         {
@@ -355,6 +385,14 @@ namespace Paladin
             {
                 return;
             }
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            event.key.scancode == SDL_SCANCODE_O)
+        {
+            cityRenderer_->presentation.roofsVisible =
+                !cityRenderer_->presentation.roofsVisible;
+            cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
+            return;
         }
         if (event.type == SDL_EVENT_MOUSE_MOTION)
         {

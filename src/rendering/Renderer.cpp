@@ -2,6 +2,7 @@
 #include "rendering/Texture.h"
 
 #include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 
 #include <cstddef>
 
@@ -114,6 +115,26 @@ namespace Paladin
         );
     }
 
+
+    std::unique_ptr<Texture> Renderer::loadImageTexture(
+        const char* filePath,
+        bool smooth
+    )
+    {
+        auto* surface = IMG_Load(filePath);
+        if (!surface)
+        {
+            SDL_Log(
+                "Cannot load sprite %s: %s; retaining placeholder",
+                filePath,
+                SDL_GetError()
+            );
+            return nullptr;
+        }
+        auto result = createTextureFromSurface(surface, smooth);
+        SDL_DestroySurface(surface);
+        return result;
+    }
 
     std::unique_ptr<Texture> Renderer::loadBitmapTexture(const char* filePath)
     {

@@ -20,6 +20,14 @@ namespace Paladin
         {
             return;
         }
+        if (!source && destination)
+        {
+            resourceTotals_[std::string(resource)].produced += amount;
+        }
+        if (source && consumer && !destination)
+        {
+            resourceTotals_[std::string(resource)].consumed += amount;
+        }
         const auto key = std::to_string(source.value()) + ":" +
                          std::to_string(destination.value()) + ":" +
                          std::to_string(consumer.value()) + ":" +
@@ -94,8 +102,7 @@ namespace Paladin
                                    c.task.kind == CitizenTaskKind::Gather ||
                                    c.task.kind == CitizenTaskKind::Demolish ||
                                    c.task.kind == CitizenTaskKind::Haul);
-            frozenPayRates_[c.id] = !c.child && c.youngDependents == 0 &&
-                                            (c.workplaceId || governmentJob)
+            frozenPayRates_[c.id] = !c.child && (c.workplaceId || governmentJob)
                                         ? policy.dailyWage / 720.0 * workShare
                                         : (!c.child && c.youngDependents > 0
                                                ? policy.dailyAllowance / 1440.0
@@ -128,12 +135,12 @@ namespace Paladin
             const auto* to = map.logistics.inventory(flow.destination);
             if (!flow.source && to)
             {
-                map.logistics.add(
-                    to->id,
-                    flow.resource,
-                    std::min(requested, map.logistics.freeSpace(to->id)),
-                    minute
-                );
+                const int amount =
+                    std::min(requested, map.logistics.freeSpace(to->id));
+                if (map.logistics.add(to->id, flow.resource, amount, minute))
+                {
+                    resourceTotals_[flow.resource].produced += amount;
+                }
             }
             else if (from && to)
             {
@@ -194,6 +201,7 @@ namespace Paladin
                     map.logistics
                         .moveAvailable(source.id, {}, flow.resource, 1);
                     recordMeal(*person, price == 0);
+                    resourceTotals_[flow.resource].consumed += 1;
                 }
             }
         }
@@ -511,12 +519,14 @@ namespace Paladin
                     std::min(treasury->balance, policy.startingSavings)
                 );
             }
-            const bool working = c.task.kind == CitizenTaskKind::AnimalWork ||
-                                 c.task.kind == CitizenTaskKind::Work ||
-                                 c.task.kind == CitizenTaskKind::Build ||
-                                 c.task.kind == CitizenTaskKind::Gather ||
-                                 c.task.kind == CitizenTaskKind::Demolish ||
-                                 c.task.kind == CitizenTaskKind::Haul;
+            const bool working =
+                map.activities.caregivingAtWorkTime(map, c, minute) ||
+                c.task.kind == CitizenTaskKind::AnimalWork ||
+                c.task.kind == CitizenTaskKind::Work ||
+                c.task.kind == CitizenTaskKind::Build ||
+                c.task.kind == CitizenTaskKind::Gather ||
+                c.task.kind == CitizenTaskKind::Demolish ||
+                c.task.kind == CitizenTaskKind::Haul;
             // Businesses pay their own staff and retain operating reserves.
             // Government labor is treasury-paid only while working; only
             // carers receive continuing support. Children never spend money.
@@ -544,7 +554,9 @@ namespace Paladin
             // Withhold only from wages actually paid. Savings, allowances,
             // child support and starting grants are not income-taxed.
             if (!c.child &&
-                (working || (inactive_ && c.youngDependents == 0)) && paid > 0)
+                (working ||
+                 (inactive_ && (c.workplaceId || c.youngDependents == 0))) &&
+                paid > 0)
             {
                 const Money taxable = std::min(
                     paid,

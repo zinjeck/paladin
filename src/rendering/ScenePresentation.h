@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/Renderer.h"
 #include <algorithm>
+#include <limits>
 #include <tuple>
 #include <vector>
 
@@ -59,22 +60,48 @@ namespace Paladin
     class SceneDrawQueue
     {
     public:
+        std::size_t size() const
+        {
+            return items_.size();
+        }
+        const std::vector<SceneDrawItem>& items() const
+        {
+            return items_;
+        }
+        void setLayerFrom(std::size_t first, int layer)
+        {
+            sorted_ = false;
+            for (; first < items_.size(); ++first)
+            {
+                items_[first].layer = layer;
+            }
+        }
         void clear()
         {
             items_.clear();
+            sorted_ = false;
         }
         void submit(const SceneDrawItem& item)
         {
             items_.push_back(item);
+            sorted_ = false;
         }
         static bool before(const SceneDrawItem& a, const SceneDrawItem& b)
         {
             return std::tie(a.layer, a.groundDepth, a.stableId, a.part) <
                    std::tie(b.layer, b.groundDepth, b.stableId, b.part);
         }
-        void render(Renderer& renderer)
+        void render(
+            Renderer& renderer,
+            int minimumLayer = std::numeric_limits<int>::min(),
+            int maximumLayer = std::numeric_limits<int>::max()
+        )
         {
-            std::sort(items_.begin(), items_.end(), before);
+            if (!sorted_)
+            {
+                std::stable_sort(items_.begin(), items_.end(), before);
+                sorted_ = true;
+            }
             batch_.clear();
             RenderColor batchColor;
             const auto flush = [&]()
@@ -87,6 +114,10 @@ namespace Paladin
             };
             for (const auto& item : items_)
             {
+                if (item.layer < minimumLayer || item.layer > maximumLayer)
+                {
+                    continue;
+                }
                 const auto& b = item.bounds;
                 if (item.texture)
                 {
@@ -125,6 +156,7 @@ namespace Paladin
         }
 
     private:
+        bool sorted_ = false;
         std::vector<SceneDrawItem> items_;
         std::vector<RenderRectangle> batch_;
     };

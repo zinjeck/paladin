@@ -9,6 +9,7 @@
 #include "ui/DebugConsole.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
+#include "ui/LedgerPanel.h"
 #include "ui/SettlementInspectionPanel.h"
 #include "ui/SimulationSpeedControls.h"
 #include "ui/WorldHud.h"
@@ -380,6 +381,10 @@ namespace Paladin
 
     bool Application::activeHudContainsPoint(float x, float y) const noexcept
     {
+        if (ledgerPanel_->containsPoint(x, y))
+        {
+            return true;
+        }
         if (debugConsole_->contains(x, y))
         {
             return true;

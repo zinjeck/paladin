@@ -21,6 +21,15 @@ namespace Paladin
 {
     struct SettlementActivityTestFixture
     {
+        static void produce(
+            SettlementMap& map,
+            const SettlementCitizenState& citizens,
+            double minute,
+            double elapsed
+        )
+        {
+            map.activities.produce(map, citizens, minute, elapsed);
+        }
         static void rematch(SettlementCitizenState& state)
         {
             for (auto& c : state.citizens_)
@@ -128,11 +137,362 @@ namespace
 void runSettlementSimulationLoopTests()
 {
     {
+        auto map = land(60);
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        const auto small = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{12, 12}, 4, 4}
+        );
+        const auto large = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{30, 12}, 8, 8}
+        );
+        for (auto [pasture, x] : {std::pair{small, 12}, std::pair{large, 30}})
+        {
+            for (int i = 0; i < 5; ++i)
+            {
+                const auto animal =
+                    map.animals.spawn(map, "cow", {x + i % 3, 12 + i / 3});
+                PALADIN_CHECK(animal);
+                map.animals.find(animal)->pasture = pasture;
+            }
+            // Five cows jointly make their first unit before any individual
+            // cow could have made a whole unit under the old accumulator.
+            map.animals.produce(map, pasture, 1, 360, 48);
+            PALADIN_CHECK(
+                map.logistics
+                    .available(map.logistics.forObject(pasture), "meat") == 1
+            );
+            map.animals.produce(map, pasture, 1, 408, 672);
+            PALADIN_CHECK(
+                map.logistics
+                    .available(map.logistics.forObject(pasture), "meat") == 15
+            );
+        }
+        PALADIN_CHECK(map.animals.capacity({{0, 0}, 4, 6}) == 21);
+        PALADIN_CHECK(map.animals.capacity({{0, 0}, 2, 2}) == 4);
+    }
+    {
+        auto map = land(50);
+        SettlementCitizenState citizens;
+        found(map, citizens, 3);
+        auto& mother = SettlementActivityTestFixture::resident(citizens, 0);
+        auto& father = SettlementActivityTestFixture::resident(citizens, 1);
+        auto& child = SettlementActivityTestFixture::resident(citizens, 2);
+        mother.sex = CitizenSex::Female;
+        father.sex = CitizenSex::Male;
+        child.child = true;
+        child.ageYears = 2;
+        child.ageMinutes =
+            map.activities.policy.childMaturationMinutes * 2 / 16;
+        child.motherId = mother.id;
+        child.fatherId = father.id;
+        SettlementActivityTestFixture::rematch(citizens);
+        const auto home =
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        map.activities.synchronizeHomes(map, citizens);
+        map.activities.policy.dailyBirthChance = 0;
+        child.tilePosition = child.destination = {20, 12};
+        child.insideHome = false;
+        mother.tilePosition = mother.destination = {9, 9};
+        mother.insideHome = true;
+        father.tilePosition = father.destination = {9, 9};
+        father.insideHome = true;
+        father.energy = 0;
+        advance(map, citizens, 360, 60);
+        PALADIN_CHECK(child.homeId == home && child.insideHome);
+        advance(map, citizens, 420, 60);
+        PALADIN_CHECK(child.insideHome);
+        std::set<std::pair<int, int>> parentPositions, childPositions;
+        for (int minute = 480; minute < 500; ++minute)
+        {
+            advance(map, citizens, minute, 1);
+            parentPositions.emplace(
+                mother.tilePosition.x,
+                mother.tilePosition.y
+            );
+            childPositions.emplace(child.tilePosition.x, child.tilePosition.y);
+            PALADIN_CHECK(mother.insideHome && child.insideHome);
+        }
+        PALADIN_CHECK(parentPositions.size() > 1 && childPositions.size() > 1);
+        SettlementFamilySystem family;
+        child.health = child.happiness = 60;
+        mother.task.kind = CitizenTaskKind::Care;
+        mother.insideHome = true;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            501,
+            1
+        );
+        PALADIN_CHECK(child.health > 60 && child.happiness > 60);
+        mother.insideHome = father.insideHome = false;
+        const auto caredHealth = child.health;
+        const auto caredHappiness = child.happiness;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            502,
+            1
+        );
+        PALADIN_CHECK(
+            child.health == caredHealth && child.happiness == caredHappiness
+        );
+        child.unsupervisedMinutes =
+            map.activities.policy.childcareHealthGraceMinutes;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            503,
+            1
+        );
+        PALADIN_CHECK(
+            child.health < caredHealth && child.happiness < caredHappiness
+        );
+        mother.task.kind = CitizenTaskKind::Eat;
+        mother.tilePosition = {8, 11};
+        advance(map, citizens, 503, 1);
+        PALADIN_CHECK(child.insideHome && !child.task.partner);
+        // The available father takes over and feeds without the child leaving.
+        father.insideHome = true;
+        father.energy = 100;
+        father.hunger = 10;
+        father.task.kind = CitizenTaskKind::Home;
+        father.tilePosition = {9, 9};
+        mother.insideHome = false;
+        mother.task.kind = CitizenTaskKind::Eat;
+        child.hunger = 40;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            504,
+            1
+        );
+        PALADIN_CHECK(
+            child.caregiverId == father.id && father.youngDependents == 1
+        );
+        PALADIN_CHECK(child.hunger < 40 && father.hunger > 10);
+        // Mother resumes the primary role after the essential trip.
+        mother.insideHome = true;
+        mother.task.kind = CitizenTaskKind::Home;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            505,
+            1
+        );
+        mother.energy = 100;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            505,
+            1
+        );
+        PALADIN_CHECK(child.caregiverId == mother.id);
+        const auto pasture = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{20, 20}, 4, 4}
+        );
+        map.employment().synchronize(map.objectState(), citizens);
+        const auto job = map.employment().forObject(pasture);
+        PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
+        PALADIN_CHECK(mother.workplaceId == job);
+        mother.task.kind = CitizenTaskKind::Care;
+        mother.task.object = home;
+        mother.tilePosition = {9, 9};
+        PALADIN_CHECK(map.activities.caregivingAtWorkTime(map, mother, 720));
+        PALADIN_CHECK(!map.activities.caregivingAtWorkTime(map, mother, 0));
+        for (int i = 0; i < 5; ++i)
+        {
+            const auto animal =
+                map.animals.spawn(map, "cow", {20 + i % 3, 20 + i / 3});
+            PALADIN_CHECK(animal);
+            map.animals.find(animal)->pasture = pasture;
+        }
+        SettlementActivityTestFixture::produce(map, citizens, 720, 720);
+        PALADIN_CHECK(map.logistics.total("meat") == 15);
+        PALADIN_CHECK(map.employment().employed(job, citizens) == 1);
+        SettlementActivityTestFixture::produce(map, citizens, 0, 720);
+        PALADIN_CHECK(map.logistics.total("meat") == 15);
+        father.task.kind = mother.task.kind = CitizenTaskKind::Sleep;
+        child.task.kind = CitizenTaskKind::Sleep;
+        child.hunger = 40;
+        const auto absence = child.unsupervisedMinutes;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            506,
+            1
+        );
+        PALADIN_CHECK(
+            child.hunger == 40 && child.unsupervisedMinutes < absence
+        );
+        child.ageMinutes =
+            map.activities.policy.childMaturationMinutes * 6 / 16;
+        const auto olderHealth = child.health;
+        const auto olderHappiness = child.happiness;
+        family.update(
+            map,
+            citizens,
+            map.activities.policy,
+            map.activities,
+            504,
+            1
+        );
+        PALADIN_CHECK(
+            child.health == olderHealth && child.happiness == olderHappiness
+        );
+        PALADIN_CHECK(!child.caregiverId && child.unsupervisedMinutes == 0);
+        PALADIN_CHECK(
+            child.task.kind == CitizenTaskKind::Care ||
+            child.task.kind == CitizenTaskKind::Sleep
+        );
+        child.task.kind = CitizenTaskKind::Home;
+        child.path.clear();
+        child.task.endMinute = 500;
+        child.insideHome = false;
+        PALADIN_CHECK(
+            SettlementActivitySystem::activityLabel(child) == "Playing nearby"
+        );
+        child.child = false;
+        PALADIN_CHECK(
+            SettlementActivitySystem::activityLabel(child) == "Idling nearby"
+        );
+        child.task.endMinute = 0;
+        PALADIN_CHECK(
+            SettlementActivitySystem::activityLabel(child) ==
+            "Waiting to go home"
+        );
+        EntityState visual;
+        visual.tilePosition = {2, 3};
+        visual.captureVisual(2, 3);
+        PALADIN_CHECK(visual.renderX(3, .25) == 2.25);
+        PALADIN_CHECK(visual.renderY(4, .75) == 3.75);
+    }
+    // Default-rate food economy: two producers must support six residents,
+    // including travel, meals, sleep and hauling (not perfect attendance).
+    for (bool livestock : {false, true})
+    {
+        auto map = land(50);
+        SettlementCitizenState citizens;
+        found(map, citizens, 6);
+        map.activities.policy.dailyBirthChance = 0;
+        completed(map, SettlementObjectTypes::House, {{8, 3}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{12, 3}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{16, 3}, 3, 3});
+        SettlementObjectId producer;
+        if (livestock)
+        {
+            producer = completed(
+                map,
+                SettlementObjectTypes::Pastureland,
+                {{12, 12}, 4, 6}
+            );
+            for (int y = 12; y < 17; ++y)
+            {
+                for (int x : {12, 14})
+                {
+                    const auto animal = map.animals.spawn(map, "cow", {x, y});
+                    PALADIN_CHECK(animal);
+                    map.animals.find(animal)->pasture = producer;
+                }
+            }
+        }
+        else
+        {
+            for (int y = 0; y < 50; ++y)
+            {
+                for (int x = 22; x < 50; ++x)
+                {
+                    map.grid().tile({x, y})->terrain = TerrainType::Water;
+                }
+            }
+            producer = completed(
+                map,
+                SettlementObjectTypes::FishingGrounds,
+                {{18, 12}, 3, 3}
+            );
+        }
+        map.employment().synchronize(map.objectState(), citizens);
+        PALADIN_CHECK(map.employment().adjust(
+            map.employment().forObject(producer),
+            2,
+            citizens
+        ));
+        advance(map, citizens, 360, 4 * 1440);
+        const auto& totals =
+            map.commerce.resourceTotals().at(livestock ? "meat" : "fish");
+        std::cout << (livestock ? "Pasture" : "Fishery")
+                  << " four-day production: " << totals.produced << '\n';
+        PALADIN_CHECK(totals.produced >= 48);
+        PALADIN_CHECK(citizens.citizens().size() == 6);
+        for (const auto& citizen : citizens.citizens())
+        {
+            PALADIN_CHECK(citizen.health >= 70);
+            PALADIN_CHECK(
+                citizen.hunger < map.activities.policy.starvationThreshold
+            );
+        }
+    }
+    {
+        auto map = land(50);
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        map.activities.policy.dailyBirthChance = 0;
+        const auto pasture = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{12, 12}, 4, 6}
+        );
+        const auto cow = map.animals.spawn(map, "cow", {13, 13});
+        const auto pig = map.animals.spawn(map, "pig", {14, 15});
+        map.animals.find(cow)->pasture = pasture;
+        map.animals.find(pig)->pasture = pasture;
+        map.employment().synchronize(map.objectState(), citizens);
+        PALADIN_CHECK(map.employment().adjust(
+            map.employment().forObject(pasture),
+            2,
+            citizens
+        ));
+        advance(map, citizens, 360, 150);
+        PALADIN_CHECK(map.animals.find(cow)->lastTendedMinute >= 360);
+        PALADIN_CHECK(map.animals.find(pig)->lastTendedMinute >= 360);
+        PALADIN_CHECK(
+            map.animals.find(cow)->tilePosition !=
+            map.animals.find(pig)->tilePosition
+        );
+        // Reservations are released through the normal task lifecycle.
+        advance(map, citizens, 1080, 5);
+        PALADIN_CHECK(
+            !map.animals.find(cow)->tender && !map.animals.find(pig)->tender
+        );
+    }
+    {
         const FisheryJobPolicy policy;
         PALADIN_CHECK(fisheryReach({{0, 0}, 2, 2}) == 4);
         PALADIN_CHECK(fisheryReach({{0, 0}, 16, 16}) <= 12);
-        PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 3);
-        PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 1.5);
+        PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 18);
+        PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 9);
+        PALADIN_CHECK(fisheryProductionPerMinute(0, 1, policy) == 0);
+        PALADIN_CHECK(fisheryProductionPerMinute(120, 0, policy) == 0);
         const SceneProjection projection{0, 0, 10, 100, 100};
         const auto tall = projection.bounds({2, 3, 1, 1, 3, .5, 1});
         PALADIN_CHECK(tall.x == 65 && tall.y == 40 && tall.height == 30);
@@ -177,6 +537,10 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.available(stock, "meat") == 0);
         map.animals.produce(map, pasture, 2, 561, 720);
         PALADIN_CHECK(map.logistics.available(stock, "meat") > 0);
+        PALADIN_CHECK(
+            map.commerce.resourceTotals().at("meat").produced ==
+            map.logistics.available(stock, "meat")
+        );
         map.employment().synchronize(map.objectState(), citizens);
         PALADIN_CHECK(
             map.employment()
@@ -237,6 +601,13 @@ void runSettlementSimulationLoopTests()
                 const auto* animal = roaming.animals.find(residents[i]);
                 PALADIN_CHECK(enclosure.contains(animal->tilePosition));
                 PALADIN_CHECK(enclosure.contains(animal->previousTile));
+                for (std::size_t j = 0; j < i; ++j)
+                {
+                    PALADIN_CHECK(
+                        animal->tilePosition !=
+                        roaming.animals.find(residents[j])->tilePosition
+                    );
+                }
                 moved[i] =
                     moved[i] || animal->tilePosition != animal->previousTile;
             }
@@ -782,14 +1153,15 @@ void runSettlementSimulationLoopTests()
         child.tilePosition = child.destination = {20, 12};
         child.hunger = 70;
         const auto start = child.tilePosition;
-        advance(map, citizens, 366, 20);
+        // The parent now brings the meal back to the child's neighborhood.
+        advance(map, citizens, 366, 40);
         PALADIN_CHECK(child.tilePosition != start);
         PALADIN_CHECK(child.hunger < 30);
         PALADIN_CHECK(mother.hunger > 20);
         PALADIN_CHECK(map.commerce.savings(child.id) == 0);
         const auto motherId = mother.id;
         child.ageMinutes = map.activities.policy.childMaturationMinutes - 1;
-        advance(map, citizens, 386, 1);
+        advance(map, citizens, 406, 1);
         PALADIN_CHECK(!child.child && child.ageYears == 16);
         PALADIN_CHECK(!child.motherId && !child.fatherId && !child.caregiverId);
         PALADIN_CHECK(child.birthMotherId == motherId);
@@ -1257,6 +1629,12 @@ void runSettlementSimulationLoopTests()
             const double homelessPressure = .5 + 1.0 / (1440 * 1440);
             const double expected = 50 + .1 - (2 + homelessPressure) / 1440;
             PALADIN_CHECK(std::abs(c.happiness - expected) < 1e-8);
+            PALADIN_CHECK(
+                std::abs(
+                    c.familiarityWith(c.task.partner) -
+                    map.activities.policy.familiarityPerTalkMinute
+                ) < 1e-8
+            );
         }
     }
     {

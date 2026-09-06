@@ -22,6 +22,7 @@ namespace Paladin
 {
     void Application::layoutCityScreen()
     {
+        cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
         cityHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
     }
 
@@ -169,7 +170,9 @@ namespace Paladin
                     *settlementObjectPlacementController_,
                     *settlementCommandController_,
                     renderedSettlement->simulationState().citizens(),
-                    *settlementInspectionController_
+                    *settlementInspectionController_,
+                    simulationClock_->interpolationAlpha(),
+                    simulation_->world().time().secondsIntoDay() / 3600.0
                 );
 
                 settlementInspectionPanel_->render(

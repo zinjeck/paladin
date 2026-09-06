@@ -21,6 +21,12 @@ namespace Paladin
     class SettlementInspectionPanel
     {
     public:
+        CitizenId takeCitizenNavigation() noexcept
+        {
+            const auto id = navigateCitizen_;
+            navigateCitizen_ = {};
+            return id;
+        }
         void render(
             Renderer& renderer,
             GrayUiRenderer& grayUiRenderer,
@@ -59,6 +65,7 @@ namespace Paladin
         void pointerMoved(float x, float y);
 
     private:
+        friend struct ApplicationSmokeTest;
         [[nodiscard]]
         UiRectangle anchoredBounds(
             const SettlementObjectFootprint& footprint,
@@ -82,6 +89,8 @@ namespace Paladin
         bool showingKeep_ = false;
         UiButton keepSalesButton_{"Market supply: Off"};
         UiButton nameButton_{""};
+        UiButton spouseButton_{""};
+        CitizenId spouseId_, navigateCitizen_;
         UiButton decreaseButton_{"<"};
         UiButton increaseButton_{">"};
         UiTextField nameField_{"Workplace name", 40};

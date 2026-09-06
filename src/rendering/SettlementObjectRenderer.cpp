@@ -407,7 +407,17 @@ namespace Paladin
                 )
             );
         }
+    }
 
+    void SettlementObjectRenderer::renderOverlay(
+        Renderer& renderer,
+        const SettlementMap& settlementMap,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics,
+        const SettlementObjectPlacementController& placementController
+    ) const
+    {
+        const auto& state = settlementMap.objectState();
         overlayRenderer_.renderOutlines(
             renderer,
             cachedInfrastructureOutlines_,

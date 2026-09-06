@@ -15,6 +15,7 @@
 #include "ui/DebugConsole.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
+#include "ui/LedgerPanel.h"
 #include "ui/MainMenu.h"
 #include "ui/SettlementInspectionPanel.h"
 #include "ui/SimulationSpeedControls.h"
@@ -29,6 +30,7 @@ namespace Paladin
 {
     void Application::startWorldSession()
     {
+        ledgerPanel_->close();
         simulation_ = std::make_unique<Simulation>();
 
         camera_ = std::make_unique<Camera2D>(
@@ -72,6 +74,7 @@ namespace Paladin
 
     void Application::endWorldSession()
     {
+        ledgerPanel_->close();
         debugConsole_->reset();
         cachedStats_.clear();
         nextStatsRefresh_ = 0;
@@ -107,6 +110,7 @@ namespace Paladin
 
     void Application::enterPlayerCapitalCity()
     {
+        ledgerPanel_->close();
         if (screen_ != Screen::World || !simulation_ || !camera_ ||
             !tileRenderMetrics_)
         {
@@ -203,6 +207,7 @@ namespace Paladin
 
     void Application::returnToWorldFromCity()
     {
+        ledgerPanel_->close();
         employmentPanel_->close();
         SDL_StopTextInput(window_->nativeHandle());
         if (screen_ != Screen::City || !simulation_)

@@ -270,10 +270,27 @@ namespace Paladin
                 candidates.push_back(i);
             }
         }
+        std::stable_sort(
+            candidates.begin(),
+            candidates.end(),
+            [&](auto a, auto b)
+            {
+                const auto score = [&](auto index)
+                {
+                    const auto& person = citizens.citizens_[index];
+                    return separation(c.tilePosition, person.tilePosition) -
+                           policy.familiarityPreference *
+                               c.familiarityWith(person.id) -
+                           (person.id == c.spouseId ? 4.0 : 0.0);
+                };
+                return score(a) < score(b);
+            }
+        );
         for (auto index : candidates)
         {
             auto& other = citizens.citizens_[index];
-            if (other.id == c.id || !available(other) ||
+            if (other.id == c.id || other.child != c.child ||
+                !available(other) ||
                 separation(c.tilePosition, other.tilePosition) >
                     policy.leisureRadius * 2)
             {
@@ -297,6 +314,12 @@ namespace Paladin
                 }
             }
             if (!route(map, citizens, planned, {meeting, 1, 1}, false))
+            {
+                continue;
+            }
+            if (!childRouteIsLocal(map, planned) ||
+                !childRouteIsLocal(map, waitingPlan) ||
+                !inChildNeighborhood(map, other, planned.destination))
             {
                 continue;
             }

@@ -1,10 +1,13 @@
 #pragma once
 
+#include "rendering/CityPresentation.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/SettlementCommandRenderer.h"
 #include "rendering/SettlementLogisticsRenderer.h"
 #include "rendering/SettlementNaturalFeatureRenderer.h"
 #include "rendering/SettlementObjectRenderer.h"
+#include "rendering/SettlementStructurePresentation.h"
 #include "rendering/WorldGridRenderer.h"
 
 namespace Paladin
@@ -22,6 +25,7 @@ namespace Paladin
     class CityRenderer
     {
     public:
+        CityPresentation presentation;
         void render(
             Renderer& renderer,
             const SettlementMap& settlementMap,
@@ -30,7 +34,9 @@ namespace Paladin
             const SettlementObjectPlacementController& placementController,
             const SettlementCommandController& commandController,
             const SettlementCitizenState& citizens,
-            const SettlementInspectionController& inspection
+            const SettlementInspectionController& inspection,
+            double interpolationAlpha = 1,
+            double hour = 12
         ) const;
 
         void renderMinimap(
@@ -42,6 +48,9 @@ namespace Paladin
         ) const;
 
     private:
+        mutable SceneSpriteLibrary sprites_;
+        mutable SceneDrawQueue raised_;
+        SettlementStructurePresentation structures_;
         WorldGridRenderer gridRenderer_;
         SettlementLogisticsRenderer logisticsRenderer_;
         SettlementNaturalFeatureRenderer naturalFeatureRenderer_;

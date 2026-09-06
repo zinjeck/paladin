@@ -42,6 +42,14 @@ namespace Paladin
                        : nullptr;
         }
         void clear() noexcept;
+        void selectCitizen(CitizenId id) noexcept
+        {
+            clear();
+            citizenId_ = id;
+            kind_ = id ? SettlementInspectionKind::Citizen
+                       : SettlementInspectionKind::None;
+            placePanelOnRight_ = true;
+        }
         void selectWorkplace(
             SettlementObjectId object,
             ConstructionSiteId site

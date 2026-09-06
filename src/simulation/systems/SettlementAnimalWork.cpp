@@ -62,8 +62,7 @@ namespace Paladin
                 {
                     if (object.objectTypeId ==
                             SettlementObjectTypes::Pastureland &&
-                        std::int64_t(object.footprint.width) *
-                                object.footprint.height >=
+                        map.animals.capacity(object.footprint) >=
                             map.animals.usedSpace(object.id) +
                                 animalSpecies(animal->species)->pastureSpace)
                     {
@@ -185,5 +184,129 @@ namespace Paladin
         }
         adoptRoute(c, planned);
         c.task.delivering = true;
+    }
+    bool SettlementActivitySystem::choosePastureWork(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& c,
+        double minute
+    )
+    {
+        const auto* job = map.employment().workplace(c.workplaceId);
+        if (!job || !job->operational)
+        {
+            return false;
+        }
+        std::vector<EntityId> candidates;
+        for (const auto& a : map.animals.all())
+        {
+            if (a.health > 0 && a.pasture == job->objectId && !a.handler &&
+                a.order == AnimalOrder::None &&
+                (!a.tender || a.tender == c.id) &&
+                minute - a.lastTendedMinute >=
+                    map.animals.policy.tendingCooldownMinutes)
+            {
+                candidates.push_back(a.id);
+            }
+        }
+        std::stable_sort(
+            candidates.begin(),
+            candidates.end(),
+            [&](auto left, auto right)
+            {
+                const auto score = [&](EntityId id)
+                {
+                    const auto& a = *map.animals.find(id);
+                    return a.lastTendedMinute +
+                           .1 * (std::abs(a.tilePosition.x - c.tilePosition.x) +
+                                 std::abs(a.tilePosition.y - c.tilePosition.y));
+                };
+                return score(left) < score(right);
+            }
+        );
+        for (const auto id : candidates)
+        {
+            auto* a = map.animals.find(id);
+            constexpr SettlementTilePosition
+                neighbors[]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (const auto d : neighbors)
+            {
+                const SettlementTilePosition target{
+                    a->tilePosition.x + d.x,
+                    a->tilePosition.y + d.y
+                };
+                if (!job->footprint.contains(target))
+                {
+                    continue;
+                }
+                if (std::any_of(
+                        map.animals.all().begin(),
+                        map.animals.all().end(),
+                        [&](const auto& other)
+                        {
+                            return other.health > 0 &&
+                                   other.tilePosition == target;
+                        }
+                    ))
+                {
+                    continue;
+                }
+                auto planned = c;
+                if (!route(map, citizens, planned, {target, 1, 1}, true) ||
+                    planned.destination != target)
+                {
+                    if (routeBudgetLimited_)
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+                map.animals.release(c.id);
+                adoptRoute(c, planned);
+                c.task = {};
+                c.task.kind = CitizenTaskKind::Work;
+                c.task.object = job->objectId;
+                c.task.animal = id;
+                c.task.workTile = target;
+                c.task.startedMinute = minute;
+                a->tender = c.id;
+                a->tendingReservedUntil =
+                    minute + map.animals.policy.tendingReservationMinutes;
+                c.activity = CitizenActivity::TravelingToWork;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void SettlementActivitySystem::executePastureWork(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& c,
+        double minute,
+        double elapsed
+    )
+    {
+        auto* animal = map.animals.find(c.task.animal);
+        if (!animal || animal->health <= 0 || animal->tender != c.id ||
+            animal->pasture != c.task.object ||
+            std::abs(animal->tilePosition.x - c.tilePosition.x) +
+                    std::abs(animal->tilePosition.y - c.tilePosition.y) !=
+                1)
+        {
+            finish(map, c, minute);
+            return;
+        }
+        c.task.laborMinutes += elapsed;
+        animal->lastTendedMinute = minute;
+        animal->tendingReservedUntil =
+            minute + map.animals.policy.tendingReservationMinutes;
+        if (c.task.laborMinutes >= map.animals.policy.tendingMinutes)
+        {
+            if (!choosePastureWork(map, citizens, c, minute))
+            {
+                finish(map, c, minute);
+            }
+        }
     }
 } // namespace Paladin

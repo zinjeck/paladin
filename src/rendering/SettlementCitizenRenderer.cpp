@@ -18,13 +18,20 @@ namespace Paladin
         const SettlementCitizenState& citizens,
         const Camera2D& camera,
         const TileRenderMetrics& metrics,
-        const SettlementAnimals* animals
+        const SettlementAnimals* animals,
+        double interpolationAlpha,
+        SceneDrawQueue* shared,
+        const SceneSpriteLibrary* sprites,
+        const CityPresentation* policy
     ) const
     {
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
         const float adultMarkerSize = static_cast<float>(tilePixels * 0.5);
-        auto& queue = drawQueue_;
-        queue.clear();
+        auto& queue = shared ? *shared : drawQueue_;
+        if (!shared)
+        {
+            queue.clear();
+        }
         const SceneProjection projection{
             camera.tileX(),
             camera.tileY(),
@@ -32,12 +39,10 @@ namespace Paladin
             renderer.outputWidth(),
             renderer.outputHeight()
         };
-        std::vector<std::pair<float, float>> sleeping;
-        struct FishingLine
-        {
-            float x, y, dx, dy;
-        };
-        std::vector<FishingLine> fishing;
+        auto& sleeping = sleeping_;
+        sleeping.clear();
+        auto& fishing = fishing_;
+        fishing.clear();
 
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
@@ -45,11 +50,26 @@ namespace Paladin
                 adultMarkerSize * (citizen.child ? .5F : 1.0F);
             const double centerX =
                 static_cast<double>(renderer.outputWidth()) * 0.5 +
-                (citizen.visualX() + 0.5 - camera.tileX()) * tilePixels;
+                (citizen.renderX(citizen.visualX(), interpolationAlpha) + 0.5 -
+                 camera.tileX()) *
+                    tilePixels;
             const double centerY =
                 static_cast<double>(renderer.outputHeight()) * 0.5 +
-                (citizen.visualY() + 0.5 - camera.tileY()) * tilePixels;
+                (citizen.renderY(citizen.visualY(), interpolationAlpha) + 0.5 -
+                 camera.tileY()) *
+                    tilePixels;
 
+            const bool custom =
+                sprites &&
+                sprites->submit(
+                    queue,
+                    projection,
+                    "citizen",
+                    citizen.renderX(citizen.visualX(), interpolationAlpha) + .5,
+                    citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
+                    (std::uint64_t(1) << 62) | citizen.id.value(),
+                    citizen.child ? .5 : 1
+                );
             if (centerX + markerSize < 0.0 || centerY + markerSize < 0.0 ||
                 centerX - markerSize > renderer.outputWidth() ||
                 centerY - markerSize > renderer.outputHeight())
@@ -76,15 +96,32 @@ namespace Paladin
                          float(tilePixels) * .65F}
                 );
             }
-            queue.submit(
-                {{static_cast<float>(centerX) - markerSize * 0.5F,
-                  static_cast<float>(centerY) - markerSize * 0.5F,
-                  markerSize,
-                  markerSize},
-                 {210, 180, 140, 255},
-                 citizen.visualY() + .5,
-                 citizen.id.value()}
-            );
+            if (policy && policy->shadowsVisible)
+            {
+                queue.submit(
+                    {{float(centerX) - markerSize * .5F,
+                      float(centerY) + markerSize * .3F,
+                      markerSize,
+                      markerSize * .3F},
+                     policy->shadowColor,
+                     0,
+                     (std::uint64_t(1) << 62) | citizen.id.value(),
+                     -1}
+                );
+            }
+            if (!custom)
+            {
+                queue.submit(
+                    {{static_cast<float>(centerX) - markerSize * 0.5F,
+                      static_cast<float>(centerY) - markerSize * 0.5F,
+                      markerSize,
+                      markerSize},
+                     {210, 180, 140, 255},
+                     citizen.renderY(citizen.visualY(), interpolationAlpha) +
+                         .5,
+                     (std::uint64_t(1) << 62) | citizen.id.value()}
+                );
+            }
         }
 
         if (animals)
@@ -102,14 +139,24 @@ namespace Paladin
                 }
                 const double size = animal.juvenile ? .65 : 1;
                 const SceneVisual visual{
-                    animal.visualX() + .5,
-                    animal.visualY() + .5,
+                    animal.renderX(animal.visualX(), interpolationAlpha) + .5,
+                    animal.renderY(animal.visualY(), interpolationAlpha) + .5,
                     0,
                     d->markerWidth * size,
                     d->markerHeight * size,
                     .5,
                     .5
                 };
+                const bool custom =
+                    sprites && sprites->submit(
+                                   queue,
+                                   projection,
+                                   "animal." + animal.species,
+                                   visual.groundX,
+                                   visual.groundY,
+                                   (std::uint64_t(2) << 62) | animal.id.value(),
+                                   size
+                               );
                 const auto body = projection.bounds(visual);
                 if (!projection.visible(body))
                 {
@@ -129,7 +176,7 @@ namespace Paladin
                           body.height * h},
                          color,
                          visual.groundY,
-                         animal.id.value(),
+                         (std::uint64_t(2) << 62) | animal.id.value(),
                          0,
                          order}
                     );
@@ -152,6 +199,23 @@ namespace Paladin
                             : RenderColor{229, 196, 70, 255},
                         0
                     );
+                }
+                if (policy && policy->shadowsVisible)
+                {
+                    queue.submit(
+                        {{body.x,
+                          body.y + body.height * .8F,
+                          body.width,
+                          body.height * .3F},
+                         policy->shadowColor,
+                         0,
+                         (std::uint64_t(2) << 62) | animal.id.value(),
+                         -1}
+                    );
+                }
+                if (custom)
+                {
+                    continue;
                 }
                 part(0, 0, 1, 1, coat, 1);
                 if (tilePixels >= 5)
@@ -176,8 +240,19 @@ namespace Paladin
                 }
             }
         }
-        queue.render(renderer);
-        for (const auto& line : fishing)
+        if (!shared)
+        {
+            queue.render(renderer);
+            renderAnnotations(renderer, tilePixels);
+        }
+    }
+    void SettlementCitizenRenderer::renderAnnotations(
+        Renderer& renderer,
+        double tilePixels
+    ) const
+    {
+        const float adultMarkerSize = float(tilePixels * .5);
+        for (const auto& line : fishing_)
         {
             renderer.drawLine(
                 line.x,
@@ -196,7 +271,7 @@ namespace Paladin
         }
         const BitmapFontRenderer font;
         const float scale = std::clamp(float(tilePixels) / 24, 1.0F, 2.0F);
-        for (const auto& [x, y] : sleeping)
+        for (const auto& [x, y] : sleeping_)
         {
             font.drawText(
                 renderer,

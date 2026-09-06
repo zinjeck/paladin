@@ -85,6 +85,10 @@ namespace Paladin
 
         [[nodiscard]]
         std::unique_ptr<Texture> loadBitmapTexture(const char* filePath);
+        std::unique_ptr<Texture> loadImageTexture(
+            const char* filePath,
+            bool smooth = false
+        );
 
         [[nodiscard]]
         std::unique_ptr<Texture> createTextureFromPixels(

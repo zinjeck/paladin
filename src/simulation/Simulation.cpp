@@ -94,6 +94,8 @@ namespace Paladin
                     else
                     {
                         map->commerce.resumeActive();
+                        state.citizens().captureVisualPositions();
+                        map->animals.captureVisualPositions();
                         map->activities.tick(
                             *map,
                             state.citizens(),
@@ -132,6 +134,7 @@ namespace Paladin
         world_->advanceTime(gameMinutes);
         ScopedTiming aggregateTimer{aggregateTiming};
         worldSimulationPipeline_->tick(*world_, gameMinutes);
+        reports.update(*world_, playerRealmId_);
     }
 
 

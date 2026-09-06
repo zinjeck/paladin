@@ -180,7 +180,7 @@ namespace Paladin
 
         const float topButtonWidth = std::clamp(
             (static_cast<float>(viewportWidth) - informationWidth -
-             SimulationSpeedControls::RowWidth) /
+             SimulationSpeedControls::RowWidth - 36.0F) /
                 static_cast<float>(topButtons_.size()),
             0.0F,
             140.0F
@@ -196,6 +196,11 @@ namespace Paladin
         }
 
         const float goodsWidth = 144.0F;
+        eventsButton_.setBounds(
+            {informationWidth + topButtonWidth * topButtons_.size(), 0, 36, 44}
+        );
+        eventsButton_.setSkinId("events");
+        ledgerButton_.setSkinId("ledger");
         const float goodsX = static_cast<float>(viewportWidth) - goodsWidth;
         goodsButton_.setBounds(
             {goodsX, SimulationSpeedControls::ButtonSide, goodsWidth, 32.0F}
@@ -239,6 +244,18 @@ namespace Paladin
             informationWidth,
             36
         };
+        // Ledger fits beside the minimap, or above it on narrow windows.
+        const float ledgerX = minimapPanel_.x - 44;
+        ledgerButton_.setBounds(
+            ledgerX >= rowX + rowWidth + 4 || worldMode_
+                ? UiRectangle{ledgerX, float(viewportHeight) - 40, 36, 36}
+                : UiRectangle{
+                      float(viewportWidth) - 40,
+                      std::max(104.F, minimapPanel_.y - 40),
+                      36,
+                      36
+                  }
+        );
         treasuryPanel_ = {
             0,
             informationTopHeight + informationBottomHeight,
@@ -253,6 +270,7 @@ namespace Paladin
         };
         populationButton_.setBounds(reservedPanel_);
         populationButton_.setSkinId("population");
+        roofsButton_.setBounds(extensionPanel_);
     }
 
     void CityHud::setSettlementStatus(
@@ -287,6 +305,12 @@ namespace Paladin
 
     void CityHud::pointerMoved(float x, float y) noexcept
     {
+        if (!worldMode_)
+        {
+            roofsButton_.pointerMoved(x, y);
+        }
+        eventsButton_.pointerMoved(x, y);
+        ledgerButton_.pointerMoved(x, y);
         backButton_.pointerMoved(x, y);
         populationButton_.pointerMoved(x, y);
         goodsButton_.pointerMoved(x, y);
@@ -311,6 +335,13 @@ namespace Paladin
 
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
+        const bool roofs = !worldMode_ && roofsButton_.pointerPressed(x, y);
+        const bool events = eventsButton_.pointerPressed(x, y);
+        const bool ledger = ledgerButton_.pointerPressed(x, y);
+        if (events || ledger || roofs)
+        {
+            return true;
+        }
         if (treasuryPanel_.contains(x, y) || extensionPanel_.contains(x, y))
         {
             return true;
@@ -365,6 +396,11 @@ namespace Paladin
 
     bool CityHud::containsInteractivePoint(float x, float y) const noexcept
     {
+        if (eventsButton_.containsPoint(x, y) ||
+            ledgerButton_.containsPoint(x, y))
+        {
+            return true;
+        }
         if (treasuryPanel_.contains(x, y) || extensionPanel_.contains(x, y))
         {
             return true;
@@ -420,6 +456,17 @@ namespace Paladin
 
     CityHudAction CityHud::pointerReleased(float x, float y) noexcept
     {
+        if (!worldMode_ && roofsButton_.pointerReleased(x, y))
+        {
+            return CityHudAction::ToggleRoofs;
+        }
+        const bool events = eventsButton_.pointerReleased(x, y);
+        const bool ledger = ledgerButton_.pointerReleased(x, y);
+        if (events || ledger)
+        {
+            closeCategoryMenus();
+            return events ? CityHudAction::Events : CityHudAction::Ledger;
+        }
         const bool backClicked = backButton_.pointerReleased(x, y);
         if (goodsButton_.pointerReleased(x, y))
         {
@@ -751,6 +798,12 @@ namespace Paladin
             timePixelSize
         );
 
+        if (!worldMode_)
+        {
+            roofsButton_.render(renderer, uiRenderer);
+        }
+        eventsButton_.render(renderer, uiRenderer);
+        ledgerButton_.render(renderer, uiRenderer);
         if (worldMode_)
         {
             uiRenderer.drawPanel(renderer, activeSettlementPanel_);
@@ -1031,6 +1084,16 @@ namespace Paladin
 {
     std::string CityHud::tooltipAt(float x, float y) const
     {
+        if (eventsButton_.containsPoint(x, y))
+        {
+            return worldMode_ ? "World events and realm warnings"
+                              : "City events and important warnings";
+        }
+        if (ledgerButton_.containsPoint(x, y))
+        {
+            return worldMode_ ? "World ledger - realms and politics"
+                              : "City ledger - citizens, production and graphs";
+        }
         if (seasonBounds_.contains(x, y))
         {
             return std::string(

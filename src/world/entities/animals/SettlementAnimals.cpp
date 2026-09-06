@@ -14,13 +14,13 @@ namespace Paladin
     namespace
     {
         constexpr std::array speciesDefinitions{
-            AnimalSpecies{"cow", "Cow", 2, 1, 2, 8, .68, .48, 0xA77549, .20, 3},
+            AnimalSpecies{"cow", "Cow", 2, 1, 3, 8, .68, .48, 0xA77549, .20, 3},
             AnimalSpecies{
                 "pig",
                 "Pig",
                 2,
                 1,
-                1.5,
+                2.5,
                 6,
                 .58,
                 .40,
@@ -33,7 +33,7 @@ namespace Paladin
                 "Chicken",
                 1,
                 .5,
-                .5,
+                1.25,
                 2,
                 .32,
                 .32,
@@ -86,7 +86,11 @@ namespace Paladin
                 animals_.begin(),
                 animals_.end(),
                 [&](const auto& a)
-                { return a.health > 0 && a.tilePosition == p; }
+                {
+                    return a.health > 0 &&
+                           (a.tilePosition == p ||
+                            (a.visualProgress < 1 && a.previousTile == p));
+                }
             ))
         {
             return {};
@@ -206,6 +210,10 @@ namespace Paladin
     {
         for (auto& a : animals_)
         {
+            if (a.tender == handler)
+            {
+                a.tender = {};
+            }
             if (a.handler == handler)
             {
                 a.handler = {};
@@ -251,8 +259,7 @@ namespace Paladin
             const auto* object = map.objectState().completedObject(pasture);
             if (!object ||
                 object->objectTypeId != SettlementObjectTypes::Pastureland ||
-                std::int64_t(object->footprint.width) *
-                        object->footprint.height <
+                capacity(object->footprint) <
                     usedSpace(pasture) +
                         animalSpecies(a->species)->pastureSpace)
             {
@@ -340,6 +347,45 @@ namespace Paladin
     )
     {
         SettlementNavigation navigation;
+        const auto tileKey = [](SettlementTilePosition p)
+        {
+            return (std::uint64_t(std::uint32_t(p.x)) << 32) |
+                   std::uint32_t(p.y);
+        };
+        struct HerdCenter
+        {
+            double x = 0, y = 0;
+            int count = 0;
+        };
+        const auto herdKey = [](const SettlementAnimal& a)
+        {
+            return a.species + ":" +
+                   (a.pasture ? std::to_string(a.pasture.value())
+                              : "wild:" + std::to_string(a.herdCenter.x) + ":" +
+                                    std::to_string(a.herdCenter.y));
+        };
+        // Entity-sized indexes, never a pasture-sized or world-sized scan.
+        std::unordered_map<std::uint64_t, int> occupied;
+        std::unordered_map<std::string, HerdCenter> centers;
+        if (move)
+        {
+            for (const auto& a : animals_)
+            {
+                if (a.health <= 0)
+                {
+                    continue;
+                }
+                ++occupied[tileKey(a.tilePosition)];
+                if (a.visualProgress < 1 && a.previousTile != a.tilePosition)
+                {
+                    ++occupied[tileKey(a.previousTile)];
+                }
+                auto& center = centers[herdKey(a)];
+                center.x += a.tilePosition.x;
+                center.y += a.tilePosition.y;
+                ++center.count;
+            }
+        }
         for (auto& a : animals_)
         {
             if (a.health <= 0)
@@ -363,6 +409,19 @@ namespace Paladin
             {
                 continue;
             }
+            if (a.tender)
+            {
+                const auto* worker = citizens.citizen(a.tender);
+                if (worker && worker->health > 0 &&
+                    worker->task.kind == CitizenTaskKind::Work &&
+                    worker->task.animal == a.id &&
+                    worker->task.object == a.pasture &&
+                    minute < a.tendingReservedUntil)
+                {
+                    continue;
+                }
+                a.tender = {};
+            }
             if (a.handler)
             {
                 const auto* c = citizens.citizen(a.handler);
@@ -383,18 +442,58 @@ namespace Paladin
             const std::array<SettlementTilePosition, 4> directions{
                 {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
             };
-            const auto d = directions[random % directions.size()];
-            const SettlementTilePosition next{
-                a.tilePosition.x + d.x,
-                a.tilePosition.y + d.y
-            };
-            if ((pasture
-                     ? !pasture->footprint.contains(next)
-                     : distance(next, a.herdCenter) > policy.roamingRadius) ||
-                !navigation.canStep(map, a.tilePosition, next))
+            if (a.visualProgress < 1)
             {
                 continue;
             }
+            const auto& center = centers[herdKey(a)];
+            SettlementTilePosition next = a.tilePosition;
+            double best = -1e30;
+            for (std::size_t index = 0; index < directions.size(); ++index)
+            {
+                const auto d = directions[(index + random) % directions.size()];
+                const SettlementTilePosition candidate{
+                    a.tilePosition.x + d.x,
+                    a.tilePosition.y + d.y
+                };
+                if (occupied.contains(tileKey(candidate)) ||
+                    (pasture ? !pasture->footprint.contains(candidate)
+                             : distance(candidate, a.herdCenter) >
+                                   policy.roamingRadius) ||
+                    !navigation.canStep(map, a.tilePosition, candidate))
+                {
+                    continue;
+                }
+                const double separation = std::hypot(
+                    candidate.x - center.x / center.count,
+                    candidate.y - center.y / center.count
+                );
+                double score = -std::max(0.0, separation - policy.herdRadius) *
+                               policy.cohesionWeight;
+                // Prefer a little breathing room, while retaining random
+                // wandering.
+                for (const auto neighbor : directions)
+                {
+                    if (occupied.contains(tileKey(
+                            {candidate.x + neighbor.x, candidate.y + neighbor.y}
+                        )))
+                    {
+                        score -= .2;
+                    }
+                }
+                score +=
+                    double(GenerationNoise::mix(random + index) % 1000) / 1000;
+                if (score > best)
+                {
+                    best = score;
+                    next = candidate;
+                }
+            }
+            if (next == a.tilePosition)
+            {
+                continue;
+            }
+            ++occupied[tileKey(next)];
             a.previousTile = a.tilePosition;
             a.tilePosition = next;
             a.visualProgress = 0;
@@ -455,8 +554,7 @@ namespace Paladin
             const auto* pasture = map.objectState().completedObject(a.pasture);
             const auto* d = animalSpecies(a.species);
             if (!pasture || herds[a.pasture].used + d->pastureSpace >
-                                std::int64_t(pasture->footprint.width) *
-                                    pasture->footprint.height)
+                                capacity(pasture->footprint))
             {
                 continue;
             }
@@ -487,8 +585,7 @@ namespace Paladin
                 map.objectState().completedObject(birth.pasture);
             if (!object || usedSpace(birth.pasture) +
                                    animalSpecies(birth.species)->pastureSpace >
-                               std::int64_t(object->footprint.width) *
-                                   object->footprint.height)
+                               capacity(object->footprint))
             {
                 continue;
             }
@@ -543,52 +640,33 @@ namespace Paladin
         {
             return;
         }
-        int occupied = 0, smallestAnimalSpace = 0;
+        double adultOutput = 0;
         for (const auto& a : animals_)
         {
-            if (a.health > 0 && a.pasture == pasture)
+            if (a.health > 0 && !a.juvenile && a.pasture == pasture)
             {
-                const int space = animalSpecies(a.species)->pastureSpace;
-                occupied += space;
-                smallestAnimalSpace =
-                    smallestAnimalSpace == 0
-                        ? space
-                        : std::min(smallestAnimalSpace, space);
+                adultOutput += animalSpecies(a.species)->foodPerWorkday;
             }
         }
-        const auto area =
-            std::int64_t(object->footprint.width) * object->footprint.height;
-        const auto usableSpace = (area / std::max(1, smallestAnimalSpace)) *
-                                 std::max(1, smallestAnimalSpace);
-        const double fullness = std::clamp(
-            double(occupied) / std::max(1.0, double(usableSpace)),
-            0.0,
-            1.0
-        );
-        const double efficiency =
-            policy.minimumStockingEfficiency +
-            (1 - policy.minimumStockingEfficiency) * fullness;
         const auto storage = map.logistics.forObject(pasture);
-        for (auto& a : animals_)
+        const int space = map.logistics.freeSpace(storage);
+        if (space <= 0 || elapsed <= 0)
         {
-            if (a.health <= 0 || a.juvenile || a.pasture != pasture ||
-                map.logistics.freeSpace(storage) <= 0)
-            {
-                continue;
-            }
-            a.productionAccrued += elapsed * attended * efficiency *
-                                   animalSpecies(a.species)->foodPerWorkday /
-                                   policy.productiveWorkdayMinutes;
-            const int amount = std::min(
-                map.logistics.freeSpace(storage),
-                int(a.productionAccrued)
-            );
-            if (amount > 0 &&
-                map.logistics.add(storage, "meat", amount, minute))
-            {
-                a.productionAccrued -= amount;
-                map.commerce.recordFlow({}, storage, "meat", amount);
-            }
+            return;
+        }
+        // One accumulator per pasture, so fractional output from different
+        // animals combines into individual goods rather than herd-sized bursts.
+        const double output = std::min(
+            double(space),
+            elapsed * attended * adultOutput / policy.productiveWorkdayMinutes
+        );
+        const int amount = std::min(
+            space,
+            int(map.objectState().accrueProduction(pasture, output))
+        );
+        if (amount > 0 && map.logistics.add(storage, "meat", amount, minute))
+        {
+            map.commerce.recordFlow({}, storage, "meat", amount);
         }
     }
 } // namespace Paladin

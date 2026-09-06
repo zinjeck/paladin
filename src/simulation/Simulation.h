@@ -1,5 +1,6 @@
 #pragma once
 #include "debug/TimingSamples.h"
+#include "simulation/SimulationReports.h"
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
@@ -41,6 +42,7 @@ namespace Paladin
     class Simulation
     {
     public:
+        SimulationReports reports;
         Simulation();
         explicit Simulation(
             const WorldGenerationSettings& generationSettings,

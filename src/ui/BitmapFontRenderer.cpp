@@ -96,6 +96,14 @@ namespace Paladin
 
             case '<':
                 return {2, 4, 8, 16, 8, 4, 2};
+            case '!':
+                return {4, 4, 4, 4, 4, 0, 4};
+            case '^':
+                return {4, 10, 17, 0, 0, 0, 0};
+            case ',':
+                return {0, 0, 0, 0, 0, 4, 8};
+            case ';':
+                return {0, 4, 4, 0, 0, 4, 8};
             case '>':
                 return {8, 4, 2, 1, 2, 4, 8};
             case '%':

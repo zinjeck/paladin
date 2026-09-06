@@ -415,7 +415,8 @@ namespace Paladin
             ((primitive(c.hunger) - primitive(before)) / policy.hungerPerDay +
              std::max(0.0, days - risingDays));
         c.health = std::max(0.0, c.health - damage);
-        if (c.hunger < policy.foodSeekThreshold &&
+        if ((!c.child || c.ageYears >= policy.independentEatingAge) &&
+            c.hunger < policy.foodSeekThreshold &&
             c.energy >= policy.fatigueEnergy)
         {
             c.health =
@@ -481,6 +482,11 @@ namespace Paladin
         case CitizenTaskKind::Build:
             return "Constructing";
         case CitizenTaskKind::Work:
+            if (c.task.animal)
+            {
+                return c.path.empty() ? "Tending livestock"
+                                      : "Going to livestock";
+            }
             return c.path.empty()
                        ? (c.activity == CitizenActivity::Fishing ? "Fishing"
                                                                  : "Working")
@@ -488,7 +494,9 @@ namespace Paladin
         case CitizenTaskKind::Break:
             return c.breakReturning ? "Returning from break" : "On break";
         case CitizenTaskKind::Talk:
-            return "Talking to " + c.task.partnerName;
+            return (c.path.empty() ? (c.child ? "Playing with " : "Talking to ")
+                                   : "Meeting ") +
+                   c.task.partnerName;
         case CitizenTaskKind::Sleep:
             return c.activity == CitizenActivity::Sleeping && c.path.empty()
                        ? "Sleeping"
@@ -497,9 +505,24 @@ namespace Paladin
         case CitizenTaskKind::Care:
             if (c.task.kind == CitizenTaskKind::Care)
             {
-                return c.child ? "Being cared for" : "Taking care of child";
+                if (!c.path.empty() && !c.insideHome)
+                {
+                    return "Going home";
+                }
+                return c.child ? "At home" : "Taking care of child";
             }
-            return c.insideHome ? "At home" : "Going home";
+            if (c.task.endMinute > 0)
+            {
+                return c.child ? (c.path.empty() ? "Playing nearby"
+                                                 : "Walking nearby")
+                               : (c.path.empty() ? "Idling nearby"
+                                                 : "Walking nearby");
+            }
+            if (!c.path.empty())
+            {
+                return "Going home";
+            }
+            return c.insideHome ? "At home" : "Waiting to go home";
         default:
             return "Idle";
         }

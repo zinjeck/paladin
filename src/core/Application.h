@@ -18,6 +18,8 @@ namespace Paladin
 {
     class Camera2D;
     class CityHud;
+    class LedgerPanel;
+    enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
     class CityRenderer;
@@ -83,6 +85,9 @@ namespace Paladin
         void updateCityScreen();
         void synchronizeCityStatus();
         void updateCityHud();
+        void updateReports();
+        bool handleReportEvent(const SDL_Event&);
+        bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
         bool handleCityRenameEvent(const SDL_Event& event, SettlementMap& map);
@@ -145,6 +150,7 @@ namespace Paladin
         std::unique_ptr<MainMenu> mainMenu_;
         std::unique_ptr<WorldHud> worldHud_;
         std::unique_ptr<CityHud> cityHud_;
+        std::unique_ptr<LedgerPanel> ledgerPanel_;
         std::unique_ptr<EmploymentPanel> employmentPanel_;
         std::unique_ptr<DebugConsole> debugConsole_;
         std::vector<std::pair<SettlementId, std::unique_ptr<Camera2D>>>

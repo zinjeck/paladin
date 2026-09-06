@@ -101,7 +101,8 @@ namespace Paladin
         }
 
         constexpr float preferredTextPixelSize = 3.0F;
-        const float horizontalTextPadding = text.size() == 1 ? 8.0F : 20.0F;
+        const float horizontalTextPadding =
+            std::min(text.size() == 1 ? 8.0F : 20.0F, bounds.width * 0.2F);
 
         const float textWidthAtPreferredSize =
             fontRenderer_.measureWidth(text, preferredTextPixelSize);

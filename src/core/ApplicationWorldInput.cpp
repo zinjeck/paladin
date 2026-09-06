@@ -336,6 +336,10 @@ namespace Paladin
                 const auto action =
                     cityHud_->pointerReleased(event.button.x, event.button.y);
                 cityHudCapturedPointer_ = false;
+                if (handleReportAction(action))
+                {
+                    return true;
+                }
                 if (action != CityHudAction::None)
                 {
                     const auto* section =

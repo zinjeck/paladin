@@ -3,6 +3,7 @@
 #include "rendering/Renderer.h"
 #include "simulation/Simulation.h"
 #include "ui/DebugConsole.h"
+#include "ui/LedgerPanel.h"
 #include "ui/SimulationSpeedControls.h"
 #include <SDL3/SDL.h>
 #include <cmath>
@@ -155,6 +156,10 @@ namespace Paladin
             synchronizeCityStatus();
             updateCityHud();
         }
+        if (screen_ != Screen::MainMenu)
+        {
+            updateReports();
+        }
     }
 
     void Application::renderFrame()
@@ -174,6 +179,7 @@ namespace Paladin
         }
         if (screen_ != Screen::MainMenu && simulation_)
         {
+            ledgerPanel_->render(*renderer_, *grayUiRenderer_);
             renderDebug();
         }
         renderer_->endFrame();
@@ -195,6 +201,10 @@ namespace Paladin
             return handleMainMenuEvent(event);
         }
         if (controlsVisible && handleSimulationControlEvent(event))
+        {
+            return true;
+        }
+        if (handleReportEvent(event))
         {
             return true;
         }

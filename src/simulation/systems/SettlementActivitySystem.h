@@ -59,6 +59,16 @@ namespace Paladin
         double childMaturationMinutes = 2 * 1440;
         double adultYearMinutes = 18 * 1440;
         std::uint16_t adulthoodAge = 16;
+        std::size_t maximumDependentChildrenPerCouple = 2;
+        double childcareWanderMinutes = 4;
+        double toddlerCareHealthPerDay = 6;
+        double toddlerCareHappinessPerDay = 12;
+        double toddlerNeglectHealthPerDay = 12;
+        double toddlerNeglectHappinessPerDay = 20;
+        double childcareAbsenceGraceMinutes = 60;
+        double childcareHealthGraceMinutes = 180;
+        double childcareRecoveryMinutesPerMinute = 2;
+        double caregiverMinimumHealth = 25;
         std::uint16_t fertilityEndAge = 45;
         double parentHealthThreshold = 80;
         std::uint16_t independentEatingAge = 5;
@@ -67,6 +77,10 @@ namespace Paladin
         double dependentFoodShare = .5;
         double familyMealTimeoutMinutes = 180;
         int leisureRadius = 8;
+        int childNeighborhoodRadius = 4;
+        double familiarityPerTalkMinute = .4;
+        double maximumFamiliarity = 100;
+        double familiarityPreference = .03;
         double hungerPerDay = 100;
         double foodSeekThreshold = 50;
         double urgentFoodThreshold = 70;
@@ -121,6 +135,11 @@ namespace Paladin
     {
     public:
         CitizenSimulationPolicy policy;
+        bool caregivingAtWorkTime(
+            const SettlementMap&,
+            const SettlementCitizen&,
+            double minute
+        ) const;
         std::size_t housingCapacity() const noexcept
         {
             return families_.housingCapacity();
@@ -141,6 +160,20 @@ namespace Paladin
         }
 
     private:
+        friend struct SettlementActivityTestFixture;
+        bool choosePastureWork(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute
+        );
+        void executePastureWork(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute,
+            double elapsed
+        );
         bool chooseAnimalWork(
             SettlementMap&,
             SettlementCitizenState&,
@@ -209,6 +242,21 @@ namespace Paladin
             SettlementCitizen&,
             double minute
         );
+        bool manageToddler(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double
+        );
+        bool inChildNeighborhood(
+            const SettlementMap&,
+            const SettlementCitizen&,
+            SettlementTilePosition
+        ) const;
+        bool childRouteIsLocal(
+            const SettlementMap&,
+            const SettlementCitizen&
+        ) const;
         void produce(
             SettlementMap&,
             const SettlementCitizenState&,

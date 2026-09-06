@@ -39,7 +39,12 @@ namespace Paladin
         double handlerCapacity = 6;
         double productiveWorkdayMinutes = 720;
         double huntMinutes = 30;
-        double minimumStockingEfficiency = .5;
+        double usablePastureFraction = .9;
+        double herdRadius = 3;
+        double cohesionWeight = 1.5;
+        double tendingMinutes = 20;
+        double tendingCooldownMinutes = 15;
+        double tendingReservationMinutes = 90;
     };
     struct SettlementAnimal : EntityState
     {
@@ -50,9 +55,11 @@ namespace Paladin
         SettlementObjectId pasture;
         SettlementObjectId reservedPasture;
         CitizenId handler;
+        CitizenId tender;
+        double tendingReservedUntil = 0;
+        double lastTendedMinute = -100000;
         AnimalOrder order = AnimalOrder::None;
         double nextWanderMinute = 0;
-        double productionAccrued = 0;
         std::uint64_t sequence = 0;
         bool female = false;
         bool juvenile = false;
@@ -74,6 +81,13 @@ namespace Paladin
     {
     public:
         AnimalPolicy policy;
+        void captureVisualPositions()
+        {
+            for (auto& a : animals_)
+            {
+                a.captureVisual(a.visualX(), a.visualY());
+            }
+        }
         void initialize(const SettlementMap&, std::uint64_t seed);
         EntityId spawn(
             const SettlementMap&,
@@ -94,6 +108,22 @@ namespace Paladin
         std::size_t cancel(const SettlementObjectFootprint&);
         void release(CitizenId);
         int usedSpace(SettlementObjectId) const;
+        std::int64_t capacity(const SettlementObjectFootprint& footprint) const
+        {
+            const auto area = std::int64_t(footprint.width) * footprint.height;
+            return std::min(
+                area,
+                std::max<std::int64_t>(
+                    4,
+                    std::int64_t(
+                        std::floor(
+                            area *
+                            std::clamp(policy.usablePastureFraction, 0.0, 1.0)
+                        )
+                    )
+                )
+            );
+        }
         int containedCount(SettlementObjectId) const;
         bool reserve(
             EntityId,

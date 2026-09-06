@@ -315,6 +315,12 @@ namespace Paladin
                     continue;
                 }
                 auto planned = c;
+                auto parentPlan = *parent;
+                const auto* childHome =
+                    map.objectState().completedObject(c.homeId);
+                const bool bringMealHome =
+                    childHome && childHome->door &&
+                    !inChildNeighborhood(map, c, parent->tilePosition);
                 const auto* home =
                     parent->insideHome
                         ? map.objectState().completedObject(parent->homeId)
@@ -324,7 +330,24 @@ namespace Paladin
                     continue;
                 }
                 const bool togetherAtHome = home && c.insideHome;
-                if (!togetherAtHome &&
+                if (bringMealHome)
+                {
+                    const auto meeting =
+                        outsideDoor(childHome->footprint, *childHome->door);
+                    if (!route(
+                            map,
+                            citizens,
+                            parentPlan,
+                            {meeting, 1, 1},
+                            true
+                        ) ||
+                        !route(map, citizens, planned, {meeting, 1, 1}, true))
+                    {
+                        continue;
+                    }
+                }
+                else if (
+                    !togetherAtHome &&
                     !route(
                         map,
                         citizens,
@@ -333,7 +356,8 @@ namespace Paladin
                             ? home->footprint
                             : SettlementObjectFootprint{parent->tilePosition, 1, 1},
                         !home
-                    ))
+                    )
+                )
                 {
                     if (routeBudgetLimited_)
                     {
@@ -351,7 +375,14 @@ namespace Paladin
                 {
                     c.destination = c.tilePosition;
                 }
-                parent->destination = parent->tilePosition;
+                if (bringMealHome)
+                {
+                    copyRoute(*parent, parentPlan);
+                }
+                else
+                {
+                    parent->destination = parent->tilePosition;
+                }
                 c.task.kind = parent->task.kind = CitizenTaskKind::FamilyMeal;
                 c.task.partner = parent->id;
                 parent->task.partner = c.id;
@@ -1034,6 +1065,10 @@ namespace Paladin
             return false;
         }
         const auto workplace = *job;
+        if (workplace.objectTypeId == SettlementObjectTypes::Pastureland)
+        {
+            return choosePastureWork(map, citizens, c, minute);
+        }
         if (workplace.objectTypeId == SettlementObjectTypes::Market)
         {
             int slot = 0;

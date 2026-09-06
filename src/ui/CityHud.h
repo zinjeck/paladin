@@ -25,6 +25,9 @@ namespace Paladin
         Technology,
         Military,
         Economy,
+        Events,
+        Ledger,
+        ToggleRoofs,
         Back
     };
 
@@ -32,6 +35,19 @@ namespace Paladin
     {
     public:
         CityHud();
+        bool roofControlAt(float x, float y) const
+        {
+            return !worldMode_ && roofsButton_.containsPoint(x, y);
+        }
+        void setRoofsVisible(bool value)
+        {
+            roofsButton_.setSelected(value);
+        }
+        bool reportControlAt(float x, float y) const noexcept
+        {
+            return eventsButton_.containsPoint(x, y) ||
+                   ledgerButton_.containsPoint(x, y);
+        }
         void setTreasuryGold(std::int64_t cents) noexcept
         {
             treasuryGold_ = cents;
@@ -116,7 +132,10 @@ namespace Paladin
         [[nodiscard]]
         bool optionIsVisible(std::size_t optionIndex) const noexcept;
 
+        UiButton roofsButton_{"Roofs O"};
         UiButton backButton_;
+        UiButton eventsButton_{"!!!"};
+        UiButton ledgerButton_{"L"};
         UiButton populationButton_{""};
         std::array<UiButton, 5> topButtons_;
         UiRectangle minimapPanel_;

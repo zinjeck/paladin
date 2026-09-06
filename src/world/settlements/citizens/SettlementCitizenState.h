@@ -11,6 +11,7 @@
 #include <functional>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Paladin
@@ -62,6 +63,13 @@ namespace Paladin
     };
     struct SettlementCitizen : EntityState
     {
+        // Sparse relationships: only citizens who have actually conversed.
+        std::unordered_map<CitizenId, double, StrongIdHash> familiarities;
+        double familiarityWith(CitizenId other) const
+        {
+            const auto it = familiarities.find(other);
+            return it == familiarities.end() ? 0 : it->second;
+        }
         CitizenSex sex = CitizenSex::Male;
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
@@ -78,6 +86,8 @@ namespace Paladin
         double fertilityTarget = 0;
         std::uint64_t birthSequence = 0;
         CitizenId caregiverId;
+        // Scheduling history, not a need/stat: brief essential trips are safe.
+        double unsupervisedMinutes = 0;
         int youngDependents = 0;
         double publicMealShare = 0;
         double publicFoodDissatisfaction = 0;
@@ -164,6 +174,13 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<const SettlementCitizen> citizens() const noexcept;
+        void captureVisualPositions()
+        {
+            for (auto& c : citizens_)
+            {
+                c.captureVisual(c.visualX(), c.visualY());
+            }
+        }
 
         [[nodiscard]]
         const SettlementCitizen* citizen(CitizenId id) const noexcept;

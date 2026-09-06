@@ -9,7 +9,9 @@ namespace Paladin
         FisheryWorkplace{SettlementObjectTypes::FishingGrounds, 4, 4, 9, 50};
     struct FisheryJobPolicy
     {
-        double minutesPerFish = 240;
+        // 18 meals per uninterrupted 12-hour shift; travel, meals and breaks
+        // bring practical output closer to 8-10 (an adult eats about 2/day).
+        double minutesPerFish = 40;
         int waterTilesPerWorker = 12;
         int baseReach = 4;
         int referenceArea = 4;

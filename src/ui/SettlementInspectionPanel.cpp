@@ -71,6 +71,7 @@ namespace Paladin
     )
     {
         const SettlementObjectState& objectState = settlementMap.objectState();
+        spouseId_ = {};
 
         const CompletedSettlementObject* object =
             controller.selectedObject(objectState);
@@ -245,8 +246,7 @@ namespace Paladin
                         ) +
                         "/" +
                         std::to_string(
-                            std::int64_t(object->footprint.width) *
-                            object->footprint.height
+                            settlementMap.animals.capacity(object->footprint)
                         ),
                     renderedBounds_.x + 13,
                     renderedBounds_.y + renderedBounds_.height - 54,
@@ -399,7 +399,22 @@ namespace Paladin
                 210
             );
             const auto* spouse = citizenState.citizen(citizen->spouseId);
-            label(spouse ? "Married: " + spouse->name : "Not married", 238);
+            spouseId_ = spouse ? spouse->id : CitizenId{};
+            if (spouse)
+            {
+                spouseButton_.setBounds(
+                    {renderedBounds_.x + 13,
+                     renderedBounds_.y + 234,
+                     renderedBounds_.width - 26,
+                     26}
+                );
+                spouseButton_.setText("Married: " + spouse->name);
+                spouseButton_.render(renderer, grayUiRenderer);
+            }
+            else
+            {
+                label("Not married", 238);
+            }
             label(
                 "Job: " + (citizen->child ? std::string("Child")
                            : job          ? job->name
@@ -594,6 +609,9 @@ namespace Paladin
 
     void SettlementInspectionPanel::clearLayout() noexcept
     {
+        spouseId_ = {};
+        navigateCitizen_ = {};
+        spouseButton_.cancelPress();
         renderedBounds_ = {};
         hasRenderedBounds_ = false;
         dragCandidate_ = dragging_ = detached_ = false;
@@ -623,6 +641,7 @@ namespace Paladin
             increaseButton_.cancelPress();
         }
         nameButton_.pointerMoved(x, y);
+        spouseButton_.pointerMoved(x, y);
         keepSalesButton_.pointerMoved(x, y);
         decreaseButton_.pointerMoved(x, y);
         increaseButton_.pointerMoved(x, y);
@@ -634,6 +653,11 @@ namespace Paladin
             return false;
         }
         dragCandidate_ = !nameField_.focused();
+        if (spouseId_ && spouseButton_.pointerPressed(x, y))
+        {
+            dragCandidate_ = false;
+            return true;
+        }
         if (showingKeep_ && keepSalesButton_.pointerPressed(x, y))
         {
             dragCandidate_ = false;
@@ -666,6 +690,11 @@ namespace Paladin
             return;
         }
         const bool title = nameButton_.pointerReleased(x, y);
+        if (spouseId_ && spouseButton_.pointerReleased(x, y) &&
+            citizens.citizen(spouseId_))
+        {
+            navigateCitizen_ = spouseId_;
+        }
         if (showingKeep_ && keepSalesButton_.pointerReleased(x, y))
         {
             map.commerce.keepFoodSalesEnabled =

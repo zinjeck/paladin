@@ -26,6 +26,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL3_ttf)
 
+# PNG exports from the artist; use SDL_image's maintained bundled decoder.
+set(SDLIMAGE_BACKEND_STB ON CACHE BOOL "" FORCE)
+set(SDLIMAGE_VENDORED OFF CACHE BOOL "" FORCE)
+foreach(format AVIF JPG JXL LBM PCX PNM QOI SVG TGA TIF WEBP XCF XPM XV)
+    set(SDLIMAGE_${format} OFF CACHE BOOL "" FORCE)
+endforeach()
+set(SDLIMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(SDL3_image
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
+    GIT_TAG release-3.2.4
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
+)
+FetchContent_MakeAvailable(SDL3_image)
+
 add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
@@ -33,6 +49,7 @@ add_executable(Paladin
     src/core/ApplicationWorldScreen.cpp
     src/core/ApplicationCityScreen.cpp
     src/core/ApplicationFrame.cpp
+    src/core/ApplicationReports.cpp
     src/core/ApplicationCityInput.cpp
     src/core/ApplicationWorldInput.cpp
     src/core/ApplicationSession.cpp
@@ -47,6 +64,8 @@ add_executable(Paladin
     src/platform/Window.cpp
     src/rendering/Renderer.cpp
     src/rendering/CityRenderer.cpp
+    src/rendering/SceneSpriteLibrary.cpp
+    src/rendering/SettlementStructurePresentation.cpp
     src/rendering/SettlementLogisticsRenderer.cpp
     src/rendering/SettlementNaturalFeatureRenderer.cpp
     src/rendering/Texture.cpp
@@ -60,6 +79,7 @@ add_executable(Paladin
     src/rendering/TerritoryPresentationPolicy.cpp
     src/rendering/TerritoryRenderer.cpp
     src/simulation/Simulation.cpp
+    src/simulation/SimulationReports.cpp
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
@@ -108,6 +128,8 @@ add_executable(Paladin
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/CityHud.cpp
+    src/ui/LedgerPanel.cpp
+    src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
     src/ui/DebugConsole.cpp
     src/ui/GrayUiRenderer.cpp
@@ -125,7 +147,7 @@ target_include_directories(Paladin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(Paladin PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+target_link_libraries(Paladin PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf SDL3_image::SDL3_image)
 
 add_custom_command(
     TARGET Paladin POST_BUILD
@@ -135,12 +157,23 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:SDL3_ttf::SDL3_ttf>
         $<TARGET_FILE_DIR:Paladin>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3_image::SDL3_image>
+        $<TARGET_FILE_DIR:Paladin>
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:Paladin>/assets/fonts
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Arimo-Regular.ttf
         $<TARGET_FILE_DIR:Paladin>/assets/fonts/Arimo-Regular.ttf
 )
+
+# Copies only runtime exports. Art masters and the asset Git policy stay separate.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites")
+    add_custom_target(PaladinSpriteAssets ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites $<TARGET_FILE_DIR:Paladin>/assets/sprites)
+    add_dependencies(Paladin PaladinSpriteAssets)
+endif()
 
 # ============================================================
 # Tests
@@ -150,6 +183,7 @@ enable_testing()
 
 add_executable(PaladinTests
     tests/TestMain.cpp
+    src/simulation/SimulationReports.cpp
     tests/SettlementSimulationLoopTests.cpp
     tests/SettlementActivityTests.cpp
     tests/SettlementEmploymentTests.cpp
@@ -228,7 +262,7 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
         ${PALADIN_APPLICATION_SOURCES}
     )
     target_include_directories(PaladinApplicationSmokeTests PRIVATE src tests)
-    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf SDL3_image::SDL3_image)
     # Reuse the game's runtime DLL/font packaging even when building only this target.
     add_dependencies(PaladinApplicationSmokeTests Paladin)
     add_test(NAME PaladinApplicationSmokeTests COMMAND PaladinApplicationSmokeTests)

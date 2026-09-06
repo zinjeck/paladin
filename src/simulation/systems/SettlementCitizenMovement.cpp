@@ -132,6 +132,8 @@ namespace Paladin
                      (citizen.tilePosition == *home->door &&
                       next == outsideDoor(home->footprint, *home->door)) ||
                      ((citizen.task.kind == CitizenTaskKind::Home ||
+                       citizen.task.kind == CitizenTaskKind::Care ||
+                       citizen.task.kind == CitizenTaskKind::FamilyMeal ||
                        citizen.task.kind == CitizenTaskKind::Sleep) &&
                       citizen.tilePosition ==
                           outsideDoor(home->footprint, *home->door) &&
@@ -217,7 +219,8 @@ namespace Paladin
         for (std::size_t scan = 0; scan < count; ++scan)
         {
             auto& citizen = citizens_[decisionCursor_++ % citizens_.size()];
-            if (!map.grid().isValidPosition(citizen.tilePosition) ||
+            if (citizen.child ||
+                !map.grid().isValidPosition(citizen.tilePosition) ||
                 citizen.activity != CitizenActivity::Idle ||
                 citizen.task.kind != CitizenTaskKind::None ||
                 !citizen.path.empty())
