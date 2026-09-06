@@ -251,6 +251,17 @@ namespace Paladin
             ));
             SceneDrawQueue bounded;
             SceneSpriteLibrary placeholders;
+            placeholders.load(
+                renderer,
+                std::string(SDL_GetBasePath()) + "assets/sprites"
+            );
+            for (const auto& definition :
+                 SettlementObjectCatalog::definitions())
+            {
+                PALADIN_CHECK(!placeholders
+                                   .objectStyle(std::string(definition.id))
+                                   .floor.empty());
+            }
             SettlementStructurePresentation structure;
             const SceneProjection close{
                 250,
@@ -289,10 +300,34 @@ namespace Paladin
             std::ofstream(directory / "sprites.catalog")
                 << "citizen alpha.png 2 1 0.5 1 0 0\ninvalid missing.png 1 1 "
                    ".5 1 0 0\n";
+            std::ofstream(directory / "objects.catalog")
+                << "house single - - - citizen 3 3 1 .12 0 0 0 0 0 dbd6c2 "
+                   "524d3d .6 .45\n"
+                   "invalid modules - - - - 0 1 1 .1 0 0 0 0 0 ffffff 555555 "
+                   ".6 .45\n";
             SceneSpriteLibrary library;
             library.load(renderer, directory.string());
             PALADIN_CHECK(library.find("citizen"));
             PALADIN_CHECK(!library.find("invalid"));
+            PALADIN_CHECK(library.objectHasArt("house"));
+            PALADIN_CHECK(library.objectStyle("invalid").mode == "ground");
+            SceneDrawQueue replacement;
+            const SceneProjection replacementView{
+                13.5,
+                13.5,
+                64,
+                renderer.outputWidth(),
+                renderer.outputHeight()
+            };
+            structure.submit(
+                replacement,
+                replacementView,
+                map,
+                city.presentation,
+                library
+            );
+            PALADIN_CHECK(replacement.size() == 1);
+            PALADIN_CHECK(replacement.items().front().texture != nullptr);
             PALADIN_CHECK(!renderer.loadImageTexture(
                 (directory / "missing.png").string().c_str()
             ));
@@ -319,6 +354,50 @@ namespace Paladin
             );
             PALADIN_CHECK(red.red == 255 && red.green == 0);
             PALADIN_CHECK(transparent.red == 18 && transparent.green == 20);
+            renderer.endFrame();
+            SettlementGrid galleryGrid(48, 48);
+            for (int y = 0; y < 48; ++y)
+            {
+                for (int x = 0; x < 48; ++x)
+                {
+                    galleryGrid.tile({x, y})->terrain = TerrainType::Land;
+                    galleryGrid.tile({x, y})->biome = BiomeType::Plain;
+                }
+            }
+            SettlementMap
+                gallery(std::move(galleryGrid), {0, 0}, 1, 1, 48, 703);
+            int slot = 0;
+            for (auto definition : SettlementObjectCatalog::definitions())
+            {
+                definition.bypassesConstruction = true;
+                const bool fixed = definition.selectionMode ==
+                                   SettlementFootprintSelectionMode::Fixed;
+                PALADIN_CHECK(gallery.objectState().placeCompletedObject(
+                    gallery.grid(),
+                    definition,
+                    {{4 + (slot % 3) * 12, 4 + (slot / 3) * 12},
+                     fixed ? definition.previewWidth : 6,
+                     fixed ? definition.previewHeight : 6}
+                ));
+                ++slot;
+            }
+            Camera2D galleryCamera(21, 20);
+            galleryCamera.setZoom(4);
+            SettlementCitizenState noPeople;
+            renderer.beginFrame();
+            city.render(
+                renderer,
+                gallery,
+                galleryCamera,
+                metrics,
+                placement,
+                commands,
+                noPeople,
+                inspection,
+                1,
+                12
+            );
+            capture(app, "presentation-all-objects.bmp");
             renderer.endFrame();
         }
 
@@ -556,6 +635,16 @@ namespace Paladin
             PALADIN_CHECK(
                 click(app, spouseBounds.x + 60, spouseBounds.y + 246)
             );
+            PALADIN_CHECK(
+                app.settlementInspectionController_->selectedCitizen(people)
+                    ->id == people.citizens()[0].id
+            );
+            PALADIN_CHECK(click(
+                app,
+                spouseBounds.x + 31 +
+                    BitmapFontRenderer{}.measureWidth("Married: ", 1.7F),
+                spouseBounds.y + 246
+            ));
             PALADIN_CHECK(
                 app.settlementInspectionController_->selectedCitizen(people)
                     ->id == people.citizens()[1].id

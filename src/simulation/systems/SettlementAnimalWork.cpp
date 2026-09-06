@@ -144,12 +144,56 @@ namespace Paladin
         double elapsed
     )
     {
-        const auto* animal = map.animals.find(c.task.animal);
-        if (!animal || animal->handler != c.id || animal->health <= 0 ||
-            animal->tilePosition != c.tilePosition)
+        auto* animal = map.animals.find(c.task.animal);
+        if (!animal || animal->handler != c.id || animal->health <= 0)
         {
             finish(map, c, minute);
             return;
+        }
+        if (animal->tilePosition != c.tilePosition)
+        {
+            // A designation reserves the job, not the animal's movement.
+            // Pursue its live location without releasing/reacquiring the job.
+            if (minute < c.nextDecisionMinute ||
+                (!c.task.delivering && !c.path.empty() &&
+                 c.destination == animal->tilePosition))
+            {
+                return;
+            }
+            auto planned = c;
+            if (route(
+                    map,
+                    citizens,
+                    planned,
+                    {animal->tilePosition, 1, 1},
+                    true
+                ))
+            {
+                adoptRoute(c, planned);
+                c.task.delivering = false;
+                if (animal->beingLed && !animal->pasture)
+                {
+                    animal->herdCenter = animal->tilePosition;
+                }
+                animal->beingLed = false;
+            }
+            else if (!routeBudgetLimited_)
+            {
+                finish(map, c, minute);
+            }
+            c.nextDecisionMinute = minute + 2;
+            return;
+        }
+        if (c.task.delivering && !c.path.empty())
+        {
+            return;
+        }
+        if (!c.task.delivering)
+        {
+            c.path.clear();
+            c.pathIndex = 0;
+            c.stepProgress = 0;
+            c.destination = c.tilePosition;
         }
         if (animal->order == AnimalOrder::Hunt)
         {
@@ -163,9 +207,14 @@ namespace Paladin
         }
         if (c.task.delivering)
         {
-            map.animals.contain(c.task.animal, c.id, map);
-            finish(map, c, minute);
-            return;
+            if (map.animals.contain(c.task.animal, c.id, map))
+            {
+                finish(map, c, minute);
+                return;
+            }
+            // A blocked route is not delivery. Replan without dropping the
+            // lead.
+            c.task.delivering = false;
         }
         const auto* pasture = map.objectState().completedObject(c.task.object);
         if (!pasture)
@@ -184,6 +233,7 @@ namespace Paladin
         }
         adoptRoute(c, planned);
         c.task.delivering = true;
+        animal->beingLed = true;
     }
     bool SettlementActivitySystem::choosePastureWork(
         SettlementMap& map,

@@ -177,6 +177,16 @@ endif()
 
 # ============================================================
 # Tests
+# Presentation recipes are source-controlled; artwork remains private.
+add_custom_target(PaladinObjectPresentation ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Paladin>/assets/sprites
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/config/city-objects.catalog
+        $<TARGET_FILE_DIR:Paladin>/assets/sprites/objects.catalog)
+if(TARGET PaladinSpriteAssets)
+    add_dependencies(PaladinObjectPresentation PaladinSpriteAssets)
+endif()
+add_dependencies(Paladin PaladinObjectPresentation)
 # ============================================================
 
 enable_testing()

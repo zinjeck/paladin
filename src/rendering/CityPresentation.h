@@ -11,16 +11,10 @@ namespace Paladin
         bool roofsVisible = true;
         bool shadowsVisible = true;
         bool daylightEnabled = true;
-        double wallHeight = .65;
-        double wallThickness = .12;
         double treeElevation = .45;
         double detailTilePixels = 8;
         RenderColor shadowColor{12, 16, 24, 65};
 
-        static bool enclosed(std::string_view type)
-        {
-            return type == "house" || type == "city_keep" || type == "bakery";
-        }
         RenderColor ambient(double hour) const
         {
             // Deliberately restrained until the artist supplies a palette.

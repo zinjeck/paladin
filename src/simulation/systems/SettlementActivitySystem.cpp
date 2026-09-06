@@ -523,6 +523,11 @@ namespace Paladin
         double elapsed
     )
     {
+        if (c.task.kind == CitizenTaskKind::AnimalWork)
+        {
+            executeAnimalWork(map, citizens, c, minute, elapsed);
+            return;
+        }
         if (c.task.kind == CitizenTaskKind::None || !c.path.empty())
         {
             return;
@@ -530,11 +535,6 @@ namespace Paladin
         if (c.tilePosition != c.destination)
         {
             finish(map, c, minute);
-            return;
-        }
-        if (c.task.kind == CitizenTaskKind::AnimalWork)
-        {
-            executeAnimalWork(map, citizens, c, minute, elapsed);
             return;
         }
         if (c.task.kind == CitizenTaskKind::FamilyMeal)

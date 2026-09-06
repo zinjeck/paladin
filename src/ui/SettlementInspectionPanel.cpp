@@ -402,13 +402,21 @@ namespace Paladin
             spouseId_ = spouse ? spouse->id : CitizenId{};
             if (spouse)
             {
+                label("Married:", 238);
+                const float prefixWidth =
+                    retroFontRenderer_.measureWidth("Married: ", 1.7F);
+                const float left = renderedBounds_.x + 13 + prefixWidth + 8;
                 spouseButton_.setBounds(
-                    {renderedBounds_.x + 13,
+                    {left,
                      renderedBounds_.y + 234,
-                     renderedBounds_.width - 26,
+                     std::min(
+                         renderedBounds_.x + renderedBounds_.width - 13 - left,
+                         retroFontRenderer_.measureWidth(spouse->name, 1.5F) +
+                             20
+                     ),
                      26}
                 );
-                spouseButton_.setText("Married: " + spouse->name);
+                spouseButton_.setText(spouse->name);
                 spouseButton_.render(renderer, grayUiRenderer);
             }
             else

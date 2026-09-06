@@ -127,7 +127,8 @@ namespace Paladin
             settlementMap,
             camera,
             metrics,
-            placementController
+            placementController,
+            sprites_
         );
 
         structures_

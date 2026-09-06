@@ -5,13 +5,13 @@
 #include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementPlacementPalette.h"
 #include "rendering/Texture.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
-#include "world/settlements/objects/jobs/market/MarketJob.h"
 
 #include <algorithm>
 #include <array>
@@ -233,7 +233,8 @@ namespace Paladin
         const SettlementMap& settlementMap,
         const Camera2D& camera,
         const TileRenderMetrics& metrics,
-        const SettlementObjectPlacementController& placementController
+        const SettlementObjectPlacementController& placementController,
+        const SceneSpriteLibrary& sprites
     ) const
     {
         const SettlementObjectState& state = settlementMap.objectState();
@@ -308,54 +309,17 @@ namespace Paladin
                     continue;
                 }
 
-                paintFootprint(
-                    pixels,
-                    settlementMap.grid().width(),
-                    object.footprint,
-                    renderColor(definition->visual.fillColor, 255)
-                );
-                if (object.door && object.footprint.contains(*object.door))
-                {
-                    auto color = renderColor(definition->visual.fillColor, 255);
-                    color = doorColor(*definition, color.alpha);
-                    paintFootprint(
-                        pixels,
-                        settlementMap.grid().width(),
-                        {object.door.value(), 1, 1},
-                        color
-                    );
-                }
-                if (object.objectTypeId == SettlementObjectTypes::Market)
-                {
-                    const auto& f = object.footprint;
-                    for (int slot = 0;
-                         slot < marketStallCount(f.width, f.height);
-                         ++slot)
-                    {
-                        const auto p =
-                            marketStallTile(f.topLeft, f.width, f.height, slot);
-                        paintFootprint(
-                            pixels,
-                            settlementMap.grid().width(),
-                            {{p.x - 1, p.y - 1},
-                             std::min(3, f.topLeft.x + f.width - p.x + 1),
-                             1},
-                            {150, 49, 38, 255}
-                        );
-                        paintFootprint(
-                            pixels,
-                            settlementMap.grid().width(),
-                            {{p.x, p.y - 1}, 1, 1},
-                            {232, 202, 143, 255}
-                        );
-                    }
-                }
-
-                if (definition->id != SettlementObjectTypes::Road)
+                // Completed visuals belong to the presentation renderer only.
+                // Never bake placeholder color/props beneath replacement art.
+                const auto& style = sprites.objectStyle(object.objectTypeId);
+                if (style.outline && !sprites.objectHasArt(object.objectTypeId))
                 {
                     cachedInfrastructureOutlines_.push_back(footprintOutline(
                         object.footprint,
-                        renderColor(definition->visual.frameColor, 255)
+                        {std::uint8_t(style.frameRgb >> 16),
+                         std::uint8_t(style.frameRgb >> 8),
+                         std::uint8_t(style.frameRgb),
+                         255}
                     ));
                 }
             }

@@ -137,6 +137,65 @@ namespace
 void runSettlementSimulationLoopTests()
 {
     {
+        auto map = land();
+        SettlementCitizenState people;
+        found(map, people, 1);
+        const auto pasture = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{12, 12}, 4, 4}
+        );
+        for (const auto order : {AnimalOrder::Gather, AnimalOrder::Hunt})
+        {
+            const auto id = map.animals.spawn(map, "cow", {28, 28});
+            PALADIN_CHECK(id);
+            map.animals.designate({{28, 28}, 1, 1}, order);
+            auto& person = SettlementActivityTestFixture::resident(people);
+            person.task.kind = CitizenTaskKind::AnimalWork;
+            person.task.animal = id;
+            PALADIN_CHECK(map.animals.reserve(id, person.id, pasture, map));
+            std::set<std::pair<int, int>> positions;
+            for (int minute = 0; minute < 50; ++minute)
+            {
+                map.animals.tick(map, people, minute, 1);
+                const auto p = map.animals.find(id)->tilePosition;
+                positions.emplace(p.x, p.y);
+            }
+            PALADIN_CHECK(positions.size() > 1);
+            // Interrupted transport establishes a valid local roaming area.
+            auto* animal = map.animals.find(id);
+            animal->beingLed = true;
+            animal->tilePosition = animal->previousTile = {8, 30};
+            animal->visualProgress = 1;
+            map.animals.release(person.id);
+            PALADIN_CHECK(animal->herdCenter == animal->tilePosition);
+            const auto start = animal->tilePosition;
+            map.animals.tick(map, people, 100, 1);
+            PALADIN_CHECK(animal->tilePosition != start);
+        }
+    }
+    {
+        auto map = land();
+        SettlementCitizenState people;
+        found(map, people, 1);
+        const auto pasture = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{12, 20}, 4, 4}
+        );
+        completed(map, SettlementObjectTypes::House, {{20, 23}, 3, 3});
+        const auto id = map.animals.spawn(map, "cow", {30, 25});
+        PALADIN_CHECK(id);
+        map.animals.designate({{30, 25}, 1, 1}, AnimalOrder::Gather);
+        for (int minute = 360; minute < 660 && !map.animals.find(id)->pasture;
+             ++minute)
+        {
+            advance(map, people, minute, 1);
+        }
+        PALADIN_CHECK(map.animals.find(id)->pasture == pasture);
+        PALADIN_CHECK(!map.animals.find(id)->beingLed);
+    }
+    {
         auto map = land(60);
         SettlementCitizenState citizens;
         found(map, citizens, 2);

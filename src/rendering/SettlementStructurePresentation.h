@@ -19,6 +19,9 @@ namespace Paladin
 
     private:
         mutable std::uint64_t instance_ = 0, version_ = ~std::uint64_t(0);
-        mutable std::vector<CompletedSettlementObject> buildings_;
+        mutable std::
+            unordered_map<std::uint64_t, std::vector<SettlementObjectId>>
+                chunks_;
+        mutable std::vector<SettlementObjectId> large_;
     };
 } // namespace Paladin

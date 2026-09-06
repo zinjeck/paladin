@@ -183,7 +183,13 @@ namespace Paladin
                     ++pendingOrders_;
                 }
                 a.order = order;
+                a.tender = {};
                 a.handler = {};
+                if (a.beingLed && !a.pasture)
+                {
+                    a.herdCenter = a.tilePosition;
+                }
+                a.beingLed = false;
                 a.reservedPasture = {};
                 ++count;
             }
@@ -199,6 +205,11 @@ namespace Paladin
             {
                 a.order = AnimalOrder::None;
                 a.handler = {};
+                if (a.beingLed && !a.pasture)
+                {
+                    a.herdCenter = a.tilePosition;
+                }
+                a.beingLed = false;
                 a.reservedPasture = {};
                 --pendingOrders_;
                 ++count;
@@ -216,6 +227,11 @@ namespace Paladin
             }
             if (a.handler == handler)
             {
+                if (a.beingLed && !a.pasture)
+                {
+                    a.herdCenter = a.tilePosition;
+                }
+                a.beingLed = false;
                 a.handler = {};
                 a.reservedPasture = {};
             }
@@ -303,6 +319,7 @@ namespace Paladin
             return false;
         }
         a->pasture = a->reservedPasture;
+        a->beingLed = false;
         if (a->order != AnimalOrder::None)
         {
             --pendingOrders_;
@@ -427,12 +444,20 @@ namespace Paladin
                 const auto* c = citizens.citizen(a.handler);
                 if (!c || c->task.animal != a.id || c->health <= 0)
                 {
+                    if (a.beingLed && !a.pasture)
+                    {
+                        a.herdCenter = a.tilePosition;
+                    }
+                    a.beingLed = false;
                     a.handler = {};
                     a.reservedPasture = {};
                 }
-                continue;
+                else if (a.beingLed)
+                {
+                    continue;
+                }
             }
-            if (a.order != AnimalOrder::None || minute < a.nextWanderMinute)
+            if (minute < a.nextWanderMinute)
             {
                 continue;
             }

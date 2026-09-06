@@ -138,9 +138,22 @@ namespace Paladin
                     continue;
                 }
                 const double size = animal.juvenile ? .65 : 1;
+                const auto* leader = animal.beingLed
+                                         ? citizens.citizen(animal.handler)
+                                         : nullptr;
+                // Use the escort's continuous movement, not a fresh one-minute
+                // animal tween restarted on every (possibly faster) road step.
+                const double groundX =
+                    leader
+                        ? leader->renderX(leader->visualX(), interpolationAlpha)
+                        : animal.renderX(animal.visualX(), interpolationAlpha);
+                const double groundY =
+                    leader
+                        ? leader->renderY(leader->visualY(), interpolationAlpha)
+                        : animal.renderY(animal.visualY(), interpolationAlpha);
                 const SceneVisual visual{
-                    animal.renderX(animal.visualX(), interpolationAlpha) + .5,
-                    animal.renderY(animal.visualY(), interpolationAlpha) + .5,
+                    groundX + .5,
+                    groundY + .5,
                     0,
                     d->markerWidth * size,
                     d->markerHeight * size,

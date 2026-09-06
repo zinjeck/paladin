@@ -15,6 +15,53 @@ namespace Paladin
         }
         loaded_ = true;
         const auto base = std::filesystem::path(root);
+        std::ifstream styles(base / "objects.catalog");
+        std::string styleLine;
+        while (std::getline(styles, styleLine))
+        {
+            if (styleLine.empty() || styleLine[0] == '#')
+            {
+                continue;
+            }
+            std::istringstream row(styleLine);
+            std::string id;
+            ObjectPresentation style;
+            int outline = 1;
+            if (!(row >> id >> style.mode >> style.floor >> style.wall >>
+                  style.roof >> style.sprite >> style.moduleWidth >>
+                  style.moduleDepth >> style.height >> style.thickness >>
+                  style.frontShade >> style.sideShade >> style.edgeLight >>
+                  style.shadowAlpha >> outline >> std::hex >> style.fillRgb >>
+                  style.frameRgb >> std::dec >> style.bodyWidth >>
+                  style.bodyDepth) ||
+                (style.mode != "ground" && style.mode != "enclosed" &&
+                 style.mode != "modules" && style.mode != "single") ||
+                !std::isfinite(style.moduleWidth) ||
+                !std::isfinite(style.moduleDepth) ||
+                !std::isfinite(style.height) ||
+                !std::isfinite(style.thickness) || style.moduleWidth < .25 ||
+                style.moduleDepth < .25 || style.moduleWidth > 64 ||
+                style.moduleDepth > 64 || style.height < 0 ||
+                style.height > 16 || style.thickness < .01 ||
+                style.thickness > 1 || style.frontShade < 0 ||
+                style.frontShade > 255 || style.sideShade < 0 ||
+                style.sideShade > 255 || style.edgeLight < 0 ||
+                style.edgeLight > 255 || style.shadowAlpha < 0 ||
+                style.shadowAlpha > 255 || (outline != 0 && outline != 1) ||
+                style.fillRgb > 0xffffff || style.frameRgb > 0xffffff ||
+                !std::isfinite(style.bodyWidth) ||
+                !std::isfinite(style.bodyDepth) || style.bodyWidth <= 0 ||
+                style.bodyWidth > 1 || style.bodyDepth <= 0 ||
+                style.bodyDepth > 1)
+            {
+                SDL_Log(
+                    "Invalid object presentation recipe; using flat fallback"
+                );
+                continue;
+            }
+            style.outline = outline != 0;
+            objects_[id] = std::move(style);
+        }
         std::ifstream input(base / "sprites.catalog");
         std::unordered_map<std::string, std::shared_ptr<Texture>> textures;
         std::string line;
@@ -82,6 +129,20 @@ namespace Paladin
         const auto it = sprites_.find(id);
         return it == sprites_.end() ? nullptr : &it->second;
     }
+    const ObjectPresentation& SceneSpriteLibrary::objectStyle(
+        const std::string& id
+    ) const
+    {
+        static const ObjectPresentation fallback;
+        const auto it = objects_.find(id);
+        return it == objects_.end() ? fallback : it->second;
+    }
+    bool SceneSpriteLibrary::objectHasArt(const std::string& id) const
+    {
+        const auto& style = objectStyle(id);
+        return find(style.floor) || find(style.wall) || find(style.roof) ||
+               find(style.sprite);
+    }
     bool SceneSpriteLibrary::submit(
         SceneDrawQueue& queue,
         const SceneProjection& projection,
@@ -132,7 +193,8 @@ namespace Paladin
         RenderColor fallback,
         double depth,
         std::uint64_t stableId,
-        int part
+        int part,
+        bool placeholder
     ) const
     {
         const auto bounds = projection.bounds(visual);
@@ -141,9 +203,35 @@ namespace Paladin
             return;
         }
         const auto* s = find(id);
-        if (!s || projection.tilePixels < 8)
+        if (!s && !placeholder)
+        {
+            return;
+        }
+        if (!s)
         {
             queue.submit({bounds, fallback, depth, stableId, 0, part});
+            return;
+        }
+        const auto overview = [&]()
+        {
+            // Art-only coarse LOD: never resurrect the placeholder under art.
+            queue.submit(
+                {bounds,
+                 {},
+                 depth,
+                 stableId,
+                 0,
+                 part,
+                 s->texture.get(),
+                 {0,
+                  0,
+                  float(s->texture->width()),
+                  float(s->texture->height())}}
+            );
+        };
+        if (projection.tilePixels < 8)
+        {
+            overview();
             return;
         }
         const double w = s->width * projection.tilePixels,
@@ -166,7 +254,7 @@ namespace Paladin
         ));
         if (std::int64_t(x1 - x0) * (y1 - y0) > 8192 || queue.size() > 32768)
         {
-            queue.submit({bounds, fallback, depth, stableId, 0, part});
+            overview();
             return;
         }
         for (int y = y0; y < y1; ++y)

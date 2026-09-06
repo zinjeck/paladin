@@ -55,6 +55,7 @@ namespace Paladin
         SettlementObjectId pasture;
         SettlementObjectId reservedPasture;
         CitizenId handler;
+        bool beingLed = false;
         CitizenId tender;
         double tendingReservedUntil = 0;
         double lastTendedMinute = -100000;

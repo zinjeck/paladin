@@ -12,6 +12,7 @@ namespace Paladin
 {
     class Camera2D;
     class Renderer;
+    class SceneSpriteLibrary;
     class SettlementMap;
     class SettlementObjectPlacementController;
     class SettlementObjectState;
@@ -33,7 +34,8 @@ namespace Paladin
             const SettlementMap& settlementMap,
             const Camera2D& camera,
             const TileRenderMetrics& metrics,
-            const SettlementObjectPlacementController& placementController
+            const SettlementObjectPlacementController& placementController,
+            const SceneSpriteLibrary& sprites
         ) const;
 
         void renderOverlay(
