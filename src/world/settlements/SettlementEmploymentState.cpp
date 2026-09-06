@@ -5,6 +5,7 @@
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/jobs/bakery/BakeryJob.h"
 #include "world/settlements/objects/jobs/fishery/FisheryJob.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 #include "world/settlements/objects/jobs/pastureland/PasturelandJob.h"
 #include "world/settlements/objects/jobs/stockpile/StockpileJob.h"
 #include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
@@ -17,7 +18,8 @@ namespace Paladin
     namespace
     {
         // Reference-area capacities follow Godot; stockpile staffing is new.
-        constexpr std::array<WorkplaceDefinition, 5> definitions{
+        constexpr std::array<WorkplaceDefinition, 6> definitions{
+            MarketWorkplace,
             StockpileWorkplace,
             FisheryWorkplace,
             WheatFarmWorkplace,
@@ -168,6 +170,11 @@ namespace Paladin
                 )
             );
             found->operational = bool(objectId);
+            if (type == SettlementObjectTypes::Market)
+            {
+                found->maximumCapacity =
+                    marketStallCount(footprint.width, footprint.height);
+            }
             found->capacity =
                 found->operational
                     ? std::min(found->capacity, found->maximumCapacity)

@@ -32,6 +32,7 @@ namespace Paladin
         jobBoard_.releaseClaim(c.task);
         c.carriedAmount = 0;
         c.carriedResource.clear();
+        c.haulDeliveryPath.clear();
         c.task = {};
         c.activity = CitizenActivity::Idle;
         c.assignedCommandId = {};
@@ -81,6 +82,7 @@ namespace Paladin
         map.logistics.synchronize(map.objectState(), minute);
         families_.update(map, citizens, policy, *this, minute, elapsed);
         map.employment().synchronize(map.objectState(), citizens);
+        map.commerce.update(map, citizens, minute, elapsed);
         assignHomes(map, citizens);
         if (jobBoard_.refreshCommandBoard(map))
         {
@@ -100,6 +102,7 @@ namespace Paladin
         {
             if (c.health <= 1e-7)
             {
+                map.commerce.citizenDeparted(c.id);
                 map.employment().citizenDeparted(c.workplaceId);
                 c.workplaceId = {};
                 finish(map, c, minute);
@@ -129,6 +132,7 @@ namespace Paladin
             }
             if (c.health <= 1e-7)
             {
+                map.commerce.citizenDeparted(c.id);
                 map.employment().citizenDeparted(c.workplaceId);
                 c.workplaceId = {};
                 finish(map, c, minute);
@@ -137,10 +141,22 @@ namespace Paladin
             const bool shift = policy.isWorkTime(minute);
             const auto* w = map.employment().workplace(c.workplaceId);
             bool valid = true;
+            if (c.task.kind == CitizenTaskKind::FamilyMeal)
+            {
+                const auto* other = citizens.citizen(c.task.partner);
+                valid =
+                    other && other->health > 0 && minute < c.task.endMinute &&
+                    other->task.kind == CitizenTaskKind::FamilyMeal &&
+                    other->task.partner == c.id &&
+                    (c.child
+                         ? (other->id == c.motherId || other->id == c.fatherId)
+                         : (other->child && (other->motherId == c.id ||
+                                             other->fatherId == c.id)));
+            }
             if (c.task.kind == CitizenTaskKind::Work)
             {
-                valid = shift && w && w->operational &&
-                        w->objectId == c.task.object;
+                valid = c.youngDependents == 0 && shift && w &&
+                        w->operational && w->objectId == c.task.object;
             }
             if (c.task.kind == CitizenTaskKind::Sleep)
             {
@@ -158,9 +174,16 @@ namespace Paladin
                 valid = other && other->task.kind == CitizenTaskKind::Talk &&
                         other->task.partner == c.id &&
                         (!c.workplaceId || !shift || c.breakUntil > minute) &&
-                        (c.workplaceId ||
+                        (c.child || !shift || c.workplaceId ||
                          (map.commandState().commands().empty() &&
                           map.objectState().constructionSites().empty()));
+            }
+            if (c.task.kind == CitizenTaskKind::Care)
+            {
+                valid =
+                    (c.youngDependents > 0 ||
+                     (c.child && c.ageYears < policy.independentEatingAge)) &&
+                    c.homeId == c.task.object;
             }
             if (c.task.kind == CitizenTaskKind::Home)
             {
@@ -189,7 +212,9 @@ namespace Paladin
                         valid &&
                         (!c.workplaceId ||
                          (shift && w && destination &&
-                          w->objectTypeId == SettlementObjectTypes::Stockpile &&
+                          (w->objectTypeId ==
+                               SettlementObjectTypes::Stockpile ||
+                           w->objectTypeId == SettlementObjectTypes::Market) &&
                           w->objectId == destination->objectId));
                 }
             }
@@ -212,6 +237,16 @@ namespace Paladin
                                                c.task.site
                                            );
                 valid = valid && designated;
+            }
+            if (c.youngDependents > 0 &&
+                (c.task.kind == CitizenTaskKind::Build ||
+                 c.task.kind == CitizenTaskKind::Gather ||
+                 c.task.kind == CitizenTaskKind::Demolish ||
+                 c.task.kind == CitizenTaskKind::Haul ||
+                 c.task.kind == CitizenTaskKind::Talk ||
+                 c.task.kind == CitizenTaskKind::Break))
+            {
+                valid = false;
             }
             if (!valid)
             {
@@ -259,7 +294,10 @@ namespace Paladin
                                ) /
                                1440 >=
                     policy.urgentFoodThreshold;
-            if (c.task.kind != CitizenTaskKind::Eat &&
+            if ((!c.child || c.ageYears >= policy.independentEatingAge) &&
+                c.task.kind != CitizenTaskKind::Eat &&
+                (c.task.kind != CitizenTaskKind::FamilyMeal ||
+                 (!c.child && c.hunger >= policy.urgentFoodThreshold)) &&
                 (c.hunger >= c.foodSeekHunger || preSleepMeal) &&
                 (c.carriedAmount == 0 ||
                  c.hunger >= policy.urgentFoodThreshold) &&
@@ -275,6 +313,10 @@ namespace Paladin
                 c.observedLogisticsVersion = map.logistics.version();
                 c.nextDecisionMinute = minute + policy.retryMinutes;
             }
+            if (c.task.kind == CitizenTaskKind::FamilyMeal)
+            {
+                continue;
+            }
             if (manageBreak(map, citizens, c, minute))
             {
                 continue;
@@ -283,12 +325,46 @@ namespace Paladin
             {
                 continue;
             }
+            if (c.youngDependents > 0 ||
+                (c.child && c.ageYears < policy.independentEatingAge))
+            {
+                if (c.task.kind != CitizenTaskKind::Care &&
+                    c.task.kind != CitizenTaskKind::Eat &&
+                    c.task.kind != CitizenTaskKind::Sleep)
+                {
+                    const auto* home =
+                        map.objectState().completedObject(c.homeId);
+                    if (home)
+                    {
+                        auto planned = c;
+                        if (c.insideHome || route(
+                                                map,
+                                                citizens,
+                                                planned,
+                                                home->footprint,
+                                                false
+                                            ))
+                        {
+                            finish(map, c, minute);
+                            c.path = std::move(planned.path);
+                            c.pathIndex = planned.pathIndex;
+                            c.stepProgress = planned.stepProgress;
+                            c.stepDuration = planned.stepDuration;
+                            c.destination = planned.destination;
+                            c.task.kind = CitizenTaskKind::Care;
+                            c.task.object = c.homeId;
+                        }
+                    }
+                }
+                continue;
+            }
             if (c.task.kind == CitizenTaskKind::Home && c.path.empty())
             {
                 chooseSocial(map, citizens, c, minute);
             }
             if (c.task.kind == CitizenTaskKind::None ||
-                (c.task.kind == CitizenTaskKind::Home && !c.workplaceId))
+                (c.task.kind == CitizenTaskKind::Home &&
+                 (!c.workplaceId || policy.isWorkTime(minute))))
             {
                 decide(map, citizens, c, minute);
             }
@@ -319,6 +395,11 @@ namespace Paladin
         c.nextWorkCheckMinutes = minute + policy.retryMinutes;
         if (!c.child && !c.workplaceId)
         {
+            if (!policy.isWorkTime(minute) &&
+                chooseSocial(map, citizens, c, minute))
+            {
+                return;
+            }
             if (chooseConstruction(map, citizens, c, minute) ||
                 chooseCommand(map, citizens, c, minute) ||
                 chooseHaul(map, citizens, c, minute))
@@ -335,8 +416,9 @@ namespace Paladin
                 {
                     return;
                 }
-                if (workplace.objectTypeId ==
-                        SettlementObjectTypes::Stockpile &&
+                if ((workplace.objectTypeId ==
+                         SettlementObjectTypes::Stockpile ||
+                     workplace.objectTypeId == SettlementObjectTypes::Market) &&
                     chooseHaul(
                         map,
                         citizens,
@@ -393,10 +475,83 @@ namespace Paladin
             finish(map, c, minute);
             return;
         }
+        if (c.task.kind == CitizenTaskKind::FamilyMeal)
+        {
+            if (!c.child)
+            {
+                return;
+            }
+            auto parent = std::find_if(
+                citizens.citizens_.begin(),
+                citizens.citizens_.end(),
+                [&](const auto& p) { return p.id == c.task.partner; }
+            );
+            if (parent == citizens.citizens_.end())
+            {
+                finish(map, c, minute);
+                return;
+            }
+            if (parent->insideHome && !c.insideHome)
+            {
+                enterHome(map, c);
+                return;
+            }
+            const bool together =
+                (parent->insideHome && c.insideHome &&
+                 parent->homeId == c.homeId) ||
+                (!parent->insideHome && !c.insideHome &&
+                 std::abs(parent->tilePosition.x - c.tilePosition.x) +
+                         std::abs(parent->tilePosition.y - c.tilePosition.y) <=
+                     1);
+            if (together && parent->hunger < policy.urgentFoodThreshold)
+            {
+                const double share = std::max(.01, policy.dependentFoodShare);
+                const double fed = std::min(
+                    {c.hunger,
+                     policy.mealRestoration,
+                     std::max(
+                         0.0,
+                         policy.urgentFoodThreshold - parent->hunger
+                     ) / share}
+                );
+                c.hunger -= fed;
+                parent->hunger += fed * share;
+                planMeal(c, map);
+                finish(map, *parent, minute);
+                finish(map, c, minute);
+            }
+            return;
+        }
         if (c.task.kind == CitizenTaskKind::Eat)
         {
+            const auto* source = map.logistics.inventory(c.task.source);
+            const bool market = source && source->kind == InventoryKind::Market;
+            const auto marketId =
+                source ? source->objectId : SettlementObjectId{};
+            const bool publicFood =
+                source && (source->kind == InventoryKind::Keep ||
+                           source->kind == InventoryKind::Stockpile);
+            const auto price =
+                source ? map.commerce.mealPrice(map, *source) : 0;
+            if (price < 0 ||
+                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                (market && !map.commerce.marketOpen(map, citizens, marketId)))
+            {
+                finish(map, c, minute);
+                return;
+            }
+            const auto* mealReservation = map.logistics.reservation(c.id);
+            const std::string mealResource =
+                mealReservation ? mealReservation->resource : "";
             if (map.logistics.pickUp(c.id))
             {
+                map.commerce
+                    .recordFlow(c.task.source, {}, mealResource, 1, c.id);
+                if (price > 0)
+                {
+                    map.commerce.buyMeal(marketId, c, citizens, price);
+                }
+                map.commerce.recordMeal(c, publicFood && price == 0);
                 c.hunger = std::max(0.0, c.hunger - policy.mealRestoration);
                 planMeal(c, map);
             }
@@ -421,7 +576,44 @@ namespace Paladin
                     return;
                 }
                 const auto footprint = destination->footprint;
-                if (!route(map, citizens, c, footprint, true))
+                const bool market = destination->kind == InventoryKind::Market;
+                const auto* sourceInventory =
+                    map.logistics.inventory(copy.source);
+                if (!sourceInventory ||
+                    map.commerce.affordableTradeUnits(
+                        *sourceInventory,
+                        *destination,
+                        copy.amount
+                    ) < copy.amount ||
+                    (market && sourceInventory &&
+                     sourceInventory->kind == InventoryKind::Keep &&
+                     !map.commerce.keepFoodSalesEnabled))
+                {
+                    finish(map, c, minute);
+                    return;
+                }
+                const bool cached = c.haulDeliveryTopology ==
+                                        map.objectState().navigationVersion() &&
+                                    (!c.haulDeliveryPath.empty() ||
+                                     c.tilePosition == c.haulDeliveryTarget);
+                if (cached)
+                {
+                    c.path = std::move(c.haulDeliveryPath);
+                    c.pathIndex = 0;
+                    c.stepProgress = 0;
+                    c.destination = c.haulDeliveryTarget;
+                    c.explicitMovement = !c.path.empty();
+                    if (!c.path.empty())
+                    {
+                        c.stepDuration = citizens.navigation_.stepCost(
+                            map,
+                            c.tilePosition,
+                            c.path.front(),
+                            citizens.movementPolicy
+                        );
+                    }
+                }
+                if (!cached && !route(map, citizens, c, footprint, true))
                 {
                     if (pathsRemaining_ > 0)
                     {
@@ -429,12 +621,18 @@ namespace Paladin
                     }
                     return;
                 }
+                // Picking up the last groundpile unit can erase/reallocate
+                // inventories.
+                const auto sourceForTrade = *sourceInventory;
+                const auto destinationForTrade = *destination;
                 if (!map.logistics.pickUp(c.id))
                 {
                     finish(map, c, minute);
                     return;
                 }
                 c.carriedResource = copy.resource;
+                map.commerce
+                    .buyGoods(sourceForTrade, destinationForTrade, copy.amount);
                 c.carriedAmount = copy.amount;
                 c.task.delivering = true;
             }
@@ -446,6 +644,12 @@ namespace Paladin
                     inventory ? inventory->siteId : ConstructionSiteId{};
                 if (map.logistics.deliver(c.id))
                 {
+                    map.commerce.recordFlow(
+                        c.task.source,
+                        c.task.destination,
+                        c.carriedResource,
+                        c.carriedAmount
+                    );
                     c.carriedAmount = 0;
                     if (siteId)
                     {
@@ -557,7 +761,14 @@ namespace Paladin
                         {
                             salvage.push_back(
                                 {std::string(cost.resourceId),
-                                 int(cost.requiredAmount / 2)}
+                                 int((std::uint64_t(cost.requiredAmount) *
+                                          (definition->constructionCostPerTile
+                                               ? std::uint64_t(
+                                                     object->footprint.width
+                                                 ) * object->footprint.height
+                                               : 1) +
+                                      cost.referenceArea - 1) /
+                                     cost.referenceArea / 2)}
                             );
                         }
                     }
@@ -657,6 +868,13 @@ namespace Paladin
                 c.observedLogisticsVersion = map.logistics.version();
             }
         }
+        else if (c.task.kind == CitizenTaskKind::Care)
+        {
+            if (enterHome(map, c))
+            {
+                c.activity = CitizenActivity::AtHome;
+            }
+        }
         else if (c.task.kind == CitizenTaskKind::Home)
         {
             if (c.task.endMinute > minute)
@@ -683,13 +901,22 @@ namespace Paladin
                 const auto random =
                     GenerationNoise::mix(c.id.value() ^ ++c.choiceSequence);
                 c.nextHomeWander = minute + 3 + random % 7;
-                if (home && home->door && random % 8 == 0)
+                if (home && home->door)
                 {
                     const auto outside =
                         outsideDoor(home->footprint, *home->door);
-                    if (route(map, citizens, c, {outside, 1, 1}, true))
+                    const SettlementTilePosition nearby{
+                        outside.x +
+                            int(random % (2 * policy.leisureRadius + 1)) -
+                            policy.leisureRadius,
+                        outside.y +
+                            int((random >> 8) %
+                                (2 * policy.leisureRadius + 1)) -
+                            policy.leisureRadius
+                    };
+                    if (route(map, citizens, c, {nearby, 1, 1}, true))
                     {
-                        c.task.endMinute = minute + 10 + random % 11;
+                        c.task.endMinute = minute + 30 + random % 31;
                         return;
                     }
                 }
@@ -739,7 +966,11 @@ namespace Paladin
                 std::abs(other->tilePosition.y - c.tilePosition.y) <= 1)
             {
                 c.happiness = std::min(
-                    100.0,
+                    std::max(
+                        0.0,
+                        100.0 - c.publicFoodDissatisfaction +
+                            std::min(0.0, c.taxHappinessAdjustment)
+                    ),
                     c.happiness + policy.talkingHappinessPerMinute * elapsed
                 );
             }
@@ -761,6 +992,21 @@ namespace Paladin
             if (object->objectTypeId == SettlementObjectTypes::FishingGrounds)
             {
                 c.activity = CitizenActivity::Fishing;
+            }
+            if (object->objectTypeId == SettlementObjectTypes::Market)
+            {
+                if (minute >= c.task.startedMinute + policy.retryMinutes)
+                {
+                    c.task.startedMinute = minute;
+                    chooseHaul(
+                        map,
+                        citizens,
+                        c,
+                        minute,
+                        map.logistics.forObject(c.task.object)
+                    );
+                }
+                return;
             }
             if (object->objectTypeId == SettlementObjectTypes::Stockpile)
             {
@@ -824,6 +1070,12 @@ namespace Paladin
             );
             if (fish > 0)
             {
+                map.commerce.recordFlow(
+                    {},
+                    inventory,
+                    SettlementResourceTypes::Fish,
+                    fish
+                );
                 map.logistics.add(
                     inventory,
                     SettlementResourceTypes::Fish,

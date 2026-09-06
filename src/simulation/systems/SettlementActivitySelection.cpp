@@ -4,6 +4,7 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -282,16 +283,110 @@ namespace Paladin
         double minute
     )
     {
+        if (c.child)
+        {
+            std::vector<SettlementCitizen*> parents;
+            for (auto& parent : citizens.citizens_)
+            {
+                if ((parent.id == c.motherId || parent.id == c.fatherId) &&
+                    !parent.child && parent.health > 0)
+                {
+                    parents.push_back(&parent);
+                }
+            }
+            std::stable_sort(
+                parents.begin(),
+                parents.end(),
+                [&](const auto* a, const auto* b)
+                {
+                    return distance(c.tilePosition, {a->tilePosition, 1, 1}) <
+                           distance(c.tilePosition, {b->tilePosition, 1, 1});
+                }
+            );
+            for (auto* parent : parents)
+            {
+                if (parent->hunger >= policy.foodSeekThreshold ||
+                    parent->task.kind == CitizenTaskKind::FamilyMeal ||
+                    parent->task.kind == CitizenTaskKind::Sleep ||
+                    parent->task.kind == CitizenTaskKind::Eat ||
+                    parent->exitingHomeId ||
+                    (parent->insideHome && !parent->path.empty()))
+                {
+                    continue;
+                }
+                auto planned = c;
+                const auto* home =
+                    parent->insideHome
+                        ? map.objectState().completedObject(parent->homeId)
+                        : nullptr;
+                if (home && c.homeId != parent->homeId)
+                {
+                    continue;
+                }
+                const bool togetherAtHome = home && c.insideHome;
+                if (!togetherAtHome &&
+                    !route(
+                        map,
+                        citizens,
+                        planned,
+                        home
+                            ? home->footprint
+                            : SettlementObjectFootprint{parent->tilePosition, 1, 1},
+                        !home
+                    ))
+                {
+                    if (routeBudgetLimited_)
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+                finish(map, c, minute);
+                finish(map, *parent, minute);
+                if (!togetherAtHome)
+                {
+                    copyRoute(c, planned);
+                }
+                else
+                {
+                    c.destination = c.tilePosition;
+                }
+                parent->destination = parent->tilePosition;
+                c.task.kind = parent->task.kind = CitizenTaskKind::FamilyMeal;
+                c.task.partner = parent->id;
+                parent->task.partner = c.id;
+                c.task.endMinute = parent->task.endMinute =
+                    minute + policy.familyMealTimeoutMinutes;
+                c.activity = CitizenActivity::SeekingFood;
+                return true;
+            }
+            // Living parents provide food, never access to their wallet.
+            // Orphans may use free public supplies as a survival fallback.
+            if (!parents.empty())
+            {
+                return false;
+            }
+        }
         struct Food
         {
             InventoryId id;
             std::string resource;
             int distance;
+            bool market = false;
         };
         std::vector<Food> foods;
         for (const auto& inventory : map.logistics.inventories())
         {
             if (inventory.kind == InventoryKind::Construction)
+            {
+                continue;
+            }
+            const bool market = inventory.kind == InventoryKind::Market;
+            const auto price = map.commerce.mealPrice(map, inventory);
+            if (price < 0 ||
+                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                (market &&
+                 !map.commerce.marketOpen(map, citizens, inventory.objectId)))
             {
                 continue;
             }
@@ -305,7 +400,8 @@ namespace Paladin
                     foods.push_back(
                         {inventory.id,
                          goods.resource,
-                         distance(c.tilePosition, inventory.footprint)}
+                         distance(c.tilePosition, inventory.footprint),
+                         market || price > 0}
                     );
                 }
             }
@@ -313,7 +409,11 @@ namespace Paladin
         std::stable_sort(
             foods.begin(),
             foods.end(),
-            [](const auto& a, const auto& b) { return a.distance < b.distance; }
+            [](const auto& a, const auto& b)
+            {
+                return a.market != b.market ? a.market
+                                            : a.distance < b.distance;
+            }
         );
         // Nearest sources first; unlike ordinary hauling, food searches have no
         // radius cutoff.
@@ -374,6 +474,15 @@ namespace Paladin
         {
             return false;
         }
+        amount = map.commerce.affordableTradeUnits(
+            *sourceInventory,
+            *targetInventory,
+            amount
+        );
+        if (amount <= 0)
+        {
+            return false;
+        }
         const auto sourceFootprint = sourceInventory->footprint;
         const auto destinationFootprint = targetInventory->footprint;
         if (failedRoute(c, source, c.tilePosition, map, minute))
@@ -420,6 +529,9 @@ namespace Paladin
         copyRoute(c, planned);
         c.task = {};
         c.task.kind = CitizenTaskKind::Haul;
+        c.haulDeliveryPath = std::move(delivery.path);
+        c.haulDeliveryTarget = delivery.destination;
+        c.haulDeliveryTopology = map.objectState().navigationVersion();
         c.task.source = source;
         c.task.destination = destination;
         c.task.startedMinute = minute;
@@ -441,10 +553,31 @@ namespace Paladin
             int amount, score;
         };
         std::vector<Opportunity> opportunities;
+        const auto* assigned = map.logistics.inventory(assignedDestination);
+        const bool market = assigned && assigned->kind == InventoryKind::Market;
+        const bool hasStockpile = std::any_of(
+            map.logistics.inventories().begin(),
+            map.logistics.inventories().end(),
+            [](const auto& i) { return i.kind == InventoryKind::Stockpile; }
+        );
+        const auto* marketJob =
+            market ? map.employment().workplace(c.workplaceId) : nullptr;
+        if (market &&
+            assigned->used() >= map.commerce.policy.restockUnitsPerWorker *
+                                    int(marketJob ? marketJob->capacity : 1))
+        {
+            return false;
+        }
         for (const auto& source : map.logistics.inventories())
         {
-            if ((source.kind != InventoryKind::Groundpile &&
-                 source.kind != InventoryKind::Workplace) ||
+            if ((market ? !(source.kind == InventoryKind::Stockpile ||
+                            (!hasStockpile &&
+                             (source.kind == InventoryKind::Workplace ||
+                              source.kind == InventoryKind::Groundpile)) ||
+                            (source.kind == InventoryKind::Keep &&
+                             map.commerce.keepFoodSalesEnabled))
+                        : (source.kind != InventoryKind::Groundpile &&
+                           source.kind != InventoryKind::Workplace)) ||
                 source.used() <= 0)
             {
                 continue;
@@ -495,7 +628,8 @@ namespace Paladin
             for (const auto& destination : map.logistics.inventories())
             {
                 if (destination.id == source.id ||
-                    !publicStorage(destination) ||
+                    !(publicStorage(destination) ||
+                      (market && destination.id == assignedDestination)) ||
                     (assignedDestination &&
                      destination.id != assignedDestination) ||
                     distance(source.footprint.topLeft, destination.footprint) >
@@ -505,8 +639,20 @@ namespace Paladin
                 }
                 for (const auto& goods : source.goods)
                 {
+                    const auto* resource =
+                        SettlementResourceCatalog::definition(goods.resource);
+                    if (market && (!resource || !resource->edible))
+                    {
+                        continue;
+                    }
+                    const int affordable = map.commerce.affordableTradeUnits(
+                        source,
+                        destination,
+                        policy.carryingCapacity
+                    );
                     const int amount = std::min(
                         {policy.carryingCapacity,
+                         affordable,
                          map.logistics.available(source.id, goods.resource),
                          map.logistics.freeSpace(destination.id)}
                     );
@@ -690,9 +836,7 @@ namespace Paladin
                         continue;
                     }
                     sources.push_back(
-                        {source.id,
-                         distance(c.tilePosition, source.footprint) +
-                             distance(source.footprint.topLeft, site.footprint)}
+                        {source.id, distance(c.tilePosition, source.footprint)}
                     );
                 }
                 std::stable_sort(
@@ -890,6 +1034,35 @@ namespace Paladin
             return false;
         }
         const auto workplace = *job;
+        if (workplace.objectTypeId == SettlementObjectTypes::Market)
+        {
+            int slot = 0;
+            for (const auto& other : citizens.citizens())
+            {
+                if (other.id == c.id)
+                {
+                    break;
+                }
+                if (other.workplaceId == c.workplaceId)
+                {
+                    ++slot;
+                }
+            }
+            const auto& f = workplace.footprint;
+            const auto target =
+                marketStallTile(f.topLeft, f.width, f.height, slot);
+            if (!route(map, citizens, c, {target, 1, 1}, true))
+            {
+                return false;
+            }
+            c.task = {};
+            c.task.kind = CitizenTaskKind::Work;
+            c.task.object = workplace.objectId;
+            c.task.workTile = target;
+            c.task.startedMinute = minute;
+            c.activity = CitizenActivity::TravelingToWork;
+            return true;
+        }
         if (workplace.objectTypeId == SettlementObjectTypes::FishingGrounds)
         {
             const auto* object =

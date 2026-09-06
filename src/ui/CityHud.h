@@ -32,6 +32,10 @@ namespace Paladin
     {
     public:
         CityHud();
+        void setTreasuryGold(std::int64_t cents) noexcept
+        {
+            treasuryGold_ = cents;
+        }
         void setWorldMode(bool enabled) noexcept
         {
             worldMode_ = enabled;
@@ -98,6 +102,8 @@ namespace Paladin
         bool worldMode_ = false;
         std::string activeSettlementName_;
         UiRectangle activeSettlementPanel_;
+        UiRectangle treasuryPanel_, extensionPanel_;
+        std::int64_t treasuryGold_ = 0;
 
         static constexpr std::size_t CategoryCount = 6;
 

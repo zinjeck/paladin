@@ -29,7 +29,9 @@ namespace Paladin
         Home,
         Sleep,
         Break,
-        Talk
+        Talk,
+        Care,
+        FamilyMeal
     };
     struct CitizenTask
     {
@@ -51,12 +53,18 @@ namespace Paladin
     struct CitizenSimulationPolicy
     {
         // Probability per full day of eligible time for each mother.
-        double dailyBirthChance = .05;
-        double childMaturationMinutes = 3 * 1440;
-        double adultYearMinutes = 12 * 1440;
-        std::uint16_t adulthoodAge = 18;
+        double dailyBirthChance = .055;
+        double childMaturationMinutes = 2 * 1440;
+        double adultYearMinutes = 18 * 1440;
+        std::uint16_t adulthoodAge = 16;
         std::uint16_t fertilityEndAge = 45;
         double parentHealthThreshold = 80;
+        std::uint16_t independentEatingAge = 5;
+        double nursingFoodShare = .15;
+        double nursingHungerPerMinute = 10;
+        double dependentFoodShare = .5;
+        double familyMealTimeoutMinutes = 180;
+        int leisureRadius = 8;
         double hungerPerDay = 100;
         double foodSeekThreshold = 50;
         double urgentFoodThreshold = 70;

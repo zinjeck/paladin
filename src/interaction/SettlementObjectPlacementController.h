@@ -66,6 +66,7 @@ namespace Paladin
 
         bool stepBack() noexcept;
         void rotateDoor(int direction) noexcept;
+        void rotatePlacement() noexcept;
         std::optional<SettlementTilePosition> visibleDoor() const noexcept;
         bool doorTileIsValid(
             SettlementTilePosition,
@@ -79,6 +80,7 @@ namespace Paladin
 
     private:
         int doorSide_ = 2;
+        int quarterTurns_ = 0;
         std::optional<SettlementTilePosition> selectedDoor_;
 
         [[nodiscard]]

@@ -40,6 +40,7 @@ namespace Paladin
     {
         std::string_view resourceId;
         std::uint32_t requiredAmount = 0;
+        std::uint32_t referenceArea = 1;
     };
 
     struct SettlementObjectDefinition
@@ -64,6 +65,8 @@ namespace Paladin
         std::span<const SettlementConstructionResourceCost>
             constructionResourceCosts;
         bool hasDoor = true;
+        bool constructionCostPerTile = false;
+        bool allowsFootprintRotation = false;
     };
 
     namespace SettlementObjectTypes
@@ -72,6 +75,7 @@ namespace Paladin
         inline constexpr std::string_view Road = "road";
         inline constexpr std::string_view House = "house";
         inline constexpr std::string_view Stockpile = "stockpile";
+        inline constexpr std::string_view Market = "market";
         inline constexpr std::string_view FishingGrounds = "fishing_grounds";
         inline constexpr std::string_view WheatFarm = "wheat_farm";
         inline constexpr std::string_view Pastureland = "pastureland";

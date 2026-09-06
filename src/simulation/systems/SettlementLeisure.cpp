@@ -2,6 +2,7 @@
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include <algorithm>
 #include <cmath>
 
@@ -219,8 +220,11 @@ namespace Paladin
         const auto available = [&](const SettlementCitizen& person)
         {
             if (person.health <= 0 || person.hunger >= person.foodSeekHunger ||
-                person.insideHome || !person.path.empty() ||
-                person.carriedAmount || minute < person.nextSocialMinute)
+                person.youngDependents > 0 ||
+                (person.child &&
+                 person.ageYears < policy.independentEatingAge) ||
+                !person.path.empty() || person.carriedAmount ||
+                minute < person.nextSocialMinute)
             {
                 return false;
             }
@@ -233,7 +237,8 @@ namespace Paladin
             {
                 return false;
             }
-            if (!person.workplaceId &&
+            if (!person.child && !person.workplaceId &&
+                policy.isWorkTime(minute) &&
                 (!map.commandState().commands().empty() ||
                  !map.objectState().constructionSites().empty()))
             {
@@ -247,22 +252,51 @@ namespace Paladin
         {
             return false;
         }
-        c.nextSocialMinute = minute + 15;
-        for (auto& other : citizens.citizens_)
+        c.nextSocialMinute = minute + 5;
+        std::vector<std::size_t> candidates;
+        for (std::size_t i = 0; i < citizens.citizens_.size(); ++i)
         {
+            if (citizens.citizens_[i].id == c.spouseId)
+            {
+                candidates.insert(candidates.begin(), i);
+            }
+            else if (
+                candidates.size() < 64 && separation(
+                                              c.tilePosition,
+                                              citizens.citizens_[i].tilePosition
+                                          ) <= policy.leisureRadius
+            )
+            {
+                candidates.push_back(i);
+            }
+        }
+        for (auto index : candidates)
+        {
+            auto& other = citizens.citizens_[index];
             if (other.id == c.id || !available(other) ||
-                separation(c.tilePosition, other.tilePosition) > 4)
+                separation(c.tilePosition, other.tilePosition) >
+                    policy.leisureRadius * 2)
             {
                 continue;
             }
             auto planned = c;
-            if (!route(
-                    map,
-                    citizens,
-                    planned,
-                    {other.tilePosition, 1, 1},
-                    false
-                ))
+            auto meeting = other.tilePosition;
+            auto waitingPlan = other;
+            if (other.insideHome)
+            {
+                const auto* home =
+                    map.objectState().completedObject(other.homeId);
+                if (!home || !home->door)
+                {
+                    continue;
+                }
+                meeting = outsideDoor(home->footprint, *home->door);
+                if (!route(map, citizens, waitingPlan, {meeting, 1, 1}, true))
+                {
+                    continue;
+                }
+            }
+            if (!route(map, citizens, planned, {meeting, 1, 1}, false))
             {
                 continue;
             }
@@ -302,6 +336,7 @@ namespace Paladin
             finish(map, c, minute);
             finish(map, other, minute);
             useRoute(c, planned);
+            useRoute(other, waitingPlan);
             c.task.kind = other.task.kind = CitizenTaskKind::Talk;
             c.task.partner = other.id;
             other.task.partner = c.id;
@@ -309,9 +344,9 @@ namespace Paladin
             other.task.partnerName = c.name;
             c.task.startedMinute = other.task.startedMinute = minute;
             c.task.laborMinutes = other.task.laborMinutes = duration;
-            other.destination = other.tilePosition;
+            other.destination = waitingPlan.destination;
             c.nextSocialMinute = other.nextSocialMinute =
-                minute + duration + 60;
+                minute + duration + 15;
             c.activity = other.activity = CitizenActivity::Talking;
             return true;
         }

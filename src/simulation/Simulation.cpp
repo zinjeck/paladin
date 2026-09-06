@@ -73,12 +73,27 @@ namespace Paladin
                 auto& state = settlement.simulationState();
                 if (auto* map = settlementMap(settlement.id()))
                 {
-                    map->activities.tick(
-                        *map,
-                        state.citizens(),
-                        world_->time().totalGameMinutes() + pendingGameMinutes_,
-                        gameDeltaMinutes
-                    );
+                    if (settlement.id() != detailedSimulationSettlementId_)
+                    {
+                        map->commerce.tickInactive(
+                            *map,
+                            state.citizens(),
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes
+                        );
+                    }
+                    else
+                    {
+                        map->commerce.resumeActive();
+                        map->activities.tick(
+                            *map,
+                            state.citizens(),
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes
+                        );
+                    }
                     if (map->logistics.founded())
                     {
                         state.synchronizeCitizenPopulation();
@@ -272,6 +287,7 @@ namespace Paladin
 
         if (const auto* realm = world_->realm(settlement->ownerRealmId()))
         {
+            generatedMap->commerce.treasury = realm->treasury;
             generatedMap->activities.policy.setWorkDayHours(
                 realm->workDayHours()
             );
@@ -347,6 +363,7 @@ namespace Paladin
         map->activities.policy.setWorkDayHours(
             world_->realm(playerRealmId_)->workDayHours()
         );
+        map->commerce.treasury = world_->realm(playerRealmId_)->treasury;
         auto profile = playerSettlementFoundationProfile(
             world_->generationSeed() ^ (std::uint64_t(position.x) << 32) ^
             std::uint32_t(position.y)

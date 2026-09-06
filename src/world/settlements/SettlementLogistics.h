@@ -17,9 +17,17 @@ namespace Paladin
         Keep,
         Stockpile,
         Workplace,
+        Market,
         Construction
     };
 
+    inline bool countsAsCityStorage(InventoryKind kind)
+    {
+        return kind == InventoryKind::Keep ||
+               kind == InventoryKind::Stockpile ||
+               kind == InventoryKind::Workplace ||
+               kind == InventoryKind::Market;
+    }
     struct ResourceAmount
     {
         std::string resource;
@@ -92,11 +100,18 @@ namespace Paladin
             int amount
         );
         bool pickUp(CitizenId citizen);
+        int moveAvailable(
+            InventoryId source,
+            InventoryId destination,
+            std::string_view resource,
+            int requested
+        );
         bool deliver(CitizenId citizen);
         const HaulReservation* reservation(CitizenId citizen) const;
         void release(CitizenId citizen);
         void consumeSite(ConstructionSiteId id);
         double total(std::string_view resource) const;
+        double storedTotal(std::string_view resource) const;
         std::uint64_t version() const
         {
             return version_;

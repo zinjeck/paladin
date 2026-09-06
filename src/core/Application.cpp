@@ -563,6 +563,13 @@ namespace Paladin
 
                     if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
                         settlementObjectPlacementController_->isActive() &&
+                        event.key.scancode == SDL_SCANCODE_F)
+                    {
+                        settlementObjectPlacementController_->rotatePlacement();
+                        continue;
+                    }
+                    if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+                        settlementObjectPlacementController_->isActive() &&
                         (event.key.scancode == SDL_SCANCODE_E ||
                          event.key.scancode == SDL_SCANCODE_R))
                     {
@@ -1308,22 +1315,14 @@ namespace Paladin
                     for (const auto& inventory :
                          settlementMap->logistics.inventories())
                     {
+                        if (!countsAsCityStorage(inventory.kind))
+                        {
+                            continue;
+                        }
                         for (const auto& goods : inventory.goods)
                         {
                             addGoods(goods.resource, goods.amount);
                         }
-                    }
-                }
-                if (citySettlement)
-                {
-                    for (const auto& citizen : citySettlement->simulationState()
-                                                   .citizens()
-                                                   .citizens())
-                    {
-                        addGoods(
-                            citizen.carriedResource,
-                            citizen.carriedAmount
-                        );
                     }
                 }
                 cityHud_->setGoodsAmounts(
@@ -1331,6 +1330,12 @@ namespace Paladin
                     goodsAmounts[1],
                     goodsAmounts[2]
                 );
+                if (const auto* realm = simulation_->world().realm(
+                        simulation_->playerRealmId()
+                    ))
+                {
+                    cityHud_->setTreasuryGold(realm->treasury->balance);
+                }
                 cityHud_->render(*renderer_, *grayUiRenderer_);
                 if (settlementMap)
                 {
@@ -2878,6 +2883,7 @@ namespace Paladin
             }
         }
         cityHud_->setSettlementStatus(true, population);
+        cityHud_->setTreasuryGold(realm ? realm->treasury->balance : 0);
         cityHud_->setCityInformation(
             realm ? std::string(realm->name()) : "",
             world.time().day(),

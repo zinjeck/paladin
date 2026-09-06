@@ -169,8 +169,11 @@ namespace Paladin
                     (nameSeed + sequence * 17U) % names.size()
                 );
 
-                citizens_.push_back({id, std::string(names[poolIndex]), sex});
+                citizens_.emplace_back();
                 auto& citizen = citizens_.back();
+                citizen.id = id;
+                citizen.name = names[poolIndex];
+                citizen.sex = sex;
                 citizen.child = child;
                 citizen.ageYears =
                     child

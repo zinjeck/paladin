@@ -24,6 +24,7 @@ namespace Paladin
         dragging_ = false;
         selectedDoor_.reset();
         doorSide_ = 2;
+        quarterTurns_ = 0;
         return true;
     }
 
@@ -226,11 +227,16 @@ namespace Paladin
                 SettlementFootprintSelectionMode::Fixed ||
             !dragging_ || !dragStart_)
         {
+            const bool sideways = quarterTurns_ % 2 != 0;
+            const int width =
+                sideways ? definition->previewHeight : definition->previewWidth;
+            const int height =
+                sideways ? definition->previewWidth : definition->previewHeight;
             return SettlementObjectFootprint{
-                {hoveredPosition_->x - definition->previewWidth / 2,
-                 hoveredPosition_->y - definition->previewHeight / 2},
-                definition->previewWidth,
-                definition->previewHeight
+                {hoveredPosition_->x - width / 2,
+                 hoveredPosition_->y - height / 2},
+                width,
+                height
             };
         }
 
@@ -330,6 +336,19 @@ namespace Paladin
     {
         const auto* d = activeDefinition();
         return lockedFootprint_ && d && d->hasDoor && !selectedDoor_;
+    }
+    void SettlementObjectPlacementController::rotatePlacement() noexcept
+    {
+        const auto* definition = activeDefinition();
+        if (!definition || !definition->allowsFootprintRotation ||
+            lockedFootprint_ ||
+            definition->selectionMode !=
+                SettlementFootprintSelectionMode::Fixed)
+        {
+            return;
+        }
+        quarterTurns_ = (quarterTurns_ + 1) % 4;
+        doorSide_ = (doorSide_ + 1) % 4;
     }
     void SettlementObjectPlacementController::rotateDoor(int direction) noexcept
     {

@@ -2,6 +2,7 @@
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
+#include "world/settlements/SettlementCommerce.h"
 
 #include <algorithm>
 #include <string>
@@ -13,6 +14,7 @@ namespace Paladin
     class Realm
     {
     public:
+        std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
         explicit Realm(RealmId id) noexcept : id_(id) {}
 
         [[nodiscard]]

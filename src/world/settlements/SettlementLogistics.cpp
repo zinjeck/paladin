@@ -2,6 +2,7 @@
 #include "world/settlements/SettlementEmploymentState.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
 
 namespace Paladin
@@ -265,6 +266,35 @@ namespace Paladin
         ++version_;
         return true;
     }
+    int SettlementLogistics::moveAvailable(
+        InventoryId source,
+        InventoryId destination,
+        std::string_view resource,
+        int requested
+    )
+    {
+        if (source == destination || requested <= 0)
+        {
+            return 0;
+        }
+        int amount = std::min(requested, available(source, resource));
+        if (destination)
+        {
+            amount = std::min(amount, receivable(destination, resource));
+        }
+        auto* from = edit(source);
+        auto* to = destination ? edit(destination) : nullptr;
+        if (!from || (destination && !to) || amount <= 0)
+        {
+            return 0;
+        }
+        change(*from, resource, -amount);
+        if (to)
+        {
+            change(*to, resource, amount);
+        }
+        return amount;
+    }
     bool SettlementLogistics::pickUp(CitizenId citizen)
     {
         for (auto& claim : reservations_)
@@ -349,6 +379,18 @@ namespace Paladin
             ++version_;
         }
     }
+    double SettlementLogistics::storedTotal(std::string_view resource) const
+    {
+        double amount = 0;
+        for (const auto& inventory : inventories_)
+        {
+            if (countsAsCityStorage(inventory.kind))
+            {
+                amount += inventory.amount(resource);
+            }
+        }
+        return amount;
+    }
     double SettlementLogistics::total(std::string_view resource) const
     {
         double result = 0;
@@ -420,13 +462,31 @@ namespace Paladin
                 {id,
                  keep        ? InventoryKind::Keep
                  : stockpile ? InventoryKind::Stockpile
-                             : InventoryKind::Workplace,
+                 : object.objectTypeId == SettlementObjectTypes::Market
+                     ? InventoryKind::Market
+                     : InventoryKind::Workplace,
                  object.id,
                  {},
                  object.footprint,
-                 keep ? 100
-                      : workplaceDefinition(object.objectTypeId)
-                            ->storageCapacity}
+                 keep ? int((std::int64_t(100) * object.footprint.width *
+                                 object.footprint.height +
+                             20) /
+                            21)
+                 : object.objectTypeId == SettlementObjectTypes::Market
+                     ? int((std::int64_t(object.footprint.width) *
+                                object.footprint.height *
+                                MarketWorkplace.storageCapacity +
+                            MarketWorkplace.referenceArea - 1) /
+                           MarketWorkplace.referenceArea)
+                     : int(std::max<std::int64_t>(
+                           1,
+                           std::int64_t(workplaceDefinition(object.objectTypeId)
+                                            ->storageCapacity) *
+                               object.footprint.width *
+                               object.footprint.height /
+                               workplaceDefinition(object.objectTypeId)
+                                   ->referenceArea
+                       ))}
             );
             if (keep && !foundingGoodsGranted_)
             {

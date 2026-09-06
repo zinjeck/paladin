@@ -447,7 +447,11 @@ namespace Paladin
                                   healthPressure - homelessPressure -
                                   unemploymentPressure),
             0.0,
-            100.0
+            std::max(
+                0.0,
+                100.0 - c.publicFoodDissatisfaction +
+                    std::min(0.0, c.taxHappinessAdjustment)
+            )
         );
     }
     std::string SettlementActivitySystem::activityLabel(
@@ -462,6 +466,8 @@ namespace Paladin
         {
         case CitizenTaskKind::Eat:
             return "Finding food";
+        case CitizenTaskKind::FamilyMeal:
+            return c.child ? "Going to parent for food" : "Feeding child";
         case CitizenTaskKind::Haul:
             return c.task.delivering ? "Delivering" : "Collecting goods";
         case CitizenTaskKind::Gather:
@@ -484,6 +490,11 @@ namespace Paladin
                        ? "Sleeping"
                        : "Going to sleep";
         case CitizenTaskKind::Home:
+        case CitizenTaskKind::Care:
+            if (c.task.kind == CitizenTaskKind::Care)
+            {
+                return c.child ? "Being cared for" : "Taking care of child";
+            }
             return c.insideHome ? "At home" : "Going home";
         default:
             return "Idle";

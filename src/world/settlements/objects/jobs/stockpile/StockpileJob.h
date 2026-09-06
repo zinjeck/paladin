@@ -7,7 +7,7 @@ namespace Paladin
         StockpileWorkplace{SettlementObjectTypes::Stockpile, 2, 2, 4, 250};
     struct StockpileJobPolicy
     {
-        int collectionRadius = 24;
+        int collectionRadius = 96;
         double employeePreferenceMinutes = 30;
     };
 } // namespace Paladin

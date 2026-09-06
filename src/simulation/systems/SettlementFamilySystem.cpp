@@ -46,14 +46,14 @@ namespace Paladin
                     // A remarriage must not make both existing families
                     // homeless by creating a household larger than a house.
                     return dependents[person.id] + dependents[other.id] <= 2 &&
-                           person.motherId != other.id &&
-                           person.fatherId != other.id &&
-                           other.motherId != person.id &&
-                           other.fatherId != person.id &&
-                           !(person.motherId &&
-                             person.motherId == other.motherId) &&
-                           !(person.fatherId &&
-                             person.fatherId == other.fatherId);
+                           person.birthMotherId != other.id &&
+                           person.birthFatherId != other.id &&
+                           other.birthMotherId != person.id &&
+                           other.birthFatherId != person.id &&
+                           !(person.birthMotherId &&
+                             person.birthMotherId == other.birthMotherId) &&
+                           !(person.birthFatherId &&
+                             person.birthFatherId == other.birthFatherId);
                 }
             );
             if (match == opposite.end())
@@ -105,6 +105,14 @@ namespace Paladin
                 continue;
             }
             c.ageMinutes += dt;
+            if (!c.birthMotherId)
+            {
+                c.birthMotherId = c.motherId;
+            }
+            if (!c.birthFatherId)
+            {
+                c.birthFatherId = c.fatherId;
+            }
             if (c.child)
             {
                 if (c.ageMinutes >= policy.childMaturationMinutes)
@@ -112,6 +120,9 @@ namespace Paladin
                     c.child = false;
                     c.ageMinutes -= policy.childMaturationMinutes;
                     c.ageYears = policy.adulthoodAge;
+                    c.motherId = {};
+                    c.fatherId = {};
+                    c.caregiverId = {};
                     changed = true;
                 }
                 else
@@ -147,6 +158,43 @@ namespace Paladin
             citizens.matchSingles();
         }
         assignHomes(map, citizens, activities);
+        for (auto& c : people)
+        {
+            c.youngDependents = 0;
+            c.caregiverId = {};
+        }
+        for (auto& c : people)
+        {
+            if (!c.child || c.ageYears >= policy.independentEatingAge ||
+                c.health <= 0)
+            {
+                continue;
+            }
+            const auto mother = index.find(c.motherId);
+            const auto father = index.find(c.fatherId);
+            const auto guardian = mother != index.end() ? mother : father;
+            if (guardian != index.end())
+            {
+                auto& carer = people[guardian->second];
+                c.caregiverId = carer.id;
+                ++carer.youngDependents;
+                // A feeding transfers a small nutritional demand to the
+                // parent. It cannot restore the child when the parent is
+                // hungry, absent, or has not physically reached home.
+                if (carer.homeId && c.homeId == carer.homeId &&
+                    carer.insideHome && c.insideHome && carer.hunger < 50 &&
+                    carer.task.kind == CitizenTaskKind::Care)
+                {
+                    const double fed =
+                        std::min(c.hunger, policy.nursingHungerPerMinute * dt);
+                    c.hunger -= fed;
+                    carer.hunger = std::min(
+                        100.0,
+                        carer.hunger + fed * policy.nursingFoodShare
+                    );
+                }
+            }
+        }
         std::unordered_map<
             SettlementObjectId,
             std::vector<std::size_t>,
@@ -243,6 +291,8 @@ namespace Paladin
             auto& baby = people.back();
             baby.motherId = motherId;
             baby.fatherId = fatherId;
+            baby.birthMotherId = motherId;
+            baby.birthFatherId = fatherId;
             baby.homeId = homeId;
             baby.tilePosition = baby.destination = position;
             baby.insideHome = true;
@@ -352,7 +402,8 @@ namespace Paladin
                 {
                     const auto existing = homeIndex.find(people[member].homeId);
                     if (existing == homeIndex.end() ||
-                        homes[existing->second].free < int(group.size()))
+                        homes[existing->second].free < int(group.size()) ||
+                        (family && homes[existing->second].free != 4))
                     {
                         continue;
                     }
@@ -370,8 +421,15 @@ namespace Paladin
                 }
                 if (chosen == homes.size())
                 {
-                    for (std::size_t slots = group.size(); slots <= 4; ++slots)
+                    // Give families room for children before sharing a home
+                    // with another family. Packing two couples into one home
+                    // prevented both from having children even with empty
+                    // houses available elsewhere.
+                    for (int offset = 0; offset <= 4 - int(group.size());
+                         ++offset)
                     {
+                        const int slots =
+                            family ? 4 - offset : int(group.size()) + offset;
                         auto& bucket = vacancies[slots];
                         while (!bucket.empty() &&
                                homes[bucket.back()].free != int(slots))

@@ -104,6 +104,35 @@ namespace Paladin
             return {};
         }
         const int width = map.grid().width();
+        // Long unobstructed journeys need O(distance), not an expanding area
+        // search that hits the node budget and masquerades as "too far".
+        if (std::max(std::abs(goal.x - start.x), std::abs(goal.y - start.y)) >
+            32)
+        {
+            std::vector<SettlementTilePosition> direct;
+            auto p = start;
+            double cost = 0;
+            while (p != goal)
+            {
+                const SettlementTilePosition next{
+                    p.x + (goal.x > p.x) - (goal.x < p.x),
+                    p.y + (goal.y > p.y) - (goal.y < p.y)
+                };
+                if (!canStep(map, p, next))
+                {
+                    break;
+                }
+                cost += stepCost(map, p, next, policy);
+                direct.push_back(next);
+                p = next;
+            }
+            if (p == goal)
+            {
+                --failures;
+                lastCost = cost;
+                return direct;
+            }
+        }
         const auto index = [width](SettlementTilePosition p)
         { return std::size_t(p.y) * width + p.x; };
         const auto position = [width](std::size_t i)

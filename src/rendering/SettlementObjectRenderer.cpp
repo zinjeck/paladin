@@ -11,6 +11,7 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 
 #include <algorithm>
 #include <array>
@@ -323,6 +324,31 @@ namespace Paladin
                         {object.door.value(), 1, 1},
                         color
                     );
+                }
+                if (object.objectTypeId == SettlementObjectTypes::Market)
+                {
+                    const auto& f = object.footprint;
+                    for (int slot = 0;
+                         slot < marketStallCount(f.width, f.height);
+                         ++slot)
+                    {
+                        const auto p =
+                            marketStallTile(f.topLeft, f.width, f.height, slot);
+                        paintFootprint(
+                            pixels,
+                            settlementMap.grid().width(),
+                            {{p.x - 1, p.y - 1},
+                             std::min(3, f.topLeft.x + f.width - p.x + 1),
+                             1},
+                            {150, 49, 38, 255}
+                        );
+                        paintFootprint(
+                            pixels,
+                            settlementMap.grid().width(),
+                            {{p.x, p.y - 1}, 1, 1},
+                            {232, 202, 143, 255}
+                        );
+                    }
                 }
 
                 if (definition->id != SettlementObjectTypes::Road)

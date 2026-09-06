@@ -32,7 +32,8 @@ namespace Paladin
         }
 
         std::vector<ConstructionResourceDelivery> initialResourceDeliveries(
-            const SettlementObjectDefinition& definition
+            const SettlementObjectDefinition& definition,
+            const SettlementObjectFootprint& footprint
         )
         {
             std::vector<ConstructionResourceDelivery> deliveries;
@@ -42,7 +43,15 @@ namespace Paladin
                  definition.constructionResourceCosts)
             {
                 deliveries.push_back(
-                    {std::string(cost.resourceId), 0, cost.requiredAmount}
+                    {std::string(cost.resourceId),
+                     0,
+                     (cost.requiredAmount *
+                          (definition.constructionCostPerTile
+                               ? std::uint32_t(footprint.width) *
+                                     footprint.height
+                               : 1) +
+                      cost.referenceArea - 1) /
+                         cost.referenceArea}
                 );
             }
 
@@ -433,7 +442,10 @@ namespace Paladin
                              {{*runStart, y}, x - *runStart, 1},
                              ConstructionSitePhase::AwaitingMaterials,
                              0,
-                             initialResourceDeliveries(definition)}
+                             initialResourceDeliveries(
+                                 definition,
+                                 {{*runStart, y}, x - *runStart, 1}
+                             )}
                         );
                         runStart.reset();
                     }
@@ -448,7 +460,7 @@ namespace Paladin
                  footprint,
                  ConstructionSitePhase::AwaitingMaterials,
                  0,
-                 initialResourceDeliveries(definition)}
+                 initialResourceDeliveries(definition, footprint)}
             );
 
             if (definition.hasDoor)
@@ -564,12 +576,19 @@ namespace Paladin
         const SettlementObjectFootprint& footprint
     ) const noexcept
     {
-        return footprint.width >= definition.minimumWidth &&
-               footprint.height >= definition.minimumHeight &&
-               (definition.selectionMode !=
-                    SettlementFootprintSelectionMode::Fixed ||
-                (footprint.width == definition.previewWidth &&
-                 footprint.height == definition.previewHeight));
+        const bool rotated = definition.allowsFootprintRotation &&
+                             definition.selectionMode ==
+                                 SettlementFootprintSelectionMode::Fixed &&
+                             footprint.width == definition.previewHeight &&
+                             footprint.height == definition.previewWidth &&
+                             footprint.width >= definition.minimumHeight &&
+                             footprint.height >= definition.minimumWidth;
+        return rotated || (footprint.width >= definition.minimumWidth &&
+                           footprint.height >= definition.minimumHeight &&
+                           (definition.selectionMode !=
+                                SettlementFootprintSelectionMode::Fixed ||
+                            (footprint.width == definition.previewWidth &&
+                             footprint.height == definition.previewHeight)));
     }
 
     bool SettlementObjectState::hasObjectType(

@@ -5,6 +5,7 @@
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/SettlementTilePosition.h"
+#include "world/entities/EntityState.h"
 
 #include <cstdint>
 #include <span>
@@ -58,12 +59,9 @@ namespace Paladin
         std::uint64_t topologyVersion = 0;
         double untilMinute = 0;
     };
-    struct SettlementCitizen
+    struct SettlementCitizen : EntityState
     {
-        CitizenId id;
-        std::string name;
         CitizenSex sex = CitizenSex::Male;
-        SettlementTilePosition tilePosition{-1, -1};
         CitizenActivity activity = CitizenActivity::Idle;
         SettlementCommandId assignedCommandId;
         std::uint16_t ageYears = 25;
@@ -72,9 +70,17 @@ namespace Paladin
         CitizenId spouseId;
         CitizenId motherId;
         CitizenId fatherId;
+        // Kinship is separate from dependency; avoid matching close relatives.
+        CitizenId birthMotherId;
+        CitizenId birthFatherId;
         double fertilityExposure = 0;
         double fertilityTarget = 0;
         std::uint64_t birthSequence = 0;
+        CitizenId caregiverId;
+        int youngDependents = 0;
+        double publicMealShare = 0;
+        double publicFoodDissatisfaction = 0;
+        double taxHappinessAdjustment = 0;
         SettlementObjectId exitingHomeId;
         WorkplaceId workplaceId;
         double nextWorkCheckMinutes = 0;
@@ -90,10 +96,7 @@ namespace Paladin
         std::size_t constructionSearchCursor = 0;
         std::size_t commandSearchCursor = 0;
         std::vector<CitizenRouteFailure> routeFailures;
-        double health = 100;
-        double energy = 100;
         double restThreshold = 0;
-        double hunger = 0;
         double foodSeekHunger = -1;
         std::uint64_t mealSequence = 0;
         double sleptMinutes = 0;
@@ -115,6 +118,9 @@ namespace Paladin
         SettlementObjectId homeId;
         CitizenTask task;
         std::string carriedResource;
+        std::vector<SettlementTilePosition> haulDeliveryPath;
+        SettlementTilePosition haulDeliveryTarget;
+        std::uint64_t haulDeliveryTopology = 0;
         int carriedAmount = 0;
         double nextDecisionMinute = 0;
         std::uint64_t observedLogisticsVersion = 0;
@@ -131,6 +137,8 @@ namespace Paladin
 
     class SettlementCitizenState
     {
+        friend class SettlementCommerce;
+
     public:
         [[nodiscard]]
         bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);

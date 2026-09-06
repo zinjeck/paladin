@@ -1,6 +1,7 @@
 #include "ui/CityHud.h"
 #include "ui/SimulationSpeedControls.h"
 #include "world/Season.h"
+#include "world/settlements/SettlementCommerce.h"
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -35,11 +36,12 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 14> menuOptions{
+        constexpr std::array<MenuOptionDefinition, 15> menuOptions{
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
              {1, SettlementObjectTypes::Road, "", "", "Road", ""},
              {2, SettlementObjectTypes::House, "", "", "House", ""},
              {3, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""},
+             {3, SettlementObjectTypes::Market, "", "", "Market", ""},
              {4,
               SettlementObjectTypes::FishingGrounds,
               "",
@@ -233,8 +235,20 @@ namespace Paladin
         };
         activeSettlementPanel_ = {
             0,
-            informationTopHeight + informationBottomHeight,
+            informationTopHeight + informationBottomHeight + 36,
             informationWidth,
+            36
+        };
+        treasuryPanel_ = {
+            0,
+            informationTopHeight + informationBottomHeight,
+            informationWidth * .5F,
+            36
+        };
+        extensionPanel_ = {
+            informationWidth * .5F,
+            treasuryPanel_.y,
+            informationWidth * .5F,
             36
         };
         populationButton_.setBounds(reservedPanel_);
@@ -297,6 +311,10 @@ namespace Paladin
 
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
+        if (treasuryPanel_.contains(x, y) || extensionPanel_.contains(x, y))
+        {
+            return true;
+        }
         if (worldMode_)
         {
             bool captured = populationButton_.pointerPressed(x, y) ||
@@ -347,6 +365,10 @@ namespace Paladin
 
     bool CityHud::containsInteractivePoint(float x, float y) const noexcept
     {
+        if (treasuryPanel_.contains(x, y) || extensionPanel_.contains(x, y))
+        {
+            return true;
+        }
         for (const UiButton& button : topButtons_)
         {
             if (button.containsPoint(x, y))
@@ -516,6 +538,30 @@ namespace Paladin
     {
         uiRenderer.drawPanel(renderer, cityNamePanel_);
         uiRenderer.drawPanel(renderer, dayTimePanel_);
+        uiRenderer.drawPanel(renderer, treasuryPanel_);
+        uiRenderer.drawPanel(renderer, extensionPanel_);
+        // Temporary gold-token artwork; the panel layout does not depend on it.
+        renderer.fillRectangle(
+            treasuryPanel_.x + 12,
+            treasuryPanel_.y + 10,
+            15,
+            16,
+            {124, 85, 19, 255}
+        );
+        renderer.fillRectangle(
+            treasuryPanel_.x + 14,
+            treasuryPanel_.y + 9,
+            11,
+            14,
+            {239, 192, 57, 255}
+        );
+        uiRenderer.drawLabel(
+            renderer,
+            goldText(treasuryGold_),
+            treasuryPanel_.x + 35,
+            treasuryPanel_.y + 12,
+            1.5F
+        );
         populationButton_.render(renderer, uiRenderer);
         const auto populationLabel =
             std::string("Population:") +
@@ -979,7 +1025,8 @@ namespace Paladin
         }
         if (goodsButton_.containsPoint(x, y))
         {
-            return "Goods - available settlement resources";
+            return "Goods stored in containers; excludes construction, "
+                   "groundpiles and carried items";
         }
         constexpr std::array titles{
             "Laws - realm and city reforms",

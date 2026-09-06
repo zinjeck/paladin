@@ -79,6 +79,8 @@ namespace Paladin
         UiRectangle renderedBounds_;
         bool hasRenderedBounds_ = false;
         WorkplaceId workplaceId_;
+        bool showingKeep_ = false;
+        UiButton keepSalesButton_{"Market supply: Off"};
         UiButton nameButton_{""};
         UiButton decreaseButton_{"<"};
         UiButton increaseButton_{">"};

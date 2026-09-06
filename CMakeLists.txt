@@ -77,6 +77,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementFamilySystem.cpp
     src/simulation/systems/SettlementJobBoard.cpp
     src/world/settlements/SettlementLogistics.cpp
+    src/world/settlements/SettlementCommerce.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
     src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp
@@ -168,6 +169,7 @@ add_executable(PaladinTests
     src/simulation/systems/SettlementFamilySystem.cpp
     src/simulation/systems/SettlementJobBoard.cpp
     src/world/settlements/SettlementLogistics.cpp
+    src/world/settlements/SettlementCommerce.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
     src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp

@@ -151,7 +151,15 @@ namespace Paladin
             : house   ? 140.0F
                       : 0;
         const float detailsHeight =
-            citizen ? 358.0F : (workplace ? 78.0F : 0.0F) + storageHeight;
+            citizen ? 386.0F
+                    : (workplace ? 78.0F : 0.0F) + storageHeight +
+                          (object && (object->objectTypeId ==
+                                          SettlementObjectTypes::CityKeep ||
+                                      workplace)
+                               ? 46
+                               : 0);
+        showingKeep_ =
+            object && object->objectTypeId == SettlementObjectTypes::CityKeep;
         const float totalHeight =
             objectPanelHeight + constructionPanelHeight + detailsHeight;
 
@@ -197,6 +205,32 @@ namespace Paladin
         hasRenderedBounds_ = true;
 
         grayUiRenderer.drawPanel(renderer, renderedBounds_);
+        if (showingKeep_)
+        {
+            keepSalesButton_.setText(
+                settlementMap.commerce.keepFoodSalesEnabled
+                    ? "Sell food to markets: On"
+                    : "Sell food to markets: Off"
+            );
+            keepSalesButton_.setBounds(
+                {renderedBounds_.x + 12,
+                 renderedBounds_.y + renderedBounds_.height - 38,
+                 renderedBounds_.width - 24,
+                 28}
+            );
+            keepSalesButton_.render(renderer, grayUiRenderer);
+        }
+        if (object && workplace)
+        {
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Operating cash: " +
+                    goldText(settlementMap.commerce.businessCash(object->id)),
+                renderedBounds_.x + 13,
+                renderedBounds_.y + renderedBounds_.height - 30,
+                1.5F
+            );
+        }
 
         constexpr float preferredNamePixelSize = 3.3F;
         const std::string_view title = citizen ? std::string_view(citizen->name)
@@ -342,6 +376,18 @@ namespace Paladin
                 266
             );
             label(citizen->homeId ? "Home: House" : "Home: Homeless", 294);
+            label(
+                citizen->child
+                    ? "No personal money"
+                    : std::string(
+                          citizen->spouseId ? "Shared gold: " : "Gold: "
+                      ) +
+                          goldText(settlementMap.commerce.spendingBalance(
+                              *citizen,
+                              citizenState
+                          )),
+                378
+            );
             label(
                 std::string("Activity: ") +
                     SettlementActivitySystem::activityLabel(*citizen),
@@ -521,6 +567,8 @@ namespace Paladin
         hasRenderedBounds_ = false;
         dragCandidate_ = dragging_ = detached_ = false;
         workplaceId_ = {};
+        showingKeep_ = false;
+        keepSalesButton_.cancelPress();
         nameField_.setFocused(false);
     }
 
@@ -544,6 +592,7 @@ namespace Paladin
             increaseButton_.cancelPress();
         }
         nameButton_.pointerMoved(x, y);
+        keepSalesButton_.pointerMoved(x, y);
         decreaseButton_.pointerMoved(x, y);
         increaseButton_.pointerMoved(x, y);
     }
@@ -554,6 +603,11 @@ namespace Paladin
             return false;
         }
         dragCandidate_ = !nameField_.focused();
+        if (showingKeep_ && keepSalesButton_.pointerPressed(x, y))
+        {
+            dragCandidate_ = false;
+            return true;
+        }
         pressX_ = x;
         pressY_ = y;
         offsetX_ = x - renderedBounds_.x;
@@ -581,6 +635,11 @@ namespace Paladin
             return;
         }
         const bool title = nameButton_.pointerReleased(x, y);
+        if (showingKeep_ && keepSalesButton_.pointerReleased(x, y))
+        {
+            map.commerce.keepFoodSalesEnabled =
+                !map.commerce.keepFoodSalesEnabled;
+        }
         const bool less = decreaseButton_.pointerReleased(x, y);
         const bool more = increaseButton_.pointerReleased(x, y);
         const auto* workplace = map.employment().workplace(workplaceId_);

@@ -18,7 +18,15 @@ namespace Paladin
                  {SettlementResourceTypes::Stone, 8}}
             };
 
-        constexpr std::array<SettlementObjectDefinition, 8> objectDefinitions{
+        constexpr std::array<SettlementConstructionResourceCost, 1>
+            stockpileTileCosts{{{SettlementResourceTypes::Lumber, 1}}};
+        constexpr std::array<SettlementConstructionResourceCost, 2>
+            marketTileCosts{
+                {{SettlementResourceTypes::Lumber, 1},
+                 {SettlementResourceTypes::Stone, 1, 12}}
+            };
+
+        constexpr std::array<SettlementObjectDefinition, 9> objectDefinitions{
             {{SettlementObjectTypes::CityKeep,
               "City Keep",
               SettlementObjectCategory::Rule,
@@ -33,7 +41,11 @@ namespace Paladin
               false,
               false,
               SettlementObjectPlacementLayer::Structure,
-              {{82, 77, 61}, {219, 214, 194}, 3.0F, 7.0F}},
+              {{82, 77, 61}, {219, 214, 194}, 3.0F, 7.0F},
+              {},
+              true,
+              false,
+              true},
              {SettlementObjectTypes::Road,
               "Road",
               SettlementObjectCategory::Roads,
@@ -67,6 +79,24 @@ namespace Paladin
               SettlementObjectPlacementLayer::Structure,
               {{82, 77, 61}, {219, 214, 194}, 3.0F, 3.0F},
               houseConstructionResourceCosts},
+             {SettlementObjectTypes::Market,
+              "Market",
+              SettlementObjectCategory::Logistics,
+              -1,
+              SettlementFootprintSelectionMode::DragRectangle,
+              1,
+              1,
+              2,
+              2,
+              false,
+              false,
+              false,
+              false,
+              SettlementObjectPlacementLayer::Structure,
+              {{104, 55, 36}, {202, 126, 72}, 4.0F, 3.0F},
+              marketTileCosts,
+              false,
+              true},
              {SettlementObjectTypes::Stockpile,
               "Stockpile",
               SettlementObjectCategory::Logistics,
@@ -82,7 +112,9 @@ namespace Paladin
               false,
               SettlementObjectPlacementLayer::Structure,
               {{117, 77, 31}, {209, 163, 82}, 2.0F, 2.0F},
-              initialConstructionResourceCosts},
+              stockpileTileCosts,
+              true,
+              true},
              {SettlementObjectTypes::FishingGrounds,
               "Fishing Grounds",
               SettlementObjectCategory::Food,

@@ -269,6 +269,22 @@ namespace Paladin
                 WorkDayChange{hit.type == "realmWorkDay", hit.delta};
             return;
         }
+        if (hit.type == "realmTax" || hit.type == "cityTax")
+        {
+            if (hit.type == "realmTax")
+            {
+                map.commerce.treasury->incomeTax.setPercent(
+                    map.commerce.treasury->incomeTax.percent + hit.delta
+                );
+            }
+            else
+            {
+                map.commerce.setCityTaxPercent(
+                    map.commerce.effectiveTaxPercent() + hit.delta
+                );
+            }
+            return;
+        }
         if (hit.icon)
         {
             selectedType_ = hit.type;
@@ -404,6 +420,250 @@ namespace Paladin
             titleScale
         );
         button({left + width - 38, top + 6, 30, 28}, "X", {{}, "close"});
+        // Shared management-window chrome: replaceable panel skin, centered
+        // title, inset content, and a consistent division below the header.
+        renderer.drawLine(
+            left + 12,
+            top + 42,
+            left + width - 12,
+            top + 42,
+            {105, 105, 110, 255}
+        );
+        if (section_ == "Economy" && !worldMode_)
+        {
+            const auto& commerce = map.commerce;
+            const float summary = std::max(130.0F, (width - 54) / 3);
+            const float chartX = left + summary + 36;
+            const float chartWidth = std::max(50.0F, width - summary - 60);
+            const float taxWidth = (width - 48) * .5F;
+            for (int scope = 0; scope < 2; ++scope)
+            {
+                const auto& tax = scope == 0 ? commerce.treasury->incomeTax
+                                             : commerce.cityIncomeTax;
+                const int rate =
+                    scope == 0 ? tax.percent : commerce.effectiveTaxPercent();
+                const int maximum = scope == 0
+                                        ? tax.maximumPercent
+                                        : commerce.treasury->incomeTax.percent;
+                const std::string type = scope == 0 ? "realmTax" : "cityTax";
+                const UiRectangle box{
+                    left + 18 + scope * (taxWidth + 12),
+                    top + 56,
+                    taxWidth,
+                    74
+                };
+                ui.drawPanel(renderer, box);
+                fitLabel(
+                    renderer,
+                    ui,
+                    std::string(
+                        scope == 0 ? "Realm income tax: "
+                                   : "City effective tax: "
+                    ) + std::to_string(rate) +
+                        "%",
+                    {box.x + 4, box.y, box.width - 8, 22}
+                );
+                button(
+                    {box.x + 8, box.y + 28, 28, 24},
+                    "-",
+                    {{}, type, {}, -1},
+                    rate > 0
+                );
+                button(
+                    {box.x + 40, box.y + 28, 28, 24},
+                    "+",
+                    {{}, type, {}, 1},
+                    rate < maximum
+                );
+                fitLabel(
+                    renderer,
+                    ui,
+                    "Neutral: " +
+                        std::to_string(
+                            commerce.treasury->incomeTax.neutralPercent
+                        ) +
+                        "%",
+                    {box.x + 76, box.y + 26, box.width - 84, 22}
+                );
+                const std::string mood =
+                    rate == commerce.treasury->incomeTax.neutralPercent
+                        ? "Neutral"
+                        : (rate > commerce.treasury->incomeTax.neutralPercent
+                               ? "Lower happiness"
+                               : "Higher happiness");
+                fitLabel(
+                    renderer,
+                    ui,
+                    std::string(
+                        scope == 0
+                            ? "All cities | "
+                            : (commerce.cityTaxOverride ? "Local override | "
+                                                        : "Inherited | ")
+                    ) + mood,
+                    {box.x + 4, box.y + 50, box.width - 8, 18}
+                );
+            }
+            const float rowHeight = (height - 200) / 3;
+            const std::array<std::string, 3> titles{
+                "Realm treasury",
+                "Business reserves",
+                "Citizen savings"
+            };
+            const std::array<Money, 3> amounts{
+                commerce.treasury->balance,
+                commerce.businessTotal(),
+                commerce.householdTotal()
+            };
+            const std::array<RenderColor, 3> colors{
+                {{231, 192, 73, 255}, {91, 182, 178, 255}, {133, 171, 228, 255}}
+            };
+            for (int series = 0; series < 3; ++series)
+            {
+                const float y = top + 142 + rowHeight * series;
+                const UiRectangle card{left + 18, y, summary, rowHeight - 8};
+                ui.drawPanel(renderer, card);
+                fitLabel(
+                    renderer,
+                    ui,
+                    titles[series],
+                    {card.x + 4, card.y + 5, card.width - 8, 24}
+                );
+                fitLabel(
+                    renderer,
+                    ui,
+                    goldText(amounts[series]) + " gold",
+                    {card.x + 4, card.y + 32, card.width - 8, 24}
+                );
+                if (series == 0)
+                {
+                    fitLabel(
+                        renderer,
+                        ui,
+                        "Tax collected: " + goldText(
+                                                commerce.realmTaxCollected +
+                                                commerce.cityTaxCollected
+                                            ),
+                        {card.x + 4, card.y + 57, card.width - 8, 20}
+                    );
+                    fitLabel(
+                        renderer,
+                        ui,
+                        "Effective: " +
+                            std::to_string(commerce.effectiveTaxPercent()) +
+                            "%",
+                        {card.x + 4, card.y + 77, card.width - 8, 20}
+                    );
+                }
+                const UiRectangle chart{
+                    chartX,
+                    y + 16,
+                    chartWidth,
+                    std::max(20.0F, rowHeight - 48)
+                };
+                renderer.fillRectangle(
+                    chart.x,
+                    chart.y,
+                    chart.width,
+                    chart.height,
+                    {48, 48, 53, 255}
+                );
+                const auto value = [series](const TreasurySample& s)
+                {
+                    return series == 0   ? s.realm
+                           : series == 1 ? s.markets
+                                         : s.households;
+                };
+                Money maxValue = std::max<Money>(100, amounts[series]);
+                Money minValue = amounts[series];
+                for (const auto& s : commerce.history())
+                {
+                    maxValue = std::max(maxValue, value(s));
+                    minValue = std::min(minValue, value(s));
+                }
+                const Money padding =
+                    std::max<Money>(100, (maxValue - minValue) / 10);
+                minValue = std::max<Money>(0, minValue - padding);
+                maxValue += padding;
+                const double first = commerce.history().empty()
+                                         ? minute
+                                         : commerce.history().front().minute;
+                const double last = std::max(first + 240, minute);
+                for (int line = 0; line <= 4; ++line)
+                {
+                    const float yy = chart.y + chart.height * line / 4;
+                    renderer.drawLine(
+                        chart.x,
+                        yy,
+                        chart.x + chart.width,
+                        yy,
+                        {77, 77, 83, 255}
+                    );
+                }
+                float previousX = 0, previousY = 0;
+                bool previous = false;
+                for (const auto& s : commerce.history())
+                {
+                    const float x =
+                        chart.x + float((s.minute - first) / (last - first)) *
+                                      chart.width;
+                    const float yy =
+                        chart.y +
+                        chart.height * (1 - float(
+                                                double(value(s) - minValue) /
+                                                (maxValue - minValue)
+                                            ));
+                    if (previous)
+                    {
+                        renderer.drawLine(
+                            previousX,
+                            previousY,
+                            x,
+                            yy,
+                            colors[series]
+                        );
+                    }
+                    previousX = x;
+                    previousY = yy;
+                    previous = true;
+                }
+                ui.drawLabel(
+                    renderer,
+                    goldText(minValue) + " - " + goldText(maxValue) + " gold",
+                    chart.x,
+                    y,
+                    1.1F
+                );
+                fitLabel(
+                    renderer,
+                    ui,
+                    "Day " + std::to_string(int(first / 1440) + 1) + " - " +
+                        std::to_string(int(last / 1440) + 1),
+                    {chart.x, chart.y + chart.height - 1, chart.width, 18}
+                );
+            }
+            const float footerY = top + height - 55;
+            fitLabel(
+                renderer,
+                ui,
+                "Every 4 hours | Last 16 days | Realm treasury shared by "
+                "cities",
+                {left + 18, footerY, width - 36, 22}
+            );
+            fitLabel(
+                renderer,
+                ui,
+                !commerce.usesMoney()
+                    ? "Cashless economy: free goods until the realm receives "
+                      "its first gold"
+                    : "Food " + goldText(commerce.policy.retailFoodPrice) +
+                          " | Wholesale " +
+                          goldText(commerce.policy.wholesaleFoodPrice) +
+                          " | Care support " +
+                          goldText(commerce.policy.dailyAllowance) + "/day",
+                {left + 18, footerY + 22, width - 36, 22}
+            );
+            return;
+        }
         if (worldMode_)
         {
             const float informationHeight = (height - 90) * .62F;
@@ -510,6 +770,24 @@ namespace Paladin
         const bool population = section_ == "Population";
         if (section_ != "Employment" && !population)
         {
+            // Empty sections retain the same information/visual/action zones
+            // until their actual gameplay is introduced.
+            const float sidebar = (width - 54) / 3;
+            ui.drawPanel(
+                renderer,
+                {left + 18, top + 62, sidebar, height - 160}
+            );
+            ui.drawPanel(
+                renderer,
+                {left + 36 + sidebar,
+                 top + 62,
+                 width - sidebar - 54,
+                 height - 160}
+            );
+            ui.drawPanel(
+                renderer,
+                {left + 18, top + height - 80, width - 36, 62}
+            );
             return;
         }
         struct GraphSample
@@ -973,6 +1251,16 @@ namespace Paladin
             if (hit.type == "cityWorkDay")
             {
                 return "Change this city's workday (0-14 hours)";
+            }
+            if (hit.type == "realmTax" || hit.type == "cityTax")
+            {
+                return std::string(
+                           hit.type == "realmTax" ? "All cities: "
+                                                  : "This city: "
+                       ) +
+                       "one income tax, not stacked. City may only lower the "
+                       "realm rate. Surplus and taxes go to treasury. Higher "
+                       "than neutral lowers happiness.";
             }
             if (hit.icon)
             {

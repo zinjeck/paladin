@@ -1,4 +1,5 @@
 #include "TestFramework.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -7,6 +8,7 @@
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/jobs/fishery/FisheryJob.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -74,6 +76,10 @@ namespace
     )
     {
         PALADIN_CHECK(citizens.initialize(count, 91));
+        // Existing monetary scenarios explicitly start after gold is
+        // introduced.
+        map.commerce.treasury->balance = 100000;
+        map.commerce.policy.startingSavings = 600;
         completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 3, 7});
         citizens.placeUnpositionedCitizens(map);
     }
@@ -120,6 +126,575 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        auto map = land();
+        SettlementObjectPlacementController placement;
+        PALADIN_CHECK(
+            placement.beginPlacement(SettlementObjectTypes::CityKeep)
+        );
+        placement.pointerMoved(SettlementTilePosition{20, 20});
+        PALADIN_CHECK(placement.visibleFootprint()->width == 3);
+        placement.rotatePlacement();
+        PALADIN_CHECK(placement.visibleFootprint()->width == 7);
+        PALADIN_CHECK(placement.visibleFootprint()->height == 3);
+        PALADIN_CHECK(
+            placement.visibleDoor() == SettlementTilePosition(17, 20)
+        );
+        PALADIN_CHECK(placement.visibleFootprintIsValid(map));
+        PALADIN_CHECK(
+            placement.pointerPressed(SettlementTilePosition{20, 20}, map) ==
+            SettlementPlacementCommitResult::CompletedObject
+        );
+        const auto& keep = map.objectState().completedObjects().back();
+        PALADIN_CHECK(keep.door == SettlementTilePosition(17, 20));
+        PALADIN_CHECK(
+            outsideDoor(keep.footprint, *keep.door) ==
+            SettlementTilePosition(16, 20)
+        );
+        map.logistics.synchronize(map.objectState(), 0);
+        const auto stored = map.logistics.storedTotal("lumber");
+        map.logistics.drop({10, 10}, "lumber", 12, 0);
+        PALADIN_CHECK(map.logistics.storedTotal("lumber") == stored);
+        PALADIN_CHECK(map.logistics.total("lumber") == stored + 12);
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(),
+            *SettlementObjectCatalog::definition(
+                SettlementObjectTypes::Stockpile
+            ),
+            {{5, 5}, 2, 2}
+        ));
+        map.logistics.synchronize(map.objectState(), 0);
+        const auto site = map.objectState().constructionSites().back().id;
+        const auto source = map.logistics.forObject(keep.id);
+        PALADIN_CHECK(map.logistics.reserve(
+            CitizenId{999},
+            source,
+            map.logistics.forSite(site),
+            "lumber",
+            4
+        ));
+        PALADIN_CHECK(map.logistics.pickUp(CitizenId{999}));
+        PALADIN_CHECK(map.logistics.storedTotal("lumber") == stored - 4);
+        PALADIN_CHECK(map.logistics.deliver(CitizenId{999}));
+        PALADIN_CHECK(map.logistics.storedTotal("lumber") == stored - 4);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState people;
+        PALADIN_CHECK(people.initialize(3, 1));
+        const auto keep =
+            completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 3, 7});
+        const auto store =
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+        map.employment().synchronize(map.objectState(), people);
+        PALADIN_CHECK(map.employment().adjust(
+            map.employment().forObject(store),
+            1,
+            people
+        ));
+        auto& adult = SettlementActivityTestFixture::resident(people);
+        adult.publicMealShare = 1;
+        map.commerce.update(map, people, 0, 5 * 1440);
+        PALADIN_CHECK(!map.commerce.usesMoney());
+        PALADIN_CHECK(map.commerce.treasury->balance == 0);
+        PALADIN_CHECK(
+            map.commerce.householdTotal() == 0 &&
+            map.commerce.businessTotal() == 0
+        );
+        PALADIN_CHECK(adult.publicFoodDissatisfaction == 0);
+        const auto& source =
+            *map.logistics.inventory(map.logistics.forObject(keep));
+        const auto& destination =
+            *map.logistics.inventory(map.logistics.forObject(store));
+        PALADIN_CHECK(
+            map.commerce.affordableTradeUnits(source, destination, 10) == 10
+        );
+        PALADIN_CHECK(map.commerce.buyGoods(source, destination, 10));
+        PALADIN_CHECK(map.commerce.mealPrice(map, destination) == 0);
+        map.commerce.treasury->balance = 10000;
+        map.commerce.update(map, people, 7200, 0);
+        PALADIN_CHECK(map.commerce.usesMoney());
+        PALADIN_CHECK(map.commerce.businessCash(store) > 0);
+        map.commerce.treasury->balance = 0;
+        PALADIN_CHECK(map.commerce.usesMoney());
+        PALADIN_CHECK(map.commerce.mealPrice(map, destination) > 0);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState people;
+        found(map, people, 4);
+        map.commerce.policy.startingSavings = 60;
+        auto& wife = SettlementActivityTestFixture::resident(people, 0);
+        auto& husband = SettlementActivityTestFixture::resident(people, 1);
+        auto& unrelated = SettlementActivityTestFixture::resident(people, 2);
+        auto& child = SettlementActivityTestFixture::resident(people, 3);
+        wife.spouseId = husband.id;
+        husband.spouseId = wife.id;
+        unrelated.spouseId = {};
+        child.spouseId = {};
+        child.child = true;
+        child.motherId = wife.id;
+        child.fatherId = husband.id;
+        map.commerce.update(map, people, 0, 0);
+        PALADIN_CHECK(map.commerce.spendingBalance(wife, people) == 120);
+        PALADIN_CHECK(!map.commerce.canBuyMeal(unrelated, people, 100));
+        PALADIN_CHECK(!map.commerce.canBuyMeal(child, people, 1));
+        PALADIN_CHECK(map.commerce.buyMeal({}, wife, people, 100));
+        PALADIN_CHECK(map.commerce.spendingBalance(husband, people) == 20);
+        PALADIN_CHECK(map.commerce.savings(unrelated.id) == 60);
+        PALADIN_CHECK(map.commerce.savings(child.id) == 0);
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.householdTotal() ==
+            100000
+        );
+    }
+    {
+        // Long-running construction may consume a distant pile without a
+        // radius cutoff or a third path request at the pickup point.
+        auto map = land(256);
+        SettlementCitizenState citizens;
+        found(map, citizens, 12);
+        map.activities.policy.dailyBirthChance = 0;
+        map.activities.policy.hungerPerDay = .001;
+        map.activities.policy.awakeEnergyPerMinute = 0;
+        map.activities.policy.workEnergyPerMinute = 0;
+        map.logistics.drop({220, 20}, "lumber", 12000, 0);
+        const auto groundLumber = [&]()
+        {
+            int total = 0;
+            for (const auto& inventory : map.logistics.inventories())
+            {
+                if (inventory.kind == InventoryKind::Groundpile)
+                {
+                    total += inventory.amount("lumber");
+                }
+            }
+            return total;
+        };
+        const auto* definition = SettlementObjectCatalog::definition(
+            SettlementObjectTypes::Stockpile
+        );
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(),
+            *definition,
+            {{10, 60}, 100, 100}
+        ));
+        advance(map, citizens, 360, 8 * 1440);
+        const auto before = groundLumber();
+        PALADIN_CHECK(before < 12000);
+        advance(map, citizens, 360 + 8 * 1440, 1440);
+        PALADIN_CHECK(groundLumber() < before);
+        const auto small = completed(
+            map,
+            SettlementObjectTypes::Stockpile,
+            {{150, 150}, 2, 2}
+        );
+        const auto large = completed(
+            map,
+            SettlementObjectTypes::Stockpile,
+            {{160, 150}, 4, 6}
+        );
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(large))->capacity ==
+            6 * map.logistics.inventory(map.logistics.forObject(small))
+                    ->capacity
+        );
+    }
+    {
+        auto map = land();
+        SettlementCitizenState people;
+        found(map, people, 3);
+        const auto producer =
+            completed(map, SettlementObjectTypes::Bakery, {{8, 8}, 3, 2});
+        const auto stock =
+            completed(map, SettlementObjectTypes::Stockpile, {{16, 8}, 2, 2});
+        const auto market =
+            completed(map, SettlementObjectTypes::Market, {{24, 8}, 4, 6});
+        map.employment().synchronize(map.objectState(), people);
+        for (auto object : {producer, stock, market})
+        {
+            map.employment()
+                .adjust(map.employment().forObject(object), 1, people);
+        }
+        map.commerce.update(map, people, 360, 1);
+        const auto& a =
+            *map.logistics.inventory(map.logistics.forObject(producer));
+        const auto& b =
+            *map.logistics.inventory(map.logistics.forObject(stock));
+        const auto& c =
+            *map.logistics.inventory(map.logistics.forObject(market));
+        const auto producerCash = map.commerce.businessCash(producer);
+        const auto stockCash = map.commerce.businessCash(stock);
+        PALADIN_CHECK(map.commerce.buyGoods(a, b, 4));
+        PALADIN_CHECK(
+            map.commerce.businessCash(producer) == producerCash + 160
+        );
+        PALADIN_CHECK(map.commerce.businessCash(stock) == stockCash - 160);
+        PALADIN_CHECK(
+            map.commerce.tradePrice(a, c) > map.commerce.tradePrice(b, c)
+        );
+        PALADIN_CHECK(map.commerce.buyGoods(b, c, 4));
+        PALADIN_CHECK(map.commerce.businessCash(stock) == stockCash + 80);
+        const auto treasury = map.commerce.treasury->balance;
+        map.commerce.update(map, people, 360, 0);
+        PALADIN_CHECK(map.commerce.treasury->balance > treasury);
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.businessTotal() +
+                map.commerce.householdTotal() ==
+            100000
+        );
+        // Inactive rates transfer actual stocked goods and cash without moving
+        // citizens, and are bounded by the same storage capacities.
+        map.logistics.add(a.id, "fish", 10);
+        map.commerce.recordFlow({}, a.id, "fish", 10);
+        map.commerce.recordFlow(a.id, b.id, "fish", 4);
+        map.commerce.recordFlow(b.id, c.id, "fish", 2);
+        const auto position = people.citizens().front().tilePosition;
+        map.commerce.captureInactive(map, people);
+        map.commerce.tickInactive(map, people, 361, 60);
+        PALADIN_CHECK(people.citizens().front().tilePosition == position);
+        PALADIN_CHECK(map.logistics.inventory(c.id)->amount("fish") > 0);
+        PALADIN_CHECK(
+            map.logistics.inventory(c.id)->used() <=
+            map.logistics.inventory(c.id)->capacity
+        );
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.businessTotal() +
+                map.commerce.householdTotal() ==
+            100000
+        );
+        map.commerce.resumeActive();
+    }
+    {
+        auto map = land();
+        auto otherCity = land();
+        otherCity.commerce.treasury = map.commerce.treasury;
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        auto& worker = SettlementActivityTestFixture::resident(citizens, 0);
+        worker.task.kind = CitizenTaskKind::Work;
+        map.commerce.policy.dailyWage = 300;
+        worker.happiness = 50;
+        map.commerce.update(map, citizens, 720, 720);
+        PALADIN_CHECK(map.commerce.realmTaxCollected == 30);
+        PALADIN_CHECK(map.commerce.cityTaxCollected == 0);
+        PALADIN_CHECK(map.commerce.savings(worker.id) == 870);
+        PALADIN_CHECK(worker.happiness == 50);
+        PALADIN_CHECK(worker.taxHappinessAdjustment == 0);
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.householdTotal() ==
+            100000
+        );
+        // Realm policy is shared; a city's additional rate is independent.
+        map.commerce.treasury->incomeTax.setPercent(20);
+        map.commerce.setCityTaxPercent(18);
+        PALADIN_CHECK(otherCity.commerce.treasury->incomeTax.percent == 20);
+        PALADIN_CHECK(otherCity.commerce.effectiveTaxPercent() == 20);
+        PALADIN_CHECK(map.commerce.effectiveTaxPercent() == 18);
+        map.commerce.update(map, citizens, 1440, 720);
+        PALADIN_CHECK(
+            worker.taxHappinessAdjustment < 0 && worker.happiness < 50
+        );
+        map.commerce.treasury->incomeTax.setPercent(0);
+        map.commerce.setCityTaxPercent(0);
+        map.commerce.update(map, citizens, 4320, 2880);
+        PALADIN_CHECK(
+            worker.taxHappinessAdjustment > 0 && worker.happiness > 50
+        );
+        map.commerce.setCityTaxPercent(999);
+        PALADIN_CHECK(map.commerce.effectiveTaxPercent() == 0);
+        map.commerce.setCityTaxPercent(-10);
+        PALADIN_CHECK(map.commerce.cityIncomeTax.percent == 0);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        auto& person = SettlementActivityTestFixture::resident(citizens, 0);
+        map.commerce.policy.startingSavings = 0;
+        map.commerce.policy.dailyWage = 300;
+        // Idle government workers do not receive wages. Care support is exempt.
+        map.commerce.treasury->incomeTax.setPercent(40);
+        map.commerce.cityIncomeTax.setPercent(40);
+        map.commerce.update(map, citizens, 0, 1);
+        PALADIN_CHECK(map.commerce.savings(person.id) == 0);
+        person.youngDependents = 1;
+        map.commerce.update(map, citizens, 720, 720);
+        PALADIN_CHECK(map.commerce.savings(person.id) == 125);
+        PALADIN_CHECK(
+            map.commerce.realmTaxCollected == 0 &&
+            map.commerce.cityTaxCollected == 0
+        );
+        // Small wages below the protected balance are exempt too.
+        person.task.kind = CitizenTaskKind::Work;
+        person.youngDependents = 0;
+        map.commerce.update(map, citizens, 840, 120);
+        PALADIN_CHECK(map.commerce.savings(person.id) == 175);
+        PALADIN_CHECK(
+            map.commerce.realmTaxCollected == 0 &&
+            map.commerce.cityTaxCollected == 0
+        );
+        // Fractional cents accumulate rather than disappearing per tick.
+        map.commerce.policy.taxProtectedBalance = 0;
+        map.commerce.policy.dailyWage = 720;
+        for (int step = 0; step < 100; ++step)
+        {
+            map.commerce.update(map, citizens, 841 + step, 1);
+        }
+        PALADIN_CHECK(
+            map.commerce.realmTaxCollected == 40 &&
+            map.commerce.cityTaxCollected == 0
+        );
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.householdTotal() ==
+            100000
+        );
+    }
+    {
+        auto map = land();
+        const auto* market =
+            SettlementObjectCatalog::definition(SettlementObjectTypes::Market);
+        const auto* stockpile = SettlementObjectCatalog::definition(
+            SettlementObjectTypes::Stockpile
+        );
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(),
+            *market,
+            {{8, 8}, 4, 6}
+        ));
+        const auto& site = map.objectState().constructionSites().back();
+        PALADIN_CHECK(site.resourceDeliveries.size() == 2);
+        PALADIN_CHECK(site.resourceDeliveries[0].requiredAmount == 24);
+        PALADIN_CHECK(site.resourceDeliveries[1].requiredAmount == 2);
+        PALADIN_CHECK(marketStallCount(4, 6) == 2);
+        PALADIN_CHECK(marketStallCount(6, 4) == 2);
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(),
+            *stockpile,
+            {{20, 8}, 3, 5}
+        ));
+        PALADIN_CHECK(
+            map.objectState()
+                .constructionSites()
+                .back()
+                .resourceDeliveries[0]
+                .requiredAmount == 15
+        );
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        map.activities.policy.dailyBirthChance = 0;
+        const auto market =
+            completed(map, SettlementObjectTypes::Market, {{10, 8}, 4, 6});
+        const auto stockpile =
+            completed(map, SettlementObjectTypes::Stockpile, {{6, 15}, 3, 3});
+        map.employment().synchronize(map.objectState(), citizens);
+        const auto job = map.employment().forObject(market);
+        PALADIN_CHECK(map.employment().workplace(job)->maximumCapacity == 2);
+        PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
+        map.commerce.update(map, citizens, 360, 1);
+        const auto initialMoney = map.commerce.treasury->balance +
+                                  map.commerce.householdTotal() +
+                                  map.commerce.businessTotal();
+        PALADIN_CHECK(initialMoney == 100000);
+        PALADIN_CHECK(!map.commerce.keepFoodSalesEnabled);
+        // Keep food may not be collected for sale with the default switch off.
+        advance(map, citizens, 360, 50);
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(market))->used() ==
+            0
+        );
+        PALADIN_CHECK(
+            map.logistics.add(map.logistics.forObject(stockpile), "fish", 20)
+        );
+        advance(map, citizens, 410, 120);
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(market))
+                ->amount("fish") > 0
+        );
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(stockpile))
+                ->amount("fish") < 20
+        );
+        PALADIN_CHECK(map.commerce.businessCash(market) < 3200);
+        const auto cash = map.commerce.treasury->balance +
+                          map.commerce.householdTotal() +
+                          map.commerce.businessTotal();
+        PALADIN_CHECK(cash == initialMoney);
+        // Paid retail consumes a real unit and transfers exactly its price.
+        auto& buyer = SettlementActivityTestFixture::resident(citizens, 1);
+        auto& seller = SettlementActivityTestFixture::resident(citizens, 0);
+        seller.path.clear();
+        seller.task = {};
+        seller.task.kind = CitizenTaskKind::Work;
+        seller.task.object = market;
+        seller.task.startedMinute = 530;
+        seller.tilePosition = seller.destination = {11, 9};
+        seller.hunger = 0;
+        seller.energy = 100;
+        buyer.path.clear();
+        buyer.task = {};
+        buyer.tilePosition = buyer.destination = {12, 9};
+        buyer.task.kind = CitizenTaskKind::Eat;
+        buyer.task.source = map.logistics.forObject(market);
+        buyer.hunger = 70;
+        buyer.energy = 100;
+        map.logistics.release(buyer.id);
+        PALADIN_CHECK(
+            map.logistics.reserve(buyer.id, buyer.task.source, {}, "fish", 1)
+        );
+        const auto wallet = map.commerce.savings(buyer.id);
+        const auto fish = map.logistics.total("fish");
+        advance(map, citizens, 530, 1);
+        PALADIN_CHECK(map.commerce.savings(buyer.id) < wallet - 98);
+        PALADIN_CHECK(buyer.hunger < 25);
+        PALADIN_CHECK(map.logistics.total("fish") == fish - 1);
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.householdTotal() +
+                map.commerce.businessTotal() ==
+            initialMoney
+        );
+        Money empty = 0, receiver = 10;
+        PALADIN_CHECK(!SettlementCommerce::transfer(empty, receiver, 1));
+        PALADIN_CHECK(!SettlementCommerce::transfer(receiver, empty, -1));
+        // Persistent reliance on free public meals limits contentment even
+        // when ordinary needs are met; market meals let it recover.
+        map.commerce.policy.publicFoodGraceDays = 0;
+        buyer.publicMealShare = 1;
+        map.commerce.update(map, citizens, 1971, 1440);
+        PALADIN_CHECK(buyer.publicFoodDissatisfaction == 2);
+        for (int meal = 0; meal < 12; ++meal)
+        {
+            map.commerce.recordMeal(buyer, false);
+        }
+        map.commerce.update(map, citizens, 3411, 1440);
+        PALADIN_CHECK(buyer.publicFoodDissatisfaction == 0);
+        PALADIN_CHECK(
+            map.commerce.treasury->balance + map.commerce.householdTotal() +
+                map.commerce.businessTotal() ==
+            initialMoney
+        );
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 3);
+        auto& mother = SettlementActivityTestFixture::resident(citizens, 0);
+        auto& father = SettlementActivityTestFixture::resident(citizens, 1);
+        auto& child = SettlementActivityTestFixture::resident(citizens, 2);
+        mother.sex = CitizenSex::Female;
+        father.sex = CitizenSex::Male;
+        child.child = true;
+        child.ageYears = 2;
+        child.ageMinutes =
+            map.activities.policy.childMaturationMinutes * 2 / 16;
+        child.motherId = mother.id;
+        child.fatherId = father.id;
+        SettlementActivityTestFixture::rematch(citizens);
+        const auto home =
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        map.activities.synchronizeHomes(map, citizens);
+        mother.tilePosition = mother.destination = {9, 9};
+        child.tilePosition = child.destination = {9, 9};
+        mother.insideHome = child.insideHome = true;
+        mother.hunger = 10;
+        child.hunger = 60;
+        map.activities.policy.dailyBirthChance = 0;
+        advance(map, citizens, 360, 5);
+        PALADIN_CHECK(child.hunger < 40);
+        PALADIN_CHECK(mother.hunger > 10);
+        PALADIN_CHECK(mother.youngDependents == 1);
+        PALADIN_CHECK(mother.task.kind == CitizenTaskKind::Care);
+        PALADIN_CHECK(child.task.kind != CitizenTaskKind::Eat);
+        child.ageMinutes =
+            map.activities.policy.childMaturationMinutes * 5 / 16;
+        advance(map, citizens, 365, 1);
+        PALADIN_CHECK(mother.youngDependents == 0);
+        mother.task = {};
+        mother.path.clear();
+        mother.exitingHomeId = {};
+        mother.insideHome = false;
+        mother.tilePosition = mother.destination = {15, 12};
+        mother.hunger = 5;
+        father.hunger = 60;
+        child.task = {};
+        child.path.clear();
+        child.insideHome = false;
+        child.tilePosition = child.destination = {20, 12};
+        child.hunger = 70;
+        const auto start = child.tilePosition;
+        advance(map, citizens, 366, 20);
+        PALADIN_CHECK(child.tilePosition != start);
+        PALADIN_CHECK(child.hunger < 30);
+        PALADIN_CHECK(mother.hunger > 20);
+        PALADIN_CHECK(map.commerce.savings(child.id) == 0);
+        const auto motherId = mother.id;
+        child.ageMinutes = map.activities.policy.childMaturationMinutes - 1;
+        advance(map, citizens, 386, 1);
+        PALADIN_CHECK(!child.child && child.ageYears == 16);
+        PALADIN_CHECK(!child.motherId && !child.fatherId && !child.caregiverId);
+        PALADIN_CHECK(child.birthMotherId == motherId);
+    }
+    // Exercise real family matching, housing, fertility and maturation over
+    // an 88-day settlement lifetime. Healthy parents and spare homes isolate
+    // demographics from food production and pathfinding.
+    {
+        std::size_t total = 0;
+        std::size_t minimum = 100000;
+        std::size_t maximum = 0;
+        for (std::uint64_t seed = 1; seed <= 16; ++seed)
+        {
+            auto map = land(80);
+            SettlementCitizenState citizens;
+            PALADIN_CHECK(citizens.initialize(8, seed));
+            for (int i = 0; i < 64; ++i)
+            {
+                completed(
+                    map,
+                    SettlementObjectTypes::House,
+                    {{2 + (i % 8) * 8, 2 + (i / 8) * 8}, 3, 3}
+                );
+            }
+            SettlementFamilySystem families;
+            auto policy = map.activities.policy;
+            for (int minute = 60; minute <= 88 * 1440; minute += 60)
+            {
+                families
+                    .update(map, citizens, policy, map.activities, minute, 60);
+            }
+            const auto population = citizens.citizens().size();
+            total += population;
+            minimum = std::min(minimum, population);
+            maximum = std::max(maximum, population);
+        }
+        PALADIN_CHECK(double(total) / 16 >= 60);
+        PALADIN_CHECK(double(total) / 16 <= 70);
+        std::cout << "Healthy, housed day-88 population: mean "
+                  << double(total) / 16 << " range " << minimum << "-"
+                  << maximum << '\n';
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 4);
+        for (std::size_t i = 0; i < 4; ++i)
+        {
+            auto& c = SettlementActivityTestFixture::resident(citizens, i);
+            c.sex = i % 2 == 0 ? CitizenSex::Female : CitizenSex::Male;
+        }
+        SettlementActivityTestFixture::rematch(citizens);
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{16, 8}, 3, 3});
+        map.activities.synchronizeHomes(map, citizens);
+        // Two families must not block one another's births by sharing a
+        // full home while another completed home stands empty.
+        const auto people = citizens.citizens();
+        PALADIN_CHECK(people[0].homeId == people[1].homeId);
+        PALADIN_CHECK(people[2].homeId == people[3].homeId);
+        PALADIN_CHECK(people[0].homeId != people[2].homeId);
+    }
     {
         auto map = land();
         SettlementCitizenState citizens;
@@ -635,7 +1210,7 @@ void runSettlementSimulationLoopTests()
         growing.ageMinutes = map.activities.policy.childMaturationMinutes - 1;
         advance(map, citizens, 748, 1);
         PALADIN_CHECK(!citizens.citizen(babyId)->child);
-        PALADIN_CHECK(citizens.citizen(babyId)->ageYears == 18);
+        PALADIN_CHECK(citizens.citizen(babyId)->ageYears == 16);
         PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
     }
     {
@@ -742,10 +1317,12 @@ void runSettlementSimulationLoopTests()
         {
             if (c.homeId)
             {
-                PALADIN_CHECK(c.insideHome);
-                PALADIN_CHECK(map.objectState()
-                                  .completedObject(c.homeId)
-                                  ->footprint.contains(c.tilePosition));
+                // Off-duty residents may now walk or talk near their home.
+                const auto* home = map.objectState().completedObject(c.homeId);
+                PALADIN_CHECK(home);
+                PALADIN_CHECK(
+                    c.insideHome == home->footprint.contains(c.tilePosition)
+                );
             }
         }
         const auto lumber = allGoods(map, citizens, "lumber");
@@ -998,9 +1575,9 @@ void runSettlementSimulationLoopTests()
         );
         PALADIN_CHECK(map.logistics.pickUp(CitizenId{999999}));
         map.logistics.release(CitizenId{999999});
-        const auto pile = map.logistics.drop({53, 8}, "lumber", 4, 480);
+        const auto pile = map.logistics.drop({53, 8}, "lumber", 9, 480);
         advance(map, citizens, 480, 90);
-        PALADIN_CHECK(map.logistics.inventory(pile)->amount("lumber") == 4);
+        PALADIN_CHECK(map.logistics.inventory(pile)->amount("lumber") == 9);
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *SettlementObjectCatalog::definition(
