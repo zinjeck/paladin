@@ -31,7 +31,8 @@ namespace Paladin
         Break,
         Talk,
         Care,
-        FamilyMeal
+        FamilyMeal,
+        AnimalWork
     };
     struct CitizenTask
     {
@@ -47,6 +48,7 @@ namespace Paladin
         double startedMinute = 0;
         bool delivering = false;
         CitizenId partner;
+        EntityId animal;
         std::string partnerName;
         double endMinute = 0;
     };
@@ -139,6 +141,19 @@ namespace Paladin
         }
 
     private:
+        bool chooseAnimalWork(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute
+        );
+        void executeAnimalWork(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute,
+            double elapsed
+        );
         void step(
             SettlementMap&,
             SettlementCitizenState&,

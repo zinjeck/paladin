@@ -88,7 +88,9 @@ namespace Paladin
     }
     void SettlementCitizenState::tickMovement(
         const SettlementMap& map,
-        double minutes
+        double minutes,
+        const std::function<
+            void(const SettlementCitizen&, SettlementTilePosition)>& onStep
     )
     {
         if (!std::isfinite(minutes) || minutes <= 0 || citizens_.empty() ||
@@ -157,12 +159,21 @@ namespace Paladin
                     }
                     break;
                 }
+                const double fraction =
+                    citizen.stepDuration > 0
+                        ? std::clamp(
+                              citizen.stepProgress / citizen.stepDuration,
+                              0.0,
+                              1.0
+                          )
+                        : 0;
                 citizen.stepDuration = navigation_.stepCost(
                     map,
                     citizen.tilePosition,
                     next,
                     movementPolicy
                 );
+                citizen.stepProgress = fraction * citizen.stepDuration;
                 const double used = std::min(
                     travel,
                     citizen.stepDuration - citizen.stepProgress
@@ -174,6 +185,10 @@ namespace Paladin
                     break;
                 }
                 citizen.tilePosition = next;
+                if (onStep)
+                {
+                    onStep(citizen, next);
+                }
                 citizen.insideHome = !citizen.exitingHomeId && home &&
                                      home->footprint.contains(next);
                 if (citizen.exitingHomeId &&

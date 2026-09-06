@@ -66,6 +66,8 @@ add_executable(Paladin
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/entities/animals/SettlementAnimals.cpp
+    src/simulation/systems/SettlementAnimalWork.cpp
     src/world/settlements/SettlementEmploymentState.cpp
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp
@@ -158,6 +160,8 @@ add_executable(PaladinTests
     src/world/generation/WorldGenerationSeed.cpp
     src/world/settlements/ResourceStockpile.cpp
     src/world/settlements/SettlementMap.cpp
+    src/world/entities/animals/SettlementAnimals.cpp
+    src/simulation/systems/SettlementAnimalWork.cpp
     src/world/settlements/SettlementEmploymentState.cpp
     src/world/settlements/SettlementNaturalFeatures.cpp
     src/simulation/systems/SettlementNavigation.cpp

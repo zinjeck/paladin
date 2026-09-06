@@ -3,6 +3,7 @@
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "world/SettlementGrid.h"
 #include "world/WorldTilePosition.h"
+#include "world/entities/animals/SettlementAnimals.h"
 #include "world/settlements/SettlementCommerce.h"
 #include "world/settlements/SettlementEmploymentState.h"
 #include "world/settlements/SettlementLogistics.h"
@@ -92,6 +93,7 @@ namespace Paladin
 
         SettlementLogistics logistics;
         SettlementCommerce commerce;
+        SettlementAnimals animals;
         SettlementActivitySystem activities;
 
     private:

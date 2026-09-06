@@ -478,6 +478,8 @@ namespace Paladin
                 const double progress = c.stepProgress;
                 const double duration = c.stepDuration;
                 activities.finish(map, c, currentMinute_);
+                c.path.clear(); // The saved partial step is appended exactly
+                                // once below.
                 auto position = c.tilePosition;
                 if (midStep)
                 {

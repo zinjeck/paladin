@@ -9,11 +9,16 @@ namespace Paladin
         FisheryWorkplace{SettlementObjectTypes::FishingGrounds, 4, 4, 9, 50};
     struct FisheryJobPolicy
     {
-        double minutesPerFish = 80;
-        int waterTilesPerWorker = 4;
-        int baseReach = 8;
+        double minutesPerFish = 240;
+        int waterTilesPerWorker = 12;
+        int baseReach = 4;
         int referenceArea = 4;
+        double reachAreaExponent = .25;
     };
+    int fisheryReach(
+        const SettlementObjectFootprint&,
+        const FisheryJobPolicy& = {}
+    );
     double fisheryProductionPerMinute(
         std::size_t waterTiles,
         int attendingWorkers,

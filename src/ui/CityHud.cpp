@@ -787,7 +787,7 @@ namespace Paladin
             {
                 uiRenderer.drawPanel(renderer, cell);
             }
-            for (std::size_t i = 0; i < 3; ++i)
+            for (std::size_t i = 0; i < 4; ++i)
             {
                 const auto& cell = goodsCells_[i];
                 const float x = cell.x + cell.width * .5F;
@@ -833,13 +833,31 @@ namespace Paladin
                         .fillRectangle(x - 7, y + 7, 2, 2, {20, 35, 45, 255});
                 }
                 std::ostringstream amount;
+                if (i == 3)
+                {
+                    renderer.fillRectangle(
+                        x - 10,
+                        y + 4,
+                        20,
+                        13,
+                        {171, 77, 72, 255}
+                    );
+                    renderer.fillRectangle(
+                        x + 3,
+                        y + 7,
+                        12,
+                        5,
+                        {225, 211, 181, 255}
+                    );
+                }
                 amount << std::fixed << std::setprecision(0)
                        << std::floor(
                               std::max(
                                   0.0,
                                   i == 0   ? stoneAmount_
                                   : i == 1 ? lumberAmount_
-                                           : fishAmount_
+                                  : i == 2 ? fishAmount_
+                                           : meatAmount_
                               )
                           );
                 const auto label = amount.str();
@@ -1048,7 +1066,7 @@ namespace Paladin
                 "Stone",
                 "Lumber",
                 "Fish - food",
-                "Empty",
+                "Meat - food",
                 "Empty",
                 "Empty"
             };

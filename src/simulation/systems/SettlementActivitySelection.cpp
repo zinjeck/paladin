@@ -309,7 +309,7 @@ namespace Paladin
                     parent->task.kind == CitizenTaskKind::FamilyMeal ||
                     parent->task.kind == CitizenTaskKind::Sleep ||
                     parent->task.kind == CitizenTaskKind::Eat ||
-                    parent->exitingHomeId ||
+                    parent->exitingHomeId || !parent->path.empty() ||
                     (parent->insideHome && !parent->path.empty()))
                 {
                     continue;

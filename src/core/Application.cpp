@@ -1293,7 +1293,7 @@ namespace Paladin
                     settlementMap ? settlementMap->activities.housingCapacity()
                                   : 0
                 );
-                std::array<double, 3> goodsAmounts{};
+                std::array<double, 4> goodsAmounts{};
                 const auto addGoods =
                     [&](std::string_view resource, double amount)
                 {
@@ -1308,6 +1308,10 @@ namespace Paladin
                     else if (resource == "fish")
                     {
                         goodsAmounts[2] += amount;
+                    }
+                    else if (resource == "meat")
+                    {
+                        goodsAmounts[3] += amount;
                     }
                 };
                 if (settlementMap)
@@ -1328,7 +1332,8 @@ namespace Paladin
                 cityHud_->setGoodsAmounts(
                     goodsAmounts[0],
                     goodsAmounts[1],
-                    goodsAmounts[2]
+                    goodsAmounts[2],
+                    goodsAmounts[3]
                 );
                 if (const auto* realm = simulation_->world().realm(
                         simulation_->playerRealmId()

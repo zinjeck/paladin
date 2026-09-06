@@ -146,6 +146,8 @@ namespace Paladin
                      : nullptr;
         const bool house =
             object && object->objectTypeId == SettlementObjectTypes::House;
+        const bool pasture = object && object->objectTypeId ==
+                                           SettlementObjectTypes::Pastureland;
         const float storageHeight =
             inventory ? 34.0F + float(inventory->goods.size()) * 22
             : house   ? 140.0F
@@ -153,6 +155,7 @@ namespace Paladin
         const float detailsHeight =
             citizen ? 386.0F
                     : (workplace ? 78.0F : 0.0F) + storageHeight +
+                          (pasture ? 48 : 0) +
                           (object && (object->objectTypeId ==
                                           SettlementObjectTypes::CityKeep ||
                                       workplace)
@@ -222,6 +225,34 @@ namespace Paladin
         }
         if (object && workplace)
         {
+            if (pasture)
+            {
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    "Animals: " +
+                        std::to_string(
+                            settlementMap.animals.containedCount(object->id)
+                        ),
+                    renderedBounds_.x + 13,
+                    renderedBounds_.y + renderedBounds_.height - 76,
+                    1.5F
+                );
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    "Space: " +
+                        std::to_string(
+                            settlementMap.animals.usedSpace(object->id)
+                        ) +
+                        "/" +
+                        std::to_string(
+                            std::int64_t(object->footprint.width) *
+                            object->footprint.height
+                        ),
+                    renderedBounds_.x + 13,
+                    renderedBounds_.y + renderedBounds_.height - 54,
+                    1.5F
+                );
+            }
             grayUiRenderer.drawLabel(
                 renderer,
                 "Operating cash: " +

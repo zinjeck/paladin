@@ -8,6 +8,7 @@
 #include "world/entities/EntityState.h"
 
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <string>
 #include <vector>
@@ -176,7 +177,13 @@ namespace Paladin
         std::uint64_t version() const noexcept;
 
         void resetLocalPlacement() noexcept;
-        void tickMovement(const SettlementMap& map, double gameMinutes);
+        void tickMovement(
+            const SettlementMap& map,
+            double gameMinutes,
+            const std::function<
+                void(const SettlementCitizen&, SettlementTilePosition)>&
+                onStep = {}
+        );
         bool moveTo(
             CitizenId id,
             const SettlementMap& map,

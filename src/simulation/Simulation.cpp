@@ -75,6 +75,14 @@ namespace Paladin
                 {
                     if (settlement.id() != detailedSimulationSettlementId_)
                     {
+                        map->animals.tick(
+                            *map,
+                            state.citizens(),
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes,
+                            false
+                        );
                         map->commerce.tickInactive(
                             *map,
                             state.citizens(),

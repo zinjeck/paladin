@@ -157,6 +157,12 @@ namespace Paladin
                  ++index)
             {
                 const auto id = citizenIds_.generate();
+                if (id.value() >= (std::uint64_t(1) << 63))
+                {
+                    throw std::overflow_error(
+                        "Citizen entity ID namespace exhausted"
+                    );
+                }
                 const auto sequence = id.value() - 1;
                 const CitizenSex sex =
                     (GenerationNoise::mix(nameSeed ^ (sequence * 104729ULL)) &
@@ -201,6 +207,15 @@ namespace Paladin
     )
     {
         const SettlementGrid& grid = settlementMap.grid();
+        if (std::all_of(
+                citizens_.begin(),
+                citizens_.end(),
+                [&](const auto& c)
+                { return grid.isValidPosition(c.tilePosition); }
+            ))
+        {
+            return;
+        }
         if (grid.width() <= 0 || grid.height() <= 0)
         {
             return;

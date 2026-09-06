@@ -1,5 +1,6 @@
 #include "TestFramework.h"
 #include "interaction/SettlementObjectPlacementController.h"
+#include "rendering/ScenePresentation.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -126,6 +127,162 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        const FisheryJobPolicy policy;
+        PALADIN_CHECK(fisheryReach({{0, 0}, 2, 2}) == 4);
+        PALADIN_CHECK(fisheryReach({{0, 0}, 16, 16}) <= 12);
+        PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 3);
+        PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 1.5);
+        const SceneProjection projection{0, 0, 10, 100, 100};
+        const auto tall = projection.bounds({2, 3, 1, 1, 3, .5, 1});
+        PALADIN_CHECK(tall.x == 65 && tall.y == 40 && tall.height == 30);
+        SceneDrawItem behind, front;
+        behind.groundDepth = 2;
+        front.groundDepth = 3;
+        PALADIN_CHECK(SceneDrawQueue::before(behind, front));
+    }
+    {
+        auto map = land(80);
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        map.activities.policy.dailyBirthChance = 0;
+        const auto pasture = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{12, 12}, 4, 6}
+        );
+        const auto cow = map.animals.spawn(map, "cow", {25, 12});
+        const auto mate = map.animals.spawn(map, "cow", {26, 12});
+        const auto pig = map.animals.spawn(map, "pig", {27, 12});
+        const auto chicken = map.animals.spawn(map, "chicken", {28, 12});
+        PALADIN_CHECK(cow && mate && pig && chicken);
+        PALADIN_CHECK(map.commandState().add(
+            map,
+            SettlementCommandTypes::Gather,
+            {{24, 11}, 6, 3},
+            citizens
+        ));
+        advance(map, citizens, 360, 200);
+        PALADIN_CHECK(map.animals.containedCount(pasture) == 4);
+        PALADIN_CHECK(map.animals.usedSpace(pasture) == 7);
+        PALADIN_CHECK(map.animals.find(cow)->pasture == pasture);
+        map.animals.find(cow)->female = true;
+        map.animals.find(mate)->female = false;
+        map.animals.find(cow)->breedingTarget = .000001;
+        advance(map, citizens, 560, 1);
+        PALADIN_CHECK(map.animals.containedCount(pasture) == 5);
+        PALADIN_CHECK(map.animals.all().back().juvenile);
+        const auto stock = map.logistics.forObject(pasture);
+        map.animals.produce(map, pasture, 0, 561, 720);
+        PALADIN_CHECK(map.logistics.available(stock, "meat") == 0);
+        map.animals.produce(map, pasture, 2, 561, 720);
+        PALADIN_CHECK(map.logistics.available(stock, "meat") > 0);
+        map.employment().synchronize(map.objectState(), citizens);
+        PALADIN_CHECK(
+            map.employment()
+                .workplace(map.employment().forObject(pasture))
+                ->maximumCapacity == 2
+        );
+        const auto position = map.animals.find(pig)->tilePosition;
+        PALADIN_CHECK(map.commandState().add(
+            map,
+            SettlementCommandTypes::Hunt,
+            {position, 1, 1},
+            citizens
+        ));
+        advance(map, citizens, 561, 90);
+        PALADIN_CHECK(map.animals.find(pig)->health == 0);
+        const auto small = completed(
+            map,
+            SettlementObjectTypes::Pastureland,
+            {{40, 40}, 2, 2}
+        );
+        const auto female = map.animals.spawn(map, "cow", {40, 40});
+        const auto male = map.animals.spawn(map, "cow", {41, 40});
+        map.animals.find(female)->pasture = small;
+        map.animals.find(female)->female = true;
+        map.animals.find(female)->breedingTarget = .000001;
+        map.animals.find(male)->pasture = small;
+        map.animals.find(male)->female = false;
+        const auto stationary = map.animals.find(female)->tilePosition;
+        map.animals.tick(map, citizens, 800, 1440, false);
+        PALADIN_CHECK(map.animals.containedCount(small) == 2);
+        PALADIN_CHECK(map.animals.usedSpace(small) == 4);
+        PALADIN_CHECK(map.animals.find(female)->tilePosition == stationary);
+    }
+    {
+        // All livestock species roam inside their pasture, including along
+        // its edges, rather than remaining at the delivery tile.
+        auto roaming = land();
+        SettlementCitizenState observers;
+        const SettlementObjectFootprint enclosure{{10, 10}, 4, 6};
+        const auto pasture =
+            completed(roaming, SettlementObjectTypes::Pastureland, enclosure);
+        const std::array residents{
+            roaming.animals.spawn(roaming, "cow", {10, 10}),
+            roaming.animals.spawn(roaming, "pig", {11, 10}),
+            roaming.animals.spawn(roaming, "chicken", {12, 10})
+        };
+        std::array<bool, 3> moved{};
+        for (const auto id : residents)
+        {
+            PALADIN_CHECK(id);
+            roaming.animals.find(id)->pasture = pasture;
+        }
+        for (int step = 0; step < 40; ++step)
+        {
+            roaming.animals.tick(roaming, observers, step * 10, 10);
+            for (std::size_t i = 0; i < residents.size(); ++i)
+            {
+                const auto* animal = roaming.animals.find(residents[i]);
+                PALADIN_CHECK(enclosure.contains(animal->tilePosition));
+                PALADIN_CHECK(enclosure.contains(animal->previousTile));
+                moved[i] =
+                    moved[i] || animal->tilePosition != animal->previousTile;
+            }
+        }
+        PALADIN_CHECK(
+            std::all_of(
+                moved.begin(),
+                moved.end(),
+                [](bool value) { return value; }
+            )
+        );
+
+        auto first = land(80);
+        auto second = land(80);
+        first.animals.initialize(first, 123);
+        second.animals.initialize(second, 123);
+        PALADIN_CHECK(first.animals.all().size() == 36);
+        PALADIN_CHECK(
+            first.animals.all().size() == second.animals.all().size()
+        );
+        for (std::size_t i = 0; i < first.animals.all().size(); ++i)
+        {
+            PALADIN_CHECK(
+                first.animals.all()[i].tilePosition ==
+                second.animals.all()[i].tilePosition
+            );
+        }
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        auto& c = SettlementActivityTestFixture::resident(citizens);
+        c.tilePosition = {10, 10};
+        c.path = {{11, 10}, {12, 10}};
+        c.destination = {12, 10};
+        c.pathIndex = 0;
+        c.stepProgress = .4;
+        c.stepDuration = 1;
+        c.task.kind =
+            CitizenTaskKind::Work; // Invalid employer cancels this task.
+        c.explicitMovement = true;
+        map.activities.tick(map, citizens, 400, .01);
+        PALADIN_CHECK(c.visualX() > 10.39 && c.visualX() < 10.42);
+        completed(map, SettlementObjectTypes::Road, {{10, 10}, 2, 1});
+        citizens.tickMovement(map, .01);
+        PALADIN_CHECK(c.visualX() > 10.40 && c.visualX() < 10.44);
+    }
     {
         auto map = land();
         SettlementObjectPlacementController placement;
@@ -1426,6 +1583,9 @@ void runSettlementSimulationLoopTests()
             SettlementObjectTypes::FishingGrounds,
             {{24, 14}, 3, 3}
         );
+        // This scenario tests hunger recovery, not the default balance rate.
+        map.activities.policy.fishery.minutesPerFish = 80;
+        map.activities.policy.fishery.waterTilesPerWorker = 4;
         const auto originalWater =
             map.objectState().completedObject(fishery)->productionWater;
         PALADIN_CHECK(!originalWater.empty());

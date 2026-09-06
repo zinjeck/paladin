@@ -378,7 +378,8 @@ namespace Paladin
                               c.path.empty();
         if (!sleeping)
         {
-            const bool labor = c.task.kind == CitizenTaskKind::Haul ||
+            const bool labor = c.task.kind == CitizenTaskKind::AnimalWork ||
+                               c.task.kind == CitizenTaskKind::Haul ||
                                c.task.kind == CitizenTaskKind::Gather ||
                                c.task.kind == CitizenTaskKind::Demolish ||
                                c.task.kind == CitizenTaskKind::Build ||
@@ -466,6 +467,9 @@ namespace Paladin
         {
         case CitizenTaskKind::Eat:
             return "Finding food";
+        case CitizenTaskKind::AnimalWork:
+            return c.task.delivering ? "Herding livestock"
+                                     : "Working with animal";
         case CitizenTaskKind::FamilyMeal:
             return c.child ? "Going to parent for food" : "Feeding child";
         case CitizenTaskKind::Haul:

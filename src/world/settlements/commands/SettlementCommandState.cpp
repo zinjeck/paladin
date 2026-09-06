@@ -41,6 +41,21 @@ namespace Paladin
             return false;
         }
         pruneInvalid(map, citizens);
+        if (type == SettlementCommandTypes::Gather ||
+            type == SettlementCommandTypes::Hunt)
+        {
+            const auto changed = map.animals.designate(
+                area,
+                type == SettlementCommandTypes::Gather ? AnimalOrder::Gather
+                                                       : AnimalOrder::Hunt
+            );
+            if (changed)
+            {
+                ++version_;
+                ++selectionVersion_;
+            }
+            return changed > 0;
+        }
         SettlementCommand command;
         command.commandTypeId = type;
         const auto expectedTargets =
@@ -141,6 +156,7 @@ namespace Paladin
     )
     {
         std::size_t removed = map.objectState().cancelConstructionWithin(area);
+        removed += map.animals.cancel(area);
         if (removed)
         {
             map.logistics.synchronize(map.objectState(), 0);

@@ -64,11 +64,17 @@ namespace Paladin
         {
             housingCapacity_ = capacity;
         }
-        void setGoodsAmounts(double stone, double lumber, double fish) noexcept
+        void setGoodsAmounts(
+            double stone,
+            double lumber,
+            double fish,
+            double meat = 0
+        ) noexcept
         {
             stoneAmount_ = stone;
             lumberAmount_ = lumber;
             fishAmount_ = fish;
+            meatAmount_ = meat;
         }
 
         void pointerMoved(float x, float y) noexcept;
@@ -123,6 +129,7 @@ namespace Paladin
         double stoneAmount_ = 0;
         double lumberAmount_ = 0;
         double fishAmount_ = 0;
+        double meatAmount_ = 0;
         std::array<UiButton, CategoryCount> bottomButtons_;
         UiRectangle toolbarBounds_;
         std::vector<UiButton> optionButtons_;

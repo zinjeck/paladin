@@ -89,7 +89,8 @@ namespace Paladin
         for (const auto& c : people.citizens())
         {
             const bool governmentJob =
-                !c.workplaceId && (c.task.kind == CitizenTaskKind::Build ||
+                !c.workplaceId && (c.task.kind == CitizenTaskKind::AnimalWork ||
+                                   c.task.kind == CitizenTaskKind::Build ||
                                    c.task.kind == CitizenTaskKind::Gather ||
                                    c.task.kind == CitizenTaskKind::Demolish ||
                                    c.task.kind == CitizenTaskKind::Haul);
@@ -510,7 +511,8 @@ namespace Paladin
                     std::min(treasury->balance, policy.startingSavings)
                 );
             }
-            const bool working = c.task.kind == CitizenTaskKind::Work ||
+            const bool working = c.task.kind == CitizenTaskKind::AnimalWork ||
+                                 c.task.kind == CitizenTaskKind::Work ||
                                  c.task.kind == CitizenTaskKind::Build ||
                                  c.task.kind == CitizenTaskKind::Gather ||
                                  c.task.kind == CitizenTaskKind::Demolish ||

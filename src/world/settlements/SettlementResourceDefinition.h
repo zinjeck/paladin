@@ -15,6 +15,7 @@ namespace Paladin
     namespace SettlementResourceTypes
     {
         inline constexpr std::string_view Fish = "fish";
+        inline constexpr std::string_view Meat = "meat";
         inline constexpr std::string_view Food = "food";
         inline constexpr std::string_view Materials = "materials";
         inline constexpr std::string_view Stone = "stone";

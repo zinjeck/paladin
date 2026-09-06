@@ -6,6 +6,26 @@
 
 namespace Paladin
 {
+    int fisheryReach(
+        const SettlementObjectFootprint& footprint,
+        const FisheryJobPolicy& policy
+    )
+    {
+        return std::max(
+            1,
+            int(std::lround(
+                std::max(1, policy.baseReach) *
+                std::pow(
+                    std::max(
+                        1.0,
+                        double(footprint.width) * footprint.height /
+                            std::max(1, policy.referenceArea)
+                    ),
+                    policy.reachAreaExponent
+                )
+            ))
+        );
+    }
     double fisheryProductionPerMinute(
         std::size_t waterTiles,
         int attendingWorkers,
@@ -17,7 +37,7 @@ namespace Paladin
             return 0;
         }
         return std::min(
-                   double(attendingWorkers),
+                   double(std::max(0, attendingWorkers)),
                    double(waterTiles) / policy.waterTilesPerWorker
                ) /
                policy.minutesPerFish;
@@ -30,13 +50,7 @@ namespace Paladin
     {
         FisheryZonePreview result;
         const FisheryJobPolicy policy;
-        const int radius = std::max(
-            policy.baseReach,
-            int(std::lround(
-                policy.baseReach *
-                std::sqrt(double(f.width) * f.height / policy.referenceArea)
-            ))
-        );
+        const int radius = fisheryReach(f, policy);
         const int left = std::max(0, f.topLeft.x - radius);
         const int top = std::max(0, f.topLeft.y - radius);
         const int right =
@@ -66,6 +80,14 @@ namespace Paladin
             for (int x = left; x < right; ++x)
             {
                 const SettlementTilePosition p{x, y};
+                const double dx =
+                    x - std::clamp(x, f.topLeft.x, f.topLeft.x + f.width - 1);
+                const double dy =
+                    y - std::clamp(y, f.topLeft.y, f.topLeft.y + f.height - 1);
+                if (dx * dx + dy * dy > double(radius) * radius)
+                {
+                    continue;
+                }
                 if (grid.tile(p)->terrain != TerrainType::Water)
                 {
                     continue;
@@ -99,7 +121,7 @@ namespace Paladin
                     water.y + delta.y
                 };
                 const auto* tile = grid.tile(land);
-                if (!tile || tile->terrain == TerrainType::Water)
+                if (!tile || tile->terrain != TerrainType::Land)
                 {
                     continue;
                 }

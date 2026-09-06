@@ -47,11 +47,12 @@ namespace Paladin
                 {
                     continue;
                 }
-                const RenderColor fill = goods.resource == "lumber"
-                                             ? RenderColor{164, 111, 57, 255}
-                                         : goods.resource == "fish"
-                                             ? RenderColor{85, 172, 215, 255}
-                                             : RenderColor{165, 169, 178, 255};
+                const RenderColor fill =
+                    goods.resource == "lumber" ? RenderColor{164, 111, 57, 255}
+                    : goods.resource == "fish" ? RenderColor{85, 172, 215, 255}
+                    : goods.resource == "meat"
+                        ? RenderColor{171, 77, 72, 255}
+                        : RenderColor{165, 169, 178, 255};
                 const float inset = .15F + .08F * stack++;
                 renderer.fillRectangle(
                     x + size * inset,

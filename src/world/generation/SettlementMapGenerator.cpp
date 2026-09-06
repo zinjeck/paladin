@@ -344,6 +344,7 @@ namespace Paladin
             seed
         );
         result->naturalFeatures().generate(result->grid(), seed);
+        result->animals.initialize(*result, seed);
         return result;
     }
 } // namespace Paladin

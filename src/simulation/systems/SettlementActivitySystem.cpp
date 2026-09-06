@@ -29,6 +29,10 @@ namespace Paladin
             );
         }
         map.logistics.release(c.id);
+        if (c.task.animal)
+        {
+            map.animals.release(c.id);
+        }
         jobBoard_.releaseClaim(c.task);
         c.carriedAmount = 0;
         c.carriedResource.clear();
@@ -36,10 +40,25 @@ namespace Paladin
         c.task = {};
         c.activity = CitizenActivity::Idle;
         c.assignedCommandId = {};
-        c.path.clear();
-        c.pathIndex = 0;
-        c.stepProgress = 0;
-        c.explicitMovement = false;
+        const bool finishStep =
+            c.health > 0 && c.pathIndex < c.path.size() && c.stepProgress > 0 &&
+            SettlementNavigation{}
+                .canStep(map, c.tilePosition, c.path[c.pathIndex]);
+        if (finishStep)
+        {
+            const auto endpoint = c.path[c.pathIndex];
+            c.path.assign(1, endpoint);
+            c.pathIndex = 0;
+            c.destination = endpoint;
+            c.explicitMovement = true;
+        }
+        else
+        {
+            c.path.clear();
+            c.pathIndex = 0;
+            c.stepProgress = 0;
+            c.explicitMovement = false;
+        }
         c.idleWait = -1;
         c.nextDecisionMinute = 0;
     }
@@ -141,6 +160,18 @@ namespace Paladin
             const bool shift = policy.isWorkTime(minute);
             const auto* w = map.employment().workplace(c.workplaceId);
             bool valid = true;
+            if (c.task.kind == CitizenTaskKind::AnimalWork)
+            {
+                const auto* animal = map.animals.find(c.task.animal);
+                valid = !c.child && !c.workplaceId && !c.youngDependents &&
+                        animal && animal->health > 0 &&
+                        animal->handler == c.id &&
+                        animal->order != AnimalOrder::None &&
+                        (animal->order != AnimalOrder::Gather ||
+                         map.objectState().completedObject(
+                             animal->reservedPasture
+                         ));
+            }
             if (c.task.kind == CitizenTaskKind::FamilyMeal)
             {
                 const auto* other = citizens.citizen(c.task.partner);
@@ -283,6 +314,11 @@ namespace Paladin
                 continue;
             }
             startBreak(map, c, minute);
+            if (c.task.kind == CitizenTaskKind::None && c.explicitMovement &&
+                !c.path.empty())
+            {
+                continue;
+            }
             const bool preSleepMeal =
                 shouldSleep(c, minute) &&
                 c.task.kind != CitizenTaskKind::Sleep &&
@@ -369,7 +405,19 @@ namespace Paladin
                 decide(map, citizens, c, minute);
             }
         }
-        citizens.tickMovement(map, elapsed);
+        citizens.tickMovement(
+            map,
+            elapsed,
+            [&](const SettlementCitizen& c, SettlementTilePosition next)
+            {
+                if (c.task.kind == CitizenTaskKind::AnimalWork &&
+                    c.task.delivering)
+                {
+                    map.animals.follow(c.task.animal, c.id, next, map);
+                }
+            }
+        );
+        map.animals.tick(map, citizens, minute, elapsed);
         for (auto& c : citizens.citizens_)
         {
             execute(map, citizens, c, minute, elapsed);
@@ -401,6 +449,7 @@ namespace Paladin
                 return;
             }
             if (chooseConstruction(map, citizens, c, minute) ||
+                chooseAnimalWork(map, citizens, c, minute) ||
                 chooseCommand(map, citizens, c, minute) ||
                 chooseHaul(map, citizens, c, minute))
             {
@@ -473,6 +522,11 @@ namespace Paladin
         if (c.tilePosition != c.destination)
         {
             finish(map, c, minute);
+            return;
+        }
+        if (c.task.kind == CitizenTaskKind::AnimalWork)
+        {
+            executeAnimalWork(map, citizens, c, minute, elapsed);
             return;
         }
         if (c.task.kind == CitizenTaskKind::FamilyMeal)
@@ -1030,15 +1084,9 @@ namespace Paladin
         std::unordered_map<SettlementObjectId, int, StrongIdHash> attendance;
         for (const auto& c : citizens.citizens())
         {
-            if (c.breakUntil > minute && c.workplaceId == c.breakEmployer &&
-                policy.isWorkTime(minute))
-            {
-                ++attendance[c.breakObject];
-            }
-            else if (
+            if (policy.isWorkTime(minute) && c.breakUntil <= minute &&
                 c.task.kind == CitizenTaskKind::Work && c.path.empty() &&
-                c.tilePosition == c.destination
-            )
+                c.tilePosition == c.destination)
             {
                 ++attendance[c.task.object];
             }
@@ -1046,6 +1094,12 @@ namespace Paladin
         for (const auto& [objectId, workers] : attendance)
         {
             const auto* object = map.objectState().completedObject(objectId);
+            if (object &&
+                object->objectTypeId == SettlementObjectTypes::Pastureland)
+            {
+                map.animals.produce(map, objectId, workers, minute, elapsed);
+                continue;
+            }
             if (!object ||
                 object->objectTypeId != SettlementObjectTypes::FishingGrounds)
             {

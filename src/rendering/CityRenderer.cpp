@@ -123,6 +123,12 @@ namespace Paladin
             placementController,
             inspection
         );
-        citizenRenderer_.render(renderer, citizens, camera, metrics);
+        citizenRenderer_.render(
+            renderer,
+            citizens,
+            camera,
+            metrics,
+            &settlementMap.animals
+        );
     }
 } // namespace Paladin
