@@ -29,6 +29,15 @@ FetchContent_MakeAvailable(SDL3_ttf)
 add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
+    src/core/ApplicationMainMenu.cpp
+    src/core/ApplicationWorldScreen.cpp
+    src/core/ApplicationCityScreen.cpp
+    src/core/ApplicationFrame.cpp
+    src/core/ApplicationCityInput.cpp
+    src/core/ApplicationWorldInput.cpp
+    src/core/ApplicationSession.cpp
+    src/core/ApplicationCamera.cpp
+    src/core/ApplicationDebug.cpp
     src/core/SimulationClock.cpp
     src/interaction/CameraNavigationPolicy.cpp
     src/interaction/SettlementCommandController.cpp
@@ -207,3 +216,24 @@ add_test(
     NAME PaladinTests
     COMMAND PaladinTests
 )
+
+# Opt-in SDL integration check for application routing. The ordinary simulation
+# tests remain independent of a window/renderer and do not rebuild the UI.
+option(PALADIN_BUILD_APPLICATION_SMOKE_TESTS "Build application routing smoke test" OFF)
+if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
+    get_target_property(PALADIN_APPLICATION_SOURCES Paladin SOURCES)
+    list(REMOVE_ITEM PALADIN_APPLICATION_SOURCES src/main.cpp)
+    add_executable(PaladinApplicationSmokeTests
+        tests/ApplicationSmokeTests.cpp
+        ${PALADIN_APPLICATION_SOURCES}
+    )
+    target_include_directories(PaladinApplicationSmokeTests PRIVATE src tests)
+    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf)
+    # Reuse the game's runtime DLL/font packaging even when building only this target.
+    add_dependencies(PaladinApplicationSmokeTests Paladin)
+    add_test(NAME PaladinApplicationSmokeTests COMMAND PaladinApplicationSmokeTests)
+    set_tests_properties(PaladinApplicationSmokeTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
+        TIMEOUT 120
+    )
+endif()

@@ -31,6 +31,8 @@ namespace Paladin
     class SettlementInspectionController;
     class SettlementInspectionPanel;
     class Simulation;
+    class SettlementMap;
+    class SettlementCitizenState;
     class SimulationClock;
     class SimulationSpeedControls;
     class Window;
@@ -51,6 +53,8 @@ namespace Paladin
         int run();
 
     private:
+        friend struct ApplicationSmokeTest;
+
         enum class Screen
         {
             MainMenu,
@@ -58,6 +62,49 @@ namespace Paladin
             City
         };
 
+        // Frame orchestration. Modal input helpers report event consumption;
+        // handleEvent and handleMainMenuEvent return false only on exit.
+        bool simulationControlsVisible() const noexcept;
+        void layoutFrame();
+        void updateFrame();
+        void renderFrame();
+        bool handleEvent(const SDL_Event& event, bool controlsVisible);
+        bool handleDebugEvent(const SDL_Event& event);
+        bool handleSimulationControlEvent(const SDL_Event& event);
+        void handleCameraZoomEvent(const SDL_Event& event);
+
+        // Main menu.
+        void layoutMainMenu();
+        bool handleMainMenuEvent(const SDL_Event& event);
+        void renderMainMenu();
+
+        // City screen and its modal/input layers.
+        void layoutCityScreen();
+        void updateCityScreen();
+        void synchronizeCityStatus();
+        void updateCityHud();
+        void renderCityScreen();
+        void handleCityEvent(const SDL_Event& event);
+        bool handleCityRenameEvent(const SDL_Event& event, SettlementMap& map);
+        bool handleCityEmploymentEvent(
+            const SDL_Event& event,
+            SettlementMap& map,
+            SettlementCitizenState& citizens
+        );
+        void handleCityPointerMotion(const SDL_Event& event);
+        void handleCityPointerPressed(const SDL_Event& event);
+        void handleCityPointerReleased(const SDL_Event& event);
+
+        // World screen and founding flow input.
+        void layoutWorldScreen();
+        void updateWorldScreen();
+        void renderWorldScreen();
+        void handleWorldEvent(const SDL_Event& event);
+        void handleFoundingEvent(const SDL_Event& event);
+        void handleWorldPointerPressed(const SDL_Event& event);
+        void handleWorldPointerReleased(const SDL_Event& event);
+
+        // Session lifecycle and existing presentation helpers.
         void startWorldSession();
         void endWorldSession();
         void enterPlayerCapitalCity();
