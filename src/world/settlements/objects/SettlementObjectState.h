@@ -38,6 +38,7 @@ namespace Paladin
         std::vector<SettlementTilePosition> productionWater;
         double productionProgress = 0;
         std::optional<SettlementTilePosition> door;
+        int homeLevel = 1; // Reserved for future upgrades; no effects yet.
     };
 
     enum class ConstructionSitePhase : std::uint8_t
@@ -226,6 +227,9 @@ namespace Paladin
         ) const noexcept;
 
         void synchronizeIdIndexes() const;
+        void synchronizeTileIndexes() const;
+        mutable std::uint64_t tileIndexedVersion_ = ~std::uint64_t(0);
+        mutable std::vector<std::uint32_t> objectAtTile_, siteAtTile_;
         mutable std::uint64_t indexedVersion_ = ~std::uint64_t(0);
         mutable std::
             unordered_map<SettlementObjectId, std::size_t, StrongIdHash>

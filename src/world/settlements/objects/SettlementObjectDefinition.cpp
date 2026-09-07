@@ -26,7 +26,7 @@ namespace Paladin
                  {SettlementResourceTypes::Stone, 1, 12}}
             };
 
-        constexpr std::array<SettlementObjectDefinition, 9> objectDefinitions{
+        constexpr std::array<SettlementObjectDefinition, 10> objectDefinitions{
             {{SettlementObjectTypes::CityKeep,
               "City Keep",
               SettlementObjectCategory::Rule,
@@ -129,7 +129,7 @@ namespace Paladin
               false,
               false,
               SettlementObjectPlacementLayer::Structure,
-              {{15, 87, 102}, {46, 158, 179}, 3.0F, 3.0F},
+              {{99, 62, 75}, {189, 134, 76}, 3.0F, 3.0F},
               initialConstructionResourceCosts},
              {SettlementObjectTypes::WheatFarm,
               "Wheat Farm",
@@ -181,7 +181,24 @@ namespace Paladin
               false,
               SettlementObjectPlacementLayer::Structure,
               {{74, 77, 79}, {156, 158, 163}, 3.0F, 3.0F},
-              initialConstructionResourceCosts}}
+              initialConstructionResourceCosts},
+             {SettlementObjectTypes::LoggingGrounds,
+              "Logging Grounds",
+              SettlementObjectCategory::Logistics,
+              1,
+              SettlementFootprintSelectionMode::DragRectangle,
+              1,
+              1,
+              3,
+              3,
+              false,
+              false,
+              false,
+              false,
+              SettlementObjectPlacementLayer::Structure,
+              {{99, 62, 75}, {189, 134, 76}, 4.0F, 4.0F},
+              initialConstructionResourceCosts,
+              false}}
         };
     } // namespace
 

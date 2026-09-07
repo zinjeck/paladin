@@ -147,12 +147,13 @@ namespace Paladin
                      : nullptr;
         const bool house =
             object && object->objectTypeId == SettlementObjectTypes::House;
+        showingHouse_ = house;
         const bool pasture = object && object->objectTypeId ==
                                            SettlementObjectTypes::Pastureland;
         const float storageHeight =
-            inventory ? 34.0F + float(inventory->goods.size()) * 22
-            : house   ? 140.0F
-                      : 0;
+            house       ? 195.0F
+            : inventory ? 34.0F + float(inventory->goods.size()) * 22
+                        : 0;
         const float detailsHeight =
             citizen ? 386.0F
                     : (workplace ? 78.0F : 0.0F) + storageHeight +
@@ -309,6 +310,31 @@ namespace Paladin
             );
         }
 
+        if (house)
+        {
+            const float x = renderedBounds_.x + 10, y = renderedBounds_.y + 8;
+            homeUpgradeButton_.setBounds({x, y, 30, 30});
+            homeUpgradeButton_.render(renderer, grayUiRenderer);
+            const RenderColor green{0xA6, 0xCD, 0x59, 255};
+            renderer.fillRectangle(x + 13, y + 12, 5, 13, green);
+            for (int row = 0; row < 8; ++row)
+            {
+                renderer.fillRectangle(
+                    x + 15 - row,
+                    y + 5 + row,
+                    1 + row * 2,
+                    1,
+                    green
+                );
+            }
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Level " + std::to_string(object->homeLevel),
+                x + 38,
+                y + 8,
+                1.3F
+            );
+        }
         if (citizen)
         {
             const auto* job =
@@ -499,7 +525,7 @@ namespace Paladin
                 1.25F
             );
         }
-        if (inventory)
+        if (inventory && !house)
         {
             float y = renderedBounds_.y + (workplace ? 138 : 60);
             grayUiRenderer.drawLabel(
@@ -568,6 +594,31 @@ namespace Paladin
                 residentY,
                 1.2F
             );
+            grayUiRenderer.drawLabel(
+                renderer,
+                std::string(
+                    settlementMap.heating.heated(object->id)
+                        ? "Warm - fire burning"
+                    : count ? "Cold - needs firewood"
+                            : "Unoccupied - fire out"
+                ),
+                renderedBounds_.x + 13,
+                residentY + 24,
+                1.2F
+            );
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Firewood: " +
+                    std::to_string(
+                        inventory
+                            ? inventory->amount(SettlementResourceTypes::Lumber)
+                            : 0
+                    ) +
+                    "/8 (2/day; winter 4)",
+                renderedBounds_.x + 13,
+                residentY + 46,
+                1.1F
+            );
         }
         if (!constructionSite)
         {
@@ -625,6 +676,8 @@ namespace Paladin
         dragCandidate_ = dragging_ = detached_ = false;
         workplaceId_ = {};
         showingKeep_ = false;
+        showingHouse_ = false;
+        homeUpgradeButton_.cancelPress();
         keepSalesButton_.cancelPress();
         nameField_.setFocused(false);
     }
@@ -649,6 +702,7 @@ namespace Paladin
             increaseButton_.cancelPress();
         }
         nameButton_.pointerMoved(x, y);
+        homeUpgradeButton_.pointerMoved(x, y);
         spouseButton_.pointerMoved(x, y);
         keepSalesButton_.pointerMoved(x, y);
         decreaseButton_.pointerMoved(x, y);
@@ -661,6 +715,11 @@ namespace Paladin
             return false;
         }
         dragCandidate_ = !nameField_.focused();
+        if (showingHouse_ && homeUpgradeButton_.pointerPressed(x, y))
+        {
+            dragCandidate_ = false;
+            return true;
+        }
         if (spouseId_ && spouseButton_.pointerPressed(x, y))
         {
             dragCandidate_ = false;
@@ -692,6 +751,10 @@ namespace Paladin
     )
     {
         dragCandidate_ = false;
+        if (showingHouse_)
+        {
+            static_cast<void>(homeUpgradeButton_.pointerReleased(x, y));
+        }
         if (dragging_)
         {
             dragging_ = false;

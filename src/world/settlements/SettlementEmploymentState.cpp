@@ -3,6 +3,7 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/LoggingGroundsJob.h"
 #include "world/settlements/objects/jobs/bakery/BakeryJob.h"
 #include "world/settlements/objects/jobs/fishery/FisheryJob.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
@@ -18,13 +19,14 @@ namespace Paladin
     namespace
     {
         // Reference-area capacities follow Godot; stockpile staffing is new.
-        constexpr std::array<WorkplaceDefinition, 6> definitions{
+        constexpr std::array<WorkplaceDefinition, 7> definitions{
             MarketWorkplace,
             StockpileWorkplace,
             FisheryWorkplace,
             WheatFarmWorkplace,
             PasturelandWorkplace,
-            BakeryWorkplace
+            BakeryWorkplace,
+            LoggingGroundsWorkplace
         };
     } // namespace
     std::span<const WorkplaceDefinition> workplaceDefinitions() noexcept

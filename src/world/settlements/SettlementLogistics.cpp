@@ -113,6 +113,24 @@ namespace Paladin
         }
         return std::max(0, amount);
     }
+    bool SettlementLogistics::consumeAvailable(
+        InventoryId id,
+        std::string_view resource,
+        int amount
+    )
+    {
+        if (amount <= 0 || available(id, resource) < amount)
+        {
+            return false;
+        }
+        auto* entry = edit(id);
+        if (!entry)
+        {
+            return false;
+        }
+        change(*entry, resource, -amount);
+        return true;
+    }
     int SettlementLogistics::freeSpace(InventoryId id) const
     {
         const auto* entry = inventory(id);
@@ -440,13 +458,27 @@ namespace Paladin
         }
         for (const auto& object : objects.completedObjects())
         {
-            if (object.objectTypeId == SettlementObjectTypes::Road ||
-                object.objectTypeId == SettlementObjectTypes::House)
+            if (object.objectTypeId == SettlementObjectTypes::Road)
             {
                 continue;
             }
             if (forObject(object.id))
             {
+                continue;
+            }
+            if (object.objectTypeId == SettlementObjectTypes::House)
+            {
+                inventories_.push_back(
+                    {ids_.generate(),
+                     InventoryKind::Home,
+                     object.id,
+                     {},
+                     object.footprint,
+                     8,
+                     minute,
+                     {},
+                     {{std::string(SettlementResourceTypes::Lumber), 8}}}
+                );
                 continue;
             }
             const bool keep =

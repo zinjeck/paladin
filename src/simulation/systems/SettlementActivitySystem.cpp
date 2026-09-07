@@ -1,16 +1,27 @@
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "world/generation/GenerationNoise.h"
+#include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/LoggingGroundsJob.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
 
 namespace Paladin
 {
+    void SettlementActivitySystem::assignHomes(
+        SettlementMap& map,
+        SettlementCitizenState& citizens
+    )
+    {
+        families_.assignHomes(map, citizens, *this);
+        assignHomeBeds(map, citizens.citizens_);
+    }
+
     void SettlementActivitySystem::finish(
         SettlementMap& map,
         SettlementCitizen& c,
@@ -86,6 +97,7 @@ namespace Paladin
         {
             const double untilMinute = 1 - (minute - std::floor(minute));
             const double dt = std::min(elapsed, std::max(1e-6, untilMinute));
+            map.immigration.advance(map, citizens, minute, dt);
             step(map, citizens, minute, dt);
             minute += dt;
             elapsed -= dt;
@@ -103,6 +115,16 @@ namespace Paladin
         map.employment().synchronize(map.objectState(), citizens);
         map.commerce.update(map, citizens, minute, elapsed);
         assignHomes(map, citizens);
+        std::unordered_set<SettlementObjectId, StrongIdHash> occupiedHomes;
+        for (const auto& c : citizens.citizens())
+        {
+            if (c.homeId && c.health > 0)
+            {
+                occupiedHomes.insert(c.homeId);
+            }
+        }
+        map.heating.advance(map.logistics, occupiedHomes, minute, elapsed);
+        map.naturalFeatures().regrow(map.grid(), map.objectState(), minute);
         if (jobBoard_.refreshCommandBoard(map))
         {
             map.commandState().pruneInvalid(map, citizens);
@@ -117,10 +139,12 @@ namespace Paladin
         pathsRemaining_ =
             std::min(std::size_t(pathCredit_), policy.maximumPathsPerStep);
         const auto initialPaths = pathsRemaining_;
+        bool citizenDied = false;
         for (auto& c : citizens.citizens_)
         {
             if (c.health <= 1e-7)
             {
+                citizenDied = true;
                 for (auto& survivor : citizens.citizens_)
                 {
                     survivor.familiarities.erase(c.id);
@@ -137,7 +161,36 @@ namespace Paladin
             }
             planSleep(map, c, minute);
             planBreak(map, c, minute);
-            needs(c, elapsed, minute);
+            needs(map, c, elapsed, minute);
+            const auto& conditions = map.immigration.conditions();
+            const auto& immigration = map.immigration.policy;
+            const auto adjustPressure =
+                [&](double& current, double target, AttributeEffect source)
+            {
+                const double step =
+                    std::max(0.0, immigration.happinessAdjustmentPerDay) *
+                    (source == AttributeEffect::FoodShortage && target > current ? 1.25 : 1.0) *
+                    elapsed / 1440;
+                const double change = std::clamp(target - current, -step, step);
+                current += change;
+                c.modifyAttributes({{source, -change}});
+            };
+            adjustPressure(
+                c.housingHappinessPenalty,
+                conditions.unhousedShare * immigration.housingHappinessPenalty,
+                AttributeEffect::Overcrowding
+            );
+            adjustPressure(
+                c.foodHappinessPenalty,
+                std::clamp(
+                    1 - conditions.foodDays /
+                            std::max(.01, immigration.minimumFoodDays),
+                    0.0,
+                    1.0
+                ) * immigration.foodHappinessPenalty,
+                AttributeEffect::FoodShortage
+            );
+            c.enforceHappinessModifiers();
             const auto* cargoDefinition =
                 SettlementResourceCatalog::definition(c.carriedResource);
             if (c.health > 0 && c.hunger >= c.foodSeekHunger &&
@@ -146,7 +199,9 @@ namespace Paladin
                 map.logistics.consumeCarriedUnit(c.id))
             {
                 --c.carriedAmount;
-                c.hunger = std::max(0.0, c.hunger - policy.mealRestoration);
+                c.modifyAttributes(
+                    {{AttributeEffect::Meals, -policy.mealRestoration}}
+                );
                 planMeal(c, map);
                 if (c.carriedAmount == 0)
                 {
@@ -155,6 +210,7 @@ namespace Paladin
             }
             if (c.health <= 1e-7)
             {
+                citizenDied = true;
                 map.commerce.citizenDeparted(c.id);
                 map.employment().citizenDeparted(c.workplaceId);
                 c.workplaceId = {};
@@ -245,7 +301,10 @@ namespace Paladin
                 {
                     valid =
                         valid &&
-                        (!c.workplaceId ||
+                        ((destination &&
+                          destination->kind == InventoryKind::Home &&
+                          !c.child) ||
+                         !c.workplaceId ||
                          (shift && w && destination &&
                           (w->objectTypeId ==
                                SettlementObjectTypes::Stockpile ||
@@ -287,6 +346,11 @@ namespace Paladin
             {
                 finish(map, c, minute);
             }
+        }
+        // Capture terminal health/needs changes before deceased entities leave.
+        if (citizenDied)
+        {
+            citizens.recordAttributes(minute, 0);
         }
         std::erase_if(
             citizens.citizens_,
@@ -434,6 +498,7 @@ namespace Paladin
         produce(map, citizens, minute, elapsed);
         pathCredit_ -= double(initialPaths - pathsRemaining_);
         citizens.recordPopulation(minute + elapsed);
+        citizens.recordAttributes(minute, elapsed);
         map.employment().record(minute, citizens);
         ++citizens.version_;
     }
@@ -449,6 +514,16 @@ namespace Paladin
             return;
         }
         c.nextWorkCheckMinutes = minute + policy.retryMinutes;
+        if (!c.child && c.homeId)
+        {
+            const auto home = map.logistics.forObject(c.homeId);
+            const auto* fuel = map.logistics.inventory(home);
+            if (fuel && fuel->amount(SettlementResourceTypes::Lumber) <= 2 &&
+                chooseHaul(map, citizens, c, minute, home))
+            {
+                return;
+            }
+        }
         if (!c.child && !c.workplaceId)
         {
             if (!policy.isWorkTime(minute) &&
@@ -576,8 +651,10 @@ namespace Paladin
                          policy.urgentFoodThreshold - parent->hunger
                      ) / share}
                 );
-                c.hunger -= fed;
-                parent->hunger += fed * share;
+                c.modifyAttributes({{AttributeEffect::ParentFeeding, -fed}});
+                parent->modifyAttributes(
+                    {{AttributeEffect::FeedingChildren, fed * share}}
+                );
                 planMeal(c, map);
                 finish(map, *parent, minute);
                 finish(map, c, minute);
@@ -614,7 +691,9 @@ namespace Paladin
                     map.commerce.buyMeal(marketId, c, citizens, price);
                 }
                 map.commerce.recordMeal(c, publicFood && price == 0);
-                c.hunger = std::max(0.0, c.hunger - policy.mealRestoration);
+                c.modifyAttributes(
+                    {{AttributeEffect::Meals, -policy.mealRestoration}}
+                );
                 planMeal(c, map);
             }
             finish(map, c, minute);
@@ -790,10 +869,7 @@ namespace Paladin
                         4,
                         minute
                     );
-                    map.naturalFeatures().set(
-                        c.task.workTile,
-                        NaturalFeatureKind::None
-                    );
+                    map.naturalFeatures().harvest(c.task.workTile, minute);
                 }
             }
             else if (c.task.site)
@@ -862,6 +938,10 @@ namespace Paladin
                 return;
             }
             const auto* home = map.objectState().completedObject(c.task.object);
+            if (home && c.bedHomeId == home->id && c.bedSlot >= 0)
+            {
+                c.task.target = homeBedPosition(*home, c.bedSlot);
+            }
             if (c.task.object &&
                 (!home || !home->footprint.contains(c.tilePosition)))
             {
@@ -914,9 +994,9 @@ namespace Paladin
                 std::max(0.0, policy.fullRestEnergy - c.energy) /
                     policy.sleepEnergyPerMinute
             );
-            c.energy = std::min(
-                policy.fullRestEnergy,
-                c.energy + policy.sleepEnergyPerMinute * restingMinutes
+            c.modifyAttributes(
+                {{AttributeEffect::Sleep,
+                  policy.sleepEnergyPerMinute * restingMinutes}}
             );
             c.sleptMinutes += restingMinutes;
             if (c.energy >= policy.fullRestEnergy - 1e-7)
@@ -1079,14 +1159,11 @@ namespace Paladin
                 std::abs(other->tilePosition.x - c.tilePosition.x) <= 1 &&
                 std::abs(other->tilePosition.y - c.tilePosition.y) <= 1)
             {
-                c.happiness = std::min(
-                    std::max(
-                        0.0,
-                        100.0 - c.publicFoodDissatisfaction +
-                            std::min(0.0, c.taxHappinessAdjustment)
-                    ),
-                    c.happiness + policy.talkingHappinessPerMinute * elapsed
+                c.modifyAttributes(
+                    {{AttributeEffect::Socializing,
+                      policy.talkingHappinessPerMinute * elapsed}}
                 );
+                c.enforceHappinessModifiers();
                 if (c.id < other->id)
                 {
                     const double gain =
@@ -1199,6 +1276,39 @@ namespace Paladin
                 object->objectTypeId == SettlementObjectTypes::Pastureland)
             {
                 map.animals.produce(map, objectId, workers, minute, elapsed);
+                continue;
+            }
+            if (object &&
+                object->objectTypeId == SettlementObjectTypes::LoggingGrounds)
+            {
+                const auto inventory = map.logistics.forObject(objectId);
+                const int space = map.logistics.freeSpace(inventory);
+                if (space > 0)
+                {
+                    const double rate = loggingProductionPerMinute(
+                        object->footprint.width * object->footprint.height,
+                        workers
+                    );
+                    const int lumber = std::min(
+                        space,
+                        int(map.objectState()
+                                .accrueProduction(objectId, elapsed * rate))
+                    );
+                    if (lumber > 0 && map.logistics.add(
+                                          inventory,
+                                          SettlementResourceTypes::Lumber,
+                                          lumber,
+                                          minute
+                                      ))
+                    {
+                        map.commerce.recordFlow(
+                            {},
+                            inventory,
+                            SettlementResourceTypes::Lumber,
+                            lumber
+                        );
+                    }
+                }
                 continue;
             }
             if (!object ||

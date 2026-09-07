@@ -11,9 +11,11 @@ namespace Paladin
         bool roofsVisible = true;
         bool shadowsVisible = true;
         bool daylightEnabled = true;
+        bool localLightsEnabled = true;
         double treeElevation = .45;
         double detailTilePixels = 8;
-        RenderColor shadowColor{12, 16, 24, 65};
+        double viewAzimuthDegrees = 0;
+        RenderColor shadowColor{12, 16, 24, 95};
 
         RenderColor ambient(double hour) const
         {

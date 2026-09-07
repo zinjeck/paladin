@@ -1,6 +1,9 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
+#include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
+#include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/DebugConsole.h"
 #include "ui/LedgerPanel.h"
@@ -143,13 +146,17 @@ namespace Paladin
             updateCityScreen();
             break;
         }
-        while (simulationClock_->shouldTick())
+        const auto simulationDeadline = SDL_GetTicksNS() + 8000000;
+        int frameTicks = 0;
+        while (simulationClock_->shouldTick() && frameTicks < 4 &&
+               (frameTicks == 0 || SDL_GetTicksNS() < simulationDeadline))
         {
             if (screen_ != Screen::MainMenu)
             {
                 simulation_->tick(simulationClock_->fixedDeltaSeconds());
             }
             simulationClock_->consumeTick();
+            ++frameTicks;
         }
         if (screen_ == Screen::City)
         {
@@ -190,6 +197,21 @@ namespace Paladin
         if (event.type == SDL_EVENT_QUIT)
         {
             return false;
+        }
+        if (screen_ != Screen::MainMenu && event.type == SDL_EVENT_KEY_DOWN &&
+            !event.key.repeat && event.key.scancode == SDL_SCANCODE_F8)
+        {
+            SceneSpriteLibrary::setEnvironmentArtEnabled(
+                !SceneSpriteLibrary::environmentArtEnabled()
+            );
+            return true;
+        }
+        if (screen_ != Screen::MainMenu && event.type == SDL_EVENT_KEY_DOWN &&
+            !event.key.repeat && event.key.scancode == SDL_SCANCODE_F6)
+        {
+            cityRenderer_->reloadArt();
+            worldRenderer_->reloadArt();
+            return true;
         }
         if (screen_ != Screen::MainMenu && simulation_ &&
             handleDebugEvent(event))

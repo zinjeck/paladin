@@ -7,6 +7,7 @@ namespace Paladin
     class Camera2D;
     class Renderer;
     class World;
+    class SceneSpriteLibrary;
 
     struct TileRenderMetrics;
 
@@ -17,7 +18,8 @@ namespace Paladin
             Renderer& renderer,
             const World& world,
             const Camera2D& camera,
-            const TileRenderMetrics& metrics
+            const TileRenderMetrics& metrics,
+            const SceneSpriteLibrary* sprites = nullptr
         ) const;
 
     private:

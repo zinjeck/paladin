@@ -3,6 +3,8 @@
 #include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneDetail.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -17,7 +19,9 @@ namespace Paladin
         const Camera2D& camera,
         const TileRenderMetrics& metrics,
         const SettlementObjectPlacementController& placement,
-        const SettlementInspectionController& inspection
+        const SettlementInspectionController& inspection,
+        SceneDrawQueue* shared,
+        const SceneSpriteLibrary* sprites
     ) const
     {
         const float size = float(metrics.scaledTilePixels(camera.zoom()));
@@ -25,6 +29,13 @@ namespace Paladin
             renderer.outputWidth() * .5F - float(camera.tileX()) * size;
         const float oy =
             renderer.outputHeight() * .5F - float(camera.tileY()) * size;
+        const SceneProjection projection{
+            camera.tileX(),
+            camera.tileY(),
+            size,
+            renderer.outputWidth(),
+            renderer.outputHeight()
+        };
         const auto visible = [&](SettlementTilePosition p)
         {
             return ox + (p.x + 1) * size >= 0 && oy + (p.y + 1) * size >= 0 &&
@@ -40,12 +51,52 @@ namespace Paladin
             }
             const auto p = inventory.footprint.topLeft;
             const float x = ox + p.x * size, y = oy + p.y * size;
+            if (size < StaticDetailPixels)
+            {
+                renderer.fillRectangle(
+                    x + size * .25F,
+                    y + size * .25F,
+                    std::max(1.F, size * .5F),
+                    std::max(1.F, size * .5F),
+                    {0xA9, 0x94, 0x78, 255}
+                );
+                continue;
+            }
             int stack = 0;
             for (const auto& goods : inventory.goods)
             {
                 if (goods.amount <= 0)
                 {
                     continue;
+                }
+                if (shared && sprites)
+                {
+                    std::string spriteId = "resource." + goods.resource;
+                    if (!sprites->find(spriteId))
+                    {
+                        spriteId = "resource.pile";
+                    }
+                    const int packets = std::min(4, 1 + (goods.amount - 1) / 10);
+                    bool drawn = false;
+                    for (int packet = 0; packet < packets && stack < 9; ++packet, ++stack)
+                    {
+                    drawn |= sprites->placed(
+                            *shared,
+                            projection,
+                            spriteId,
+                            p.x + .23 + (stack % 3) * .25,
+                            p.y + .40 + (stack / 3) * .19,
+                            p.y + .40 + (stack / 3) * .19,
+                            inventory.id.value(),
+                            stack,
+                            .32,
+                            .23
+                        );
+                    }
+                    if (drawn || stack >= 9)
+                    {
+                        continue;
+                    }
                 }
                 const RenderColor fill =
                     goods.resource == "lumber" ? RenderColor{164, 111, 57, 255}

@@ -264,22 +264,20 @@ namespace Paladin
                               std::max(0.0, previousAbsence - grace)) /
                                  1440;
             };
-            c.happiness = std::clamp(
-                c.happiness +
-                    (caredFor
-                         ? days * policy.toddlerCareHappinessPerDay
-                         : -neglectedDays(policy.childcareAbsenceGraceMinutes) *
-                               policy.toddlerNeglectHappinessPerDay),
-                0.0,
-                100.0
+            c.modifyAttributes(
+                {{caredFor ? AttributeEffect::CareHappiness
+                           : AttributeEffect::NeglectHappiness,
+                  (caredFor
+                       ? days * policy.toddlerCareHappinessPerDay
+                       : -neglectedDays(policy.childcareAbsenceGraceMinutes) *
+                             policy.toddlerNeglectHappinessPerDay)}}
             );
             if (!caredFor)
             {
-                c.health = std::max(
-                    0.0,
-                    c.health -
-                        neglectedDays(policy.childcareHealthGraceMinutes) *
-                            policy.toddlerNeglectHealthPerDay
+                c.modifyAttributes(
+                    {{AttributeEffect::NeglectHealth,
+                      -neglectedDays(policy.childcareHealthGraceMinutes) *
+                          policy.toddlerNeglectHealthPerDay}}
                 );
             }
             else if (
@@ -287,9 +285,9 @@ namespace Paladin
                 c.energy > policy.criticalRestEnergy
             )
             {
-                c.health = std::min(
-                    100.0,
-                    c.health + days * policy.toddlerCareHealthPerDay
+                c.modifyAttributes(
+                    {{AttributeEffect::CareHealth,
+                      days * policy.toddlerCareHealthPerDay}}
                 );
             }
             c.caregiverId = {};
@@ -326,10 +324,12 @@ namespace Paladin
                 {
                     const double fed =
                         std::min(c.hunger, policy.nursingHungerPerMinute * dt);
-                    c.hunger -= fed;
-                    carer.hunger = std::min(
-                        100.0,
-                        carer.hunger + fed * policy.nursingFoodShare
+                    c.modifyAttributes(
+                        {{AttributeEffect::ParentFeeding, -fed}}
+                    );
+                    carer.modifyAttributes(
+                        {{AttributeEffect::FeedingChildren,
+                          fed * policy.nursingFoodShare}}
                     );
                 }
             }

@@ -1,4 +1,6 @@
 #include "ui/CityHud.h"
+#include <SDL3/SDL.h>
+#include "rendering/SceneSpriteLibrary.h"
 #include "ui/SimulationSpeedControls.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementCommerce.h"
@@ -36,12 +38,18 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 15> menuOptions{
+        constexpr std::array<MenuOptionDefinition, 16> menuOptions{
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
              {1, SettlementObjectTypes::Road, "", "", "Road", ""},
              {2, SettlementObjectTypes::House, "", "", "House", ""},
              {3, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""},
              {3, SettlementObjectTypes::Market, "", "", "Market", ""},
+             {3,
+              SettlementObjectTypes::LoggingGrounds,
+              "",
+              "",
+              "Logging",
+              "Grounds"},
              {4,
               SettlementObjectTypes::FishingGrounds,
               "",
@@ -98,6 +106,7 @@ namespace Paladin
           }
     {
         setSettlementStatus(false, 8);
+        goodsButton_.setSelected(goodsOpen_);
         optionButtons_.reserve(menuOptions.size());
         optionBounds_.resize(menuOptions.size());
 
@@ -270,7 +279,19 @@ namespace Paladin
         };
         populationButton_.setBounds(reservedPanel_);
         populationButton_.setSkinId("population");
-        roofsButton_.setBounds(extensionPanel_);
+        roofsButton_.setBounds(
+            {extensionPanel_.x,
+             extensionPanel_.y,
+             extensionPanel_.width * .5F,
+             extensionPanel_.height}
+        );
+        artButton_.setBounds(
+            {extensionPanel_.x + extensionPanel_.width * .5F,
+             extensionPanel_.y,
+             extensionPanel_.width * .5F,
+             extensionPanel_.height}
+        );
+        artButton_.setSelected(SceneSpriteLibrary::environmentArtEnabled());
     }
 
     void CityHud::setSettlementStatus(
@@ -305,6 +326,7 @@ namespace Paladin
 
     void CityHud::pointerMoved(float x, float y) noexcept
     {
+        artButton_.pointerMoved(x, y);
         if (!worldMode_)
         {
             roofsButton_.pointerMoved(x, y);
@@ -335,10 +357,11 @@ namespace Paladin
 
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
+        const bool art = artButton_.pointerPressed(x, y);
         const bool roofs = !worldMode_ && roofsButton_.pointerPressed(x, y);
         const bool events = eventsButton_.pointerPressed(x, y);
         const bool ledger = ledgerButton_.pointerPressed(x, y);
-        if (events || ledger || roofs)
+        if (events || ledger || roofs || art)
         {
             return true;
         }
@@ -456,6 +479,10 @@ namespace Paladin
 
     CityHudAction CityHud::pointerReleased(float x, float y) noexcept
     {
+        if (artButton_.pointerReleased(x, y))
+        {
+            return CityHudAction::ToggleEnvironmentArt;
+        }
         if (!worldMode_ && roofsButton_.pointerReleased(x, y))
         {
             return CityHudAction::ToggleRoofs;
@@ -802,6 +829,7 @@ namespace Paladin
         {
             roofsButton_.render(renderer, uiRenderer);
         }
+        artButton_.render(renderer, uiRenderer);
         eventsButton_.render(renderer, uiRenderer);
         ledgerButton_.render(renderer, uiRenderer);
         if (worldMode_)
@@ -834,6 +862,16 @@ namespace Paladin
         }
         uiRenderer.drawPanel(renderer, minimapPanel_);
         goodsButton_.render(renderer, uiRenderer);
+        if (!goodsIconsLoaded_) {
+            goodsIconsLoaded_ = true;
+            std::string root = std::string(SDL_GetBasePath()) + "assets/sprites";
+#ifdef PALADIN_ART_ROOT
+            root = PALADIN_ART_ROOT;
+#endif
+            constexpr const char* paths[] = {"environment-v4/props/resource-stone.png", "environment-v4/props/resource-lumber.png", "tribal-v14/fish.png", "tribal-v14/meat.png"};
+            for (int i=0;i<4;++i) goodsIcons_[i] = renderer.loadImageTexture((root + "/" + paths[i]).c_str());
+        }
+
         if (goodsOpen_)
         {
             for (const auto& cell : goodsCells_)
@@ -845,64 +883,12 @@ namespace Paladin
                 const auto& cell = goodsCells_[i];
                 const float x = cell.x + cell.width * .5F;
                 const float y = cell.y + 9.0F;
-                const RenderColor edge = i == 0 ? RenderColor{67, 69, 73, 255}
-                                                : RenderColor{75, 43, 23, 255};
-                const RenderColor fill = i == 0
-                                             ? RenderColor{164, 168, 174, 255}
-                                             : RenderColor{157, 105, 54, 255};
-                renderer.fillRectangle(x - 10, y, 20, 20, edge);
-                renderer.fillRectangle(x - 7, y + 3, 14, 14, fill);
-                if (i == 1)
-                {
-                    renderer.fillRectangle(x - 4, y + 4, 2, 12, edge);
-                    renderer.fillRectangle(x + 3, y + 4, 2, 12, edge);
-                }
-                if (i == 2)
-                {
-                    renderer
-                        .fillRectangle(x - 12, y, 24, 22, {90, 90, 90, 255});
-                    renderer.fillRectangle(
-                        x - 8,
-                        y + 6,
-                        15,
-                        9,
-                        {78, 155, 195, 255}
-                    );
-                    renderer.fillRectangle(
-                        x - 5,
-                        y + 3,
-                        8,
-                        15,
-                        {108, 190, 224, 255}
-                    );
-                    renderer.fillRectangle(
-                        x + 7,
-                        y + 4,
-                        4,
-                        13,
-                        {70, 135, 175, 255}
-                    );
-                    renderer
-                        .fillRectangle(x - 7, y + 7, 2, 2, {20, 35, 45, 255});
+                if (const auto& icon = goodsIcons_[i]) {
+                    renderer.drawTexture(*icon,0,0,float(icon->width()),float(icon->height()),x-14,y,28,24);
+                } else {
+                    renderer.fillRectangle(x-8,y+4,16,14,{0xA9,0x94,0x78,255});
                 }
                 std::ostringstream amount;
-                if (i == 3)
-                {
-                    renderer.fillRectangle(
-                        x - 10,
-                        y + 4,
-                        20,
-                        13,
-                        {171, 77, 72, 255}
-                    );
-                    renderer.fillRectangle(
-                        x + 3,
-                        y + 7,
-                        12,
-                        5,
-                        {225, 211, 181, 255}
-                    );
-                }
                 amount << std::fixed << std::setprecision(0)
                        << std::floor(
                               std::max(
@@ -1084,6 +1070,11 @@ namespace Paladin
 {
     std::string CityHud::tooltipAt(float x, float y) const
     {
+        if (artButton_.containsPoint(x, y))
+        {
+            return "Environment art: switch sprites on/off (F8). People and "
+                   "animals stay unchanged.";
+        }
         if (eventsButton_.containsPoint(x, y))
         {
             return worldMode_ ? "World events and realm warnings"

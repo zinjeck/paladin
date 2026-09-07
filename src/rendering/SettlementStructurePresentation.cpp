@@ -1,5 +1,11 @@
 #include "rendering/SettlementStructurePresentation.h"
+#include "rendering/BuildingView.h"
+#include "rendering/HomePresentation.h"
+#include "rendering/PasturePresentation.h"
+#include "rendering/SettlementEnvironmentDetails.h"
+#include "rendering/StockpilePresentation.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <cmath>
 #include <unordered_set>
@@ -11,18 +17,61 @@ namespace Paladin
         const SceneProjection& projection,
         const SettlementMap& map,
         const CityPresentation& policy,
-        const SceneSpriteLibrary& sprites
+        const SceneSpriteLibrary& sprites,
+        const SettlementCitizenState* citizens,
+        Renderer* renderer
     ) const
     {
         const auto& state = map.objectState();
+        std::unordered_map<SettlementObjectId, unsigned, StrongIdHash> doubleRows;
+        if (citizens && !policy.roofsVisible)
+            for (const auto& c : citizens->citizens())
+                if (c.health > 0 && c.doubleBed && c.bedSlot >= 0 && c.bedHomeId)
+                    doubleRows[c.bedHomeId] |= 1u << (c.bedSlot / 2);
+        const bool animate = projection.tilePixels >= AnimationDetailPixels;
+        const bool detailed = projection.tilePixels >= StaticDetailPixels;
+        if (renderer)
+        {
+            groundCache_.begin(map, sprites);
+        }
         constexpr int chunkSide = 32;
         const auto key = [](int x, int y)
         { return (std::uint64_t(std::uint32_t(x)) << 32) | std::uint32_t(y); };
+        const double now = sprites.time();
+        const double dt =
+            lastDoorTime_ < 0 ? 0 : std::clamp(now - lastDoorTime_, 0., .25);
+        lastDoorTime_ = now;
+        if (instance_ != map.instanceId())
+        {
+            doors_.clear();
+        }
+        std::unordered_set<std::uint64_t> doorTraffic;
+        if (citizens && animate)
+        {
+            for (const auto& c : citizens->citizens())
+            {
+                if (c.health <= 0 || (c.insideHome && c.path.empty()))
+                {
+                    continue;
+                }
+                doorTraffic.insert(key(c.tilePosition.x, c.tilePosition.y));
+                doorTraffic.insert(
+                    key(int(std::floor(c.visualX())),
+                        int(std::floor(c.visualY())))
+                );
+                if (c.pathIndex < c.path.size())
+                {
+                    doorTraffic.insert(
+                        key(c.path[c.pathIndex].x, c.path[c.pathIndex].y)
+                    );
+                }
+            }
+        }
         if (instance_ != map.instanceId() ||
-            version_ != state.presentationVersion())
+            version_ != state.navigationVersion())
         {
             instance_ = map.instanceId();
-            version_ = state.presentationVersion();
+            version_ = state.navigationVersion();
             chunks_.clear();
             large_.clear();
             for (const auto& object : state.completedObjects())
@@ -95,12 +144,79 @@ namespace Paladin
                 continue;
             }
             const auto& object = *pointer;
+            const auto& footprint = object.footprint;
+            const auto& recipe = sprites.objectStyle(object.objectTypeId);
+            double marginX = 1, marginY = std::max(1., recipe.height);
+            for (const auto& name :
+                 {object.objectTypeId + ".roof.full",
+                  recipe.sprite,
+                  recipe.wall})
+            {
+                if (const auto* s = sprites.find(name))
+                {
+                    marginX = std::max(marginX, s->width);
+                    marginY = std::max(marginY, s->height + s->elevation);
+                }
+            }
+            for (const auto& piece : sprites.pieces())
+            {
+                if (piece.object == object.objectTypeId)
+                {
+                    if (const auto* s = sprites.find(piece.sprite))
+                    {
+                        marginX =
+                            std::max(marginX, std::abs(piece.x) + s->width);
+                        marginY = std::max(
+                            marginY,
+                            std::abs(piece.y) + s->height + s->elevation
+                        );
+                    }
+                }
+            }
+            // Real artwork extents, not the former 64-tile padding per object.
+            if (!projection.visible(projection.bounds(
+                    {footprint.topLeft.x - marginX,
+                     footprint.topLeft.y - marginY,
+                     0,
+                     footprint.width + 2 * marginX,
+                     footprint.height + 2 * marginY,
+                     0,
+                     0}
+                )))
+            {
+                continue;
+            }
+            double doorOpen = 0;
+            if (object.door && citizens && animate)
+            {
+                auto& door = doors_[object.id.value()];
+                if (doorTraffic.contains(key(object.door->x, object.door->y)))
+                {
+                    door.until = now + .7;
+                }
+                const double target = now < door.until ? 1 : 0;
+                if (target > door.openness)
+                {
+                    door.openness = std::min(target, door.openness + 4.5 * dt);
+                }
+                else if (target < door.openness)
+                {
+                    door.openness = std::max(target, door.openness - 2.5 * dt);
+                }
+                doorOpen = door.openness;
+            }
             const auto& style = sprites.objectStyle(object.objectTypeId);
             const bool placeholder = !sprites.objectHasArt(object.objectTypeId);
             const auto& f = object.footprint;
             const double x = f.topLeft.x, y = f.topLeft.y, w = f.width,
                          h = f.height;
-            const double height = style.height, thickness = style.thickness;
+            const double thickness = style.thickness;
+            // Roof-off is a cutaway, not just removal of the roof plane.
+            // Retain a low perimeter without hiding occupants on the front row.
+            const double height =
+                style.mode == "enclosed" && !policy.roofsVisible
+                    ? std::min(style.height, thickness)
+                    : style.height;
             const auto visible = projection.bounds(
                 {x - 64, y - height - 64, 0, w + 128, h + height + 128, 0, 0}
             );
@@ -119,48 +235,287 @@ namespace Paladin
                 };
             };
             const auto roof = rgb(style.fillRgb), wall = rgb(style.frameRgb);
-            if (policy.shadowsVisible && style.mode == "enclosed" &&
-                placeholder)
+            if (object.objectTypeId == SettlementObjectTypes::Road &&
+                sprites.find("road.floor"))
             {
-                const double cast = height * .45;
-                // Cast beyond the footprint, not across the entire interior.
-                queue.submit(
-                    {projection.bounds({x + w, y + cast, 0, cast, h, 0, 0}),
-                     {12, 16, 24, std::uint8_t(style.shadowAlpha)},
-                     y,
-                     id,
-                     -1}
-                );
-                queue.submit(
-                    {projection.bounds(
-                         {x + cast, y + h, 0, w - cast, cast, 0, 0}
-                     ),
-                     {12, 16, 24, std::uint8_t(style.shadowAlpha)},
-                     y,
-                     id,
-                     -1}
-                );
+                if (!groundCache_.submit(
+                        renderer,
+                        queue,
+                        projection,
+                        map,
+                        sprites,
+                        object,
+                        id
+                    ))
+                {
+                    if (!renderer && detailed)
+                    {
+                        naturalRoad(
+                            queue,
+                            projection,
+                            map,
+                            sprites,
+                            object,
+                            id
+                        );
+                    }
+                    else
+                    {
+                        const auto* art = sprites.find("road.floor");
+                        queue.submit(
+                            {projection.bounds({x, y, 0, w, h, 0, 0}),
+                             {},
+                             y,
+                             id,
+                             -2,
+                             0,
+                             art->texture.get(),
+                             sprites.frame(*art, false)}
+                        );
+                    }
+                }
+                continue;
             }
-            // Floor is a ground surface, visible through the roof toggle. It
+            if (object.objectTypeId == SettlementObjectTypes::Stockpile &&
+                stockpilePresentation(
+                    queue,
+                    projection,
+                    sprites,
+                    map,
+                    object,
+                    id
+                ))
+            {
+                continue;
+            }
+            if (object.objectTypeId == SettlementObjectTypes::LoggingGrounds &&
+                !placeholder)
+            {
+                loggingDetails(
+                    queue,
+                    projection,
+                    sprites,
+                    object,
+                    citizens,
+                    id,
+                    policy.shadowsVisible
+                );
+                continue;
+            }
+            if (style.mode == "enclosed" && detailed)
+            {
+                if (!groundCache_.submit(
+                        renderer,
+                        queue,
+                        projection,
+                        map,
+                        sprites,
+                        object,
+                        id
+                    ) &&
+                    !renderer)
+                {
+                    buildingGround(queue, projection, sprites, map, f, id);
+                }
+            }
+            if (object.objectTypeId == SettlementObjectTypes::House &&
+                policy.roofsVisible && animate)
+            {
+                homeChimney(queue, projection, sprites, map, object, id);
+            }
+            if (const auto* soil = sprites.find("road.floor");
+                detailed && soil && style.mode != "enclosed" &&
+                (!sprites.find(style.floor) || !sprites.find("terrain.plain") ||
+                 sprites.find(style.floor)->texture !=
+                     sprites.find("terrain.plain")->texture))
+            {
+                // A shallow, irregular apron ties placed surfaces into their
+                // surroundings. It lies under floors and ground shadows.
+                const auto frame = sprites.frame(*soil, false);
+                const double apron = style.mode == "ground" ? .20 : .38;
+                for (int edge = 0; edge < 4; ++edge)
+                {
+                    const double length = edge % 2 ? h : w;
+                    for (double along = 0; along < length; along += .25)
+                    {
+                        const std::uint64_t grain =
+                            (id * 73856093ULL) ^
+                            std::uint64_t(along * 4 + edge * 193);
+                        const double spread = apron * (.45 + .18 * (grain % 4));
+                        const double px = edge == 1   ? x + w
+                                          : edge == 3 ? x - spread
+                                                      : x + along;
+                        const double py = edge == 2   ? y + h
+                                          : edge == 0 ? y - spread
+                                                      : y + along;
+                        const double pw =
+                            edge % 2 ? spread : std::min(.25, length - along);
+                        const double ph =
+                            edge % 2 ? std::min(.25, length - along) : spread;
+                        const auto* ground = map.grid().tile(
+                            {int(std::floor(px + pw * .5)),
+                             int(std::floor(py + ph * .5))}
+                        );
+                        if (!ground || ground->terrain != TerrainType::Land)
+                        {
+                            continue;
+                        }
+                        const auto b =
+                            projection.bounds({px, py, 0, pw, ph, 0, 0});
+                        if (projection.visible(b))
+                        {
+                            queue.submit(
+                                {b,
+                                 {},
+                                 y,
+                                 id,
+                                 -3,
+                                 0,
+                                 soil->texture.get(),
+                                 {frame.x +
+                                      float((grain % 4) * frame.width / 4),
+                                  0,
+                                  frame.width / 4,
+                                  frame.height / 4},
+                                 std::uint8_t(55 + grain % 40)}
+                            );
+                        }
+                    }
+                }
+            }
+            if (policy.shadowsVisible && style.mode == "enclosed" &&
+                style.shadowAlpha > 0)
+            {
+                const auto* roofArt =
+                    sprites.find(object.objectTypeId + ".roof.full");
+                if (roofArt && roofArt->shadow && policy.roofsVisible)
+                {
+                    const double rw = roofArt->width + w - style.moduleWidth;
+                    const double rh = roofArt->height + h - style.moduleDepth;
+                    // Short sun cast from the roof's real silhouette. Ground
+                    // floors cover its interior, leaving only the cast edge.
+                    const auto b = projection.bounds(
+                        {x - roofArt->width * roofArt->pivotX + .28,
+                         y + .22,
+                         0,
+                         rw,
+                         rh,
+                         0,
+                         0}
+                    );
+                    queue.submit(
+                        {b,
+                         {},
+                         y,
+                         id,
+                         -1,
+                         0,
+                         roofArt->shadow.get(),
+                         {0,
+                          0,
+                          float(roofArt->shadow->width()),
+                          float(roofArt->shadow->height())}}
+                    );
+                }
+                else
+                {
+                    const double cast = policy.roofsVisible ? .24 : .08;
+                    for (int band = 0; band < 3; ++band)
+                    {
+                        const double inset = band * cast / 3;
+                        const auto shade = RenderColor{
+                            32,
+                            44,
+                            67,
+                            std::uint8_t(48 - band * 12)
+                        };
+                        queue.submit(
+                            {projection.bounds(
+                                 {x + w + inset, y + .12, 0, cast / 3, h, 0, 0}
+                             ),
+                             shade,
+                             y,
+                             id,
+                             -1}
+                        );
+                        queue.submit(
+                            {projection.bounds(
+                                 {x + .12,
+                                  y + h + inset,
+                                  0,
+                                  w - .12,
+                                  cast / 3,
+                                  0,
+                                  0}
+                             ),
+                             shade,
+                             y,
+                             id,
+                             -1}
+                        );
+                    }
+                }
+            } // Floor is a ground surface, visible through the roof toggle. It
             // retains the existing footprint palette until the artist replaces
             // it.
+            homeDetails(queue, projection, sprites, policy, object, id, doubleRows[object.id]);
+            if (style.mode == "enclosed" && tribalBuilding(
+                                                queue,
+                                                projection,
+                                                sprites,
+                                                policy,
+                                                object.objectTypeId,
+                                                f,
+                                                object.door,
+                                                id,
+                                                doorOpen
+                                            ))
+            {
+                continue;
+            }
             const auto floorStart = queue.size();
-            sprites.surface(
-                queue,
-                projection,
-                style.floor,
-                {x, y, 0, w, h, 0, 0},
-                roof,
-                y,
-                id,
-                0,
-                placeholder
-            );
+            if (!policy.roofsVisible ||
+                !sprites.find(object.objectTypeId + ".roof.full"))
+            {
+                sprites.surface(
+                    queue,
+                    projection,
+                    style.floor,
+                    {x, y, 0, w, h, 0, 0},
+                    roof,
+                    y,
+                    id,
+                    0,
+                    placeholder
+                );
+            }
+            if (placeholder && object.door)
+            {
+                auto threshold = wall;
+                threshold.alpha = std::uint8_t(style.sideShade);
+                queue.submit(
+                    {projection.bounds(
+                         {double(object.door->x),
+                          double(object.door->y),
+                          0,
+                          1,
+                          1,
+                          0,
+                          0}
+                     ),
+                     threshold,
+                     y,
+                     id,
+                     -2}
+                );
+            }
             queue.setLayerFrom(floorStart, -2);
             if (style.mode != "enclosed")
             {
                 if (style.mode == "ground")
                 {
+                    if (object.objectTypeId == SettlementObjectTypes::Pastureland)
+                        pastureFence(queue, projection, sprites, f, id);
                     continue;
                 }
                 const auto overview = [&]()
@@ -177,7 +532,8 @@ namespace Paladin
                         );
                     }
                 };
-                if (projection.tilePixels < policy.detailTilePixels)
+                if (projection.tilePixels <
+                    std::max(StaticDetailPixels, policy.detailTilePixels))
                 {
                     overview();
                     continue;
@@ -243,6 +599,30 @@ namespace Paladin
                                 id
                             ))
                         {
+                            if (policy.shadowsVisible && style.shadowAlpha > 0)
+                            {
+                                const double breadth = std::min(cellW * .8, 2.);
+                                for (int band = 0; band < 3; band++)
+                                {
+                                    const double fraction =
+                                        band == 1 ? 1. : .65;
+                                    queue.submit(
+                                        {projection.bounds(
+                                             {cx + .15,
+                                              cy + .06 + band * .08,
+                                              0,
+                                              breadth * fraction,
+                                              .08,
+                                              .5,
+                                              .5}
+                                         ),
+                                         {12, 16, 24, 85},
+                                         cy,
+                                         id,
+                                         -1}
+                                    );
+                                }
+                            }
                             ++submitted;
                             continue;
                         }
@@ -330,8 +710,8 @@ namespace Paladin
                     part,
                     placeholder
                 );
-                // Light the existing surface, including supplied textures.
-                // One bounded overlay per visible wall segment, no tile scan.
+                // Placeholder-only shading; authored pixels are never painted
+                // over with proxy geometry. Scene lighting is a separate pass.
                 const auto bounds =
                     projection.bounds({left, top, 0, width, depthSize, 0, 0});
                 if (projection.visible(bounds) && placeholder)
@@ -361,33 +741,115 @@ namespace Paladin
                     );
                 }
             };
-            // North and south walls have real door gaps. Side walls are split
-            // into visible row segments so people can pass either side
-            // correctly.
+            // Directional artwork is a complete wall. Cutaway selection is
+            // whole-wall, never individual holes. The rear wall cannot occlude
+            // the interior. North and south walls have real door gaps. Side
+            // walls are split into visible row segments so people can pass
+            // either side correctly.
             for (int edge = 0; edge < 2; ++edge)
             {
+                if (!edge && policy.roofsVisible &&
+                    sprites.find(object.objectTypeId + ".roof.full"))
+                {
+                    continue;
+                }
                 const double row = edge ? y + h - 1 : y;
+                const double wallHeight =
+                    (!policy.roofsVisible && !edge) ? style.height : height;
                 const double base = edge ? y + h : y + thickness;
+                const std::string direction = edge ? "south" : "north";
+                std::string piece =
+                    object.objectTypeId + "." +
+                    ((!policy.roofsVisible && edge) ? "cap." : "wall.") +
+                    direction;
+                if (!policy.roofsVisible && !edge &&
+                    sprites.find(object.objectTypeId + ".wall.front"))
+                {
+                    piece = object.objectTypeId + (buildingView(
+                                                       object.footprint,
+                                                       object.door,
+                                                       policy.viewAzimuthDegrees
+                                                   ) == 0
+                                                       ? ".wall.front"
+                                                       : ".wall.back");
+                }
+                if (sprites.placed(
+                        queue,
+                        projection,
+                        piece,
+                        x,
+                        base,
+                        edge ? y + h : y,
+                        id,
+                        edge ? 12 : 1,
+                        w,
+                        0,
+                        edge && policy.roofsVisible ? doorOpen : 0
+                    ))
+                {
+                    continue;
+                }
                 const double depth = edge ? y + h : y;
                 const bool door = object.door && object.door->y == row;
                 const double cut = door ? object.door->x - x : w;
                 if (cut > 0)
                 {
-                    strip(x, base - height, cut, height, depth, edge ? 12 : 1);
+                    strip(
+                        x,
+                        base - wallHeight,
+                        cut,
+                        wallHeight,
+                        depth,
+                        edge ? 12 : 1
+                    );
                 }
                 if (door && cut + 1 < w)
                 {
                     strip(
                         x + cut + 1,
-                        base - height,
+                        base - wallHeight,
                         w - cut - 1,
-                        height,
+                        wallHeight,
                         depth,
                         edge ? 12 : 1
                     );
                 }
             }
-            if (projection.tilePixels >= policy.detailTilePixels)
+            const bool coveredSides =
+                policy.roofsVisible &&
+                sprites.find(object.objectTypeId + ".roof.full");
+            const bool west =
+                coveredSides ||
+                sprites.placed(
+                    queue,
+                    projection,
+                    object.objectTypeId +
+                        (policy.roofsVisible ? ".wall.west" : ".cap.west"),
+                    x,
+                    y + h,
+                    y + h,
+                    id,
+                    2,
+                    0,
+                    policy.roofsVisible ? 0 : h
+                );
+            const bool east =
+                coveredSides ||
+                sprites.placed(
+                    queue,
+                    projection,
+                    object.objectTypeId +
+                        (policy.roofsVisible ? ".wall.east" : ".cap.east"),
+                    x + w,
+                    y + h,
+                    y + h,
+                    id,
+                    2,
+                    0,
+                    policy.roofsVisible ? 0 : h
+                );
+            if (projection.tilePixels >=
+                std::max(StaticDetailPixels, policy.detailTilePixels))
             {
                 const int first = std::max(
                     0,
@@ -408,6 +870,10 @@ namespace Paladin
                 {
                     for (int edge = 0; edge < 2; ++edge)
                     {
+                        if ((edge && east) || (!edge && west))
+                        {
+                            continue;
+                        }
                         const double col = edge ? x + w - 1 : x;
                         if (object.door && object.door->x == col &&
                             object.door->y == y + row)
@@ -428,11 +894,64 @@ namespace Paladin
             else
             {
                 // Preserve the silhouette at low zoom without row subdivision.
-                strip(x, y - height, thickness, h, y + h, 2);
-                strip(x + w - thickness, y - height, thickness, h, y + h, 2);
+                if (!west)
+                {
+                    strip(x, y - height, thickness, h, y + h, 2);
+                }
+                if (!east)
+                {
+                    strip(
+                        x + w - thickness,
+                        y - height,
+                        thickness,
+                        h,
+                        y + h,
+                        2
+                    );
+                }
+            }
+            for (const auto& p : sprites.pieces())
+            {
+                if (p.object != object.objectTypeId ||
+                    (p.state == "roofed" && !policy.roofsVisible) ||
+                    (p.state == "cutaway" && policy.roofsVisible))
+                {
+                    continue;
+                }
+                sprites.placed(
+                    queue,
+                    projection,
+                    p.sprite,
+                    x + p.x,
+                    y + p.y,
+                    y + p.depth,
+                    id,
+                    20
+                );
             }
             if (policy.roofsVisible)
             {
+                const auto* fullRoof =
+                    sprites.find(object.objectTypeId + ".roof.full");
+                const double extraWidth = w - style.moduleWidth;
+                const double extraDepth = h - style.moduleDepth;
+                if (sprites.placed(
+                        queue,
+                        projection,
+                        object.objectTypeId + ".roof.full",
+                        x + (fullRoof ? extraWidth * fullRoof->pivotX : 0),
+                        y + (fullRoof ? extraDepth * fullRoof->pivotY : 0),
+                        y + h,
+                        id,
+                        10,
+                        fullRoof ? std::max(.125, fullRoof->width + extraWidth)
+                                 : 0,
+                        fullRoof ? std::max(.125, fullRoof->height + extraDepth)
+                                 : 0
+                    ))
+                {
+                    continue;
+                }
                 sprites.surface(
                     queue,
                     projection,

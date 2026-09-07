@@ -118,6 +118,8 @@ add_executable(Paladin
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
     src/world/settlements/citizens/SettlementCitizenState.cpp
+    src/world/settlements/citizens/SettlementCitizenAttributes.cpp
+    src/world/settlements/SettlementImmigration.cpp
     src/world/settlements/commands/SettlementCommandDefinition.cpp
     src/world/settlements/commands/SettlementCommandState.cpp
     src/world/settlements/objects/SettlementObjectDefinition.cpp
@@ -131,6 +133,7 @@ add_executable(Paladin
     src/ui/LedgerPanel.cpp
     src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
+    src/ui/EmploymentPopulation.cpp
     src/ui/DebugConsole.cpp
     src/ui/GrayUiRenderer.cpp
     src/ui/FoundingPanel.cpp
@@ -236,6 +239,8 @@ add_executable(PaladinTests
     src/world/settlements/SettlementSimulationPolicy.cpp
     src/world/settlements/SettlementSimulationState.cpp
     src/world/settlements/citizens/SettlementCitizenState.cpp
+    src/world/settlements/citizens/SettlementCitizenAttributes.cpp
+    src/world/settlements/SettlementImmigration.cpp
     src/world/settlements/commands/SettlementCommandDefinition.cpp
     src/world/settlements/commands/SettlementCommandState.cpp
     src/world/settlements/objects/SettlementObjectDefinition.cpp
@@ -280,4 +285,18 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
         TIMEOUT 120
     )
+    add_test(NAME PaladinRenderPerformanceTests COMMAND PaladinApplicationSmokeTests)
+    set_tests_properties(PaladinRenderPerformanceTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;PALADIN_RENDER_BENCHMARK=1"
+        TIMEOUT 60
+    )
 endif()
+
+# Artist exports can be reloaded with F6 without recompiling in Debug builds.
+target_compile_definitions(Paladin PRIVATE $<$<CONFIG:Debug>:PALADIN_ART_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites">)
+add_custom_target(PaladinArtSettings ALL
+ COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Paladin>/assets/sprites
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/art-palette.hex $<TARGET_FILE_DIR:Paladin>/assets/sprites/art-palette.hex
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/pieces.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/pieces.catalog
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/lights.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/lights.catalog)
+add_dependencies(Paladin PaladinArtSettings)

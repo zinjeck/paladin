@@ -2,6 +2,7 @@
 
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/Settlement.h"
 #include "world/World.h"
@@ -14,7 +15,8 @@ namespace Paladin
         Renderer& renderer,
         const World& world,
         const Camera2D& camera,
-        const TileRenderMetrics& metrics
+        const TileRenderMetrics& metrics,
+        const SceneSpriteLibrary* sprites
     ) const
     {
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
@@ -25,7 +27,9 @@ namespace Paladin
         const double viewportHeight =
             static_cast<double>(renderer.outputHeight());
 
-        constexpr float outerMarkerSize = 11.0F;
+        const auto* artwork =
+            sprites ? sprites->find("world.settlement") : nullptr;
+        const float outerMarkerSize = artwork ? 24.0F : 11.0F;
         constexpr float innerMarkerSize = 7.0F;
 
         for (const Settlement& settlement : world.settlements())
@@ -51,14 +55,6 @@ namespace Paladin
                 continue;
             }
 
-            renderer.fillRectangle(
-                centerX - outerMarkerSize * 0.5F,
-                centerY - outerMarkerSize * 0.5F,
-                outerMarkerSize,
-                outerMarkerSize,
-                {38, 27, 18, 255}
-            );
-
             RenderColor markerColor{244, 197, 72, 255};
 
             if (const Realm* realm = world.realm(settlement.ownerRealmId()))
@@ -68,13 +64,54 @@ namespace Paladin
                     {mapColor.red, mapColor.green, mapColor.blue, 255};
             }
 
-            renderer.fillRectangle(
-                centerX - innerMarkerSize * 0.5F,
-                centerY - innerMarkerSize * 0.5F,
-                innerMarkerSize,
-                innerMarkerSize,
-                markerColor
-            );
+            if (artwork)
+            {
+                const auto frame = sprites->frame(*artwork);
+                const float markerWidth = float(
+                    outerMarkerSize * artwork->width /
+                    std::max(artwork->width, artwork->height)
+                );
+                const float markerHeight = float(
+                    outerMarkerSize * artwork->height /
+                    std::max(artwork->width, artwork->height)
+                );
+                renderer.drawTexture(
+                    *artwork->texture,
+                    frame.x,
+                    frame.y,
+                    frame.width,
+                    frame.height,
+                    centerX - markerWidth * .5F,
+                    centerY - markerHeight * .5F,
+                    markerWidth,
+                    markerHeight
+                );
+                // Ownership remains an interface annotation over the artwork.
+                renderer.fillRectangle(
+                    centerX - 4,
+                    centerY + outerMarkerSize * .5F + 1,
+                    8,
+                    2,
+                    markerColor
+                );
+            }
+            else
+            {
+                renderer.fillRectangle(
+                    centerX - outerMarkerSize * .5F,
+                    centerY - outerMarkerSize * .5F,
+                    outerMarkerSize,
+                    outerMarkerSize,
+                    {38, 27, 18, 255}
+                );
+                renderer.fillRectangle(
+                    centerX - innerMarkerSize * .5F,
+                    centerY - innerMarkerSize * .5F,
+                    innerMarkerSize,
+                    innerMarkerSize,
+                    markerColor
+                );
+            }
 
             if (settlement.name().empty())
             {

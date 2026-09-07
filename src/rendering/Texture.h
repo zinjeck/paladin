@@ -28,5 +28,6 @@ namespace Paladin
         SDL_Texture* texture_ = nullptr;
         int width_ = 0;
         int height_ = 0;
+        bool premultiplied_ = false;
     };
 } // namespace Paladin

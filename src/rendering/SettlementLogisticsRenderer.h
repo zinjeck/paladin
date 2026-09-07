@@ -9,6 +9,8 @@ namespace Paladin
     class SettlementMap;
     class SettlementObjectPlacementController;
     class SettlementInspectionController;
+    class SceneDrawQueue;
+    class SceneSpriteLibrary;
     struct TileRenderMetrics;
     class SettlementLogisticsRenderer
     {
@@ -19,7 +21,9 @@ namespace Paladin
             const Camera2D&,
             const TileRenderMetrics&,
             const SettlementObjectPlacementController&,
-            const SettlementInspectionController&
+            const SettlementInspectionController&,
+            SceneDrawQueue* shared = nullptr,
+            const SceneSpriteLibrary* sprites = nullptr
         ) const;
 
     private:

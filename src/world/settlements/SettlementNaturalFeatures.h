@@ -2,6 +2,7 @@
 #include "world/SettlementGrid.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 #include <array>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -51,6 +52,20 @@ namespace Paladin
     {
     public:
         static constexpr int ChunkSide = 32;
+        static constexpr int OverviewSide = 4;
+        std::array<std::uint8_t, 2> overview(
+            SettlementTilePosition p
+        ) const noexcept
+        {
+            if (!valid(p) || overviewCounts_.empty())
+            {
+                return {};
+            }
+            return overviewCounts_
+                [std::size_t(p.y / OverviewSide) *
+                     ((width_ + OverviewSide - 1) / OverviewSide) +
+                 p.x / OverviewSide];
+        }
         SettlementNaturalFeatures(int width, int height);
         void generate(
             const SettlementGrid& grid,
@@ -59,6 +74,12 @@ namespace Paladin
         );
         NaturalFeature at(SettlementTilePosition position) const noexcept;
         void set(SettlementTilePosition position, NaturalFeatureKind kind);
+        void harvest(SettlementTilePosition position, double minute);
+        void regrow(
+            const SettlementGrid&,
+            const SettlementObjectState&,
+            double minute
+        );
         void mark(SettlementTilePosition position, bool marked);
         void clear(const SettlementObjectFootprint& footprint);
         std::size_t countIn(const SettlementObjectFootprint&) const noexcept;
@@ -81,7 +102,9 @@ namespace Paladin
         int height_;
         int chunkColumns_;
         std::vector<NaturalFeature> features_;
+        std::multimap<double, SettlementTilePosition> regrowth_;
         std::vector<int> chunkCounts_;
+        std::vector<std::array<std::uint8_t, 2>> overviewCounts_;
         std::vector<std::uint64_t> versions_;
         bool valid(SettlementTilePosition p) const noexcept;
         void changed(SettlementTilePosition p);

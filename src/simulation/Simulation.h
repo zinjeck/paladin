@@ -108,6 +108,7 @@ namespace Paladin
 
         [[nodiscard]]
         SettlementMap* settlementMap(SettlementId settlementId) noexcept;
+        bool admitImmigrants(SettlementId settlementId, std::uint64_t count);
 
         [[nodiscard]]
         const SettlementMap* settlementMap(

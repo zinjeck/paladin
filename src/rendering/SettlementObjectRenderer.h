@@ -23,6 +23,11 @@ namespace Paladin
     {
     public:
         SettlementObjectRenderer();
+        void invalidate() const
+        {
+            cachedMapInstance_ = 0;
+            cachedInfrastructureTexture_.reset();
+        }
         ~SettlementObjectRenderer();
 
         SettlementObjectRenderer(const SettlementObjectRenderer&) = delete;
@@ -49,6 +54,7 @@ namespace Paladin
     private:
         mutable std::uint64_t cachedMapInstance_ = 0;
         mutable std::uint64_t cachedVersion_ = 0;
+        mutable bool cachedEnvironmentArtEnabled_ = true;
         mutable std::vector<RenderColor> infrastructurePixels_;
         mutable std::vector<RenderRectangle> awaitingMaterialLines_;
         mutable std::vector<RenderRectangle> readyToBuildLines_;

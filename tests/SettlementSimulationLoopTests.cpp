@@ -1,13 +1,16 @@
 #include "TestFramework.h"
 #include "interaction/SettlementObjectPlacementController.h"
+#include "rendering/NaturalSurfaceShape.h"
 #include "rendering/ScenePresentation.h"
 #include "world/Season.h"
+#include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/SettlementSimulationState.h"
 #include "world/settlements/commands/SettlementCommandDefinition.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/jobs/LoggingGroundsJob.h"
 #include "world/settlements/objects/jobs/fishery/FisheryJob.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
@@ -21,6 +24,15 @@ namespace Paladin
 {
     struct SettlementActivityTestFixture
     {
+        static void needs(
+            SettlementMap& map,
+            SettlementCitizen& c,
+            double elapsed,
+            double minute
+        )
+        {
+            map.activities.needs(map, c, elapsed, minute);
+        }
         static void produce(
             SettlementMap& map,
             const SettlementCitizenState& citizens,
@@ -136,6 +148,186 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        auto map = land();
+        const auto home =
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto inventory = map.logistics.forObject(home);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->kind == InventoryKind::Home
+        );
+        PALADIN_CHECK(!map.logistics.add(inventory, "stone", 1));
+        PALADIN_CHECK(map.logistics.add(inventory, "lumber", 8));
+        const std::unordered_set<SettlementObjectId, StrongIdHash> occupied{
+            home
+        };
+        map.heating.advance(map.logistics, {}, 0, 1440);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 8
+        );
+        PALADIN_CHECK(!map.heating.heated(home));
+        map.heating.advance(map.logistics, occupied, 0, 1440);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 6
+        );
+        PALADIN_CHECK(map.heating.heated(home));
+        map.heating.advance(map.logistics, occupied, 9 * 1440, 1440);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 2
+        );
+        PALADIN_CHECK(map.heating.heated(home));
+        map.heating.advance(map.logistics, occupied, 10 * 1440, 1440);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 0
+        );
+        PALADIN_CHECK(!map.heating.heated(home));
+        PALADIN_CHECK(std::abs(map.heating.coldFraction(home) - .5) < 1e-9);
+        map.heating.advance(map.logistics, occupied, 10 * 1440, 60);
+        SettlementCitizen cold;
+        cold.homeId = home;
+        cold.hunger = 0;
+        cold.energy = 100;
+        cold.health = 80;
+        cold.happiness = 80;
+        auto warm = cold;
+        SettlementActivityTestFixture::needs(map, cold, 60, 10 * 1440);
+        PALADIN_CHECK(cold.health < 80 && cold.happiness < 80);
+        PALADIN_CHECK(map.logistics.add(inventory, "lumber", 1));
+        map.heating.advance(map.logistics, occupied, 10 * 1440, 60);
+        SettlementActivityTestFixture::needs(map, warm, 60, 10 * 1440);
+        PALADIN_CHECK(
+            warm.health > cold.health && warm.happiness > cold.happiness
+        );
+        // Reservations cannot be consumed by a fire before physical delivery.
+        PALADIN_CHECK(map.logistics.add(inventory, "lumber", 1));
+        PALADIN_CHECK(
+            map.logistics.reserve(CitizenId{1000}, inventory, {}, "lumber", 1)
+        );
+        PALADIN_CHECK(!map.logistics.consumeAvailable(inventory, "lumber", 1));
+        map.logistics.release(CitizenId{1000});
+    }
+    {
+        auto map = land();
+        map.naturalFeatures().set({12, 12}, NaturalFeatureKind::Tree);
+        map.naturalFeatures().set({18, 18}, NaturalFeatureKind::Tree);
+        map.naturalFeatures().set({25, 25}, NaturalFeatureKind::Rock);
+        map.naturalFeatures().harvest({12, 12}, 100);
+        map.naturalFeatures().harvest({18, 18}, 100);
+        map.naturalFeatures().harvest({25, 25}, 100);
+        map.naturalFeatures()
+            .regrow(map.grid(), map.objectState(), 100 + 11 * 1440);
+        PALADIN_CHECK(
+            map.naturalFeatures().at({12, 12}).kind == NaturalFeatureKind::None
+        );
+        completed(map, SettlementObjectTypes::LoggingGrounds, {{18, 18}, 3, 3});
+        map.naturalFeatures()
+            .regrow(map.grid(), map.objectState(), 100 + 21 * 1440);
+        PALADIN_CHECK(
+            map.naturalFeatures().at({12, 12}).kind == NaturalFeatureKind::Tree
+        );
+        PALADIN_CHECK(
+            map.naturalFeatures().at({18, 18}).kind == NaturalFeatureKind::None
+        );
+        PALADIN_CHECK(
+            map.naturalFeatures().at({25, 25}).kind == NaturalFeatureKind::None
+        );
+    }
+    {
+        // An employed resident must finish both legs of a firewood delivery;
+        // assigning a home or having wood elsewhere cannot instantly heat it.
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        const auto home =
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto grounds = completed(
+            map,
+            SettlementObjectTypes::LoggingGrounds,
+            {{18, 12}, 3, 3}
+        );
+        map.employment().synchronize(map.objectState(), citizens);
+        const auto job = map.employment().forObject(grounds);
+        PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
+        auto& c = SettlementActivityTestFixture::resident(citizens);
+        c.hunger = 0;
+        c.energy = 100;
+        advance(map, citizens, 600, 1);
+        PALADIN_CHECK(!map.heating.heated(home));
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(home))
+                ->amount("lumber") == 0
+        );
+        advance(map, citizens, 601, 180);
+        PALADIN_CHECK(map.heating.heated(home));
+        PALADIN_CHECK(
+            map.logistics.inventory(map.logistics.forObject(home))
+                ->amount("lumber") > 0
+        );
+        PALADIN_CHECK(c.workplaceId == job && map.heating.lumberBurned() > 0);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 2);
+        const auto grounds = completed(
+            map,
+            SettlementObjectTypes::LoggingGrounds,
+            {{12, 12}, 6, 3}
+        );
+        map.employment().synchronize(map.objectState(), citizens);
+        const auto job = map.employment().forObject(grounds);
+        PALADIN_CHECK(map.employment().workplace(job)->maximumCapacity == 2);
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            auto& c = SettlementActivityTestFixture::resident(citizens, i);
+            c.workplaceId = job;
+            c.child = false;
+            c.youngDependents = 0;
+            c.tilePosition = c.destination = {13 + int(i) * 3, 14};
+            c.path.clear();
+            c.task.kind = CitizenTaskKind::Work;
+            c.task.object = grounds;
+            c.breakUntil = 0;
+        }
+        SettlementActivityTestFixture::produce(map, citizens, 600, 30);
+        const auto inventory = map.logistics.forObject(grounds);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 2
+        );
+        // Production persists without any harvestable trees, regardless of
+        // which presentation phase its decorative trees happen to be in.
+        PALADIN_CHECK(
+            loggingTreeGrowth(0, 0, true) != loggingTreeGrowth(18, 0, true)
+        );
+        SettlementActivityTestFixture::produce(map, citizens, 630, 30);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 4
+        );
+        SettlementActivityTestFixture::resident(citizens, 1).task = {};
+        SettlementActivityTestFixture::produce(map, citizens, 660, 30);
+        PALADIN_CHECK(
+            map.logistics.inventory(inventory)->amount("lumber") == 5
+        );
+        PALADIN_CHECK(
+            loggingProductionPerMinute(9, 4) == loggingProductionPerMinute(9, 1)
+        );
+        PALADIN_CHECK(loggingProductionPerMinute(18, 0) == 0);
+        PALADIN_CHECK(loggingTreeGrowth(18, 0, false) == 1);
+    }
+    {
+        // Continuous material masks agree across adjoining tiles and cut
+        // convex corners instead of exposing square cells.
+        const auto road = [](int x, int y)
+        { return y == 0 && x >= 0 && x <= 2; };
+        PALADIN_CHECK(surfaceField(1, .5, road) == 1);
+        PALADIN_CHECK(surfaceField(.05, .05, road) < .5);
+        PALADIN_CHECK(
+            std::abs(
+                surfaceField(1 - 1e-7, .3, road) -
+                surfaceField(1 + 1e-7, .3, road)
+            ) < 1e-6
+        );
+    }
     {
         auto map = land();
         SettlementCitizenState people;
@@ -1472,6 +1664,14 @@ void runSettlementSimulationLoopTests()
                 if (c.activity == CitizenActivity::Sleeping)
                 {
                     PALADIN_CHECK(c.insideHome);
+                    PALADIN_CHECK(c.bedHomeId == c.homeId && c.bedSlot >= 0);
+                    PALADIN_CHECK(
+                        c.tilePosition ==
+                        homeBedPosition(
+                            *map.objectState().completedObject(c.homeId),
+                            c.bedSlot
+                        )
+                    );
                     PALADIN_CHECK(map.objectState()
                                       .completedObject(c.homeId)
                                       ->footprint.contains(c.tilePosition));
@@ -1507,7 +1707,10 @@ void runSettlementSimulationLoopTests()
             completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
         map.activities.synchronizeHomes(map, citizens);
         auto& c = SettlementActivityTestFixture::resident(citizens);
-        c.tilePosition = c.destination = {9, 9};
+        c.tilePosition = c.destination = homeBedPosition(
+            *map.objectState().completedObject(house),
+            c.bedSlot
+        );
         c.insideHome = true;
         c.path.clear();
         c.task = {};
@@ -1669,6 +1872,9 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 2);
         map.activities.policy.decisionsPerMinute = 0;
+        // Isolate the conversation/need effects from city-wide shortages.
+        map.immigration.policy.housingHappinessPenalty = 0;
+        map.immigration.policy.foodHappinessPenalty = 0;
         for (std::size_t i = 0; i < 2; ++i)
         {
             auto& c = SettlementActivityTestFixture::resident(citizens, i);
@@ -1897,7 +2103,9 @@ void runSettlementSimulationLoopTests()
         advance(map, citizens, 580, 240);
         PALADIN_CHECK(map.objectState().constructionSites().empty());
         PALADIN_CHECK(map.objectState().completedObjectAt({12, 5}));
-        PALADIN_CHECK(allGoods(map, citizens, "lumber") == 28);
+        PALADIN_CHECK(
+            allGoods(map, citizens, "lumber") + map.heating.lumberBurned() == 28
+        );
         PALADIN_CHECK(allGoods(map, citizens, "stone") == 36);
         PALADIN_CHECK(
             std::count_if(
@@ -1919,7 +2127,8 @@ void runSettlementSimulationLoopTests()
                 );
             }
         }
-        const auto lumber = allGoods(map, citizens, "lumber");
+        const auto lumber =
+            allGoods(map, citizens, "lumber") + map.heating.lumberBurned();
         PALADIN_CHECK(map.commandState().add(
             map,
             SettlementCommandTypes::Demolish,
@@ -1928,7 +2137,10 @@ void runSettlementSimulationLoopTests()
         ));
         advance(map, citizens, 1240, 480);
         PALADIN_CHECK(!map.objectState().completedObjectAt({7, 12}));
-        PALADIN_CHECK(allGoods(map, citizens, "lumber") == lumber);
+        PALADIN_CHECK(
+            allGoods(map, citizens, "lumber") + map.heating.lumberBurned() ==
+            lumber
+        );
     }
     // Equal on-site time must contribute equal labor for every builder.
     for (int workers : {1, 4})

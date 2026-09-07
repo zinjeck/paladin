@@ -1,12 +1,12 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
-#include "rendering/Camera2D.h"
-#include "rendering/TileRenderMetrics.h"
 #include "debug/ConsoleCommand.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementObjectPlacementController.h"
 #include "platform/Window.h"
+#include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
+#include "rendering/TileRenderMetrics.h"
 #include "simulation/Simulation.h"
 #include "ui/DebugConsole.h"
 #include "ui/GrayUiRenderer.h"
@@ -36,6 +36,28 @@ namespace Paladin
         if (command.kind == ConsoleCommandKind::Invalid)
         {
             debugConsole_->print(command.error);
+            return;
+        }
+        if (command.kind == ConsoleCommandKind::Money)
+        {
+            const auto* realm =
+                simulation_->world().realm(simulation_->playerRealmId());
+            if (!realm)
+            {
+                debugConsole_->print(
+                    "No player realm. Found your polity first."
+                );
+                return;
+            }
+            realm->treasury->balance = command.amount;
+            if (command.amount != 0)
+            {
+                realm->treasury->moneyEconomyStarted = true;
+            }
+            debugConsole_->print(
+                "Treasury set to " + goldText(command.amount) + " gold."
+            );
+            nextStatsRefresh_ = 0;
             return;
         }
         // Presented settlement is the active player context, independent of

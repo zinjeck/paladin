@@ -1,5 +1,6 @@
 #include "TestFramework.h"
 #include "simulation/systems/SettlementNavigation.h"
+#include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/commands/SettlementCommandDefinition.h"
@@ -27,6 +28,175 @@ namespace
 } // namespace
 void runSettlementActivityTests()
 {
+    {
+        auto map = makeMap(16);
+        auto house =
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
+        house.bypassesConstruction = true;
+        PALADIN_CHECK(map.objectState().placeCompletedObject(
+            map.grid(),
+            house,
+            {{3, 3}, 3, 3}
+        ));
+        const auto home = map.objectState().completedObjects().back().id;
+        std::array<SettlementCitizen, 4> residents;
+        for (auto& c : residents)
+        {
+            c.health = 100;
+            c.homeId = home;
+        }
+        assignHomeBeds(map, residents);
+        for (int i = 0; i < 4; ++i)
+        {
+            PALADIN_CHECK(residents[i].bedSlot == i);
+            PALADIN_CHECK(residents[i].bedHomeId == home);
+        }
+        std::swap(residents[0], residents[3]);
+        assignHomeBeds(map, residents);
+        PALADIN_CHECK(residents[0].bedSlot == 3 && residents[3].bedSlot == 0);
+        residents[1].health = 0;
+        assignHomeBeds(map, residents);
+        PALADIN_CHECK(residents[1].bedSlot == -1 && !residents[1].bedHomeId);
+        residents[1].health = 100;
+        assignHomeBeds(map, residents);
+        PALADIN_CHECK(residents[1].bedSlot == 1);
+        residents[2].homeId = {};
+        assignHomeBeds(map, residents);
+        PALADIN_CHECK(residents[2].bedSlot == -1);
+        PALADIN_CHECK(map.objectState().completedObject(home)->homeLevel == 1);
+        // Household changes rebuild double/single beds without assigning
+        // two citizens the same navigation destination.
+        for (int i=0;i<4;++i) { residents[i].id = CitizenId{std::uint64_t(i+1)}; residents[i].homeId = home; }
+        residents[0].spouseId=residents[2].id; residents[2].spouseId=residents[0].id;
+        assignHomeBeds(map,residents);
+        PALADIN_CHECK(residents[0].doubleBed && residents[2].doubleBed);
+        PALADIN_CHECK(residents[0].bedSlot/2 == residents[2].bedSlot/2);
+        PALADIN_CHECK(!residents[1].doubleBed && !residents[3].doubleBed);
+        residents[1].spouseId=residents[3].id; residents[3].spouseId=residents[1].id;
+        assignHomeBeds(map,residents);
+        unsigned slots=0;
+        for (const auto& c : residents) { PALADIN_CHECK(c.doubleBed); slots |= 1u << c.bedSlot; }
+        PALADIN_CHECK(slots == 15);
+        for (auto& c : residents) c.spouseId={};
+        assignHomeBeds(map,residents);
+        for (const auto& c : residents) PALADIN_CHECK(!c.doubleBed && c.bedVisualOffsetX == 0);
+    }
+    // One focused immigration/attribute scenario, independent of wall-clock
+    // speed and UI. Reuses the normal keep, names, placement and food catalog.
+    {
+        EntityState entity;
+        PALADIN_CHECK(entity.normalized(EntityAttribute::Happiness) == 1);
+        PALADIN_CHECK(entity.normalized(EntityAttribute::Hunger) == 1);
+        entity.modifyAttributes(
+            {{AttributeEffect::Comfort, 4},
+             {AttributeEffect::HungerDistress, -2}}
+        );
+        PALADIN_CHECK(entity.happiness == 100);
+        PALADIN_CHECK(
+            entity.attributeModifiers
+                .pending[std::size_t(AttributeEffect::Comfort)] == 2
+        );
+        entity.modifyAttributes({{AttributeEffect::Metabolism, 25}});
+        PALADIN_CHECK(
+            entity.hunger == 25 &&
+            entity.normalized(EntityAttribute::Hunger) == .75
+        );
+
+        auto city = makeMap(32);
+        const auto& keep = *SettlementObjectCatalog::definition(
+            SettlementObjectTypes::CityKeep
+        );
+        PALADIN_CHECK(city.objectState().placeCompletedObject(
+            city.grid(),
+            keep,
+            {{12, 12}, keep.previewWidth, keep.previewHeight}
+        ));
+        city.logistics.synchronize(city.objectState(), 0);
+        SettlementCitizenState residents;
+        PALADIN_CHECK(residents.initialize(4, 418));
+        for (const auto& person : residents.citizens())
+        {
+            auto& c = const_cast<SettlementCitizen&>(person);
+            c.health = 80;
+            c.happiness = 99.9;
+            c.hunger = 20;
+            c.energy = 60;
+            c.traits.definitionIds.push_back("test-personality");
+            c.stats.values.push_back({"test-skill", 12});
+        }
+        city.immigration.assess(city, residents);
+        PALADIN_CHECK(city.immigration.conditions().applicantsPerDay > 0);
+        SettlementImmigration batched = city.immigration,
+                              split = city.immigration;
+        batched.advance(city, residents, 0, 1440);
+        for (int minute = 0; minute < 1440; ++minute)
+        {
+            split.advance(city, residents, minute, 1);
+        }
+        PALADIN_CHECK(batched.available() == split.available());
+        city.immigration = batched;
+        const auto available = city.immigration.available();
+        PALADIN_CHECK(available > 0);
+        PALADIN_CHECK(
+            !city.immigration.admit(city, residents, available + 1, 1440)
+        );
+        PALADIN_CHECK(!city.immigration.admit(city, residents, 0, 1440));
+        PALADIN_CHECK(city.immigration.admit(city, residents, available, 1440));
+        PALADIN_CHECK(city.immigration.available() == 0);
+        for (std::size_t i = 4; i < residents.citizens().size(); ++i)
+        {
+            const auto& c = residents.citizens()[i];
+            PALADIN_CHECK(
+                c.health == 80 && c.happiness == 99.9 && c.hunger == 20 &&
+                c.energy == 60
+            );
+            PALADIN_CHECK(!c.child && c.ageYears >= 16 && !c.workplaceId);
+            PALADIN_CHECK(
+                c.traits.definitionIds.empty() && c.stats.values.empty() &&
+                !c.spouseId
+            );
+            PALADIN_CHECK(city.grid().isValidPosition(c.tilePosition));
+        }
+        const double reserves = city.immigration.conditions().storedFood;
+        city.logistics.drop({1, 1}, "meat", 10000, 1440);
+        city.immigration.assess(city, residents);
+        PALADIN_CHECK(city.immigration.conditions().storedFood == reserves);
+        for (const auto& c : residents.citizens())
+        {
+            const_cast<SettlementCitizen&>(c).happiness = 0;
+        }
+        city.immigration.assess(city, residents);
+        PALADIN_CHECK(city.immigration.conditions().applicantsPerDay == 0);
+        auto& first = const_cast<SettlementCitizen&>(residents.citizens()[0]);
+        first.modifyAttributes({{AttributeEffect::Meals, -10}});
+        residents.recordAttributes(1440, 1);
+        const auto tooltip = residents.attributeReport().tooltip(
+            EntityAttribute::Hunger,
+            residents.averageAttributes()
+        );
+        PALADIN_CHECK(tooltip.find("Meals eaten: -") != std::string::npos);
+        first.modifyAttributes({{AttributeEffect::Socializing, .1}});
+        residents.recordAttributes(1441, 1);
+        auto happinessTooltip = residents.attributeReport().tooltip(
+            EntityAttribute::Happiness,
+            residents.averageAttributes()
+        );
+        PALADIN_CHECK(
+            happinessTooltip.find("Conversation") != std::string::npos
+        );
+        PALADIN_CHECK(happinessTooltip.find("Tax policy") == std::string::npos);
+        residents.recordAttributes(1442, 1);
+        happinessTooltip = residents.attributeReport().tooltip(
+            EntityAttribute::Happiness,
+            residents.averageAttributes()
+        );
+        PALADIN_CHECK(
+            happinessTooltip.find("Conversation") == std::string::npos
+        );
+        PALADIN_CHECK(
+            happinessTooltip.find("No active modifiers") != std::string::npos
+        );
+    }
     auto map = makeMap(96);
     auto same = makeMap(96);
     map.naturalFeatures().generate(map.grid(), 789);

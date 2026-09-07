@@ -587,10 +587,9 @@ namespace Paladin
                 policy.taxHappinessChangePerDay * elapsed / 1440;
             c.taxHappinessAdjustment +=
                 std::clamp(target - previousTaxMood, -step, step);
-            c.happiness = std::clamp(
-                c.happiness + c.taxHappinessAdjustment - previousTaxMood,
-                0.0,
-                100.0
+            c.modifyAttributes(
+                {{AttributeEffect::Taxes,
+                  c.taxHappinessAdjustment - previousTaxMood}}
             );
             if (monetary && !c.child &&
                 monetaryMinutes_ >= policy.publicFoodGraceDays * 1440)

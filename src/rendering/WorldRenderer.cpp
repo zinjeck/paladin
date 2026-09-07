@@ -4,6 +4,7 @@
 
 #include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
+#include <SDL3/SDL.h>
 
 #include <utility>
 
@@ -33,7 +34,14 @@ namespace Paladin
         std::span<const TileOutlineRenderItem> outlines
     ) const
     {
-        gridRenderer_.render(renderer, world.grid(), camera, metrics);
+        std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
+#ifdef PALADIN_ART_ROOT
+        artRoot = PALADIN_ART_ROOT;
+#endif
+        artwork_.load(renderer, artRoot);
+        artwork_.setTime(animationSeconds);
+        gridRenderer_
+            .render(renderer, world.grid(), camera, metrics, &artwork_);
 
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
@@ -75,7 +83,8 @@ namespace Paladin
 
         if (!politicalViewActive_)
         {
-            settlementMarkerRenderer_.render(renderer, world, camera, metrics);
+            settlementMarkerRenderer_
+                .render(renderer, world, camera, metrics, &artwork_);
         }
 
         overlayRenderer_.render(renderer, overlays, camera, metrics);

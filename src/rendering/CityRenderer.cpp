@@ -1,5 +1,8 @@
 #include "rendering/CityRenderer.h"
+#include "rendering/BuildingView.h"
+#include "rendering/GrassPresentation.h"
 #include "ui/UiTypes.h"
+#include "world/settlements/objects/SettlementObjectDefinition.h"
 
 #include "interaction/SettlementInspectionController.h"
 #include <SDL3/SDL.h>
@@ -98,12 +101,21 @@ namespace Paladin
         double hour
     ) const
     {
-        gridRenderer_.render(renderer, settlementMap.grid(), camera, metrics);
-
-        sprites_.load(
-            renderer,
-            std::string(SDL_GetBasePath()) + "assets/sprites"
+        std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
+#ifdef PALADIN_ART_ROOT
+        artRoot = PALADIN_ART_ROOT;
+#endif
+        if (!artRootOverride.empty())
+        {
+            artRoot = artRootOverride;
+        }
+        sprites_.load(renderer, artRoot);
+        sprites_.setTime(
+            animationTimeOverride >= 0 ? animationTimeOverride
+                                       : animationSeconds
         );
+        gridRenderer_
+            .render(renderer, settlementMap.grid(), camera, metrics, &sprites_);
         raised_.clear();
         const SceneProjection projection{
             camera.tileX(),
@@ -112,6 +124,19 @@ namespace Paladin
             renderer.outputWidth(),
             renderer.outputHeight()
         };
+        const auto grassStart = raised_.size();
+        grass_.submit(
+            raised_,
+            projection,
+            settlementMap,
+            sprites_,
+            &citizens,
+            interpolationAlpha
+        );
+        raised_.setOpacityFrom(
+            grassStart,
+            detailBlend(projection.tilePixels, 20, 36)
+        );
         naturalFeatureRenderer_.render(
             renderer,
             settlementMap,
@@ -131,8 +156,47 @@ namespace Paladin
             sprites_
         );
 
-        structures_
-            .submit(raised_, projection, settlementMap, presentation, sprites_);
+        const double objectDetail = detailBlend(projection.tilePixels, 16, 28);
+        distantObjects_.render(
+            renderer,
+            projection,
+            settlementMap,
+            sprites_,
+            presentation.roofsVisible,
+            1 - objectDetail
+        );
+        if (objectDetail > 0)
+        {
+            const auto start = raised_.size();
+            structures_.submit(
+                raised_,
+                projection,
+                settlementMap,
+                presentation,
+                sprites_,
+                &citizens,
+                &renderer
+            );
+            raised_.setOpacityFrom(start, objectDetail);
+        }
+        if (const auto* definition = placementController.activeDefinition())
+        {
+            if (const auto footprint = placementController.visibleFootprint())
+            {
+                const auto first = raised_.size();
+                tribalBuilding(
+                    raised_,
+                    projection,
+                    sprites_,
+                    presentation,
+                    std::string(definition->id),
+                    *footprint,
+                    placementController.visibleDoor(),
+                    ~std::uint64_t(0)
+                );
+                raised_.setOpacityFrom(first, .65);
+            }
+        }
         citizenRenderer_.render(
             renderer,
             citizens,
@@ -144,27 +208,26 @@ namespace Paladin
             &sprites_,
             &presentation
         );
-        raised_.render(renderer, -2, -1);
+        raised_.render(renderer, -3, -1);
         logisticsRenderer_.render(
             renderer,
             settlementMap,
             camera,
             metrics,
             placementController,
-            inspection
+            inspection,
+            &raised_,
+            &sprites_
         );
         raised_.render(renderer, 0);
-        const auto tint = presentation.ambient(hour);
-        if (tint.alpha)
-        {
-            renderer.fillRectangle(
-                0,
-                0,
-                float(renderer.outputWidth()),
-                float(renderer.outputHeight()),
-                tint
-            );
-        }
+        lighting_.render(
+            renderer,
+            projection,
+            settlementMap,
+            sprites_,
+            presentation,
+            hour
+        );
         objectRenderer_.renderOverlay(
             renderer,
             settlementMap,
@@ -183,19 +246,9 @@ namespace Paladin
             renderer,
             metrics.scaledTilePixels(camera.zoom())
         );
-        // Keep a selected citizen locatable even under an opaque roof/canopy.
-        if (const auto* c = inspection.selectedCitizen(citizens))
+        const auto highlight = [&](const RenderRectangle& b)
         {
-            const auto b = projection.bounds(
-                {c->renderX(c->visualX(), interpolationAlpha) + .5,
-                 c->renderY(c->visualY(), interpolationAlpha) + .5,
-                 0,
-                 .65,
-                 .65,
-                 .5,
-                 .5}
-            );
-            const RenderColor selected{255, 235, 155, 255};
+            const RenderColor selected{0xFF, 0xD7, 0x83, 255};
             renderer.drawLine(b.x, b.y, b.x + b.width, b.y, selected);
             renderer.drawLine(
                 b.x,
@@ -212,6 +265,49 @@ namespace Paladin
                 b.y + b.height,
                 selected
             );
+        };
+        const auto footprintHighlight = [&](const auto& f)
+        {
+            highlight(projection.bounds(
+                {double(f.topLeft.x),
+                 double(f.topLeft.y),
+                 0,
+                 double(f.width),
+                 double(f.height),
+                 0,
+                 0}
+            ));
+        };
+        if (const auto* object =
+                inspection.selectedObject(settlementMap.objectState()))
+        {
+            footprintHighlight(object->footprint);
+        }
+        else if (
+            const auto* site =
+                inspection.selectedConstructionSite(settlementMap.objectState())
+        )
+        {
+            footprintHighlight(site->footprint);
+        }
+        else if (
+            const auto* pile =
+                inspection.selectedInventory(settlementMap.logistics)
+        )
+        {
+            footprintHighlight(pile->footprint);
+        }
+        else if (const auto* c = inspection.selectedCitizen(citizens))
+        {
+            highlight(projection.bounds(
+                {c->renderX(c->visualX(), interpolationAlpha) + .5,
+                 c->renderY(c->visualY(), interpolationAlpha) + .5,
+                 0,
+                 .65,
+                 .65,
+                 .5,
+                 .5}
+            ));
         }
     }
 } // namespace Paladin

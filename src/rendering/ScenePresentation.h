@@ -54,6 +54,7 @@ namespace Paladin
         int part = 0;
         const Texture* texture = nullptr;
         RenderRectangle atlasFrame;
+        std::uint8_t opacity = 255;
     };
     // One visible-item queue; no terrain-wide sorting, per-entity textures,
     // or dependency from simulation state to SDL/resources.
@@ -63,6 +64,21 @@ namespace Paladin
         std::size_t size() const
         {
             return items_.size();
+        }
+        void bendFrom(
+            std::size_t first,
+            double dx,
+            double scaleY,
+            double groundY
+        )
+        {
+            for (auto i = first; i < items_.size(); ++i)
+            {
+                auto& b = items_[i].bounds;
+                b.x += float(dx);
+                b.y = float(groundY + (b.y - groundY) * scaleY);
+                b.height *= float(scaleY);
+            }
         }
         const std::vector<SceneDrawItem>& items() const
         {
@@ -74,6 +90,22 @@ namespace Paladin
             for (; first < items_.size(); ++first)
             {
                 items_[first].layer = layer;
+            }
+        }
+        void setOpacityFrom(std::size_t first, double opacity)
+        {
+            for (; first < items_.size(); ++first)
+            {
+                if (items_[first].texture)
+                {
+                    items_[first].opacity =
+                        std::uint8_t(items_[first].opacity * opacity);
+                }
+                else
+                {
+                    items_[first].color.alpha =
+                        std::uint8_t(items_[first].color.alpha * opacity);
+                }
             }
         }
         void clear()
@@ -132,7 +164,8 @@ namespace Paladin
                         b.x,
                         b.y,
                         b.width,
-                        b.height
+                        b.height,
+                        item.opacity
                     );
                 }
                 else

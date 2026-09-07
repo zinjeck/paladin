@@ -1,6 +1,9 @@
 #pragma once
 
+#include "rendering/CityDistantObjects.h"
+#include "rendering/CityLighting.h"
 #include "rendering/CityPresentation.h"
+#include "rendering/GrassPresentation.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/SettlementCommandRenderer.h"
@@ -26,6 +29,22 @@ namespace Paladin
     {
     public:
         CityPresentation presentation;
+        std::string artRootOverride;
+        double animationTimeOverride =
+            -1; // Fixed clock for reproducible art previews/tests.
+        double animationSeconds = 0;
+        std::size_t submittedItems() const
+        {
+            return raised_.size();
+        }
+        void reloadArt() const
+        {
+            raised_.clear();
+            sprites_.reset();
+            lighting_.reset();
+            naturalFeatureRenderer_.invalidateArt();
+            objectRenderer_.invalidate();
+        }
         void render(
             Renderer& renderer,
             const SettlementMap& settlementMap,
@@ -48,6 +67,9 @@ namespace Paladin
         ) const;
 
     private:
+        CityDistantObjects distantObjects_;
+        GrassPresentation grass_;
+        mutable CityLighting lighting_;
         mutable SceneSpriteLibrary sprites_;
         mutable SceneDrawQueue raised_;
         SettlementStructurePresentation structures_;

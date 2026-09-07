@@ -586,6 +586,67 @@ namespace Paladin
         std::vector<Opportunity> opportunities;
         const auto* assigned = map.logistics.inventory(assignedDestination);
         const bool market = assigned && assigned->kind == InventoryKind::Market;
+        const bool homeDelivery =
+            assigned && assigned->kind == InventoryKind::Home;
+        if (!market)
+        {
+            std::unordered_set<SettlementObjectId, StrongIdHash> occupiedHomes;
+            for (const auto& resident : citizens.citizens())
+            {
+                if (resident.homeId && resident.health > 0)
+                {
+                    occupiedHomes.insert(resident.homeId);
+                }
+            }
+            for (const auto& home : map.logistics.inventories())
+            {
+                if (home.kind != InventoryKind::Home ||
+                    (homeDelivery && home.id != assignedDestination) ||
+                    home.amount(SettlementResourceTypes::Lumber) > 2 ||
+                    !occupiedHomes.contains(home.objectId))
+                {
+                    continue;
+                }
+                for (const auto& source : map.logistics.inventories())
+                {
+                    if (source.kind == InventoryKind::Home ||
+                        source.kind == InventoryKind::Construction ||
+                        distance(c.tilePosition, source.footprint) >
+                            policy.stockpile.collectionRadius ||
+                        distance(source.footprint.topLeft, home.footprint) >
+                            policy.stockpile.collectionRadius)
+                    {
+                        continue;
+                    }
+                    const int amount = std::min(
+                        {policy.carryingCapacity,
+                         map.logistics.available(
+                             source.id,
+                             SettlementResourceTypes::Lumber
+                         ),
+                         map.logistics.receivable(
+                             home.id,
+                             SettlementResourceTypes::Lumber
+                         )}
+                    );
+                    if (amount > 0)
+                    {
+                        opportunities.push_back(
+                            {source.id,
+                             home.id,
+                             std::string(SettlementResourceTypes::Lumber),
+                             amount,
+                             -10000 +
+                                 distance(c.tilePosition, source.footprint) +
+                                 distance(
+                                     source.footprint.topLeft,
+                                     home.footprint
+                                 )}
+                        );
+                    }
+                }
+            }
+        }
         const bool hasStockpile = std::any_of(
             map.logistics.inventories().begin(),
             map.logistics.inventories().end(),
@@ -601,6 +662,10 @@ namespace Paladin
         }
         for (const auto& source : map.logistics.inventories())
         {
+            if (homeDelivery)
+            {
+                break;
+            }
             if ((market ? !(source.kind == InventoryKind::Stockpile ||
                             (!hasStockpile &&
                              (source.kind == InventoryKind::Workplace ||
@@ -861,6 +926,7 @@ namespace Paladin
                 for (const auto& source : map.logistics.inventories())
                 {
                     if (source.kind == InventoryKind::Construction ||
+                        source.kind == InventoryKind::Home ||
                         map.logistics.available(source.id, cost.resourceId) <=
                             0)
                     {
@@ -1065,6 +1131,39 @@ namespace Paladin
             return false;
         }
         const auto workplace = *job;
+        if (workplace.objectTypeId == SettlementObjectTypes::LoggingGrounds)
+        {
+            int slot = 0;
+            for (const auto& other : citizens.citizens())
+            {
+                if (other.id == c.id)
+                {
+                    break;
+                }
+                if (other.workplaceId == c.workplaceId)
+                {
+                    ++slot;
+                }
+            }
+            const auto& f = workplace.footprint;
+            const int columns = std::max(1, (f.width + 2) / 3);
+            const SettlementTilePosition target{
+                f.topLeft.x + std::min(f.width - 1, slot % columns * 3 + 1),
+                f.topLeft.y + std::min(f.height - 1, slot / columns * 3 + 2)
+            };
+            if (!route(map, citizens, c, {target, 1, 1}, true) ||
+                c.destination != target)
+            {
+                return false;
+            }
+            c.task = {};
+            c.task.kind = CitizenTaskKind::Work;
+            c.task.object = workplace.objectId;
+            c.task.workTile = target;
+            c.task.startedMinute = minute;
+            c.activity = CitizenActivity::TravelingToWork;
+            return true;
+        }
         if (workplace.objectTypeId == SettlementObjectTypes::Pastureland)
         {
             return choosePastureWork(map, citizens, c, minute);

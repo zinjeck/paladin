@@ -28,10 +28,15 @@ namespace Paladin
         double fixedDeltaSeconds() const noexcept;
         double frameDeltaSeconds() const noexcept;
         double interpolationAlpha() const noexcept;
+        double presentationSeconds() const noexcept
+        {
+            return presentationSeconds_;
+        }
 
     private:
         double fixedDeltaSeconds_ = 0.05;
         double frameDeltaSeconds_ = 0.0;
+        double presentationSeconds_ = 0.0;
         double accumulatorSeconds_ = 0.0;
         double previousTimeSeconds_ = 0.0;
         double speedMultiplier_ = 1.0;

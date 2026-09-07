@@ -165,6 +165,7 @@ namespace Paladin
             outlineCount = 1;
         }
 
+        worldRenderer_->animationSeconds = simulationClock_->presentationSeconds();
         worldRenderer_->render(
             *renderer_,
             simulation_->world(),

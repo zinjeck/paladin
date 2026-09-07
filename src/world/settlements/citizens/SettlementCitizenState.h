@@ -6,6 +6,7 @@
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/SettlementTilePosition.h"
 #include "world/entities/EntityState.h"
+#include "world/settlements/citizens/SettlementAttributeReport.h"
 
 #include <cstdint>
 #include <functional>
@@ -92,6 +93,9 @@ namespace Paladin
         double publicMealShare = 0;
         double publicFoodDissatisfaction = 0;
         double taxHappinessAdjustment = 0;
+        double housingHappinessPenalty = 0;
+        double foodHappinessPenalty = 0;
+        void enforceHappinessModifiers();
         SettlementObjectId exitingHomeId;
         WorkplaceId workplaceId;
         double nextWorkCheckMinutes = 0;
@@ -124,9 +128,12 @@ namespace Paladin
         double nextSocialMinute = 0;
         bool insideHome = false;
         SettlementTilePosition homeEntrance{-1, -1};
-        double happiness = 100;
         double homelessMinutes = 0;
         SettlementObjectId homeId;
+        SettlementObjectId bedHomeId;
+        int bedSlot = -1;
+        bool doubleBed = false;
+        double bedVisualOffsetX = 0;
         CitizenTask task;
         std::string carriedResource;
         std::vector<SettlementTilePosition> haulDeliveryPath;
@@ -155,6 +162,13 @@ namespace Paladin
         bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);
 
         bool spawn(std::uint64_t count);
+        bool spawnImmigrants(std::uint64_t count);
+        EntityAttributes averageAttributes() const;
+        void recordAttributes(double minute, double elapsed);
+        const SettlementAttributeReport& attributeReport() const
+        {
+            return attributeReport_;
+        }
         void recordPopulation(double minute);
         const std::deque<PopulationSample>& populationHistory() const noexcept
         {
@@ -218,6 +232,7 @@ namespace Paladin
         void matchSingles();
         std::uint64_t familyVersion_ = 0;
         std::deque<PopulationSample> populationHistory_;
+        SettlementAttributeReport attributeReport_;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;

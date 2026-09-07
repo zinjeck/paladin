@@ -4,6 +4,7 @@
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/TileRenderMetrics.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
@@ -338,6 +339,13 @@ namespace Paladin
                 cityHudCapturedPointer_ = false;
                 if (handleReportAction(action))
                 {
+                    return true;
+                }
+                if (action == CityHudAction::ToggleEnvironmentArt)
+                {
+                    SceneSpriteLibrary::setEnvironmentArtEnabled(
+                        !SceneSpriteLibrary::environmentArtEnabled()
+                    );
                     return true;
                 }
                 if (action != CityHudAction::None)

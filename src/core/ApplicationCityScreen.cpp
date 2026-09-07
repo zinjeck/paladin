@@ -162,6 +162,7 @@ namespace Paladin
                 simulation_->world().settlement(activeCitySettlementId_);
             if (renderedSettlement)
             {
+                cityRenderer_->animationSeconds = simulationClock_->presentationSeconds();
                 cityRenderer_->render(
                     *renderer_,
                     *settlementMap,
@@ -234,12 +235,16 @@ namespace Paladin
         if (employmentPanel_->containsPoint(x, y))
         {
             text = employmentPanel_->tooltipAt(x, y);
+            key = employmentPanel_->tooltipKeyAt(x, y);
         }
         else
         {
             text = cityHud_->tooltipAt(x, y);
         }
-        key = text;
+        if (key.empty())
+        {
+            key = text;
+        }
         if (text.empty() && !activeHudContainsPoint(x, y))
         {
             const auto* map =

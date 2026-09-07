@@ -35,6 +35,16 @@ namespace Paladin
         float height = 0.0F;
     };
 
+    // Reusable artwork can be composed into a bounded terrain cache without
+    // retaining a second CPU copy of every source image.
+    struct TextureDrawItem
+    {
+        const Texture* texture = nullptr;
+        RenderRectangle source, destination;
+        RenderColor fill{0, 0, 0, 0};
+        std::uint8_t opacity = 255;
+    };
+
     class Renderer
 
     {
@@ -53,6 +63,7 @@ namespace Paladin
         bool isValid() const noexcept;
 
         void beginFrame();
+        void compositeLighting(Texture& light, Texture& glow);
 
         void endFrame();
 
@@ -103,11 +114,19 @@ namespace Paladin
             bool smoothScaling
         );
 
+        std::unique_ptr<Texture> createTextureFromDrawItems(
+            int width,
+            int height,
+            std::span<const TextureDrawItem> items,
+            bool premultiplied = false
+        );
+
         [[nodiscard]]
         bool updateTexturePixels(
             Texture& texture,
             std::span<const RenderColor> pixels
         );
+        bool updateTextureRegion(Texture&, int x, int y, int width, int height, std::span<const RenderColor>);
 
         void drawTexture(
             const Texture& texture,
@@ -118,7 +137,8 @@ namespace Paladin
             float destinationX,
             float destinationY,
             float destinationWidth,
-            float destinationHeight
+            float destinationHeight,
+            std::uint8_t opacity = 255
         );
 
         [[nodiscard]]

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/OverlayRenderer.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/TerritoryPresentationPolicy.h"
@@ -20,11 +21,17 @@ namespace Paladin
     class WorldRenderer
     {
     public:
+        double animationSeconds = 0;
         WorldRenderer();
 
         explicit WorldRenderer(
             TerritoryPresentationPolicy territoryPresentationPolicy
         );
+
+        void reloadArt() const
+        {
+            artwork_.reset();
+        }
 
         void render(
             Renderer& renderer,
@@ -38,6 +45,7 @@ namespace Paladin
 
     private:
         WorldGridRenderer gridRenderer_;
+        mutable SceneSpriteLibrary artwork_;
         TerritoryRenderer territoryRenderer_;
         SpriteRenderer spriteRenderer_;
         SettlementMarkerRenderer settlementMarkerRenderer_;

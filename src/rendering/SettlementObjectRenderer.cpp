@@ -240,10 +240,14 @@ namespace Paladin
         const SettlementObjectState& state = settlementMap.objectState();
 
         if (cachedMapInstance_ != settlementMap.instanceId() ||
-            cachedVersion_ != state.navigationVersion())
+            cachedVersion_ != state.navigationVersion() ||
+            cachedEnvironmentArtEnabled_ !=
+                SceneSpriteLibrary::environmentArtEnabled())
         {
             cachedMapInstance_ = settlementMap.instanceId();
             cachedVersion_ = state.navigationVersion();
+            cachedEnvironmentArtEnabled_ =
+                SceneSpriteLibrary::environmentArtEnabled();
 
             auto& pixels = infrastructurePixels_;
             pixels.assign(
@@ -339,7 +343,7 @@ namespace Paladin
             }
         }
 
-        if (cachedInfrastructureTexture_)
+        if (cachedInfrastructureTexture_ && !state.constructionSites().empty())
         {
             const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
@@ -501,16 +505,6 @@ namespace Paladin
                 );
             }
         };
-        for (const auto& object :
-             settlementMap.objectState().completedObjects())
-        {
-            if (const auto* style =
-                    SettlementObjectCatalog::definition(object.objectTypeId);
-                object.door && style && style->hasDoor)
-            {
-                paintDoor(*object.door, *style);
-            }
-        }
         for (const auto& site : settlementMap.objectState().constructionSites())
         {
             if (const auto* style =

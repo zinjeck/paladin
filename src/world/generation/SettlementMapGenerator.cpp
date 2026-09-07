@@ -335,6 +335,7 @@ namespace Paladin
             }
         }
 
+        cityGrid.classifyCoast(seed);
         auto result = std::make_unique<SettlementMap>(
             std::move(cityGrid),
             sourceRegionCenter,

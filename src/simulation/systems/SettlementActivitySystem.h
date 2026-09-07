@@ -94,7 +94,7 @@ namespace Paladin
         double mealRestoration = 50;
         double healthRecoveryPerDay = 25;
         double happinessRecoveryPerDay = 12;
-        double unemploymentHappinessPerDay = 2;
+        double unemploymentHappinessPerDay = 2.5;
         double talkingHappinessPerMinute = .1;
         double postWorkLeisureShare = .65;
         double fullRestEnergy = 100;
@@ -193,7 +193,12 @@ namespace Paladin
             double minute,
             double elapsed
         );
-        void needs(SettlementCitizen&, double elapsed, double minute);
+        void needs(
+            const SettlementMap&,
+            SettlementCitizen&,
+            double elapsed,
+            double minute
+        );
         void planMeal(SettlementCitizen&, const SettlementMap&);
         bool shouldSleep(const SettlementCitizen&, double minute) const;
         void planSleep(SettlementMap&, SettlementCitizen&, double minute);
@@ -263,10 +268,7 @@ namespace Paladin
             double minute,
             double elapsed
         );
-        void assignHomes(SettlementMap& map, SettlementCitizenState& citizens)
-        {
-            families_.assignHomes(map, citizens, *this);
-        }
+        void assignHomes(SettlementMap& map, SettlementCitizenState& citizens);
         void finish(SettlementMap&, SettlementCitizen&, double minute);
         bool route(
             SettlementMap&,

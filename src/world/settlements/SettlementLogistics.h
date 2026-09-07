@@ -18,7 +18,8 @@ namespace Paladin
         Stockpile,
         Workplace,
         Market,
-        Construction
+        Construction,
+        Home
     };
 
     inline bool countsAsCityStorage(InventoryKind kind)
@@ -88,6 +89,11 @@ namespace Paladin
             double minute = 0
         );
         bool consumeCarriedUnit(CitizenId citizen);
+        bool consumeAvailable(
+            InventoryId,
+            std::string_view resource,
+            int amount
+        );
         bool founded() const
         {
             return foundingGoodsGranted_;

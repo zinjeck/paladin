@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cmath>
 
 namespace Paladin
@@ -15,6 +16,7 @@ namespace Paladin
     {
         limitHits = 0;
         discardedSeconds = 0;
+        presentationSeconds_ = 0;
         frameDeltaSeconds_ = 0.0;
         accumulatorSeconds_ = 0.0;
         previousTimeSeconds_ = 0.0;
@@ -55,7 +57,17 @@ namespace Paladin
         frameDeltaSeconds_ = frameTimeSeconds;
         if (!paused_)
         {
+            presentationSeconds_ += frameTimeSeconds;
             accumulatorSeconds_ += frameTimeSeconds * speedMultiplier_;
+            // Slow simulation rather than accumulating an unbounded
+            // input-blocking debt.
+            const double maxBacklog = fixedDeltaSeconds_ * 4;
+            if (accumulatorSeconds_ > maxBacklog)
+            {
+                ++limitHits;
+                discardedSeconds += accumulatorSeconds_ - maxBacklog;
+                accumulatorSeconds_ = maxBacklog;
+            }
         }
     }
 
@@ -104,6 +116,6 @@ namespace Paladin
 
     double SimulationClock::interpolationAlpha() const noexcept
     {
-        return accumulatorSeconds_ / fixedDeltaSeconds_;
+        return std::clamp(accumulatorSeconds_ / fixedDeltaSeconds_, 0., 1.);
     }
 } // namespace Paladin

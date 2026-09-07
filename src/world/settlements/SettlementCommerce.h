@@ -37,8 +37,11 @@ namespace Paladin
     };
     inline std::string goldText(Money amount)
     {
-        return std::to_string(amount / 100) + "." +
-               (amount % 100 < 10 ? "0" : "") + std::to_string(amount % 100);
+        const auto magnitude = amount < 0 ? std::uint64_t(-(amount + 1)) + 1
+                                          : std::uint64_t(amount);
+        return (amount < 0 ? "-" : "") + std::to_string(magnitude / 100) + "." +
+               (magnitude % 100 < 10 ? "0" : "") +
+               std::to_string(magnitude % 100);
     }
     struct TreasurySample
     {

@@ -6,6 +6,8 @@
 #include "world/entities/animals/SettlementAnimals.h"
 #include "world/settlements/SettlementCommerce.h"
 #include "world/settlements/SettlementEmploymentState.h"
+#include "world/settlements/SettlementHomeHeating.h"
+#include "world/settlements/SettlementImmigration.h"
 #include "world/settlements/SettlementLogistics.h"
 #include "world/settlements/SettlementNaturalFeatures.h"
 #include "world/settlements/commands/SettlementCommandState.h"
@@ -92,7 +94,9 @@ namespace Paladin
         }
 
         SettlementLogistics logistics;
+        SettlementHomeHeating heating;
         SettlementCommerce commerce;
+        SettlementImmigration immigration;
         SettlementAnimals animals;
         SettlementActivitySystem activities;
 

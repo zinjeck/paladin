@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ui/UiButton.h"
+#include "rendering/Texture.h"
+#include <memory>
 
 #include <array>
 #include <cstddef>
@@ -28,6 +30,7 @@ namespace Paladin
         Events,
         Ledger,
         ToggleRoofs,
+        ToggleEnvironmentArt,
         Back
     };
 
@@ -37,7 +40,8 @@ namespace Paladin
         CityHud();
         bool roofControlAt(float x, float y) const
         {
-            return !worldMode_ && roofsButton_.containsPoint(x, y);
+            return artButton_.containsPoint(x, y) ||
+                   (!worldMode_ && roofsButton_.containsPoint(x, y));
         }
         void setRoofsVisible(bool value)
         {
@@ -133,6 +137,7 @@ namespace Paladin
         bool optionIsVisible(std::size_t optionIndex) const noexcept;
 
         UiButton roofsButton_{"Roofs O"};
+        UiButton artButton_{"Art F8"};
         UiButton backButton_;
         UiButton eventsButton_{"!!!"};
         UiButton ledgerButton_{"L"};
@@ -140,8 +145,10 @@ namespace Paladin
         std::array<UiButton, 5> topButtons_;
         UiRectangle minimapPanel_;
         UiButton goodsButton_{"Goods"};
+        mutable bool goodsIconsLoaded_ = false;
+        mutable std::array<std::shared_ptr<Texture>, 4> goodsIcons_;
         std::array<UiRectangle, 6> goodsCells_{};
-        bool goodsOpen_ = false;
+        bool goodsOpen_ = true;
         bool hasKeep_ = false;
         std::size_t population_ = 8;
         std::size_t housingCapacity_ = 0;

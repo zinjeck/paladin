@@ -2,7 +2,9 @@
 
 #include "core/EntityRegistry.h"
 #include "core/StrongId.h"
+#include "debug/ConsoleCommand.h"
 #include "rendering/Camera2D.h"
+#include "world/settlements/SettlementCommerce.h"
 
 #include <type_traits>
 
@@ -103,6 +105,28 @@ namespace
 
 void runCoreTests()
 {
+    using Paladin::ConsoleCommandKind;
+    using Paladin::parseConsoleCommand;
+    PALADIN_CHECK(
+        parseConsoleCommand("money").kind == ConsoleCommandKind::Invalid
+    );
+    PALADIN_CHECK(parseConsoleCommand("money 20").amount == 2000);
+    PALADIN_CHECK(
+        parseConsoleCommand("money 0").kind == ConsoleCommandKind::Money
+    );
+    PALADIN_CHECK(parseConsoleCommand("money -2000").amount == -200000);
+    for (const auto text :
+         {"money 1.5",
+          "money 1 extra",
+          "money nonsense",
+          "money 9223372036854775807"})
+    {
+        PALADIN_CHECK(
+            parseConsoleCommand(text).kind == ConsoleCommandKind::Invalid
+        );
+    }
+    PALADIN_CHECK(Paladin::goldText(-200000) == "-2000.00");
+    PALADIN_CHECK(Paladin::goldText(-1) == "-0.01");
     testStrongIds();
     testEntityRegistry();
     testCameraZoomLimits();

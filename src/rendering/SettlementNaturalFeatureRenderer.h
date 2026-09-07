@@ -5,6 +5,7 @@
 #include "world/SettlementTilePosition.h"
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 namespace Paladin
 {
@@ -15,6 +16,11 @@ namespace Paladin
     class SettlementNaturalFeatureRenderer
     {
     public:
+        void invalidateArt() const
+        {
+            clearanceInstance_ = 0;
+            sourceInstance_ = 0;
+        }
         void render(
             Renderer&,
             const SettlementMap&,
@@ -44,12 +50,24 @@ namespace Paladin
         {
             std::unique_ptr<Texture> texture;
             std::uint64_t version = 0;
+            std::uint64_t baseVersion = 0, navigation = 0;
+            double readyAt = 0;
+            bool empty = false;
             std::uint64_t spriteVersion = ~std::uint64_t(0);
             std::vector<FeatureSprite> sprites;
         };
         mutable std::unique_ptr<Texture> placeholderAtlas_;
+        mutable std::unique_ptr<Texture> contactShadow_;
+        mutable RenderColor contactShadowColor_{0, 0, 0, 0};
         mutable std::uint64_t sourceInstance_ = 0;
-        mutable std::size_t refreshCursor_ = 0;
-        mutable std::vector<Chunk> chunks_;
+        mutable bool overviewArt_ = false;
+        mutable std::size_t refreshCursor_ = 0, cachedTextures_ = 0;
+        mutable std::vector<Chunk> chunks_, featureChunks_;
+        mutable std::unique_ptr<Texture> overviewTexture_;
+        mutable std::uint64_t clearanceInstance_ = 0,
+                              clearanceVersion_ = ~std::uint64_t(0);
+        mutable bool clearanceArtEnabled_ = false;
+        mutable std::unordered_map<std::uint64_t, std::vector<RenderRectangle>>
+            clearance_;
     };
 } // namespace Paladin

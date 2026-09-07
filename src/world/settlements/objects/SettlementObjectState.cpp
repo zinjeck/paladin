@@ -542,28 +542,56 @@ namespace Paladin
         SettlementTilePosition position
     ) const noexcept
     {
-        const auto iterator = std::find_if(
-            completedObjects_.rbegin(),
-            completedObjects_.rend(),
-            [position](const CompletedSettlementObject& object)
-            { return object.footprint.contains(position); }
-        );
-
-        return iterator == completedObjects_.rend() ? nullptr : &*iterator;
+        if (position.x < 0 || position.y < 0 || position.x >= mapWidth_ ||
+            position.y >= mapHeight_)
+        {
+            return nullptr;
+        }
+        synchronizeTileIndexes();
+        const auto index = objectAtTile_[tileIndex(position)];
+        return index ? &completedObjects_[index - 1] : nullptr;
     }
 
     const SettlementConstructionSite* SettlementObjectState::constructionSiteAt(
         SettlementTilePosition position
     ) const noexcept
     {
-        const auto iterator = std::find_if(
-            constructionSites_.rbegin(),
-            constructionSites_.rend(),
-            [position](const SettlementConstructionSite& site)
-            { return site.footprint.contains(position); }
-        );
-
-        return iterator == constructionSites_.rend() ? nullptr : &*iterator;
+        if (position.x < 0 || position.y < 0 || position.x >= mapWidth_ ||
+            position.y >= mapHeight_)
+        {
+            return nullptr;
+        }
+        synchronizeTileIndexes();
+        const auto index = siteAtTile_[tileIndex(position)];
+        return index ? &constructionSites_[index - 1] : nullptr;
+    }
+    void SettlementObjectState::synchronizeTileIndexes() const
+    {
+        if (tileIndexedVersion_ == navigationVersion_)
+        {
+            return;
+        }
+        const auto count = std::size_t(mapWidth_) * mapHeight_;
+        objectAtTile_.assign(count, 0);
+        siteAtTile_.assign(count, 0);
+        const auto populate = [&](const auto& objects, auto& tiles)
+        {
+            for (std::size_t i = 0; i < objects.size(); ++i)
+            {
+                const auto& f = objects[i].footprint;
+                for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
+                {
+                    for (int x = f.topLeft.x; x < f.topLeft.x + f.width; ++x)
+                    {
+                        tiles[tileIndex({x, y})] = std::uint32_t(i + 1);
+                    }
+                }
+            }
+        };
+        // Last object wins, matching the previous reverse-vector lookup.
+        populate(completedObjects_, objectAtTile_);
+        populate(constructionSites_, siteAtTile_);
+        tileIndexedVersion_ = navigationVersion_;
     }
 
     std::uint64_t SettlementObjectState::presentationVersion() const noexcept

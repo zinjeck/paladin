@@ -1,6 +1,7 @@
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "world/Season.h"
 #include "world/generation/GenerationNoise.h"
+#include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementDoor.h"
@@ -176,6 +177,10 @@ namespace Paladin
         {
             return {-1, -1};
         }
+        if (c.bedHomeId == home->id && c.bedSlot >= 0 && c.bedSlot < 4)
+        {
+            return homeBedPosition(*home, c.bedSlot);
+        }
         auto best = c.tilePosition;
         int bestScore = -1000000;
         const auto& f = home->footprint;
@@ -267,6 +272,12 @@ namespace Paladin
             {
                 return false;
             }
+        }
+        // A housed resident waits for a route to their bed; only homeless
+        // citizens use the existing outdoor sleeping fallback.
+        if (!atHome && map.objectState().completedObject(c.homeId))
+        {
+            return false;
         }
         if (!atHome)
         {
@@ -367,12 +378,19 @@ namespace Paladin
     }
 
     void SettlementActivitySystem::needs(
+        const SettlementMap& map,
         SettlementCitizen& c,
         double elapsed,
         double minute
     )
     {
         const double days = elapsed / 1440;
+        const double cold = c.homeId ? map.heating.coldFraction(c.homeId) : 1;
+        const bool winter = seasonAtMinute(minute) == Season::Winter;
+        c.modifyAttributes(
+            {{AttributeEffect::UnheatedHome, c.homeId ? -36 * days * cold : 0},
+             {AttributeEffect::WinterCold, winter ? -18 * days * cold : 0}}
+        );
         const bool sleeping = c.task.kind == CitizenTaskKind::Sleep &&
                               c.activity == CitizenActivity::Sleeping &&
                               c.path.empty();
@@ -385,23 +403,25 @@ namespace Paladin
                                c.task.kind == CitizenTaskKind::Build ||
                                (c.task.kind == CitizenTaskKind::Work &&
                                 policy.isWorkTime(minute));
-            c.energy = std::max(
-                0.0,
-                c.energy - policy.awakeEnergyPerMinute * elapsed -
-                    (labor ? policy.workEnergyPerMinute * elapsed : 0)
+            c.modifyAttributes(
+                {{AttributeEffect::Awake,
+                  -policy.awakeEnergyPerMinute * elapsed},
+                 {AttributeEffect::Labor,
+                  labor ? -policy.workEnergyPerMinute * elapsed : 0}}
             );
         }
-        c.health = std::max(
-            0.0,
-            c.health -
-                policy.fatigueHealthPerDay * days *
-                    std::max(
-                        0.0,
-                        (policy.fatigueEnergy - c.energy) / policy.fatigueEnergy
-                    )
+        c.modifyAttributes(
+            {{AttributeEffect::Exhaustion,
+              -policy.fatigueHealthPerDay * days *
+                  std::max(
+                      0.0,
+                      (policy.fatigueEnergy - c.energy) / policy.fatigueEnergy
+                  )}}
         );
         const double before = c.hunger;
-        c.hunger = std::min(100.0, before + policy.hungerPerDay * days);
+        c.modifyAttributes(
+            {{AttributeEffect::Metabolism, policy.hungerPerDay * days}}
+        );
         // Scale damage with depletion: reaching 100 from 75 costs 100 health.
         const auto primitive = [&](double hunger)
         {
@@ -409,18 +429,21 @@ namespace Paladin
                 std::max(0.0, hunger - policy.starvationThreshold);
             return above * above / (2 * (100 - policy.starvationThreshold));
         };
-        const double risingDays = (c.hunger - before) / policy.hungerPerDay;
+        const double depletion = std::max(1e-9, policy.hungerPerDay);
+        const double risingDays = (c.hunger - before) / depletion;
         const double damage =
             (8 * policy.hungerPerDay) *
-            ((primitive(c.hunger) - primitive(before)) / policy.hungerPerDay +
+            ((primitive(c.hunger) - primitive(before)) / depletion +
              std::max(0.0, days - risingDays));
-        c.health = std::max(0.0, c.health - damage);
+        c.modifyAttributes({{AttributeEffect::Starvation, -damage}});
         if ((!c.child || c.ageYears >= policy.independentEatingAge) &&
             c.hunger < policy.foodSeekThreshold &&
             c.energy >= policy.fatigueEnergy)
         {
-            c.health =
-                std::min(100.0, c.health + policy.healthRecoveryPerDay * days);
+            c.modifyAttributes(
+                {{AttributeEffect::HealthyRecovery,
+                  policy.healthRecoveryPerDay * days * (winter ? 1 - cold : 1)}}
+            );
         }
         if (c.homeId)
         {
@@ -444,17 +467,15 @@ namespace Paladin
             (c.child || c.workplaceId) ? 0 : policy.unemploymentHappinessPerDay;
         const double workdayEffect =
             c.workplaceId ? std::clamp(12.0 - workHours, -2.0, 3.0) : 0;
-        c.happiness = std::clamp(
-            c.happiness + days * (recovery + workdayEffect - hungerPressure -
-                                  healthPressure - homelessPressure -
-                                  unemploymentPressure),
-            0.0,
-            std::max(
-                0.0,
-                100.0 - c.publicFoodDissatisfaction +
-                    std::min(0.0, c.taxHappinessAdjustment)
-            )
+        c.modifyAttributes(
+            {{AttributeEffect::Comfort, recovery * days},
+             {AttributeEffect::Workday, workdayEffect * days},
+             {AttributeEffect::HungerDistress, -hungerPressure * days},
+             {AttributeEffect::IllHealth, -healthPressure * days},
+             {AttributeEffect::Homelessness, -homelessPressure * days},
+             {AttributeEffect::Unemployment, -unemploymentPressure * days}}
         );
+        c.enforceHappinessModifiers();
     }
     std::string SettlementActivitySystem::activityLabel(
         const SettlementCitizen& c

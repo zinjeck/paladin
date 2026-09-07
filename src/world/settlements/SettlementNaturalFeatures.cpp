@@ -69,6 +69,22 @@ namespace Paladin
         if (chunkCounts_.empty())
         {
             chunkCounts_.resize(versions_.size());
+            overviewCounts_.resize(
+                std::size_t((width_ + OverviewSide - 1) / OverviewSide) *
+                ((height_ + OverviewSide - 1) / OverviewSide)
+            );
+        }
+        auto& summary = overviewCounts_
+            [std::size_t(p.y / OverviewSide) *
+                 ((width_ + OverviewSide - 1) / OverviewSide) +
+             p.x / OverviewSide];
+        if (feature.kind != NaturalFeatureKind::None)
+        {
+            --summary[int(feature.kind) - 1];
+        }
+        if (kind != NaturalFeatureKind::None)
+        {
+            ++summary[int(kind) - 1];
         }
         chunkCounts_
             [std::size_t(p.y / ChunkSide) * chunkColumns_ + p.x / ChunkSide] +=
@@ -76,6 +92,40 @@ namespace Paladin
             int(feature.kind != NaturalFeatureKind::None);
         feature = {kind, false};
         changed(p);
+    }
+    void SettlementNaturalFeatures::harvest(
+        SettlementTilePosition p,
+        double minute
+    )
+    {
+        if (at(p).kind == NaturalFeatureKind::Tree)
+        {
+            const auto seed =
+                std::uint32_t(p.x) * 73856093u ^ std::uint32_t(p.y) * 19349663u;
+            regrowth_.emplace(minute + (12 + seed % 9) * 1440.0, p);
+        }
+        set(p, NaturalFeatureKind::None);
+    }
+    void SettlementNaturalFeatures::regrow(
+        const SettlementGrid& grid,
+        const SettlementObjectState& objects,
+        double minute
+    )
+    {
+        // Only visit due stumps, not every tile each simulation minute.
+        while (!regrowth_.empty() && regrowth_.begin()->first <= minute)
+        {
+            const auto p = regrowth_.begin()->second;
+            regrowth_.erase(regrowth_.begin());
+            const auto* tile = grid.tile(p);
+            if (tile && tile->terrain == TerrainType::Land &&
+                !objects.completedObjectAt(p) &&
+                !objects.constructionSiteAt(p) &&
+                at(p).kind == NaturalFeatureKind::None)
+            {
+                set(p, NaturalFeatureKind::Tree);
+            }
+        }
     }
     void SettlementNaturalFeatures::mark(SettlementTilePosition p, bool marked)
     {
@@ -132,6 +182,7 @@ namespace Paladin
                     [&](const auto& item) { return item.biome == tile.biome; }
                 );
                 if (tile.terrain == TerrainType::Land &&
+                    grid.cityTileType({x, y}) != CityTileType::Beach &&
                     entry != policy.biomes.end())
                 {
                     const auto noise =

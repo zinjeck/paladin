@@ -13,6 +13,7 @@
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
+#include <cmath>
 
 namespace Paladin
 {
@@ -109,6 +110,13 @@ namespace Paladin
                     activeCitySettlementId_,
                     change->realm,
                     change->delta
+                );
+            }
+            if (const auto admission = employmentPanel_->takeAdmission())
+            {
+                simulation_->admitImmigrants(
+                    activeCitySettlementId_,
+                    *admission
                 );
             }
             employmentCapturedPointer_ = false;
@@ -307,6 +315,12 @@ namespace Paladin
                 !cityRenderer_->presentation.roofsVisible;
             cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
         }
+        else if (action == CityHudAction::ToggleEnvironmentArt)
+        {
+            SceneSpriteLibrary::setEnvironmentArtEnabled(
+                !SceneSpriteLibrary::environmentArtEnabled()
+            );
+        }
         else if (action == CityHudAction::Back)
         {
             returnToWorldFromCity();
@@ -385,6 +399,20 @@ namespace Paladin
             {
                 return;
             }
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            event.key.scancode == SDL_SCANCODE_F7)
+        {
+            camera_->setZoom(
+                std::max(8.0, std::round(camera_->zoom() / 8.0) * 8.0)
+            );
+            return;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            event.key.scancode == SDL_SCANCODE_F6)
+        {
+            cityRenderer_->reloadArt();
+            return;
         }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             event.key.scancode == SDL_SCANCODE_O)

@@ -263,6 +263,30 @@ namespace Paladin
         {
             return;
         }
+        if (hit.type == "migrate")
+        {
+            admissionCount_ =
+                std::min(admissionCount_, map.immigration.available());
+            if (hit.delta > 0 && admissionCount_ < map.immigration.available())
+            {
+                ++admissionCount_;
+            }
+            if (hit.delta < 0 && admissionCount_ > 0)
+            {
+                --admissionCount_;
+            }
+            return;
+        }
+        if (hit.type == "admit")
+        {
+            if (admissionCount_ > 0 &&
+                admissionCount_ <= map.immigration.available())
+            {
+                admissionRequest_ = admissionCount_;
+            }
+            admissionCount_ = 0;
+            return;
+        }
         if (hit.type == "realmWorkDay" || hit.type == "cityWorkDay")
         {
             workDayChange_ =
@@ -339,6 +363,13 @@ namespace Paladin
             return;
         }
         hits_.clear();
+        attributeBounds_ = {};
+        if (immigrationMap_ != map.instanceId())
+        {
+            immigrationMap_ = map.instanceId();
+            admissionCount_ = 0;
+            admissionRequest_.reset();
+        }
         const bool laws = section_ == "Laws";
         const float width =
             std::min(730.0F, float(renderer.outputWidth()) * .62F);
@@ -846,7 +877,7 @@ namespace Paladin
         };
         if (population)
         {
-            double happiness = 0, health = 0, hunger = 0;
+            double happiness = 0, health = 0, hunger = 0, energy = 0;
             std::size_t count = 0;
             for (const auto& citizen : citizens.citizens())
             {
@@ -857,13 +888,27 @@ namespace Paladin
                 happiness += citizen.happiness;
                 health += citizen.health;
                 hunger += citizen.hunger;
+                energy += citizen.energy;
                 ++count;
             }
-            const std::array values{happiness, health, hunger};
-            const std::array labels{"Happiness:", "Health:", "Hunger:"};
-            for (int i = 0; i < 3; ++i)
+            const std::array values{happiness, health, hunger, energy};
+            const std::array
+                labels{"Happiness:", "Health:", "Hunger:", "Energy:"};
+            const std::array attributes{
+                EntityAttribute::Happiness,
+                EntityAttribute::Health,
+                EntityAttribute::Hunger,
+                EntityAttribute::Energy
+            };
+            const EntityAttributes average{
+                count ? health / count : 100,
+                count ? happiness / count : 100,
+                count ? hunger / count : 0,
+                count ? energy / count : 100
+            };
+            for (int i = 0; i < 4; ++i)
             {
-                const float rowHeight = graph.height / 3;
+                const float rowHeight = graph.height / 4;
                 const UiRectangle row{
                     left + 18,
                     graph.y + i * rowHeight,
@@ -871,6 +916,9 @@ namespace Paladin
                     rowHeight - 6
                 };
                 ui.drawPanel(renderer, row);
+                attributeBounds_[i] = row;
+                attributeTooltips_[i] =
+                    citizens.attributeReport().tooltip(attributes[i], average);
                 const float labelSize =
                     std::min(1.35F, (row.width * .48F - 8) / 59);
                 const float labelY = row.y + (row.height - 7 * labelSize) * .5F;
@@ -1052,6 +1100,7 @@ namespace Paladin
         }
         if (population)
         {
+            renderImmigration(renderer, ui, map, graph.y + graph.height + 36);
             for (const auto& sample : history)
             {
                 if (sample.gameMinute / 1440 + 1 < startDay)
@@ -1230,6 +1279,13 @@ namespace Paladin
         {
             return {};
         }
+        for (std::size_t i = 0; i < attributeBounds_.size(); ++i)
+        {
+            if (section_ == "Population" && attributeBounds_[i].contains(x, y))
+            {
+                return attributeTooltips_[i];
+            }
+        }
         for (const auto& hit : hits_)
         {
             if (!hit.bounds.contains(x, y))
@@ -1243,6 +1299,15 @@ namespace Paladin
             if (hit.type == "foundSettlement")
             {
                 return "Choose a region for a new settlement";
+            }
+            if (hit.type == "migrate")
+            {
+                return "Choose how many waiting adults to admit";
+            }
+            if (hit.type == "admit")
+            {
+                return "Admit selected immigrants; newcomers are unemployed "
+                       "adults";
             }
             if (hit.type == "realmWorkDay")
             {

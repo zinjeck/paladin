@@ -1,4 +1,5 @@
 #include "rendering/SettlementCitizenRenderer.h"
+#include "rendering/SceneDetail.h"
 #include "rendering/ScenePresentation.h"
 #include "world/entities/animals/SettlementAnimals.h"
 
@@ -46,11 +47,12 @@ namespace Paladin
 
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
+            const double sleepOffset = citizen.activity == CitizenActivity::Sleeping && citizen.insideHome ? citizen.bedVisualOffsetX : 0;
             const float markerSize =
                 adultMarkerSize * (citizen.child ? .5F : 1.0F);
             const double centerX =
                 static_cast<double>(renderer.outputWidth()) * 0.5 +
-                (citizen.renderX(citizen.visualX(), interpolationAlpha) + 0.5 -
+                (citizen.renderX(citizen.visualX(), interpolationAlpha) + sleepOffset + 0.5 -
                  camera.tileX()) *
                     tilePixels;
             const double centerY =
@@ -59,17 +61,6 @@ namespace Paladin
                  camera.tileY()) *
                     tilePixels;
 
-            const bool custom =
-                sprites &&
-                sprites->submit(
-                    queue,
-                    projection,
-                    "citizen",
-                    citizen.renderX(citizen.visualX(), interpolationAlpha) + .5,
-                    citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
-                    (std::uint64_t(1) << 62) | citizen.id.value(),
-                    citizen.child ? .5 : 1
-                );
             if (centerX + markerSize < 0.0 || centerY + markerSize < 0.0 ||
                 centerX - markerSize > renderer.outputWidth() ||
                 centerY - markerSize > renderer.outputHeight())
@@ -77,14 +68,27 @@ namespace Paladin
                 continue;
             }
 
-            if (citizen.activity == CitizenActivity::Sleeping)
+            const bool custom =
+                tilePixels >= StaticDetailPixels && sprites &&
+                sprites->submit(
+                    queue,
+                    projection,
+                    "citizen",
+                    citizen.renderX(citizen.visualX(), interpolationAlpha) + sleepOffset + .5,
+                    citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
+                    (std::uint64_t(1) << 62) | citizen.id.value(),
+                    citizen.child ? .5 : 1
+                );
+            if (tilePixels >= AnimationDetailPixels &&
+                citizen.activity == CitizenActivity::Sleeping)
             {
                 sleeping.emplace_back(
                     float(centerX) - markerSize * .5F,
                     float(centerY) - markerSize * .5F
                 );
             }
-            if (citizen.activity == CitizenActivity::Fishing &&
+            if (tilePixels >= AnimationDetailPixels &&
+                citizen.activity == CitizenActivity::Fishing &&
                 citizen.path.empty())
             {
                 fishing.push_back(
@@ -96,7 +100,8 @@ namespace Paladin
                          float(tilePixels) * .65F}
                 );
             }
-            if (policy && policy->shadowsVisible)
+            if (tilePixels >= StaticDetailPixels && policy &&
+                policy->shadowsVisible)
             {
                 queue.submit(
                     {{float(centerX) - markerSize * .5F,
@@ -145,11 +150,11 @@ namespace Paladin
                 // animal tween restarted on every (possibly faster) road step.
                 const double groundX =
                     leader
-                        ? leader->renderX(leader->visualX(), interpolationAlpha)
+                        ? leader->renderX(leader->visualX(), interpolationAlpha) + .72
                         : animal.renderX(animal.visualX(), interpolationAlpha);
                 const double groundY =
                     leader
-                        ? leader->renderY(leader->visualY(), interpolationAlpha)
+                        ? leader->renderY(leader->visualY(), interpolationAlpha) + .28
                         : animal.renderY(animal.visualY(), interpolationAlpha);
                 const SceneVisual visual{
                     groundX + .5,
@@ -213,7 +218,8 @@ namespace Paladin
                         0
                     );
                 }
-                if (policy && policy->shadowsVisible)
+                if (tilePixels >= StaticDetailPixels && policy &&
+                    policy->shadowsVisible)
                 {
                     queue.submit(
                         {{body.x,
@@ -231,7 +237,7 @@ namespace Paladin
                     continue;
                 }
                 part(0, 0, 1, 1, coat, 1);
-                if (tilePixels >= 5)
+                if (tilePixels >= StaticDetailPixels)
                 {
                     part(.10F, .8F, .13F, .25F, {70, 52, 39, 255}, 2);
                     part(.66F, .8F, .13F, .25F, {70, 52, 39, 255}, 3);

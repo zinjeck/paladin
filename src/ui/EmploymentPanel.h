@@ -2,6 +2,7 @@
 #include "core/StrongId.h"
 #include "ui/NormalFontRenderer.h"
 #include "ui/UiButton.h"
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -31,6 +32,7 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
+            admissionRequest_.reset();
         }
         bool isOpen() const noexcept
         {
@@ -40,6 +42,13 @@ namespace Paladin
         bool pointerPressed(float, float);
         bool pointerMoved(float, float);
         std::string tooltipAt(float, float) const;
+        std::string tooltipKeyAt(float, float) const;
+        std::optional<std::uint64_t> takeAdmission()
+        {
+            const auto result = admissionRequest_;
+            admissionRequest_.reset();
+            return result;
+        }
         void pointerReleased(
             float,
             float,
@@ -88,6 +97,17 @@ namespace Paladin
         );
 
     private:
+        friend struct ApplicationSmokeTest;
+        std::uint64_t immigrationMap_ = 0, admissionCount_ = 0;
+        std::optional<std::uint64_t> admissionRequest_;
+        std::array<UiRectangle, 4> attributeBounds_{};
+        std::array<std::string, 4> attributeTooltips_;
+        void renderImmigration(
+            Renderer&,
+            const GrayUiRenderer&,
+            const SettlementMap&,
+            float top
+        );
         bool worldMode_ = false, foundSettlement_ = false;
         bool dragCandidate_ = false;
         float pressX_ = 0, pressY_ = 0;

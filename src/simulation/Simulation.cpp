@@ -90,6 +90,18 @@ namespace Paladin
                                 pendingGameMinutes_,
                             gameDeltaMinutes
                         );
+                        map->immigration.advance(
+                            *map,
+                            state.citizens(),
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes
+                        );
+                        state.citizens().recordAttributes(
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes
+                        );
                     }
                     else
                     {
@@ -141,6 +153,31 @@ namespace Paladin
     void Simulation::setSpeed(SimulationSpeed speed) noexcept
     {
         speed_ = speed;
+    }
+
+    bool Simulation::admitImmigrants(
+        SettlementId settlementId,
+        std::uint64_t count
+    )
+    {
+        auto* settlement = world_->settlement(settlementId);
+        auto* map = settlementMap(settlementId);
+        if (!settlement || settlement->ownerRealmId() != playerRealmId_ || !map)
+        {
+            return false;
+        }
+        auto& state = settlement->simulationState();
+        if (!map->immigration.admit(
+                *map,
+                state.citizens(),
+                count,
+                world_->time().totalGameMinutes() + pendingGameMinutes_
+            ))
+        {
+            return false;
+        }
+        state.synchronizeCitizenPopulation();
+        return true;
     }
 
 

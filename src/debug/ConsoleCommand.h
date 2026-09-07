@@ -1,6 +1,7 @@
 #pragma once
 #include <charconv>
 #include <cstdint>
+#include <limits>
 #include <string_view>
 namespace Paladin
 {
@@ -9,6 +10,7 @@ namespace Paladin
         Empty,
         Stats,
         SpawnCitizens,
+        Money,
         Invalid
     };
     struct ConsoleCommand
@@ -16,6 +18,7 @@ namespace Paladin
         ConsoleCommandKind kind = ConsoleCommandKind::Empty;
         std::uint64_t count = 1;
         std::string_view error;
+        std::int64_t amount = 0;
     };
     inline ConsoleCommand parseConsoleCommand(std::string_view text)
     {
@@ -45,6 +48,39 @@ namespace Paladin
                                           0,
                                           "Usage: stats"
                                       };
+        }
+        if (name == "money")
+        {
+            if (argument.empty())
+            {
+                return {
+                    ConsoleCommandKind::Invalid,
+                    0,
+                    "Specify an amount. Usage: money <whole amount>"
+                };
+            }
+            std::int64_t amount = 0;
+            const auto [end, error] = std::from_chars(
+                argument.data(),
+                argument.data() + argument.size(),
+                amount
+            );
+            if (error != std::errc{} ||
+                end != argument.data() + argument.size() ||
+                amount > std::numeric_limits<std::int64_t>::max() / 100 ||
+                amount < std::numeric_limits<std::int64_t>::min() / 100)
+            {
+                return {
+                    ConsoleCommandKind::Invalid,
+                    0,
+                    "Invalid amount. Use money <whole amount> within the "
+                    "supported cash range."
+                };
+            }
+            ConsoleCommand command{ConsoleCommandKind::Money};
+            command.amount =
+                amount * 100; // Console units are gold, storage is hundredths.
+            return command;
         }
         if (name != "spawncitizens")
         {

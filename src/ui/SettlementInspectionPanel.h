@@ -87,6 +87,8 @@ namespace Paladin
         bool hasRenderedBounds_ = false;
         WorkplaceId workplaceId_;
         bool showingKeep_ = false;
+        bool showingHouse_ = false;
+        UiButton homeUpgradeButton_{""};
         UiButton keepSalesButton_{"Market supply: Off"};
         UiButton nameButton_{""};
         UiButton spouseButton_{""};
