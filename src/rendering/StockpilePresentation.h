@@ -112,7 +112,18 @@ namespace Paladin
                 const double xx = x + .4 + (slot % columns) * w / columns,
                              yy = y + shedH + .45 + (slot / columns) * .7;
                 const double baseY = std::min(y + h - .08, yy);
-                sprites.placed(q,p,"stockpile.crate",xx,baseY,baseY+.1,id,10+slot*2,.66,.46);
+                sprites.placed(
+                    q,
+                    p,
+                    "stockpile.crate",
+                    xx,
+                    baseY,
+                    baseY + .1,
+                    id,
+                    10 + slot * 2,
+                    .66,
+                    .46
+                );
                 sprites.placed(
                     q,
                     p,
@@ -121,7 +132,7 @@ namespace Paladin
                     baseY - .10,
                     baseY + .1,
                     id,
-                    11 + slot*2,
+                    11 + slot * 2,
                     .43,
                     .25
                 );

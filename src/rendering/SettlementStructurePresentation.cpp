@@ -23,11 +23,19 @@ namespace Paladin
     ) const
     {
         const auto& state = map.objectState();
-        std::unordered_map<SettlementObjectId, unsigned, StrongIdHash> doubleRows;
+        std::unordered_map<SettlementObjectId, unsigned, StrongIdHash>
+            doubleRows;
         if (citizens && !policy.roofsVisible)
+        {
             for (const auto& c : citizens->citizens())
-                if (c.health > 0 && c.doubleBed && c.bedSlot >= 0 && c.bedHomeId)
+            {
+                if (c.health > 0 && c.doubleBed && c.bedSlot >= 0 &&
+                    c.bedHomeId)
+                {
                     doubleRows[c.bedHomeId] |= 1u << (c.bedSlot / 2);
+                }
+            }
+        }
         const bool animate = projection.tilePixels >= AnimationDetailPixels;
         const bool detailed = projection.tilePixels >= StaticDetailPixels;
         if (renderer)
@@ -458,7 +466,15 @@ namespace Paladin
             } // Floor is a ground surface, visible through the roof toggle. It
             // retains the existing footprint palette until the artist replaces
             // it.
-            homeDetails(queue, projection, sprites, policy, object, id, doubleRows[object.id]);
+            homeDetails(
+                queue,
+                projection,
+                sprites,
+                policy,
+                object,
+                id,
+                doubleRows[object.id]
+            );
             if (style.mode == "enclosed" && tribalBuilding(
                                                 queue,
                                                 projection,
@@ -514,8 +530,11 @@ namespace Paladin
             {
                 if (style.mode == "ground")
                 {
-                    if (object.objectTypeId == SettlementObjectTypes::Pastureland)
+                    if (object.objectTypeId ==
+                        SettlementObjectTypes::Pastureland)
+                    {
                         pastureFence(queue, projection, sprites, f, id);
+                    }
                     continue;
                 }
                 const auto overview = [&]()

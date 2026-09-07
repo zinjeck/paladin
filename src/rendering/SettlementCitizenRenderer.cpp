@@ -47,13 +47,17 @@ namespace Paladin
 
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
-            const double sleepOffset = citizen.activity == CitizenActivity::Sleeping && citizen.insideHome ? citizen.bedVisualOffsetX : 0;
+            const double sleepOffset =
+                citizen.activity == CitizenActivity::Sleeping &&
+                        citizen.insideHome
+                    ? citizen.bedVisualOffsetX
+                    : 0;
             const float markerSize =
                 adultMarkerSize * (citizen.child ? .5F : 1.0F);
             const double centerX =
                 static_cast<double>(renderer.outputWidth()) * 0.5 +
-                (citizen.renderX(citizen.visualX(), interpolationAlpha) + sleepOffset + 0.5 -
-                 camera.tileX()) *
+                (citizen.renderX(citizen.visualX(), interpolationAlpha) +
+                 sleepOffset + 0.5 - camera.tileX()) *
                     tilePixels;
             const double centerY =
                 static_cast<double>(renderer.outputHeight()) * 0.5 +
@@ -74,7 +78,8 @@ namespace Paladin
                     queue,
                     projection,
                     "citizen",
-                    citizen.renderX(citizen.visualX(), interpolationAlpha) + sleepOffset + .5,
+                    citizen.renderX(citizen.visualX(), interpolationAlpha) +
+                        sleepOffset + .5,
                     citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
                     (std::uint64_t(1) << 62) | citizen.id.value(),
                     citizen.child ? .5 : 1
@@ -150,11 +155,17 @@ namespace Paladin
                 // animal tween restarted on every (possibly faster) road step.
                 const double groundX =
                     leader
-                        ? leader->renderX(leader->visualX(), interpolationAlpha) + .72
+                        ? leader->renderX(
+                              leader->visualX(),
+                              interpolationAlpha
+                          ) + .72
                         : animal.renderX(animal.visualX(), interpolationAlpha);
                 const double groundY =
                     leader
-                        ? leader->renderY(leader->visualY(), interpolationAlpha) + .28
+                        ? leader->renderY(
+                              leader->visualY(),
+                              interpolationAlpha
+                          ) + .28
                         : animal.renderY(animal.visualY(), interpolationAlpha);
                 const SceneVisual visual{
                     groundX + .5,

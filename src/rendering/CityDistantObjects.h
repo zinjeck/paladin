@@ -66,10 +66,18 @@ namespace Paladin
                             {
                                 color = {0x74, 0x51, 0x3F, 255};
                             }
-                            else if (object.objectTypeId == SettlementObjectTypes::Pastureland)
+                            else if (
+                                object.objectTypeId ==
+                                SettlementObjectTypes::Pastureland
+                            )
                             {
-                                const bool edge = x == f.topLeft.x || y == f.topLeft.y || x == f.topLeft.x + f.width - 1 || y == f.topLeft.y + f.height - 1;
-                                color = edge ? RenderColor{0x74,0x51,0x3F,255} : RenderColor{0,0,0,0};
+                                const bool edge =
+                                    x == f.topLeft.x || y == f.topLeft.y ||
+                                    x == f.topLeft.x + f.width - 1 ||
+                                    y == f.topLeft.y + f.height - 1;
+                                color = edge
+                                            ? RenderColor{0x74, 0x51, 0x3F, 255}
+                                            : RenderColor{0, 0, 0, 0};
                             }
                             else if (style.mode == "enclosed")
                             {

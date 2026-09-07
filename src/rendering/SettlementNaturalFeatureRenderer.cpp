@@ -798,7 +798,10 @@ namespace Paladin
                          << 3) |
                         4;
                     double treeScale = double(stride);
-                    const double rockScale = .68 + (GenerationNoise::mix(id ^ map.generationSeed()) % 5) * .12;
+                    const double rockScale =
+                        .68 +
+                        (GenerationNoise::mix(id ^ map.generationSeed()) % 5) *
+                            .12;
                     double crownScale = 1;
                     if (f.tree && sprites.find("tree.trunk.1"))
                     {

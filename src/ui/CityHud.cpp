@@ -1,9 +1,9 @@
 #include "ui/CityHud.h"
-#include <SDL3/SDL.h>
 #include "rendering/SceneSpriteLibrary.h"
 #include "ui/SimulationSpeedControls.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementCommerce.h"
+#include <SDL3/SDL.h>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -862,14 +862,25 @@ namespace Paladin
         }
         uiRenderer.drawPanel(renderer, minimapPanel_);
         goodsButton_.render(renderer, uiRenderer);
-        if (!goodsIconsLoaded_) {
+        if (!goodsIconsLoaded_)
+        {
             goodsIconsLoaded_ = true;
-            std::string root = std::string(SDL_GetBasePath()) + "assets/sprites";
+            std::string root =
+                std::string(SDL_GetBasePath()) + "assets/sprites";
 #ifdef PALADIN_ART_ROOT
             root = PALADIN_ART_ROOT;
 #endif
-            constexpr const char* paths[] = {"environment-v4/props/resource-stone.png", "environment-v4/props/resource-lumber.png", "tribal-v14/fish.png", "tribal-v14/meat.png"};
-            for (int i=0;i<4;++i) goodsIcons_[i] = renderer.loadImageTexture((root + "/" + paths[i]).c_str());
+            constexpr const char* paths[] = {
+                "environment-v4/props/resource-stone.png",
+                "environment-v4/props/resource-lumber.png",
+                "tribal-v14/fish.png",
+                "tribal-v14/meat.png"
+            };
+            for (int i = 0; i < 4; ++i)
+            {
+                goodsIcons_[i] =
+                    renderer.loadImageTexture((root + "/" + paths[i]).c_str());
+            }
         }
 
         if (goodsOpen_)
@@ -883,10 +894,29 @@ namespace Paladin
                 const auto& cell = goodsCells_[i];
                 const float x = cell.x + cell.width * .5F;
                 const float y = cell.y + 9.0F;
-                if (const auto& icon = goodsIcons_[i]) {
-                    renderer.drawTexture(*icon,0,0,float(icon->width()),float(icon->height()),x-14,y,28,24);
-                } else {
-                    renderer.fillRectangle(x-8,y+4,16,14,{0xA9,0x94,0x78,255});
+                if (const auto& icon = goodsIcons_[i])
+                {
+                    renderer.drawTexture(
+                        *icon,
+                        0,
+                        0,
+                        float(icon->width()),
+                        float(icon->height()),
+                        x - 14,
+                        y,
+                        28,
+                        24
+                    );
+                }
+                else
+                {
+                    renderer.fillRectangle(
+                        x - 8,
+                        y + 4,
+                        16,
+                        14,
+                        {0xA9, 0x94, 0x78, 255}
+                    );
                 }
                 std::ostringstream amount;
                 amount << std::fixed << std::setprecision(0)

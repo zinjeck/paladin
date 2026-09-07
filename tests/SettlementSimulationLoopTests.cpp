@@ -1892,7 +1892,7 @@ void runSettlementSimulationLoopTests()
             // Actual conversation restores happiness; unemployment remains
             // a small independent pressure even during leisure.
             const double homelessPressure = .5 + 1.0 / (1440 * 1440);
-            const double expected = 50 + .1 - (2 + homelessPressure) / 1440;
+            const double expected = 50 + .1 - (2.5 + homelessPressure) / 1440;
             PALADIN_CHECK(std::abs(c.happiness - expected) < 1e-8);
             PALADIN_CHECK(
                 std::abs(

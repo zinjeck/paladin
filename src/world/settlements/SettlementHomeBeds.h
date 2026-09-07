@@ -2,10 +2,10 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include <algorithm>
 #include <array>
 #include <span>
 #include <unordered_map>
-#include <algorithm>
 #include <vector>
 
 namespace Paladin
@@ -72,24 +72,52 @@ namespace Paladin
         }
         // Pair co-resident spouses into rows. Keep navigation destinations
         // distinct; presentation brings their sleeping positions together.
-        std::unordered_map<SettlementObjectId, std::vector<SettlementCitizen*>, StrongIdHash> households;
+        std::unordered_map<
+            SettlementObjectId,
+            std::vector<SettlementCitizen*>,
+            StrongIdHash>
+            households;
         for (auto& c : people)
+        {
             if (c.bedHomeId && c.bedSlot >= 0)
+            {
                 households[c.bedHomeId].push_back(&c);
+            }
+        }
         for (auto& [homeId, residents] : households)
         {
-            std::stable_sort(residents.begin(), residents.end(), [](auto* a, auto* b) { return a->id.value() < b->id.value(); });
+            std::stable_sort(
+                residents.begin(),
+                residents.end(),
+                [](auto* a, auto* b) { return a->id.value() < b->id.value(); }
+            );
             unsigned paired = 0;
             for (auto* a : residents)
             {
-                if (!a->spouseId || a->doubleBed || a->child) continue;
-                auto partner = std::find_if(residents.begin(), residents.end(), [&](auto* b) {
-                    return b != a && b->id == a->spouseId && b->spouseId == a->id && !b->child && !b->doubleBed;
-                });
-                if (partner == residents.end()) continue;
+                if (!a->spouseId || a->doubleBed || a->child)
+                {
+                    continue;
+                }
+                auto partner = std::find_if(
+                    residents.begin(),
+                    residents.end(),
+                    [&](auto* b)
+                    {
+                        return b != a && b->id == a->spouseId &&
+                               b->spouseId == a->id && !b->child &&
+                               !b->doubleBed;
+                    }
+                );
+                if (partner == residents.end())
+                {
+                    continue;
+                }
                 auto* b = *partner;
                 int row = a->bedSlot / 2;
-                if (paired & (3u << (row * 2))) row = 1 - row;
+                if (paired & (3u << (row * 2)))
+                {
+                    row = 1 - row;
+                }
                 a->bedSlot = row * 2;
                 b->bedSlot = row * 2 + 1;
                 a->doubleBed = b->doubleBed = true;
@@ -98,20 +126,40 @@ namespace Paladin
             auto mask = paired;
             // Preserve unpaired residents' previous slots where possible.
             for (auto* c : residents)
-                if (!c->doubleBed) {
-                    if (mask & (1u << c->bedSlot)) c->bedSlot = -1;
-                    else mask |= 1u << c->bedSlot;
+            {
+                if (!c->doubleBed)
+                {
+                    if (mask & (1u << c->bedSlot))
+                    {
+                        c->bedSlot = -1;
+                    }
+                    else
+                    {
+                        mask |= 1u << c->bedSlot;
+                    }
                 }
+            }
             for (auto* c : residents)
             {
                 if (c->bedSlot < 0)
+                {
                     for (int slot = 0; slot < 4; ++slot)
-                        if (!(mask & (1u << slot))) { c->bedSlot = slot; mask |= 1u << slot; break; }
+                    {
+                        if (!(mask & (1u << slot)))
+                        {
+                            c->bedSlot = slot;
+                            mask |= 1u << slot;
+                            break;
+                        }
+                    }
+                }
                 if (c->doubleBed)
                 {
-                    const auto* home = map.objectState().completedObject(homeId);
+                    const auto* home =
+                        map.objectState().completedObject(homeId);
                     const double half = (home->footprint.width - 1) * .5;
-                    c->bedVisualOffsetX = c->bedSlot % 2 ? .26 - half : half - .26;
+                    c->bedVisualOffsetX =
+                        c->bedSlot % 2 ? .26 - half : half - .26;
                 }
             }
         }

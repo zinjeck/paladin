@@ -126,7 +126,14 @@ namespace Paladin
             Texture& texture,
             std::span<const RenderColor> pixels
         );
-        bool updateTextureRegion(Texture&, int x, int y, int width, int height, std::span<const RenderColor>);
+        bool updateTextureRegion(
+            Texture&,
+            int x,
+            int y,
+            int width,
+            int height,
+            std::span<const RenderColor>
+        );
 
         void drawTexture(
             const Texture& texture,
@@ -148,9 +155,13 @@ namespace Paladin
         [[nodiscard]]
 
         int outputHeight() const noexcept;
+        bool beginPixelScene(double pitch);
+        void endPixelScene();
 
     private:
         SDL_Renderer* renderer_ = nullptr;
+        std::unique_ptr<Texture> pixelScene_;
+        double pixelPitch_ = 1;
     };
 
 } // namespace Paladin

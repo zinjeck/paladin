@@ -31,35 +31,83 @@ namespace Paladin
         {
             const int facing =
                 buildingView(f, home.door, policy.viewAzimuthDegrees);
-            // Keep the door and existing windows readable; use the blank wall
-            // margins.
-            constexpr const char* extras[] =
-                {"basket", "hide", "jars", "woodrack"};
+            // Attach details to the visible wall plane. No ground containers
+            // are overlaid on the facade. The door's center remains clear.
+            const double wallHeight =
+                sprites.objectStyle(home.objectTypeId).height;
+            const double bottom = y + h - .12;
+            const double depth = y + h + .02;
+            const bool left = (seed >> 3) % 2;
+            const double mountX = x + w * (left ? .19 : .81);
             sprites.placed(
                 queue,
                 p,
-                std::string("home.detail.") + extras[seed % 4],
-                x + w * .12,
-                y + h - .02,
-                y + h + .02,
+                "home.detail.shutters",
+                mountX,
+                bottom - .20,
+                depth,
                 id,
                 24,
-                .46,
-                .53
+                .48,
+                std::min(.38, wallHeight * .48)
             );
-            if (facing != 2 || (seed >> 4) % 2)
+            if ((seed >> 5) % 3 != 0)
             {
                 sprites.placed(
                     queue,
                     p,
-                    "home.detail.jars",
-                    x + w * .86,
-                    y + h + .05,
-                    y + h + .03,
+                    "home.detail.hide",
+                    x + w * (left ? .81 : .19),
+                    bottom,
+                    depth,
                     id,
                     25,
-                    .45,
-                    .43
+                    .32,
+                    std::min(.48, wallHeight * .65)
+                );
+            }
+            // Pegs, lintel and shallow timber sill share the wall's depth.
+            const auto timber = [&](double xx,
+                                    double yy,
+                                    double ww,
+                                    double hh,
+                                    RenderColor color,
+                                    int part)
+            {
+                queue.submit(
+                    {p.bounds({xx, yy, 0, ww, hh, 0, 0}),
+                     color,
+                     depth,
+                     id,
+                     0,
+                     part}
+                );
+            };
+            timber(
+                mountX - .27,
+                bottom - .18,
+                .54,
+                .0625,
+                {0xBD, 0x86, 0x4C, 255},
+                26
+            );
+            timber(
+                mountX - .23,
+                bottom - .64,
+                .46,
+                .0625,
+                {0x63, 0x3E, 0x4B, 255},
+                27
+            );
+            if (facing == 2)
+            {
+                timber(
+                    x + w * .43,
+                    y + h - wallHeight * .82,
+                    w * .14,
+                    .0625,
+                    {0xBD, 0x86, 0x4C, 255},
+                    28
                 );
             }
         }
@@ -108,7 +156,10 @@ namespace Paladin
             for (int slot = 0; slot < 4; ++slot)
             {
                 const bool shared = (doubleRows & (1u << (slot / 2))) != 0;
-                if (shared && slot % 2) continue;
+                if (shared && slot % 2)
+                {
+                    continue;
+                }
                 const auto at = homeBedPosition(home, slot);
                 const auto first = queue.size();
                 sprites.placed(

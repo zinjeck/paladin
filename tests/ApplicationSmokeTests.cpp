@@ -11,7 +11,10 @@
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/GrassPresentation.h"
+#include "rendering/HomePresentation.h"
+#include "rendering/PasturePresentation.h"
 #include "rendering/Renderer.h"
+#include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/SettlementEnvironmentDetails.h"
 #include "rendering/SpriteStyle.h"
 #include "rendering/StockpilePresentation.h"
@@ -93,6 +96,36 @@ namespace Paladin
     // of the dispatch logic. Enabled explicitly via CMake for UI refactors.
     struct ApplicationSmokeTest
     {
+        static void requireUniformWorldPixels(Application& app, int pitch)
+        {
+            auto* raw = SDL_RenderReadPixels(
+                SDL_GetRenderer(app.window_->nativeHandle()),
+                nullptr
+            );
+            PALADIN_CHECK(raw);
+            auto* rgba = SDL_ConvertSurface(raw, SDL_PIXELFORMAT_RGBA32);
+            SDL_DestroySurface(raw);
+            PALADIN_CHECK(rgba);
+            std::unordered_set<std::uint32_t> colors;
+            for (int y = 0; y < rgba->h; ++y)
+            {
+                for (int x = 0; x < rgba->w; ++x)
+                {
+                    const auto* row = reinterpret_cast<const std::uint32_t*>(
+                        static_cast<const Uint8*>(rgba->pixels) +
+                        y * rgba->pitch
+                    );
+                    const auto* anchor = reinterpret_cast<const std::uint32_t*>(
+                        static_cast<const Uint8*>(rgba->pixels) +
+                        (y / pitch * pitch) * rgba->pitch
+                    );
+                    PALADIN_CHECK(row[x] == anchor[x / pitch * pitch]);
+                    colors.insert(row[x]);
+                }
+            }
+            PALADIN_CHECK(colors.size() > 8);
+            SDL_DestroySurface(rgba);
+        }
         static void capture(Application& app, const char* name)
         {
             const char* directory = SDL_getenv("PALADIN_SMOKE_SCREENSHOTS");
@@ -171,11 +204,11 @@ namespace Paladin
                 SDL_MapSurfaceRGBA(art, 99, 62, 75, 255)
             );
             auto* simple = simplifySprite(art, 1, 1, 2);
-            PALADIN_CHECK(simple && simple->w == 64 && simple->h == 32);
+            PALADIN_CHECK(simple && simple->w == 32 && simple->h == 16);
             Uint8 r, g, b, a;
-            SDL_ReadSurfacePixel(simple, 31, 8, &r, &g, &b, &a);
+            SDL_ReadSurfacePixel(simple, 15, 8, &r, &g, &b, &a);
             PALADIN_CHECK(r == 73 && g == 151 && b == 91 && a == 255);
-            SDL_ReadSurfacePixel(simple, 32, 8, &r, &g, &b, &a);
+            SDL_ReadSurfacePixel(simple, 16, 8, &r, &g, &b, &a);
             PALADIN_CHECK(r == 99 && g == 62 && b == 75 && a == 255);
             SDL_DestroySurface(simple);
             SDL_DestroySurface(art);
@@ -587,6 +620,109 @@ namespace Paladin
             PALADIN_CHECK(installed.find("house.roof"));
             PALADIN_CHECK(installed.find("house.wall"));
             PALADIN_CHECK(installed.find("house.floor"));
+            // Test the final scene, not just PNG sizes: fitted roofs, animated
+            // sprites, cached ground and lighting must obey the same lattice.
+            const auto previousZoom = camera.zoom();
+            camera.setZoom(16);
+            map.naturalFeatures().set({10, 13}, NaturalFeatureKind::Rock);
+            draw(12);
+            requireUniformWorldPixels(app, 4);
+            capture(app, "uniform-pixels-day.bmp");
+            renderer.endFrame();
+            draw(0);
+            requireUniformWorldPixels(app, 4);
+            capture(app, "uniform-pixels-night.bmp");
+            renderer.endFrame();
+            camera.setZoom(previousZoom);
+            {
+                const SceneProjection view{10, 10, 64, 1280, 720};
+                SceneDrawQueue fence;
+                for (bool art : {false, true})
+                {
+                    SceneSpriteLibrary::setEnvironmentArtEnabled(art);
+                    fence.clear();
+                    pastureFence(fence, view, installed, {{8, 8}, 6, 5}, 998);
+                    PALADIN_CHECK(fence.size() > 8);
+                    for (const auto& item : fence.items())
+                    {
+                        PALADIN_CHECK(item.layer == 0);
+                    }
+                }
+                SceneSpriteLibrary::setEnvironmentArtEnabled(true);
+                SettlementCitizenState handler;
+                SettlementActivityTestFixture::setRenderPerson(handler, {6, 6});
+                const auto animalId = map.animals.spawn(map, "cow", {6, 6});
+                PALADIN_CHECK(animalId);
+                auto* animal = map.animals.find(animalId);
+                animal->handler = handler.citizens()[0].id;
+                animal->beingLed = true;
+                SceneDrawQueue escort;
+                Camera2D escortCamera(6.5, 6.5);
+                escortCamera.setZoom(16);
+                SettlementCitizenRenderer personRenderer;
+                personRenderer.render(
+                    renderer,
+                    handler,
+                    escortCamera,
+                    metrics,
+                    &map.animals,
+                    1,
+                    &escort,
+                    &installed
+                );
+                const SceneDrawItem* personItem = nullptr;
+                for (const auto& item : escort.items())
+                {
+                    if (item.stableId == ((std::uint64_t(1) << 62) |
+                                          handler.citizens()[0].id.value()))
+                    {
+                        personItem = &item;
+                    }
+                }
+                PALADIN_CHECK(personItem);
+                for (const auto& item : escort.items())
+                {
+                    if (item.stableId == animalId.value() && item.part == 0)
+                    {
+                        PALADIN_CHECK(
+                            item.bounds.x >
+                            personItem->bounds.x + personItem->bounds.width * .5
+                        );
+                    }
+                }
+                animal->health = 0;
+                auto house = *map.objectState().completedObjectAt({12, 12});
+                house.objectTypeId = SettlementObjectTypes::House;
+                house.footprint = {{8, 8}, 3, 3};
+                CityPresentation cutaway;
+                cutaway.roofsVisible = false;
+                for (unsigned rows : {0u, 1u, 3u})
+                {
+                    SceneDrawQueue beds;
+                    homeDetails(
+                        beds,
+                        view,
+                        installed,
+                        cutaway,
+                        house,
+                        999,
+                        rows
+                    );
+                    int bedCount = 0;
+                    for (const auto& item : beds.items())
+                    {
+                        if (item.part == 3 && item.texture)
+                        {
+                            ++bedCount;
+                        }
+                    }
+                    PALADIN_CHECK(
+                        bedCount == (rows == 0   ? 4
+                                     : rows == 1 ? 3
+                                                 : 2)
+                    );
+                }
+            }
             city.reloadArt();
             city.presentation.roofsVisible = true;
             if (installed.find("terrain.plain"))

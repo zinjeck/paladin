@@ -76,11 +76,13 @@ namespace Paladin
                     {
                         spriteId = "resource.pile";
                     }
-                    const int packets = std::min(4, 1 + (goods.amount - 1) / 10);
+                    const int packets =
+                        std::min(4, 1 + (goods.amount - 1) / 10);
                     bool drawn = false;
-                    for (int packet = 0; packet < packets && stack < 9; ++packet, ++stack)
+                    for (int packet = 0; packet < packets && stack < 9;
+                         ++packet, ++stack)
                     {
-                    drawn |= sprites->placed(
+                        drawn |= sprites->placed(
                             *shared,
                             projection,
                             spriteId,

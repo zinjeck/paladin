@@ -268,7 +268,7 @@ add_test(
 
 # Opt-in SDL integration check for application routing. The ordinary simulation
 # tests remain independent of a window/renderer and do not rebuild the UI.
-option(PALADIN_BUILD_APPLICATION_SMOKE_TESTS "Build application routing smoke test" OFF)
+option(PALADIN_BUILD_APPLICATION_SMOKE_TESTS "Build application routing and mandatory art consistency tests" ON)
 if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
     get_target_property(PALADIN_APPLICATION_SOURCES Paladin SOURCES)
     list(REMOVE_ITEM PALADIN_APPLICATION_SOURCES src/main.cpp)
@@ -281,6 +281,13 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
     # Reuse the game's runtime DLL/font packaging even when building only this target.
     add_dependencies(PaladinApplicationSmokeTests Paladin)
     add_test(NAME PaladinApplicationSmokeTests COMMAND PaladinApplicationSmokeTests)
+    add_custom_target(PaladinArtCheck
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinApplicationSmokeTests>
+        DEPENDS PaladinApplicationSmokeTests
+        COMMENT "Verify final world pixel grid, daylight/night rendering and sprite integration"
+        VERBATIM
+    )
     set_tests_properties(PaladinApplicationSmokeTests PROPERTIES
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
         TIMEOUT 120

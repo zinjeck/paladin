@@ -1,6 +1,7 @@
 #include "rendering/CityRenderer.h"
 #include "rendering/BuildingView.h"
 #include "rendering/GrassPresentation.h"
+#include "rendering/WorldPixelGrid.h"
 #include "ui/UiTypes.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 
@@ -110,6 +111,10 @@ namespace Paladin
             artRoot = artRootOverride;
         }
         sprites_.load(renderer, artRoot);
+        WorldPixelScene pixelScene(
+            renderer,
+            metrics.scaledTilePixels(camera.zoom())
+        );
         sprites_.setTime(
             animationTimeOverride >= 0 ? animationTimeOverride
                                        : animationSeconds

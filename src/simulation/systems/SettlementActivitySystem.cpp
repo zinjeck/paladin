@@ -169,7 +169,9 @@ namespace Paladin
             {
                 const double step =
                     std::max(0.0, immigration.happinessAdjustmentPerDay) *
-                    (source == AttributeEffect::FoodShortage && target > current ? 1.25 : 1.0) *
+                    (source == AttributeEffect::FoodShortage && target > current
+                         ? 1.25
+                         : 1.0) *
                     elapsed / 1440;
                 const double change = std::clamp(target - current, -step, step);
                 current += change;

@@ -4,7 +4,9 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 
+#include <cmath>
 #include <cstddef>
+#include <stdexcept>
 
 namespace Paladin
 {
@@ -26,15 +28,17 @@ namespace Paladin
     {
         SDL_SetTextureScaleMode(light.texture_, SDL_SCALEMODE_LINEAR);
         SDL_SetTextureBlendMode(light.texture_, SDL_BLENDMODE_MOD);
-        SDL_RenderTexture(renderer_, light.texture_, nullptr, nullptr);
+        const SDL_FRect area{0, 0, float(outputWidth()), float(outputHeight())};
+        SDL_RenderTexture(renderer_, light.texture_, nullptr, &area);
         SDL_SetTextureScaleMode(glow.texture_, SDL_SCALEMODE_LINEAR);
         SDL_SetTextureBlendMode(glow.texture_, SDL_BLENDMODE_ADD);
-        SDL_RenderTexture(renderer_, glow.texture_, nullptr, nullptr);
+        SDL_RenderTexture(renderer_, glow.texture_, nullptr, &area);
         SDL_SetTextureBlendMode(light.texture_, SDL_BLENDMODE_BLEND);
         SDL_SetTextureBlendMode(glow.texture_, SDL_BLENDMODE_BLEND);
     }
     Renderer::~Renderer()
     {
+        pixelScene_.reset();
         if (renderer_)
         {
             SDL_DestroyRenderer(renderer_);
@@ -291,6 +295,8 @@ namespace Paladin
             return nullptr;
         }
         SDL_Texture* previousTarget = SDL_GetRenderTarget(renderer_);
+        float previousScaleX = 1, previousScaleY = 1;
+        SDL_GetRenderScale(renderer_, &previousScaleX, &previousScaleY);
         SDL_Rect previousViewport{}, previousClip{};
         SDL_GetRenderViewport(renderer_, &previousViewport);
         const bool hadViewport = SDL_RenderViewportSet(renderer_);
@@ -304,6 +310,7 @@ namespace Paladin
             return nullptr;
         }
         SDL_SetRenderViewport(renderer_, nullptr);
+        SDL_SetRenderScale(renderer_, 1, 1);
         SDL_SetRenderClipRect(renderer_, nullptr);
         SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 0);
         SDL_RenderClear(renderer_);
@@ -332,6 +339,7 @@ namespace Paladin
             }
         }
         const bool restored = SDL_SetRenderTarget(renderer_, previousTarget);
+        SDL_SetRenderScale(renderer_, previousScaleX, previousScaleY);
         SDL_SetRenderViewport(
             renderer_,
             hadViewport ? &previousViewport : nullptr
@@ -349,17 +357,83 @@ namespace Paladin
             premultiplied ? SDL_BLENDMODE_BLEND_PREMULTIPLIED
                           : SDL_BLENDMODE_BLEND
         );
-        auto result = std::unique_ptr<Texture>(new Texture(texture, width, height));
+        auto result =
+            std::unique_ptr<Texture>(new Texture(texture, width, height));
         result->premultiplied_ = premultiplied;
         return result;
     }
 
 
-    bool Renderer::updateTextureRegion(Texture& texture, int x, int y, int width, int height, std::span<const RenderColor> pixels)
+    bool Renderer::updateTextureRegion(
+        Texture& texture,
+        int x,
+        int y,
+        int width,
+        int height,
+        std::span<const RenderColor> pixels
+    )
     {
-        if (width <= 0 || height <= 0 || pixels.size() != std::size_t(width) * height) return false;
+        if (width <= 0 || height <= 0 ||
+            pixels.size() != std::size_t(width) * height)
+        {
+            return false;
+        }
         const SDL_Rect rect{x, y, width, height};
-        return SDL_UpdateTexture(texture.texture_, &rect, pixels.data(), width * int(sizeof(RenderColor)));
+        return SDL_UpdateTexture(
+            texture.texture_,
+            &rect,
+            pixels.data(),
+            width * int(sizeof(RenderColor))
+        );
+    }
+
+    bool Renderer::beginPixelScene(double pitch)
+    {
+        if (pitch <= 1)
+        {
+            return false;
+        }
+        const int w = outputWidth(), h = outputHeight();
+        if (!pixelScene_ || pixelScene_->width() != w ||
+            pixelScene_->height() != h)
+        {
+            auto* texture = SDL_CreateTexture(
+                renderer_,
+                SDL_PIXELFORMAT_RGBA8888,
+                SDL_TEXTUREACCESS_TARGET,
+                w,
+                h
+            );
+            if (!texture)
+            {
+                throw std::runtime_error(
+                    "Cannot create mandatory world pixel grid"
+                );
+            }
+            SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+            pixelScene_.reset(new Texture(texture, w, h));
+        }
+        if (!SDL_SetRenderTarget(renderer_, pixelScene_->texture_))
+        {
+            throw std::runtime_error("Cannot activate world pixel grid");
+        }
+        pixelPitch_ = pitch;
+        SDL_SetRenderScale(renderer_, float(1 / pitch), float(1 / pitch));
+        SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
+        SDL_RenderClear(renderer_);
+        return true;
+    }
+    void Renderer::endPixelScene()
+    {
+        SDL_SetRenderTarget(renderer_, nullptr);
+        SDL_SetRenderScale(renderer_, 1, 1);
+        const float w = float(std::ceil(outputWidth() / pixelPitch_));
+        const float h = float(std::ceil(outputHeight() / pixelPitch_));
+        const SDL_FRect source{0, 0, w, h},
+            dest{0, 0, float(w * pixelPitch_), float(h * pixelPitch_)};
+        SDL_RenderTexture(renderer_, pixelScene_->texture_, &source, &dest);
+        pixelPitch_ = 1;
     }
     bool Renderer::updateTexturePixels(
         Texture& texture,
@@ -430,13 +504,24 @@ namespace Paladin
         if (opacity != 255)
         {
             SDL_SetTextureAlphaMod(texture.texture_, opacity);
-            if (texture.premultiplied_) SDL_SetTextureColorMod(texture.texture_, opacity, opacity, opacity);
+            if (texture.premultiplied_)
+            {
+                SDL_SetTextureColorMod(
+                    texture.texture_,
+                    opacity,
+                    opacity,
+                    opacity
+                );
+            }
         }
         SDL_RenderTexture(renderer_, texture.texture_, &source, &destination);
         if (opacity != 255)
         {
             SDL_SetTextureAlphaMod(texture.texture_, 255);
-            if (texture.premultiplied_) SDL_SetTextureColorMod(texture.texture_, 255, 255, 255);
+            if (texture.premultiplied_)
+            {
+                SDL_SetTextureColorMod(texture.texture_, 255, 255, 255);
+            }
         }
     }
 

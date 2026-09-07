@@ -4,6 +4,7 @@
 
 #include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldPixelGrid.h"
 #include <SDL3/SDL.h>
 
 #include <utility>
@@ -39,6 +40,10 @@ namespace Paladin
         artRoot = PALADIN_ART_ROOT;
 #endif
         artwork_.load(renderer, artRoot);
+        WorldPixelScene pixelScene(
+            renderer,
+            metrics.scaledTilePixels(camera.zoom())
+        );
         artwork_.setTime(animationSeconds);
         gridRenderer_
             .render(renderer, world.grid(), camera, metrics, &artwork_);

@@ -15,11 +15,11 @@ namespace Paladin
         double treeElevation = .45;
         double detailTilePixels = 8;
         double viewAzimuthDegrees = 0;
-        RenderColor shadowColor{12, 16, 24, 95};
+        RenderColor shadowColor{0x63, 0x3E, 0x4B, 100};
 
         RenderColor ambient(double hour) const
         {
-            // Deliberately restrained until the artist supplies a palette.
+            // Cool night is applied separately from sunlit material colors.
             const double daylight = std::clamp(
                 std::min((hour - 5.0) / 2.0, (21.0 - hour) / 2.0),
                 0.0,

@@ -66,20 +66,36 @@ void runSettlementActivityTests()
         PALADIN_CHECK(map.objectState().completedObject(home)->homeLevel == 1);
         // Household changes rebuild double/single beds without assigning
         // two citizens the same navigation destination.
-        for (int i=0;i<4;++i) { residents[i].id = CitizenId{std::uint64_t(i+1)}; residents[i].homeId = home; }
-        residents[0].spouseId=residents[2].id; residents[2].spouseId=residents[0].id;
-        assignHomeBeds(map,residents);
+        for (int i = 0; i < 4; ++i)
+        {
+            residents[i].id = CitizenId{std::uint64_t(i + 1)};
+            residents[i].homeId = home;
+        }
+        residents[0].spouseId = residents[2].id;
+        residents[2].spouseId = residents[0].id;
+        assignHomeBeds(map, residents);
         PALADIN_CHECK(residents[0].doubleBed && residents[2].doubleBed);
-        PALADIN_CHECK(residents[0].bedSlot/2 == residents[2].bedSlot/2);
+        PALADIN_CHECK(residents[0].bedSlot / 2 == residents[2].bedSlot / 2);
         PALADIN_CHECK(!residents[1].doubleBed && !residents[3].doubleBed);
-        residents[1].spouseId=residents[3].id; residents[3].spouseId=residents[1].id;
-        assignHomeBeds(map,residents);
-        unsigned slots=0;
-        for (const auto& c : residents) { PALADIN_CHECK(c.doubleBed); slots |= 1u << c.bedSlot; }
+        residents[1].spouseId = residents[3].id;
+        residents[3].spouseId = residents[1].id;
+        assignHomeBeds(map, residents);
+        unsigned slots = 0;
+        for (const auto& c : residents)
+        {
+            PALADIN_CHECK(c.doubleBed);
+            slots |= 1u << c.bedSlot;
+        }
         PALADIN_CHECK(slots == 15);
-        for (auto& c : residents) c.spouseId={};
-        assignHomeBeds(map,residents);
-        for (const auto& c : residents) PALADIN_CHECK(!c.doubleBed && c.bedVisualOffsetX == 0);
+        for (auto& c : residents)
+        {
+            c.spouseId = {};
+        }
+        assignHomeBeds(map, residents);
+        for (const auto& c : residents)
+        {
+            PALADIN_CHECK(!c.doubleBed && c.bedVisualOffsetX == 0);
+        }
     }
     // One focused immigration/attribute scenario, independent of wall-clock
     // speed and UI. Reuses the normal keep, names, placement and food catalog.

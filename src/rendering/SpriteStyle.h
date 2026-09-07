@@ -1,4 +1,6 @@
 #pragma once
+#include "rendering/SunlitMaterials.h"
+#include "rendering/WorldPixelGrid.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
@@ -8,7 +10,7 @@
 namespace Paladin
 {
     // Shared material-detail standard, applied once at import to every sprite.
-    // Preserve authored texture and edges at the restored 32-texel tile density.
+    // Match the final common world grid; fitting cannot bypass that grid.
     inline SDL_Surface* simplifySprite(
         SDL_Surface* source,
         double width,
@@ -22,9 +24,14 @@ namespace Paladin
             return nullptr;
         }
         const int fw = rgba->w / frames;
-        const int tw = std::min(fw, std::max(4, int(std::round(width * 32))));
-        const int th =
-            std::min(rgba->h, std::max(4, int(std::round(height * 32))));
+        const int tw = std::min(
+            fw,
+            std::max(1, int(std::round(width * WorldPixelsPerTile)))
+        );
+        const int th = std::min(
+            rgba->h,
+            std::max(1, int(std::round(height * WorldPixelsPerTile)))
+        );
         auto* output =
             SDL_CreateSurface(tw * frames, th, SDL_PIXELFORMAT_RGBA32);
         if (!output)
@@ -46,7 +53,11 @@ namespace Paladin
                           );
                 const auto* c = static_cast<const Uint8*>(rgba->pixels) +
                                 sy * rgba->pitch + sx * 4;
-                pixels[std::size_t(y) * stride + x] = {c[0], c[1], c[2], c[3]};
+                const auto color = sunlitMaterial(
+                    (unsigned(c[0]) << 16) | (unsigned(c[1]) << 8) | c[2]
+                );
+                pixels[std::size_t(y) * stride + x] =
+                    {Uint8(color >> 16), Uint8(color >> 8), Uint8(color), c[3]};
             }
         }
         for (int y = 0; y < th; ++y)
