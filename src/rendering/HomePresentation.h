@@ -29,6 +29,13 @@ namespace Paladin
         const auto start = queue.size();
         if (policy.roofsVisible)
         {
+            if (sprites.find(
+                    sprites.objectStyle(home.objectTypeId).wall + ".front"
+                ))
+            {
+                return; // Accessories now come from the independent decor
+                        // catalog.
+            }
             if (!sprites.find("home.detail.shutters"))
             {
                 return;

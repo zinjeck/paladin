@@ -23,7 +23,7 @@ namespace Paladin
     {
     public:
         static constexpr float ButtonSide = 48.0F;
-        static constexpr float RowWidth = ButtonSide * 4;
+        static constexpr float RowWidth = ButtonSide * 3;
         SimulationSpeedControls();
 
         void layout(int viewportWidth) noexcept;
@@ -44,7 +44,8 @@ namespace Paladin
         void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
 
     private:
-        static constexpr std::size_t ButtonCount = 4;
+        static constexpr std::size_t ButtonCount = 3;
+        bool paused_ = true;
 
         std::array<UiButton, ButtonCount> buttons_;
         std::array<UiRectangle, ButtonCount> bounds_{};

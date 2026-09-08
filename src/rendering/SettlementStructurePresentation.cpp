@@ -157,6 +157,8 @@ namespace Paladin
             double marginX = 1, marginY = std::max(1., recipe.height);
             for (const auto& name :
                  {object.objectTypeId + ".roof.full",
+                  recipe.roof + ".full",
+                  recipe.roof + ".full.side",
                   recipe.sprite,
                   recipe.wall})
             {
@@ -168,7 +170,8 @@ namespace Paladin
             }
             for (const auto& piece : sprites.pieces())
             {
-                if (piece.object == object.objectTypeId)
+                if (piece.object == object.objectTypeId ||
+                    piece.object == recipe.decor)
                 {
                     if (const auto* s = sprites.find(piece.sprite))
                     {
@@ -256,7 +259,7 @@ namespace Paladin
                         id
                     ))
                 {
-                    if (!renderer && detailed)
+                    if (detailed)
                     {
                         naturalRoad(
                             queue,
@@ -320,8 +323,7 @@ namespace Paladin
                         sprites,
                         object,
                         id
-                    ) &&
-                    !renderer)
+                    ))
                 {
                     buildingGround(queue, projection, sprites, map, f, id);
                 }
@@ -394,16 +396,35 @@ namespace Paladin
             if (policy.shadowsVisible && style.mode == "enclosed" &&
                 style.shadowAlpha > 0)
             {
-                const auto* roofArt =
-                    sprites.find(object.objectTypeId + ".roof.full");
+                const bool modular = sprites.find(style.wall + ".front");
+                const int facing =
+                    buildingView(f, object.door, policy.viewAzimuthDegrees);
+                const bool side =
+                    h > w * 1.4 || (std::abs(w - h) < .5 && facing % 2);
+                const auto roofName =
+                    modular ? style.roof + (side ? ".full.side" : ".full")
+                            : object.objectTypeId + ".roof.full";
+                const auto* roofArt = sprites.find(roofName);
+                if (const auto* variant = sprites.find(
+                        roofName + "." +
+                        std::to_string(1 + ((id ^ (id >> 3) ^ (id >> 17)) % 4))
+                    ))
+                {
+                    roofArt = variant;
+                }
                 if (roofArt && roofArt->shadow && policy.roofsVisible)
                 {
-                    const double rw = roofArt->width + w - style.moduleWidth;
-                    const double rh = roofArt->height + h - style.moduleDepth;
+                    const double rw =
+                        modular ? w + .44
+                                : roofArt->width + w - style.moduleWidth;
+                    const double rh =
+                        modular ? h + .08
+                                : roofArt->height + h - style.moduleDepth;
                     // Short sun cast from the roof's real silhouette. Ground
                     // floors cover its interior, leaving only the cast edge.
                     const auto b = projection.bounds(
-                        {x - roofArt->width * roofArt->pivotX + .28,
+                        {modular ? x + .06
+                                 : x - roofArt->width * roofArt->pivotX + .28,
                          y + .22,
                          0,
                          rw,

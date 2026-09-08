@@ -4,6 +4,27 @@
 
 namespace Paladin
 {
+    struct CoastSample
+    {
+        double x, y;
+    };
+
+    // Continuous, bounded displacement in map space. It is independent of the
+    // camera, cache chunks and time: waves move, the land itself does not.
+    inline CoastSample coastSample(double x, double y, bool worldScale)
+    {
+        const double scale = worldScale ? .55 : 1.7;
+        const double amplitude = worldScale ? .12 : .19;
+        return {
+            x + amplitude * std::sin(y * scale + .6 * std::sin(x * .71)) +
+                amplitude * .28 * std::sin(y * scale * 3.1 + x * 1.3),
+            y +
+                amplitude *
+                    std::sin(x * scale * 1.13 + .7 * std::sin(y * .63)) +
+                amplitude * .28 * std::sin(x * scale * 2.7 - y * 1.1)
+        };
+    }
+
     // A continuous material field sampled at logical pixel centres. Adjacent
     // cells share the same field, so their curved edges join without seams.
     template<class Occupied>

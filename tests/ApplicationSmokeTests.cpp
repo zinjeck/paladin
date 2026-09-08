@@ -1,4 +1,5 @@
 #include "EnvironmentTerrainSmokeChecks.h"
+#include "RenderingRevisionChecks.h"
 #include "TestFramework.h"
 #include "core/Application.h"
 #include "core/SimulationClock.h"
@@ -252,6 +253,10 @@ namespace Paladin
             visualClock.beginFrame();
             PALADIN_CHECK(visualClock.presentationSeconds() == frozenTime);
             auto& renderer = *app.renderer_;
+            renderingRevisionChecks(
+                *app.renderer_,
+                SDL_GetRenderer(app.window_->nativeHandle())
+            );
             environmentTerrainSmokeChecks(
                 renderer,
                 SDL_GetRenderer(app.window_->nativeHandle())
@@ -815,13 +820,27 @@ namespace Paladin
                     city.presentation,
                     installed
                 );
-                const auto* bakeryRoof = installed.find("bakery.roof.full");
-                PALADIN_CHECK(bakeryRoof);
+                const auto roofFamily = installed.objectStyle("bakery").roof;
+                std::unordered_set<const Texture*> bakeryRoofs;
+                for (const auto* orientation : {".full", ".full.side"})
+                {
+                    for (int variation = 0; variation <= 4; ++variation)
+                    {
+                        const auto name =
+                            roofFamily + orientation +
+                            (variation ? "." + std::to_string(variation) : "");
+                        if (const auto* roof = installed.find(name))
+                        {
+                            bakeryRoofs.insert(roof->texture.get());
+                        }
+                    }
+                }
+                PALADIN_CHECK(!bakeryRoofs.empty());
                 bool bakeryCovered = false;
                 float roofTop = 100000, roofBottom = -100000;
                 for (const auto& item : fitted.items())
                 {
-                    if (item.texture == bakeryRoof->texture.get() &&
+                    if (bakeryRoofs.contains(item.texture) &&
                         item.groundDepth == 34)
                     {
                         bakeryCovered =
@@ -967,7 +986,8 @@ namespace Paladin
                         );
                     }
                     const SceneProjection motionView{0, 0, 64, 1280, 720};
-                    for (const auto* name : {"grass.tuft", "house.roof.full"})
+                    for (const auto* name :
+                         {"grass.tuft", "house.roof.full", "roof.thatch.full"})
                     {
                         SceneDrawQueue a, b;
                         installed.setTime(0);
@@ -1080,8 +1100,9 @@ namespace Paladin
                             q.items().end(),
                             [](const auto& item)
                             {
-                                return !item.texture && item.part == 13 &&
-                                       item.color.red == 8;
+                                return !item.texture && item.color.red == 8 &&
+                                       item.color.green == 15 &&
+                                       item.color.blue == 27;
                             }
                         );
                     };
@@ -2294,18 +2315,22 @@ namespace Paladin
             const float side = SimulationSpeedControls::ButtonSide;
             const auto speedButton = [&](int offset)
             { return click(app, width - side * offset + side / 2, side / 2); };
-            PALADIN_CHECK(speedButton(1)); // Pause, without placing a keep.
+            app.simulationClock_->setPaused(false);
+            frame(app);
+            PALADIN_CHECK(
+                speedButton(3)
+            ); // Shared 1x toggle pauses without placing a keep.
             PALADIN_CHECK(app.simulationClock_->isPaused());
             PALADIN_CHECK(map->objectState().completedObjects().empty());
             PALADIN_CHECK(!placement.hasLockedFootprint());
-            PALADIN_CHECK(speedButton(4));
+            PALADIN_CHECK(speedButton(3));
             PALADIN_CHECK(app.simulationClock_->speedMultiplier() == 1);
             PALADIN_CHECK(!app.simulationClock_->isPaused());
-            PALADIN_CHECK(speedButton(3));
+            PALADIN_CHECK(speedButton(2));
             PALADIN_CHECK(app.simulationClock_->speedMultiplier() == 2);
-            PALADIN_CHECK(speedButton(2));
+            PALADIN_CHECK(speedButton(1));
             PALADIN_CHECK(app.simulationClock_->speedMultiplier() == 3);
-            PALADIN_CHECK(speedButton(2));
+            PALADIN_CHECK(speedButton(1));
             PALADIN_CHECK(app.simulationClock_->speedMultiplier() == 5);
             placement.cancelPlacement();
             app.simulationClock_->setPaused(true);
@@ -2378,7 +2403,11 @@ namespace Paladin
                     capture(app, "ledger-graphs.bmp");
                 }
             }
-            PALADIN_CHECK(speedButton(1));
+            PALADIN_CHECK(speedButton(3));
+            PALADIN_CHECK(!app.simulationClock_->isPaused());
+            frame(app);
+            PALADIN_CHECK(speedButton(3));
+            PALADIN_CHECK(app.simulationClock_->isPaused());
             PALADIN_CHECK(app.ledgerPanel_->isOpen());
             key(app, SDL_SCANCODE_ESCAPE);
             PALADIN_CHECK(!app.ledgerPanel_->isOpen());
@@ -2568,7 +2597,12 @@ namespace Paladin
             PALADIN_CHECK(app.simulationControlsVisible());
             PALADIN_CHECK(!app.simulation_->detailedSimulationSettlementId());
             frame(app);
-            PALADIN_CHECK(speedButton(1));
+            PALADIN_CHECK(speedButton(3));
+            PALADIN_CHECK(app.simulationClock_->isPaused());
+            PALADIN_CHECK(speedButton(3));
+            PALADIN_CHECK(!app.simulationClock_->isPaused());
+            PALADIN_CHECK(app.simulationClock_->speedMultiplier() == 1);
+            PALADIN_CHECK(speedButton(3));
             PALADIN_CHECK(app.simulationClock_->isPaused());
             PALADIN_CHECK(app.handleReportAction(CityHudAction::Ledger));
             frame(app);

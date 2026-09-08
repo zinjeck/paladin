@@ -18,12 +18,11 @@ namespace Paladin
     } // namespace
 
     SimulationSpeedControls::SimulationSpeedControls()
-        : buttons_{UiButton(""), UiButton(""), UiButton(""), UiButton("")}
+        : buttons_{UiButton(""), UiButton(""), UiButton("")}
     {
-        buttons_[0].setSkinId("time-pause");
-        buttons_[1].setSkinId("time-normal");
-        buttons_[2].setSkinId("time-double");
-        buttons_[3].setSkinId("time-fast");
+        buttons_[0].setSkinId("time-normal");
+        buttons_[1].setSkinId("time-double");
+        buttons_[2].setSkinId("time-fast");
     }
 
     void SimulationSpeedControls::layout(int viewportWidth) noexcept
@@ -32,7 +31,7 @@ namespace Paladin
         {
             bounds_[index] = {
                 static_cast<float>(viewportWidth) -
-                    static_cast<float>(index == 0 ? 1 : 5 - index) * buttonSide,
+                    static_cast<float>(ButtonCount - index) * buttonSide,
                 0.0F,
                 buttonSide,
                 buttonSide
@@ -47,10 +46,11 @@ namespace Paladin
         double speedMultiplier
     )
     {
-        buttons_[0].setSelected(paused);
-        buttons_[1].setSelected(!paused && nearlyEqual(speedMultiplier, 1.0));
-        buttons_[2].setSelected(!paused && nearlyEqual(speedMultiplier, 2.0));
-        buttons_[3].setSelected(
+        paused_ = paused;
+        buttons_[0].setSkinId(paused ? "time-pause" : "time-normal");
+        buttons_[0].setSelected(paused || nearlyEqual(speedMultiplier, 1.0));
+        buttons_[1].setSelected(!paused && nearlyEqual(speedMultiplier, 2.0));
+        buttons_[2].setSelected(
             !paused && (nearlyEqual(speedMultiplier, 3.0) ||
                         nearlyEqual(speedMultiplier, 5.0))
         );
@@ -106,20 +106,16 @@ namespace Paladin
 
         if (clicked[0])
         {
-            return SimulationSpeedControlAction::Pause;
+            return paused_ ? SimulationSpeedControlAction::Normal
+                           : SimulationSpeedControlAction::Pause;
         }
 
         if (clicked[1])
         {
-            return SimulationSpeedControlAction::Normal;
-        }
-
-        if (clicked[2])
-        {
             return SimulationSpeedControlAction::Double;
         }
 
-        if (clicked[3])
+        if (clicked[2])
         {
             return SimulationSpeedControlAction::Fast;
         }
@@ -138,9 +134,14 @@ namespace Paladin
         }
 
         // Pixel-stepped right arrows: one, two, then three speed tiers.
-        for (std::size_t level = 1; level < buttons_.size(); ++level)
+        for (std::size_t index = 0; index < buttons_.size(); ++index)
         {
-            const auto& box = bounds_[level];
+            if (index == 0 && paused_)
+            {
+                continue;
+            }
+            const auto level = index + 1;
+            const auto& box = bounds_[index];
             constexpr float arrowWidth = 10.0F;
             constexpr float spacing = 2.0F;
             const float width = float(level) * (arrowWidth + spacing) - spacing;
@@ -162,6 +163,10 @@ namespace Paladin
             }
         }
 
+        if (!paused_)
+        {
+            return;
+        }
         const UiRectangle& pauseBounds = bounds_[0];
         constexpr float pauseBarWidth = 4.0F;
         constexpr float pauseBarHeight = 16.0F;

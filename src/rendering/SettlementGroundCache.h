@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/SceneDetail.h"
 #include "rendering/SettlementEnvironmentDetails.h"
+#include "rendering/WorldPixelGrid.h"
 #include <SDL3/SDL.h>
 
 namespace Paladin
@@ -11,7 +12,6 @@ namespace Paladin
         {
             std::unique_ptr<Texture> texture;
             std::uint64_t used = 0, version = 0, signature = 0;
-            double readyAt = 0;
         };
         std::unordered_map<SettlementObjectId, Entry, StrongIdHash> entries_;
         std::shared_ptr<Texture> source_;
@@ -108,7 +108,7 @@ namespace Paladin
             const auto& f = object.footprint;
             const double pad = road ? 1 : .5, width = f.width + 2 * pad,
                          height = f.height + 2 * pad;
-            const int pixels = road ? 32 : 8, tw = int(width * pixels),
+            const int pixels = WorldPixelsPerTile, tw = int(width * pixels),
                       th = int(height * pixels);
             if (tw > 512 || th > 512)
             {
@@ -181,43 +181,15 @@ namespace Paladin
                                  std::move(texture),
                                  frame_,
                                  version_,
-                                 signature(map, object),
-                                 SDL_GetTicksNS() / 1e9
+                                 signature(map, object)
                              }
                          )
                          .first;
             }
             it->second.used = frame_;
-            const double opacity =
-                detailBlend(p.tilePixels, 16, 24) *
-                detailBlend(
-                    SDL_GetTicksNS() / 1e9 - it->second.readyAt,
-                    0,
-                    .18
-                );
-            if (road && opacity < 1)
-            {
-                const auto* art = sprites.find("road.floor");
-                queue.submit(
-                    {p.bounds(
-                         {double(f.topLeft.x),
-                          double(f.topLeft.y),
-                          0,
-                          double(f.width),
-                          double(f.height),
-                          0,
-                          0}
-                     ),
-                     {},
-                     double(f.topLeft.y),
-                     id,
-                     -2,
-                     0,
-                     art->texture.get(),
-                     sprites.frame(*art, false),
-                     std::uint8_t(std::round(255 * (1 - opacity)))}
-                );
-            }
+            // Cache residency is never an animation. Adjacent construction
+            // changes the road contour; present the rebuilt contour
+            // immediately.
             queue.submit(
                 {p.bounds(
                      {f.topLeft.x - pad,
@@ -235,7 +207,7 @@ namespace Paladin
                  0,
                  it->second.texture.get(),
                  {0, 0, float(tw), float(th)},
-                 std::uint8_t(std::round(255 * opacity))}
+                 255}
             );
             return true;
         }

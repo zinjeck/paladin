@@ -18,6 +18,8 @@ namespace Paladin
         bool outline = true;
         std::uint32_t fillRgb = 0x999999, frameRgb = 0x555555;
         double bodyWidth = .6, bodyDepth = .45;
+        // Optional shared accessory recipe, independent of wall/roof materials.
+        std::string decor = "-";
     };
     struct BlueprintLight
     {
@@ -29,6 +31,7 @@ namespace Paladin
     {
         std::string object, sprite, state;
         double x = 0, y = 0, depth = 0;
+        unsigned choices = 1, choice = 0;
     };
     struct SceneSprite
     {

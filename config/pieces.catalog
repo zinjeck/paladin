@@ -1,2 +1,16 @@
 # object sprite state(always/roofed/cutaway) offset-x offset-y ground-depth-offset
 # Optional independent blueprint parts; offsets in logical tiles from footprint top-left.
+
+# Optional choices/choice: deterministic selection independent of camera/time.
+# Shared decor profiles in city-objects.catalog are independent of materials.
+# Negative Y anchors an attachment to the front facade from its base.
+# Use '-' decor for no shared extras; exact object rows opt into unique pieces.
+decor.tribal home.detail.shutters roofed .6 -.18 0 2 0
+decor.tribal home.detail.hide roofed 2.4 -.06 0 3 1
+decor.tribal home.detail.shutters roofed 2.4 -.18 0 3 2
+city_keep furniture.communal-table cutaway 1.5 2.1 0
+city_keep home.detail.jars cutaway .45 3.3 0
+city_keep home.detail.jars cutaway 2.55 3.3 0
+city_keep home.detail.basket cutaway .45 5.5 0
+bakery furniture.communal-table cutaway 1.5 1.65 0
+bakery home.detail.jars cutaway .5 2.6 0
