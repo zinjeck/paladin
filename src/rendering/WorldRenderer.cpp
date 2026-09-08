@@ -8,8 +8,11 @@
 #include "rendering/WorldPixelGrid.h"
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <utility>
+#include <vector>
 
 namespace Paladin
 {
@@ -141,8 +144,14 @@ namespace Paladin
                     height
                 );
             }
+
+            // Settlement identity is projection-independent. The same renderer
+            // is used for the globe and flat map, and size comes from settlement
+            // population rather than from a separate settlement-type enum.
+            settlementMarkerRenderer_.renderGlobe(renderer, world, camera);
             return;
         }
+
         politicalViewActive_ = politicalViewRequested;
         if (!politicalViewActive_)
         {
@@ -187,15 +196,12 @@ namespace Paladin
                 presentation
             );
             spriteRenderer_.render(renderer, sprites, flat, metrics);
-            if (!politicalViewActive_)
-            {
-                settlementMarkerRenderer_
-                    .render(renderer, world, flat, metrics, &artwork_);
-            }
+            settlementMarkerRenderer_.renderFlat(renderer, world, flat, metrics);
             overlayRenderer_.render(renderer, overlays, flat, metrics);
             overlayRenderer_.renderOutlines(renderer, outlines, flat, metrics);
         }
     }
+
     void WorldRenderer::toggleProjection(
         Camera2D& camera,
         const WorldGrid& grid,
@@ -204,12 +210,24 @@ namespace Paladin
         const TileRenderMetrics& metrics
     )
     {
+        if (width <= 0 || height <= 0 || grid.width() <= 0 ||
+            grid.height() <= 0 || !std::isfinite(metrics.tilePixels) ||
+            metrics.tilePixels <= 0.0)
+        {
+            return;
+        }
+
         const auto uv = WorldSurface::UV{
             camera.tileX() / grid.width(),
             camera.tileY() / grid.height()
         };
         const double globeScale =
             std::min(width, height) * .40 * 6.283185307 / grid.width();
+        if (!std::isfinite(globeScale) || globeScale <= 0.0)
+        {
+            return;
+        }
+
         if (globeEnabled)
         {
             lastGlobeRotation_ =
@@ -235,6 +253,7 @@ namespace Paladin
         }
         globeEnabled = !globeEnabled;
     }
+
     void WorldRenderer::renderNavigator(
         Renderer& r,
         const World& world,
@@ -302,26 +321,30 @@ namespace Paladin
             }
         }
         r.fillRectangles(unseen, {8, 15, 27, 145});
-        for (const auto& city : world.settlements())
+        for (const auto& settlement : world.settlements())
         {
             r.fillRectangle(
                 b.x +
-                    float((city.position().x + .5) / world.grid().width()) *
+                    float(
+                        (settlement.position().x + .5) / world.grid().width()
+                    ) *
                         b.width -
                     1,
                 b.y +
-                    float((city.position().y + .5) / world.grid().height()) *
+                    float(
+                        (settlement.position().y + .5) / world.grid().height()
+                    ) *
                         b.height -
                     1,
                 3,
                 3,
-                {238, 190, 100, 255}
+                {255, 215, 131, 255}
             );
         }
         const float x = b.x + float(c.tileX() / world.grid().width()) * b.width,
                     y = b.y +
                         float(c.tileY() / world.grid().height()) * b.height;
-        r.drawLine(x - 4, y, x + 4, y, {255, 245, 200, 255});
-        r.drawLine(x, y - 4, x, y + 4, {255, 245, 200, 255});
+        r.drawLine(x - 4, y, x + 4, y, {255, 240, 196, 255});
+        r.drawLine(x, y - 4, x, y + 4, {255, 240, 196, 255});
     }
 } // namespace Paladin
