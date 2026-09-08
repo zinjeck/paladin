@@ -110,15 +110,24 @@ namespace Paladin
         void handleWorldPointerPressed(const SDL_Event& event);
         void handleWorldPointerReleased(const SDL_Event& event);
 
-        // Session lifecycle and existing presentation helpers.
+        // Canonical settlement lifecycle. Legacy city/capital-named wrappers
+        // remain temporarily so presentation code can migrate incrementally.
         void startWorldSession();
         void endWorldSession();
         void enterPresentedSettlement();
+        void enterPlayerCapitalCity()
+        {
+            enterPresentedSettlement();
+        }
         void executeConsoleCommand(std::string_view text);
         void renderDebug();
         void renderCityTooltip();
         UiTooltip tooltip_;
         void returnToWorldFromSettlement();
+        void returnToWorldFromCity()
+        {
+            returnToWorldFromSettlement();
+        }
 
         void cancelFoundingFlow();
         void confirmFoundingFlow();
@@ -155,7 +164,7 @@ namespace Paladin
         std::unique_ptr<EmploymentPanel> employmentPanel_;
         std::unique_ptr<DebugConsole> debugConsole_;
         std::vector<std::pair<SettlementId, std::unique_ptr<Camera2D>>>
-            settlementCameras_;
+            cityCameras_;
         std::string cachedStats_;
         std::uint64_t nextStatsRefresh_ = 0;
         bool employmentCapturedPointer_ = false;
@@ -185,7 +194,7 @@ namespace Paladin
         bool handleWorldManagement(const SDL_Event& event);
         void renderWorldManagement();
         std::unique_ptr<Camera2D> savedWorldCamera_;
-        SettlementId activeSettlementId_;
+        SettlementId activeCitySettlementId_;
         bool cityHudCapturedPointer_ = false;
         bool globePointerDown_ = false, globeDragging_ = false;
         int worldNavigatorPress_ = 0;
