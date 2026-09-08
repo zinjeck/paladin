@@ -1,0 +1,21 @@
+{
+  "out/art-pipeline-screenshots": "handoffs/art-direction/art-pipeline/screenshots",
+  "out/environment-v4-delivery": "handoffs/art-direction/environment-v4/previews/delivery",
+  "out/environment-v4-final-screenshots": "handoffs/art-direction/environment-v4/previews/final",
+  "out/environment-v4-final2-screenshots": "handoffs/art-direction/environment-v4/previews/final2",
+  "out/environment-v4-screenshots": "handoffs/art-direction/environment-v4/previews/initial",
+  "out/environment-v5-screenshots": "handoffs/art-direction/environment-v5/previews",
+  "out/renderer-pass/screenshots": "handoffs/art-direction/renderer-pass/screenshots",
+  "out/catalog-before-environment-v4.txt": "handoffs/art-direction/environment-v4/backups/catalog-before-environment-v4.txt",
+  "out/catalog-before-environment-v5.txt": "handoffs/art-direction/environment-v5/backups/catalog-before-environment-v5.txt",
+  "out/catalog-before-house-v2.txt": "handoffs/art-direction/house-v2/backups/catalog-before-house-v2.txt",
+  "out/catalog-before-muddy-v3.txt": "handoffs/art-direction/house-muddy-v3/backups/catalog-before-muddy-v3.txt",
+  "out/house-corrected-cutaway.png": "handoffs/art-direction/house-v2/previews/house-corrected-cutaway.png",
+  "out/house-corrected-day.png": "handoffs/art-direction/house-v2/previews/house-corrected-day.png",
+  "out/house-corrected-night.png": "handoffs/art-direction/house-v2/previews/house-corrected-night.png",
+  "out/house-muddy-v3-cutaway.png": "handoffs/art-direction/house-muddy-v3/previews/house-muddy-v3-cutaway.png",
+  "out/house-muddy-v3-day.png": "handoffs/art-direction/house-muddy-v3/previews/house-muddy-v3-day.png",
+  "out/house-muddy-v3-night.png": "handoffs/art-direction/house-muddy-v3/previews/house-muddy-v3-night.png",
+  "out/house-muddy-v3-palette-verification.txt": "handoffs/art-direction/house-muddy-v3/verification/house-muddy-v3-palette-verification.txt",
+  "out/house-v2-palette-verification.txt": "handoffs/art-direction/house-v2/verification/house-v2-palette-verification.txt"
+}

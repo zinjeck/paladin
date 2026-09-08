@@ -1,0 +1,13 @@
+{
+  "width": 64,
+  "height": 64,
+  "accentPixels": 58,
+  "accentPercent": 1.42,
+  "colors": {
+    "#49975B": 4038,
+    "#79B56D": 38,
+    "#337A58": 20
+  },
+  "offPalette": 0,
+  "partialAlpha": 0
+}

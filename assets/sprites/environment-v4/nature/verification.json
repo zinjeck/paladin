@@ -1,0 +1,203 @@
+[
+  {
+    "file": "tree.png",
+    "width": 48,
+    "height": 64,
+    "opaque": 2008,
+    "transparent": 1064,
+    "colors": 12,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#193E42",
+      "#235747",
+      "#337A58",
+      "#392B3C",
+      "#49975B",
+      "#633E4B",
+      "#79B56D",
+      "#95655F",
+      "#A6CD59",
+      "#A99478",
+      "#D0E58A",
+      "#D9C79F"
+    ]
+  },
+  {
+    "file": "rock.png",
+    "width": 32,
+    "height": 24,
+    "opaque": 517,
+    "transparent": 251,
+    "colors": 8,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#394658",
+      "#596679",
+      "#716D70",
+      "#81718F",
+      "#9AA7AF",
+      "#A99478",
+      "#D7E0E3",
+      "#F4E7C7"
+    ]
+  },
+  {
+    "file": "grass.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 3,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#337A58",
+      "#49975B",
+      "#79B56D"
+    ]
+  },
+  {
+    "file": "water.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 4,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#46627D",
+      "#548AC4",
+      "#63BFC3",
+      "#7E9CAA"
+    ]
+  },
+  {
+    "file": "road.png",
+    "width": 32,
+    "height": 32,
+    "opaque": 1024,
+    "transparent": 0,
+    "colors": 3,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#A78D72",
+      "#A99478",
+      "#C18B5A"
+    ]
+  },
+  {
+    "file": "farm.png",
+    "width": 32,
+    "height": 32,
+    "opaque": 1024,
+    "transparent": 0,
+    "colors": 3,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#4E3B39",
+      "#7A5038",
+      "#B78350"
+    ]
+  },
+  {
+    "file": "pasture.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 5,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#337A58",
+      "#49975B",
+      "#79B56D",
+      "#A6CD59",
+      "#D0E58A"
+    ]
+  },
+  {
+    "file": "planks.png",
+    "width": 32,
+    "height": 32,
+    "opaque": 1024,
+    "transparent": 0,
+    "colors": 4,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#633E4B",
+      "#95655F",
+      "#A78D72",
+      "#A99478"
+    ]
+  },
+  {
+    "file": "paving.png",
+    "width": 32,
+    "height": 32,
+    "opaque": 1024,
+    "transparent": 0,
+    "colors": 5,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#716D70",
+      "#81718F",
+      "#A99478",
+      "#D9C79F",
+      "#F4E7C7"
+    ]
+  },
+  {
+    "file": "sand.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 3,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#D9C79F",
+      "#F4E7C7",
+      "#FFE8AD"
+    ]
+  },
+  {
+    "file": "snow.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 3,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#AFC9D6",
+      "#D7E0E3",
+      "#F4F3E8"
+    ]
+  },
+  {
+    "file": "mountain.png",
+    "width": 64,
+    "height": 64,
+    "opaque": 4096,
+    "transparent": 0,
+    "colors": 4,
+    "offPalette": 0,
+    "partialAlpha": 0,
+    "hex": [
+      "#716D70",
+      "#9AA7AF",
+      "#A99478",
+      "#D7E0E3"
+    ]
+  }
+]

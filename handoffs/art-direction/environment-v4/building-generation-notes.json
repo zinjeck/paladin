@@ -1,0 +1,20 @@
+{
+  "tool": "built-in image_gen",
+  "assets": [
+    [
+      "house",
+      "A small tribal mud-and-timber cottage with a straw thatch roof. Roof is neutral pale straw with straw gold accents, EARTHY but luminous. Clean honey-beige mud walls matching roof material family, dark natural timberposts, a centered wooden door, a small square window left and an unlit iron sconce on right."
+    ],
+    [
+      "keep",
+      "A long narrow tribal chieftain's hall, early City Keep. Ground footprint THREE tiles wide and SEVEN tiles deep, meaning very long from top tobottom. Long pitched deep blue slate shingled roof with a small restrained royal blue cloth banner near back ridge. Facade is pale limestone and dark timber, centered broad oak double door with iron hardware, two narrow glowing-free windows. Proud grand but modest tribal architecture, no tall castle towers."
+    ],
+    [
+      "bakery",
+      "A small village bakery workshop with sage green glazed tile roof and honey beige mud/timber walls. Center timber door, breadstall shelf on left with two goldenloaves, rounded pale stone ovenfront on right, no fire/glow. Very short chimney can be part of roof silhouette. Luminous natural materials matching Zelda-like village."
+    ]
+  ],
+  "sharedPrompt": "Single complete 2D game building sprite. Charming polished Zelda-like adventure village environments, slightly chunky deliberate pixel art, 32 source pixels per logical tile, broad handcrafted forms and 2-4 pixel highlight clusters, clean shaded planes, no granular noise or photoreal straw. Shiny material highlights, rich dimensional shadows, balanced natural hues without orange or blue/cold wash. Daylight upperleft, sparse creamy highlight strips with rich shaded underside. Fixed elevated topdown, north roof at top and south front facade at bottom, axis-aligned rectangular footprint, no isometric or three-quarter view. Transparent background, no surrounding ground, cast shadow, entities, labels or text. Whole building in frame, small margins. Target112x128 cottage/bakery,112x256long3x7keep. Roof occupies most height, frontwall horizontal strip atbottom. Palette intent F4E7C7 D9C79F A99478 B78350 886044 74513F 49352F 4E3B39; slate/metal548AC4 3F5F9A 394658 596679 AFC9D6 81718F; sage49975B 337A58 79B56D D0E58A.",
+  "integration": "User subsequently requested shared roofs across tribal buildings. House roof used for both house and bakery; keep uses matching long thatch generated separately. Only facades from keep/bakery sources are active; their original blue/green roofs are not installed. Source examples saved in sources/. Runtime exports normalized to exact original64 palette with broader pixel clusters.",
+  "exports": "C:/Paladin/assets/sprites/environment-v4/buildings"
+}

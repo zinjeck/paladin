@@ -1,0 +1,19 @@
+# Restored material detail, brown hay, and richer grass
+
+This revision supersedes v10's simplification standard. The shared importer now retains authored texture with a 32-texel-per-logical-tile cap and no neighborhood cleanup filter. Animation frames remain independent and nearest sampling preserves authored colors. This restores detail in all catalog sprite categories without undoing the distance caches, animation limits, fade transitions, or other rendering fixes.
+
+The roof is the original detailed unified thatch from `../tribal-v10/source/tribal-atlas.png`, exported into an earth/wood-only subset of the master palette. Bright yellow and fire-orange entries are excluded. The same roof material is used by the house, keep, bakery, and stockpile shelter. Enclosed buildings retain the clean brown mud theme and one continuous roof per blueprint; the more livable v11 house facades remain installed.
+
+Grass reuses the original `../tribal-v10/source/grass.png`, matching the reference the user reattached, without v10's averaging filter. Its four quadrants provide four stable ground-pattern variants. The field uses jade/emerald shadows and fresh-leaf highlights rather than pale sage as its midtone. Four-by-four-tile material modules keep patches broad at normal city zoom. Biome and climate variants remain; warm grass no longer shifts the entire field into a pale highlight color. All colors are from the existing 64-color master palette.
+
+Four additional nearby tuft silhouettes: short meadow blades, taller arching blades, low broadleaf/clover-like growth, and wispy woodland grass. They use the existing deterministic variant selection and pause-aware wind treatment, with the existing distance cutoff and submission budget. Their source is `source/grass-tufts.png`, generated with the built-in ImageGen tool and copied from `C:/Users/Super/.codex/generated_images/01a077eb-cbcd-7473-9710-020251c2b278/exec-77723fb0-ce1e-44f5-9fb0-725a8b7ee274.png`. Prompt: four distinct tiny green cutout grass silhouettes, rich emerald shadows and lime tips, readable at 16×16, broad crisp pixel clusters, no flowers or ground rectangles, approved green palette and transparent background.
+
+Day/night direction remains vivid daylight with color and depth, followed by a cool, dark night with contrasting warm pools of light. No palette restriction was added to the dynamic lighting calculations; authored sprite PNGs remain exact-palette with binary alpha.
+
+Runtime exports are in `C:/Paladin/assets/sprites/tribal-v12/`. Reproduce with Windows PowerShell 5 using `tools/export.ps1`; it first reproduces the unchanged v10/v11 base assets, then exports the detailed roof, green ground variants, and four tufts. Catalog references and module sizes are in `assets/sprites/sprites.catalog`. Palette audit: `../tribal-v10/tools/audit.ps1`.
+
+Build and validation logs: `C:/Paladin/out/tribal-v12-{build,palette,smoke,review,performance}.log`. The user closed the game during this turn, so the normal `C:/Paladin/out/build/x64-Debug/Paladin.exe` was rebuilt successfully; a separate executable is not required. No simulation or lighting-system changes were made.
+
+Palette audit passed for 64 referenced PNGs, 95,604 pixels, with alpha restricted to 0/255. Rendering regression benchmark passed its static-distance, draw-budget, offscreen, and cache invalidation checks. Continuous zoom in the software-rendered Debug fixture averaged 54.19 ms through houses (worst 76.79) and 47.58 ms through forest (worst 71.68). These are rendering-only diagnostics, not a full-game FPS guarantee.
+
+Final regular application smoke suite and art-review scenario passed after the broader grass-module change. Reviewed the final daylight and nighttime captures. `previews/tribal-day.png` and `tribal-night.png` are lossless conversions of the game captures. No commit or push was made.

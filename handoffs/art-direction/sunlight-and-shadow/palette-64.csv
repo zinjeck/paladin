@@ -1,0 +1,65 @@
+﻿Index,Group,Name,Hex,R,G,B
+1,Original 32,Straw highlight,#FFE8AD,255,232,173
+2,Original 32,Honey thatch,#EBC46B,235,196,107
+3,Original 32,Thatch shade,#BD864C,189,134,76
+4,Original 32,Peach plaster,#DF947F,223,148,127
+5,Original 32,Clay shade,#B76858,183,104,88
+6,Original 32,Plum timber,#633E4B,99,62,75
+7,Original 32,Fresh leaf,#A6CD59,166,205,89
+8,Original 32,Jade green,#49975B,73,151,91
+9,Original 32,Deep foliage,#235747,35,87,71
+10,Original 32,Lavender shadow,#81718F,129,113,143
+11,Original 32,Night depth,#080F1B,8,15,27
+12,Original 32,Indigo shadow,#202C43,32,44,67
+13,Original 32,Moonlit blue,#46627D,70,98,125
+14,Original 32,Ember bounce,#B76A36,183,106,54
+15,Original 32,Amber light,#F3AE45,243,174,69
+16,Original 32,Flame core,#FFF0C4,255,240,196
+17,Original 32,Straw midlight,#F4D78B,244,215,139
+18,Original 32,Golden ochre,#D5A454,213,164,84
+19,Original 32,Deep thatch,#886044,136,96,68
+20,Original 32,Plaster highlight,#F3B69A,243,182,154
+21,Original 32,Rose clay,#CB7C70,203,124,112
+22,Original 32,Clay recess,#874D50,135,77,80
+23,Original 32,Timber highlight,#95655F,149,101,95
+24,Original 32,Timber recess,#392B3C,57,43,60
+25,Original 32,Leaf glint,#D0E58A,208,229,138
+26,Original 32,Sage midlight,#79B56D,121,181,109
+27,Original 32,Emerald shade,#337A58,51,122,88
+28,Original 32,Teal shadow,#193E42,25,62,66
+29,Original 32,Lilac bounce,#ADA0B9,173,160,185
+30,Original 32,Night midtone,#30455D,48,69,93
+31,Original 32,Fire orange,#DF8738,223,135,56
+32,Original 32,Light gold,#FFD783,255,215,131
+33,Stone & masonry,Limestone highlight,#F4E7C7,244,231,199
+34,Stone & masonry,Sunlit limestone,#D9C79F,217,199,159
+35,Stone & masonry,Warm stone,#A99478,169,148,120
+36,Stone & masonry,Stone shadow,#716D70,113,109,112
+37,Stone & masonry,Granite blue,#596679,89,102,121
+38,Stone & masonry,Slate roof,#394658,57,70,88
+39,Metal,Iron glint,#D7E0E3,215,224,227
+40,Metal,Steel mid,#9AA7AF,154,167,175
+41,Metal,Iron grey,#6C747A,108,116,122
+42,Metal,Black iron,#35383E,53,56,62
+43,Metal,Bronze,#B37A3E,179,122,62
+44,Metal,Copper,#C56F4A,197,111,74
+45,Metal,Verdigris,#4F8C7A,79,140,122
+46,Heraldry & ceremonial,Royal crimson,#A63545,166,53,69
+47,Heraldry & ceremonial,Banner red,#D75056,215,80,86
+48,Heraldry & ceremonial,Imperial purple,#6F4A7E,111,74,126
+49,Heraldry & ceremonial,Royal blue,#3F5F9A,63,95,154
+50,Heraldry & ceremonial,Azure cloth,#548AC4,84,138,196
+51,Heraldry & ceremonial,Ceremonial white,#EFE2CF,239,226,207
+52,Bone & leather,Bone ivory,#D7C8A2,215,200,162
+53,Bone & leather,Leather tan,#B78350,183,131,80
+54,Bone & leather,Leather brown,#7A5038,122,80,56
+55,Bone & leather,Dark leather,#49352F,73,53,47
+56,Earth & roads,Dry earth,#C18B5A,193,139,90
+57,Earth & roads,Rich soil,#74513F,116,81,63
+58,Earth & roads,Mud shadow,#4E3B39,78,59,57
+59,Earth & roads,Road dust,#A78D72,167,141,114
+60,Cold & fantasy,Snow light,#F4F3E8,244,243,232
+61,Cold & fantasy,Ice blue,#AFC9D6,175,201,214
+62,Cold & fantasy,Frost shadow,#7E9CAA,126,156,170
+63,Cold & fantasy,Arcane violet,#8A67B4,138,103,180
+64,Cold & fantasy,Aether cyan,#63BFC3,99,191,195

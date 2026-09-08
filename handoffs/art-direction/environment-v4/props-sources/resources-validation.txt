@@ -1,0 +1,12 @@
+resource-fish: 24x24, opaque=260, colors=23, alpha=0/255; source bbox=54,242,1147,780
+resource-meat: 24x24, opaque=258, colors=21, alpha=0/255; source bbox=41,96,1172,1031
+resource-food: 24x24, opaque=298, colors=18, alpha=0/255; source bbox=155,32,971,1202
+resource-stone: 24x24, opaque=272, colors=17, alpha=0/255; source bbox=76,146,1099,957
+resource-lumber: 24x24, opaque=244, colors=13, alpha=0/255; source bbox=166,107,1120,862
+resource-materials: 24x24, opaque=286, colors=17, alpha=0/255; source bbox=113,138,1198,928
+resource-fish: independently validated visibleColors=23 offPalette=0 partialAlpha=0 transparent=316 colors=#7E9CAA,#EFE2CF,#886044,#B78350,#6C747A,#63BFC3,#4E3B39,#9AA7AF,#7A5038,#EBC46B,#F4E7C7,#46627D,#49352F,#AFC9D6,#F4D78B,#394658,#D7E0E3,#D9C79F,#FFE8AD,#4F8C7A,#596679,#392B3C,#202C43
+resource-meat: independently validated visibleColors=21 offPalette=0 partialAlpha=0 transparent=318 colors=#CB7C70,#886044,#B78350,#A63545,#4E3B39,#392B3C,#7A5038,#633E4B,#EBC46B,#F3B69A,#49352F,#F4E7C7,#A99478,#D75056,#EFE2CF,#F4D78B,#DF947F,#874D50,#D9C79F,#FFE8AD,#81718F
+resource-food: independently validated visibleColors=18 offPalette=0 partialAlpha=0 transparent=278 colors=#EFE2CF,#B78350,#63BFC3,#4E3B39,#392B3C,#7A5038,#193E42,#EBC46B,#F4E7C7,#886044,#A99478,#49352F,#D5A454,#F4D78B,#D9C79F,#FFE8AD,#4F8C7A,#235747
+resource-stone: independently validated visibleColors=17 offPalette=0 partialAlpha=0 transparent=304 colors=#7E9CAA,#F4F3E8,#ADA0B9,#6C747A,#596679,#9AA7AF,#394658,#F4E7C7,#A99478,#46627D,#AFC9D6,#35383E,#D7E0E3,#D9C79F,#81718F,#716D70,#202C43
+resource-lumber: independently validated visibleColors=13 offPalette=0 partialAlpha=0 transparent=332 colors=#886044,#B78350,#4E3B39,#392B3C,#7A5038,#EBC46B,#F4E7C7,#A99478,#49352F,#D5A454,#F4D78B,#633E4B,#FFE8AD
+resource-materials: independently validated visibleColors=17 offPalette=0 partialAlpha=0 transparent=290 colors=#F4E7C7,#EFE2CF,#886044,#B78350,#4E3B39,#392B3C,#7A5038,#633E4B,#EBC46B,#596679,#A99478,#49352F,#D5A454,#F4D78B,#D9C79F,#FFE8AD,#81718F

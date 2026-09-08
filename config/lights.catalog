@@ -1,0 +1,8 @@
+# object offset-x offset-y radius intensity RGB (light colors are unrestricted)
+# Facade offsets use the reference module footprint. Wider walls scale x;
+# deeper buildings retain each light's distance from the front wall.
+house 2.65 2.75 4.5 1 FFA04C
+house .65 2.75 2 .45 FFB65C
+city_keep .45 6.65 3 .5 FFB65C
+city_keep 2.55 6.65 3 .5 FFB65C
+bakery 2.6 2.7 3.5 .8 FFA04C

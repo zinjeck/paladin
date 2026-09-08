@@ -1,0 +1,189 @@
+[
+  {
+    "key": "tree",
+    "prompt": "Use case: stylized-concept. Asset type: one transparent 2D pixel-art game tree sprite for an elevated top-down settlement game, NOT an isometric diamond. Primary request: one inviting leafy broadleaf tree, large rounded layered canopy, visible chunky trunk ending at bottom center, crisp dimensional volume from clear light/shade planes, appealing polished Zelda-like daytime fantasy feel. Slightly chunky pixel clusters, deliberate broad leaf clumps, NO noisy confetti or individual tiny leaves; reads beautifully after downsample to 48x64 pixels. Pixelart not painterly. Image aspect ratio 3:4 portrait. Tree fills 90 percent of canvas width and height, visible trunk at bottom. GENUINELY TRANSPARENT alpha background, absolutely no checkerboard painted into image, no ground disk, no cast shadow outside silhouette. Light from upper-left, luminous lime and pale leaf-green highlight clusters, mid jade and sage green, deep green shadows, dark warm natural trunk. Palette only: #D0E58A #A6CD59 #79B56D #49975B #337A58 #235747 #193E42 and trunk #D9C79F #A99478 #95655F #633E4B #392B3C. Balanced natural material colors, no cold filter, no orange wash. No text, outline border, frame, watermark, scene, labels, UI.",
+    "width": 48,
+    "height": 64,
+    "transparent": true,
+    "palette": [
+      "D0E58A",
+      "A6CD59",
+      "79B56D",
+      "49975B",
+      "337A58",
+      "235747",
+      "193E42",
+      "D9C79F",
+      "A99478",
+      "95655F",
+      "633E4B",
+      "392B3C"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\tree-source.png"
+  },
+  {
+    "key": "rock",
+    "prompt": "Use case: stylized-concept. Asset type: one transparent 2D pixel-art game rock sprite. One squat broad natural boulder with three or four large angular faceted planes and a couple small supporting stones fused into silhouette, viewed from elevated top-down front, horizontal flat ground plane not isometric diamond. Chic inviting polished Zelda-like fantasy material volume with broad clear planes and small crisp bright sunlight edge glints. Moderately chunky pixels, clean silhouette; will downsample to 32x24 pixels. Landscape 4:3 crop, rock fills 85percent of width and 80percent of height and bottomcenter is ground anchor. Palette #D7E0E3 #F4E7C7 #A99478 #9AA7AF #596679 #716D70 #394658 #81718F. Balanced sunlit gray stone, not dull blue nor orange; readable bright planes and shaded lower-right. GENUINELY TRANSPARENT background, no paintedchecker, no ground tile, no external cast shadow. No text, labels, grid, watermark. No elaborate microtexture.",
+    "width": 32,
+    "height": 24,
+    "transparent": true,
+    "palette": [
+      "D7E0E3",
+      "F4E7C7",
+      "A99478",
+      "9AA7AF",
+      "596679",
+      "716D70",
+      "394658",
+      "81718F"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\rock-source.png"
+  },
+  {
+    "key": "grass",
+    "prompt": "Tool: built-in imagegen. Edit reference: original nature/grass.png, preserved as grass-before-quiet.png.\n\nUse case: precise-object-edit. Asset type: one seamless ground grass tile for a64x64pixel 2D game, used repeatedly across the WHOLE screen. EDIT this grass tile to remove almost all busy speckling: replace the numerous tiny dashes and confetti with mostly uninterrupted SOLID jade green #49975B. Make the ground QUIET. At least95percent of entire image area MUST be this exact unbroken base #49975B. Remaining5percent: ONLY FOUR small irregular grouped tufts spread asymmetrically across the canvas, made of large simple clean lowcontrast blocky pixelclusters, using #79B56D subtlelights and #337A58 subtleshade. The tufts each should occupy roughly5x7pixels in eventual64px tile. No brightyellow flecks, NO #A6CD59 or #D0E58A, no sharp shiny grassparticles, no dither, no small isolated singlepixels, no scatter noise, no blades anywhere except thefour groups. Keep broad quiet negative space between groups. Light upperleft implied in tufts only. Whole image flat topdown opaque64square fullbleed texture. No giantgradient, no border, no symbols, no checkboard, no text, no objects, no 3D grass render. The reference is too noisy: simplify extremely while retaining natural inviting slightlypixelated grass material.\n",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "49975B",
+      "79B56D",
+      "337A58"
+    ],
+    "source": "C:/Paladin/handoffs/art-direction/environment-v4/sources/nature/grass-quiet-source.png"
+  },
+  {
+    "key": "water",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to64x64 pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: serene clear fantasy blue riverwater texture of shallow broad blue/aquamarine patches with a few SHORT crisp interrupted pale glints and subtly defined rippleplanes. Uniform water across tile, no shore, sand, underwater objects, no big circles, no large isolated wave. Palette exact: #548AC4 base #63BFC3 broad highlightplanes #46627D subtle shadow #AFC9D6 rare thin glints #7E9CAA transitions. Bright beautiful natural water not neonblue, no white allover stippling.",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "548AC4",
+      "63BFC3",
+      "46627D",
+      "AFC9D6",
+      "7E9CAA"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\water-source.png"
+  },
+  {
+    "key": "road",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to64x64 pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: smooth compacted dirtpath texture, muted honey-taupe earth material, broad subtle patches with a few scattered small flat stones and slight footworn variation. No path boundaries, grass or road edges. Fills entirecanvas. Palette exact #A78D72 main #A99478 softerlights #C18B5A sparing warmer material #74513F soft sparse compressed hollows #D9C79F very few dusty pebbles. Natural appealing luminous earthen material NOT orangebrown wash, NO reddish tint. Avoid too many scattered rocks and dark noise. Desired final32x32.",
+    "width": 32,
+    "height": 32,
+    "transparent": false,
+    "palette": [
+      "A78D72",
+      "A99478",
+      "C18B5A",
+      "74513F",
+      "D9C79F"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\road-source.png"
+  },
+  {
+    "key": "farm",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to64x64 pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: rich tilled earth texture with THREE clear straight evenly spaced horizontal soil furrows. Soil ridges run perfectly horizontal edge to edge, axisaligned rows, broad forms. No crops or grass or plants or seeds, just cultivated earth. Richbrown main earth and subtle raisedlit ridges, deeply shaded narrow groove. Palette exact #74513F main #A78D72 small soil glints #4E3B39 grooves #7A5038 midridge #B78350 sparse sunwardridge. Soil should feel rich and glossy rather than gritty, restrained pixel clusters no dots. No orange glare. Desired final32x32.",
+    "width": 32,
+    "height": 32,
+    "transparent": false,
+    "palette": [
+      "74513F",
+      "A78D72",
+      "4E3B39",
+      "7A5038",
+      "B78350"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\farm-source.png"
+  },
+  {
+    "key": "pasture",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: grazed lush short grass pasture with soft broad meadow-green areas and subtle lightyellow-green wisps, occasional small flattened stems, no fences, no animals, no flowers, no dirt patch or haystack. Palette exact #79B56D main #49975B lowerplanes #A6CD59 sparse lights #337A58 sparse shadow #D0E58A just 2or3 rareglints. Natural cheerful lush green, not lime/neon, no blue cast, lowcontrast. Designed64x64.",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "79B56D",
+      "49975B",
+      "A6CD59",
+      "337A58",
+      "D0E58A"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\pasture-source.png"
+  },
+  {
+    "key": "planks",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: smooth rustic timber floor. Four broad parallel horizontal wooden planks spanning edge to edge, subtly staggered joins, four beams high only, broad quiet oak grain marks and small crisp glints, woodlooks neatly crafted and polished from walking. Palette exact #A99478 main #D9C79F sparse polishededges #A78D72 secondary #95655F shadow grain #633E4B narrow joins #392B3C veryfew nailpoints. Balanced straw-taupe natural wood not orangewash nor purple hue, no white boards. Final32x32.",
+    "width": 32,
+    "height": 32,
+    "transparent": false,
+    "palette": [
+      "A99478",
+      "D9C79F",
+      "A78D72",
+      "95655F",
+      "633E4B",
+      "392B3C"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\planks-source.png"
+  },
+  {
+    "key": "paving",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: clean smooth slightly irregular square limestone paving slabs in simple offset brickbond pattern. Broad rounded bevels with small clean sunlight edgeglints and rich shadowjoins. Roughly4 columns and4 rows, not tinygravel. Palette exact #D9C79F main #F4E7C7 sparse bright topbevel #A99478 muted sideplane #716D70 joins #81718F a hint of shade. Balanced warm neutral palecream, no orange tint, no gray deadness, solid continuousfloor. Final32x32.",
+    "width": 32,
+    "height": 32,
+    "transparent": false,
+    "palette": [
+      "D9C79F",
+      "F4E7C7",
+      "A99478",
+      "716D70",
+      "81718F"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\paving-source.png"
+  },
+  {
+    "key": "sand",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: inviting sunlit sandy desertground, gently undulating broad pale sand planes and a few small clean dune ripple strokes. No cacti rocks footprints waterplants or props. Palette exact #D9C79F base #F4E7C7 litplanes #A99478 verysoft shade #FFE8AD sparse glints. Not orange, yellowbrown overload or dune landscape, fully overhead flatground tile. Quiet luminous sand material. Final64x64.",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "D9C79F",
+      "F4E7C7",
+      "A99478",
+      "FFE8AD"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\sand-source.png"
+  },
+  {
+    "key": "snow",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: pristine smooth snowy tundraground with broad subtly irregular powder snow patches and shallow palegray-blue hollows, extremely subtle. No snowflakes icons, no trees footprints crystals pebbles or ice blocks. Palette exact #F4F3E8 main #D7E0E3 secondary #AFC9D6 subtle hollows #7E9CAA extremelysparse defined shadedcracks. Bright clean whitesnow with a few polished soft icyglints, no blue overallwash. Final64x64.",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "F4F3E8",
+      "D7E0E3",
+      "AFC9D6",
+      "7E9CAA"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\snow-source.png"
+  },
+  {
+    "key": "mountain",
+    "prompt": "Use case: stylized-concept. Asset type: ONE seamless fullbleed square opaque terrain texture tile for 2D top-down pixel-art fantasy city game. View directly down on ground, no isometric diamond, no border, no scene, no text or watermark. All canvas filled with material, no alpha. Larger deliberate pixel clusters, no microtexture or confetti. It must read after reduction to32 or64pixels. Calm lowcontrast ground supports vivid building art. Appealing polished Zelda-like fantasy colors with natural color richness, sunlight glints and rich shadows but no giant baked lighting gradient. Opposing edges seamlessly repeat. Primary request: continuous exposed mountain bedrock groundsurface, broad interlocking stone planes with a few short natural angular fissures, no separate rockprops or boulders. Palette exact #9AA7AF main #596679 shade #D7E0E3 small bright facetglints #A99478 small neutral variation #716D70 fissures. Balanced naturally sunlit stone neither bluewash nor drearygrey, subtle material polish and wellgrouped clusters. Big calm shapes not confettirubble. Final64x64.",
+    "width": 64,
+    "height": 64,
+    "transparent": false,
+    "palette": [
+      "9AA7AF",
+      "596679",
+      "D7E0E3",
+      "A99478",
+      "716D70"
+    ],
+    "source": "C:\\Paladin\\handoffs\\art-direction\\environment-v4\\sources\\nature\\mountain-source.png"
+  }
+]

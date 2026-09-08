@@ -1,0 +1,20 @@
+Paladin environment v4 props, 2026-09-06
+
+Generated using the built-in imagegen tool, one call per distinct asset.
+Final user correction honored: natural luminous Zelda-like richness, slightly chunkier pixel detail. No deliberate cool color cast. Approved Sunlight & Shadow64 palette strictly enforced at authored export; runtime lighting remains separate.
+
+Recommended catalog rows (width/height in logical tiles; 32 source px/tile):
+market.stall environment-v4/props/market-stall.png 2 2 0.5 1 0 0
+stockpile.stack environment-v4/props/stockpile-stack.png 1.5 1.25 0.5 1 0 0
+fishing_grounds.station environment-v4/props/fishing-station.png 1.5 2 0.5 1 0 0
+wheat_farm.crop environment-v4/props/wheat-crop.png 1.5 1.25 0.5 1 0 0
+
+market-stall.png 64x64, jade/ivory fabric and natural wood, fruit/produce only, no entity.
+stockpile-stack.png 48x40, crates and sacks.
+fishing-station.png 48x64: portrait jetty aspect intentionally preserved rather than distorting it to64x48. Transparent surrounding area allows water/ground layering. No fish/people.
+wheat-crop.png 48x40: harvest clump, pale gold heads and vibrant green leaves.
+
+All images: alpha strictly0 or255; each visible RGB exactly in authoritative palette-64.csv. Independent validation details in props-validation.txt. Source pixels normalized with nearest sampling and nearest approved material-palette color, no dither. Sources alpha cropped, aspect ratio preserved, one pixel margin.
+Visual inspection: source art and every final export at native scale and 3x nearest on a palette green backdrop. Props-preview.png is an inspection contact sheet and must NOT be registered as runtime art.
+Generation sources and full prompts are in props-generation.json. Original tool-generated files preserved at generated_images paths AND copied into C:/Paladin/handoffs/art-direction/environment-v4/props-sources/. The project copies are used for repeatable exports; export-props.ps1 can recreate normalized sprites.
+No catalog, source code or existing assets modified by this prop work.

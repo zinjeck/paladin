@@ -1,0 +1,31 @@
+Paladin environment v4 loose resources, 2026-09-06
+
+Six distinct resource exports, all 24x24 PNG, binary alpha, nearest sampling. Authored RGB strictly limited to approved Sunlight & Shadow64 palette. Independent scan: offPalette=0, partialAlpha=0 for each PNG.
+
+Recommended catalog rows, matched with terrain_support's loose-resource hook:
+resource.fish environment-v4/props/resource-fish.png .75 .75 .5 1 0 0
+resource.meat environment-v4/props/resource-meat.png .75 .75 .5 1 0 0
+resource.food environment-v4/props/resource-food.png .75 .75 .5 1 0 0
+resource.materials environment-v4/props/resource-materials.png .75 .75 .5 1 0 0
+resource.stone environment-v4/props/resource-stone.png .75 .75 .5 1 0 0
+resource.lumber environment-v4/props/resource-lumber.png .75 .75 .5 1 0 0
+Optional generic fallback uses resource-materials.png with the same dimensions/pivot as resource.pile.
+
+Subjects: two caught silver fish in shallow wicker basket; cured meat portions in basket; open canvas sack of bread; mixed supplies crates/sacks; quarried stone chunks; three cut logs tied with rope. Fish and meat are resource items, not living entities. Materials intentionally reuses the stockpile-stack source for consistency.
+
+Visual inspection completed on every final PNG at native size and4x nearest on a palette green background. Distinct silhouettes and food/material colors remain readable at24px.
+
+Built-in imagegen used once per new resource source (five distinct generations), original tool files preserved. Full final prompts, source paths, project original copies, repeatable normalization script, independent pixel validation, and preview are in:
+C:/Paladin/handoffs/art-direction/environment-v4/props-sources/
+resources-generation.json
+export-resources.ps1
+resources-validation.txt
+resources-preview.png
+resource-fish-original.png
+resource-meat-original.png
+resource-food-original.png
+resource-stone-original.png
+resource-lumber-original.png
+stockpile-stack-original.png (reused for resource-materials)
+
+Original sources for market, stockpile, fishing station, wheat also copied into that project handoff folder. No source or catalog changes performed by this asset subtask.

@@ -1,0 +1,70 @@
+GIMP Palette
+Name: Paladin - Sunlight and Shadow 64
+Columns: 8
+# First 32 colors preserved exactly from Paladin - Sunlight and Shadow 32.
+# Added colors broaden architecture, war materials, heraldry, terrain, cold regions and fantasy accents.
+255 232 173 Straw highlight
+235 196 107 Honey thatch
+189 134  76 Thatch shade
+223 148 127 Peach plaster
+183 104  88 Clay shade
+ 99  62  75 Plum timber
+166 205  89 Fresh leaf
+ 73 151  91 Jade green
+ 35  87  71 Deep foliage
+129 113 143 Lavender shadow
+  8  15  27 Night depth
+ 32  44  67 Indigo shadow
+ 70  98 125 Moonlit blue
+183 106  54 Ember bounce
+243 174  69 Amber light
+255 240 196 Flame core
+244 215 139 Straw midlight
+213 164  84 Golden ochre
+136  96  68 Deep thatch
+243 182 154 Plaster highlight
+203 124 112 Rose clay
+135  77  80 Clay recess
+149 101  95 Timber highlight
+ 57  43  60 Timber recess
+208 229 138 Leaf glint
+121 181 109 Sage midlight
+ 51 122  88 Emerald shade
+ 25  62  66 Teal shadow
+173 160 185 Lilac bounce
+ 48  69  93 Night midtone
+223 135  56 Fire orange
+255 215 131 Light gold
+# --- Added realm-support colors ---
+244 231 199 Limestone highlight
+217 199 159 Sunlit limestone
+169 148 120 Warm stone
+113 109 112 Stone shadow
+ 89 102 121 Granite blue
+ 57  70  88 Slate roof
+215 224 227 Iron glint
+154 167 175 Steel mid
+108 116 122 Iron grey
+ 53  56  62 Black iron
+179 122  62 Bronze
+197 111  74 Copper
+ 79 140 122 Verdigris
+166  53  69 Royal crimson
+215  80  86 Banner red
+111  74 126 Imperial purple
+ 63  95 154 Royal blue
+ 84 138 196 Azure cloth
+239 226 207 Ceremonial white
+215 200 162 Bone ivory
+183 131  80 Leather tan
+122  80  56 Leather brown
+ 73  53  47 Dark leather
+193 139  90 Dry earth
+116  81  63 Rich soil
+ 78  59  57 Mud shadow
+167 141 114 Road dust
+244 243 232 Snow light
+175 201 214 Ice blue
+126 156 170 Frost shadow
+138 103 180 Arcane violet
+ 99 191 195 Aether cyan

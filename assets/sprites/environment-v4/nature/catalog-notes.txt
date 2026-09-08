@@ -1,0 +1,24 @@
+Nature assets v4 — generated with the built-in imagegen tool, then exported at runtime pixel dimensions using binary alpha and the approved 64-color palette.
+
+Suggested catalog rows (root integrator owns actual sprite catalog):
+tree environment-v4/nature/tree.png 1.5 2 0.5 1 0 0
+rock environment-v4/nature/rock.png 1 0.75 0.5 1 0 0
+terrain.plain environment-v4/nature/grass.png 2 2 0 0 0 0
+terrain.forest environment-v4/nature/grass.png 2 2 0 0 0 0
+terrain.jungle environment-v4/nature/grass.png 2 2 0 0 0 0
+terrain.taiga environment-v4/nature/grass.png 2 2 0 0 0 0
+terrain.water environment-v4/nature/water.png 2 2 0 0 0 0
+terrain.desert environment-v4/nature/sand.png 2 2 0 0 0 0
+terrain.tundra environment-v4/nature/snow.png 2 2 0 0 0 0
+terrain.mountain environment-v4/nature/mountain.png 2 2 0 0 0 0
+
+Additional surface modules:
+road.png — 32x32, 1x1 tile, compacted earth path.
+farm.png — 32x32, 1x1 tile, cultivated soil with horizontal furrows.
+pasture.png — 64x64, 2x2 tiles, short bright grazing meadow.
+planks.png — 32x32, 1x1 tile, broad horizontal timber floorboards.
+paving.png — 32x32, 1x1 tile, offset limestone slabs.
+
+Every nontransparent exported pixel matches the approved palette. Exact results are recorded in verification.json. The 12 prompts and preserved source-original paths are recorded in source-manifest.json. contact-sheet.png is a QA preview, not a runtime sprite. export.ps1 reproduces source normalization; it does not draw new artwork.
+
+Style follows the user's correction: polished and appealing like Zelda, natural material color richness, clear sunny glints and shaded volume, slightly chunkier pixels; no overall warm or cool filter. Engine lighting remains independent of the authored palette.

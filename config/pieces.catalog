@@ -1,0 +1,2 @@
+# object sprite state(always/roofed/cutaway) offset-x offset-y ground-depth-offset
+# Optional independent blueprint parts; offsets in logical tiles from footprint top-left.

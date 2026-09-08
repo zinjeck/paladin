@@ -1,0 +1,9 @@
+tribal-roof-courses-muddy-v3.png: 112x100, colors 74513F, 49352F, C18B5A, 886044, B78350, exact palette; alpha mask unchanged
+tribal-roof-legacy-muddy-v3.png: 96x96, colors 74513F, 49352F, C18B5A, 886044, B78350, exact palette; alpha mask unchanged
+tribal-facade-muddy-v3.png: 96x28, colors 7A5038, 74513F, 49352F, 4E3B39, 886044, B78350, 080F1B, exact palette; alpha mask unchanged
+tribal-interior-north-muddy-v3.png: 96x28, colors 7A5038, 74513F, 49352F, 4E3B39, B78350, 080F1B, exact palette; alpha mask unchanged
+tribal-sidecap-muddy-v3.png: 4x96, colors 49352F, 4E3B39, 7A5038, exact palette; alpha mask unchanged
+tribal-wallcap-open-muddy-v3.png: 96x4, colors 49352F, 4E3B39, 74513F, exact palette; alpha mask unchanged
+tribal-mud-wall-muddy-v3.png: 32x32, colors 7A5038, 74513F, C18B5A, 886044, B78350, exact palette; alpha mask unchanged
+tribal-earth-floor-muddy-v3.png: 32x32, colors B78350, A78D72, exact palette; alpha mask unchanged
+Reopened all 8 PNG exports: 25684 visible pixels; 0 off-palette or partial-alpha pixels.

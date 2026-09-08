@@ -1,0 +1,29 @@
+# Paladin: optional artist-owned runtime PNG exports. No artwork is supplied.
+# Each uncommented row: id relative_path width height pivotX pivotY elevation smooth
+# Sizes/elevation are logical tiles, NOT source pixels. Paths have no spaces.
+# smooth: 0 nearest, 1 linear. Optional trailing columns: frame-count fps
+# Animation is a horizontal strip of equal-sized frames. Dimensions describe ONE frame.
+# Art is validated against config/art-palette.hex; lighting is unrestricted.
+# F6 reloads in game; Debug builds read source exports directly. F7 snaps zoom to 32px/tile multiples.
+# Supported IDs: citizen, tree, rock, animal.cow, animal.pig, animal.chicken
+# Building modules: house.floor, house.wall, house.roof
+# Also: city_keep.floor/wall/roof and bakery.floor/wall/roof
+# City object layers/placeholder recipes are configured in config/city-objects.catalog.
+# Any ID can be referenced there: e.g. market.stall, stockpile.stack,
+# fishing_grounds.station, wheat_farm.crop, pastureland.floor, road.floor.
+# Supplying any object art removes that object's entire placeholder geometry.
+# Building module width/height specify repeat size; pivot/elevation are ignored
+# for these surfaces, whose placement comes from the footprint and wall height.
+# Example only; uncomment after creating your own export:
+# citizen entities/citizen.png 0.5 0.8 0.5 1 0 0
+# tree vegetation/tree.png 1.3 2 0.5 1 0 0
+# house.roof structures/roof_tile.png 1 1 0 0 0 0
+house.roof structures/tribal-roof-legacy-muddy-v3.png 3 3 0 0 0 0
+house.wall structures/tribal-mud-wall-muddy-v3.png 1 1 0 0 0 0
+house.floor structures/tribal-earth-floor-muddy-v3.png 1 1 0 0 0 0
+house.roof.full structures/tribal-roof-courses-muddy-v3.png 3.5 3.125 0.0714285714 0.04 0.85 0
+house.wall.south structures/tribal-facade-muddy-v3.png 3 0.875 0 1 0 0
+house.cap.south structures/tribal-wallcap-open-muddy-v3.png 3 0.125 0 1 0 0
+house.wall.north structures/tribal-interior-north-muddy-v3.png 3 0.875 0 1 0 0
+house.cap.west structures/tribal-sidecap-muddy-v3.png 0.125 3 0 1 0 0
+house.cap.east structures/tribal-sidecap-muddy-v3.png 0.125 3 1 1 0 0

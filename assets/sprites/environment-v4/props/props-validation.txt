@@ -1,0 +1,8 @@
+market-stall: 64x64, opaque=2806, colors=26, alpha=0/255; source bbox=56,95,1141,1037
+stockpile-stack: 48x40, opaque=1264, colors=18, alpha=0/255; source bbox=113,138,1198,928
+fishing-station: 48x64, opaque=1886, colors=23, alpha=0/255; source bbox=387,36,689,1018
+wheat-crop: 48x40, opaque=1201, colors=12, alpha=0/255; source bbox=75,58,1221,1006
+market-stall 64x64 visibleColors=26 offPalette=0 partialAlpha=0 transparent=1290 opaque=2806 colors=#ADA0B9,#4E3B39,#F4D78B,#596679,#D9C79F,#79B56D,#4F8C7A,#B78350,#633E4B,#D0E58A,#7A5038,#81718F,#886044,#F4E7C7,#49352F,#235747,#D7E0E3,#A99478,#202C43,#EBC46B,#392B3C,#A6CD59,#49975B,#337A58,#FFE8AD,#193E42
+stockpile-stack 48x40 visibleColors=18 offPalette=0 partialAlpha=0 transparent=656 opaque=1264 colors=#D5A454,#81718F,#EFE2CF,#7A5038,#FFE8AD,#D9C79F,#596679,#4E3B39,#EBC46B,#F4E7C7,#49352F,#886044,#633E4B,#B78350,#D7E0E3,#A99478,#392B3C,#F4D78B
+fishing-station 48x64 visibleColors=23 offPalette=0 partialAlpha=0 transparent=1186 opaque=1886 colors=#D5A454,#81718F,#7A5038,#337A58,#235747,#FFE8AD,#D7C8A2,#886044,#193E42,#596679,#4E3B39,#49975B,#A99478,#EBC46B,#63BFC3,#49352F,#633E4B,#4F8C7A,#B78350,#D7E0E3,#F4E7C7,#392B3C,#F4D78B
+wheat-crop 48x40 visibleColors=12 offPalette=0 partialAlpha=0 transparent=719 opaque=1201 colors=#D5A454,#79B56D,#337A58,#235747,#FFE8AD,#49975B,#EBC46B,#F4E7C7,#886044,#193E42,#A6CD59,#F4D78B

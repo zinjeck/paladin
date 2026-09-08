@@ -1,0 +1,11 @@
+# World terrain and hill pass
+
+Mountains use mountain sprites; usable Hills land uses grassy hill sprites. Whole sprite footprints are checked against terrain, including small sprites for narrow terrain regions. All imports use 16 pixels per tile, with actual scene pixel-block and imported-dimension checks in PaladinArtCheck. The hill export is 48x32 pixels for 3x2 tiles, binary transparency, exact approved palette. Source lives here; runtime export is assets/sprites/world-relief/hill.png. Export with tools/export.ps1 using Windows PowerShell.
+
+Generation now uses a warped continental backbone and convergent plate ridges to produce elevation, with a Hills transition before inland lowland. Elevation does not add movement/slope mechanics. Tiny enclosed water holes are filled; ocean-connected channels and larger lakes remain. New geography requires a newly generated world.
+
+The Godot reference was Documents/Paladin/scripts/world/generation/WorldGenerator.gd and scripts/city/generation/CityWorldGenerator.gd. Hills stay Land, propagate to city generation, have sparse trees and denser rock clusters (.10 tree base, .34 rock cluster chance). The current C++ game has no equivalent terrain fertility or iron/coal/gold systems; those legacy mechanics are not claimed as implemented.
+
+The distant world map uses a cached cartographic texture, darker navy seas, muted realm colors, quiet relief and dark boundaries/labels. Close terrain boundaries sample continuous fields while retaining existing textures. WorldSurface supplies UV-based spherical/conic coordinate helpers for future presentation; current gameplay and rendering remain flat. This is preparation, not a globe renderer.
+
+Hill art used the built-in image-generation tool. Prompt: single isolated low rounded grassy hill with small stone shoulder, fixed elevated top-down camera, clean clustered pixel art for a 48x32 export, upper-left light, grass #A6CD59 #79B56D #49975B #337A58 #235747 and stone #A99478 #716D70 #596679, transparent background, no trees/buildings/text or external shadow. Revision requested removal of glow/haze and crisp transparent edges. Export quantizes to the approved palette and balances green midtones for existing runtime daylight remapping.
