@@ -3,9 +3,13 @@
 #include "core/EntityRegistry.h"
 #include "core/StrongId.h"
 #include "debug/ConsoleCommand.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "rendering/Camera2D.h"
+#include "rendering/GlobeView.h"
+#include "world/WorldGrid.h"
 #include "world/settlements/SettlementCommerce.h"
 
+#include <cmath>
 #include <type_traits>
 
 namespace
@@ -100,6 +104,35 @@ namespace
         camera.setZoom(100.0);
         PALADIN_CHECK(camera.zoom() == 80.0);
     }
+
+    void testGlobeRollNavigation()
+    {
+        constexpr double pi = 3.14159265358979323846;
+        Paladin::WorldGrid grid(360, 180);
+        Paladin::Camera2D camera(180.0, 90.0);
+
+        const auto before = Paladin::GlobeView::from(camera, grid, 1000, 800);
+        const auto worldRight = before.orientation().inverse().apply({1, 0, 0});
+        const double centerX = camera.tileX();
+        const double centerY = camera.tileY();
+
+        Paladin::GlobeCameraNavigation::roll(
+            camera,
+            grid,
+            1000,
+            800,
+            pi * 0.5
+        );
+
+        PALADIN_CHECK(std::abs(camera.tileX() - centerX) < 1e-9);
+        PALADIN_CHECK(std::abs(camera.tileY() - centerY) < 1e-9);
+
+        const auto after = Paladin::GlobeView::from(camera, grid, 1000, 800);
+        const auto rotatedRight = after.orientation().apply(worldRight);
+        PALADIN_CHECK(std::abs(rotatedRight.x) < 1e-9);
+        PALADIN_CHECK(rotatedRight.y > 0.999999999);
+        PALADIN_CHECK(std::abs(rotatedRight.z) < 1e-9);
+    }
 } // namespace
 
 
@@ -130,4 +163,5 @@ void runCoreTests()
     testStrongIds();
     testEntityRegistry();
     testCameraZoomLimits();
+    testGlobeRollNavigation();
 }
