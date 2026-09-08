@@ -5,6 +5,7 @@
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/settlements/SettlementSimulationState.h"
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -14,6 +15,9 @@ namespace Paladin
 {
     class World;
 
+    // Settlement is the canonical domain concept. Terms such as city, town, or
+    // village may be used by presentation/UI, but they are not separate entity
+    // types. For now, settlement scale is data-driven (primarily population).
     class Settlement
     {
     public:
@@ -75,6 +79,12 @@ namespace Paladin
         CultureId primaryCultureId() const noexcept
         {
             return primaryCultureId_;
+        }
+
+        [[nodiscard]]
+        std::uint64_t population() const noexcept
+        {
+            return simulationState_.population().residents();
         }
 
         [[nodiscard]]
