@@ -170,7 +170,7 @@ add_custom_command(
         $<TARGET_FILE_DIR:Paladin>/assets/fonts/Arimo-Regular.ttf
 )
 
-# Copies only runtime exports. Art masters and the asset Git policy stay separate.
+# Copies only runtime exports. Source art and review material stay out of the build.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites")
     add_custom_target(PaladinSpriteAssets ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -180,7 +180,7 @@ endif()
 
 # ============================================================
 # Tests
-# Presentation recipes are source-controlled; artwork remains private.
+# Presentation recipes and runtime artwork are source-controlled inputs.
 add_custom_target(PaladinObjectPresentation ALL
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Paladin>/assets/sprites
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -196,6 +196,8 @@ enable_testing()
 
 add_executable(PaladinTests
     tests/TestMain.cpp
+    tests/EntityAttributeTests.cpp
+    tests/WorldReliefTests.cpp
     src/simulation/SimulationReports.cpp
     tests/SettlementSimulationLoopTests.cpp
     tests/SettlementActivityTests.cpp
@@ -265,6 +267,18 @@ add_test(
     NAME PaladinTests
     COMMAND PaladinTests
 )
+
+# Keep source/art inputs trackable without publishing local build output.
+# Git is optional for building/running the C++ simulation tests.
+find_package(Git QUIET)
+if(Git_FOUND)
+    add_test(NAME PaladinGitIgnoreTests
+        COMMAND ${CMAKE_COMMAND}
+            "-DPALADIN_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DPALADIN_TEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/gitignore-policy-test"
+            "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/GitIgnoreTests.cmake")
+endif()
 
 # Opt-in SDL integration check for application routing. The ordinary simulation
 # tests remain independent of a window/renderer and do not rebuild the UI.
