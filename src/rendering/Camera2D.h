@@ -2,6 +2,7 @@
 
 #include "rendering/PlanetRotation.h"
 #include <algorithm>
+#include <utility>
 
 namespace Paladin
 {
@@ -76,6 +77,67 @@ namespace Paladin
             tileY_ = uv.v * height;
         }
 
+        [[nodiscard]]
+        int cityQuarterTurns() const noexcept
+        {
+            return cityQuarterTurns_;
+        }
+
+        [[nodiscard]]
+        double cityHeadingDegrees() const noexcept
+        {
+            return cityQuarterTurns_ * 90.0;
+        }
+
+        void setCityQuarterTurns(int turns) noexcept
+        {
+            turns %= 4;
+            cityQuarterTurns_ = turns < 0 ? turns + 4 : turns;
+        }
+
+        void rotateCityQuarterTurns(int delta) noexcept
+        {
+            setCityQuarterTurns(cityQuarterTurns_ + delta);
+        }
+
+        [[nodiscard]]
+        std::pair<double, double> cityWorldToViewOffset(
+            double x,
+            double y
+        ) const noexcept
+        {
+            switch (cityQuarterTurns_)
+            {
+            case 1:
+                return {y, -x};
+            case 2:
+                return {-x, -y};
+            case 3:
+                return {-y, x};
+            default:
+                return {x, y};
+            }
+        }
+
+        [[nodiscard]]
+        std::pair<double, double> cityViewToWorldOffset(
+            double x,
+            double y
+        ) const noexcept
+        {
+            switch (cityQuarterTurns_)
+            {
+            case 1:
+                return {-y, x};
+            case 2:
+                return {-x, -y};
+            case 3:
+                return {y, -x};
+            default:
+                return {x, y};
+            }
+        }
+
     private:
         std::optional<PlanetRotation> planetRotation_;
         static constexpr double MinimumZoom = 0.25;
@@ -88,5 +150,6 @@ namespace Paladin
         double tileY_ = 0.0;
 
         double zoom_ = 1.0;
+        int cityQuarterTurns_ = 0;
     };
 } // namespace Paladin

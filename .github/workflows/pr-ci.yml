@@ -1,0 +1,40 @@
+name: Paladin PR CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: paladin-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Windows build and tests
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: >-
+          cmake -S . -B build
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DPALADIN_BUILD_APPLICATION_SMOKE_TESTS=OFF
+
+      - name: Build Paladin and tests
+        run: >-
+          cmake --build build
+          --config Debug
+          --target Paladin PaladinTests PaladinAssetTests
+          --parallel
+
+      - name: Run automated tests
+        run: ctest --test-dir build -C Debug --output-on-failure
