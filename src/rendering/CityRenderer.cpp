@@ -48,8 +48,13 @@ namespace Paladin
         {
             return;
         }
-        const double halfWidth = renderer.outputWidth() / tilePixels * 0.5;
-        const double halfHeight = renderer.outputHeight() / tilePixels * 0.5;
+        const bool sideways = (camera.cityQuarterTurns() & 1) != 0;
+        const double halfWidth =
+            (sideways ? renderer.outputHeight() : renderer.outputWidth()) /
+            tilePixels * 0.5;
+        const double halfHeight =
+            (sideways ? renderer.outputWidth() : renderer.outputHeight()) /
+            tilePixels * 0.5;
         const float left = x + static_cast<float>(std::clamp(
                                    camera.tileX() - halfWidth,
                                    0.0,
@@ -112,11 +117,20 @@ namespace Paladin
             artRoot = artRootOverride;
         }
         sprites_.load(renderer, artRoot);
-        sprites_.setShadowsEnabled(presentation.shadowsVisible);
+        CityPresentation viewPresentation = presentation;
+        viewPresentation.viewAzimuthDegrees = camera.cityHeadingDegrees();
+        sprites_.setShadowsEnabled(viewPresentation.shadowsVisible);
         WorldPixelScene pixelScene(
             renderer,
             metrics.scaledTilePixels(camera.zoom())
         );
+        SceneQuarterTurnScope sceneTurn(camera.cityQuarterTurns());
+        struct ResetRendererTurn
+        {
+            Renderer& renderer;
+            ~ResetRendererTurn() { renderer.setQuarterTurnTransform(0); }
+        } resetRendererTurn{renderer};
+
         sprites_.setTime(
             animationTimeOverride >= 0 ? animationTimeOverride
                                        : animationSeconds
@@ -128,9 +142,16 @@ namespace Paladin
             renderTimings[index] = (now - timing) / 1e6;
             timing = now;
         };
+
+        // Terrain and other map-space raster layers rotate as world geometry.
+        // Detailed sprites use SceneProjection below so their anchors rotate
+        // while the authored sprites themselves remain upright.
+        renderer.setQuarterTurnTransform(camera.cityQuarterTurns());
         gridRenderer_
             .render(renderer, settlementMap.grid(), camera, metrics, &sprites_);
+        renderer.setQuarterTurnTransform(0);
         stage(0);
+
         raised_.clear();
         const SceneProjection projection{
             camera.tileX(),
@@ -153,6 +174,8 @@ namespace Paladin
             detailBlend(projection.tilePixels, 20, 36)
         );
         stage(1);
+
+        renderer.setQuarterTurnTransform(camera.cityQuarterTurns());
         naturalFeatureRenderer_.render(
             renderer,
             settlementMap,
@@ -160,10 +183,12 @@ namespace Paladin
             metrics,
             &raised_,
             &sprites_,
-            &presentation
+            &viewPresentation
         );
+        renderer.setQuarterTurnTransform(0);
 
         stage(2);
+        renderer.setQuarterTurnTransform(camera.cityQuarterTurns());
         objectRenderer_.render(
             renderer,
             settlementMap,
@@ -172,6 +197,7 @@ namespace Paladin
             placementController,
             sprites_
         );
+        renderer.setQuarterTurnTransform(0);
 
         const double objectDetail = detailBlend(projection.tilePixels, 16, 28);
         distantObjects_.render(
@@ -179,7 +205,7 @@ namespace Paladin
             projection,
             settlementMap,
             sprites_,
-            presentation.roofsVisible,
+            viewPresentation.roofsVisible,
             1 - objectDetail
         );
         if (objectDetail == 0)
@@ -195,7 +221,7 @@ namespace Paladin
                 raised_,
                 projection,
                 settlementMap,
-                presentation,
+                viewPresentation,
                 sprites_,
                 &citizens,
                 &renderer
@@ -220,7 +246,7 @@ namespace Paladin
                     raised_,
                     projection,
                     sprites_,
-                    presentation,
+                    viewPresentation,
                     std::string(definition->id),
                     *footprint,
                     placementController.visibleDoor(),
@@ -238,10 +264,12 @@ namespace Paladin
             interpolationAlpha,
             &raised_,
             &sprites_,
-            &presentation
+            &viewPresentation
         );
         const auto drawStart = SDL_GetTicksNS();
         raised_.render(renderer, -3, -1);
+
+        renderer.setQuarterTurnTransform(camera.cityQuarterTurns());
         logisticsRenderer_.render(
             renderer,
             settlementMap,
@@ -252,6 +280,7 @@ namespace Paladin
             &raised_,
             &sprites_
         );
+        renderer.setQuarterTurnTransform(0);
         raised_.render(renderer, 0);
         if (SDL_getenv("PALADIN_CAMERA_PROFILE") &&
             SDL_GetTicksNS() - drawStart > 10000000)
@@ -265,7 +294,7 @@ namespace Paladin
             std::isfinite(sunIncidence) ? sunIncidence
                                         : globeSunDot(.5, .5, hour * 3600.)
         );
-        if (presentation.cloudsEnabled)
+        if (viewPresentation.cloudsEnabled)
         {
             clouds_.render(
                 renderer,
@@ -283,11 +312,11 @@ namespace Paladin
             projection,
             settlementMap,
             sprites_,
-            presentation,
+            viewPresentation,
             hour,
             sunIncidence
         );
-        if (presentation.cloudsEnabled)
+        if (viewPresentation.cloudsEnabled)
         {
             clouds_.render(
                 renderer,
@@ -300,6 +329,8 @@ namespace Paladin
             );
         }
         stage(4);
+
+        renderer.setQuarterTurnTransform(camera.cityQuarterTurns());
         objectRenderer_.renderOverlay(
             renderer,
             settlementMap,
@@ -314,6 +345,8 @@ namespace Paladin
             camera,
             metrics
         );
+        renderer.setQuarterTurnTransform(0);
+
         citizenRenderer_.renderAnnotations(
             renderer,
             metrics.scaledTilePixels(camera.zoom())
@@ -340,14 +373,11 @@ namespace Paladin
         };
         const auto footprintHighlight = [&](const auto& f)
         {
-            highlight(projection.bounds(
-                {double(f.topLeft.x),
-                 double(f.topLeft.y),
-                 0,
-                 double(f.width),
-                 double(f.height),
-                 0,
-                 0}
+            highlight(projection.groundBounds(
+                double(f.topLeft.x),
+                double(f.topLeft.y),
+                double(f.width),
+                double(f.height)
             ));
         };
         if (const auto* object =
