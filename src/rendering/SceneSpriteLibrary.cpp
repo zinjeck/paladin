@@ -281,7 +281,13 @@ namespace Paladin
                             source,
                             sprite.width,
                             sprite.height,
-                            sprite.frames
+                            sprite.frames,
+                            palette.contains(0xA6CD59) &&
+                                palette.contains(0x79B56D) &&
+                                palette.contains(0x49975B) &&
+                                palette.contains(0x337A58) &&
+                                palette.contains(0xD9C79F) &&
+                                palette.contains(0xB78350)
                         ))
                     {
                         SDL_DestroySurface(source);

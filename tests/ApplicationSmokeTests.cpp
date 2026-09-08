@@ -19,6 +19,7 @@
 #include "rendering/SpriteStyle.h"
 #include "rendering/StockpilePresentation.h"
 #include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -620,11 +621,59 @@ namespace Paladin
             PALADIN_CHECK(installed.find("house.roof"));
             PALADIN_CHECK(installed.find("house.wall"));
             PALADIN_CHECK(installed.find("house.floor"));
+            for (const char* name :
+                 {"terrain.plain",
+                  "terrain.forest",
+                  "terrain.jungle",
+                  "terrain.taiga",
+                  "pastureland.floor",
+                  "hill.mound",
+                  "hill.mound.small",
+                  "mountain.range.a",
+                  "mountain.peak.small"})
+            {
+                const auto* grass = installed.find(name);
+                PALADIN_CHECK(grass);
+                PALADIN_CHECK(
+                    grass->texture->width() ==
+                    std::lround(grass->width * WorldPixelsPerTile)
+                );
+                PALADIN_CHECK(
+                    grass->texture->height() ==
+                    std::lround(grass->height * WorldPixelsPerTile)
+                );
+            }
+            // These cutouts must not import foliage from adjacent atlas cells.
+            for (const char* name : {"meat", "fish", "crate"})
+            {
+                const auto path = std::filesystem::path(city.artRootOverride) /
+                                  "tribal-v14" / (std::string(name) + ".png");
+                auto* icon = IMG_Load(path.string().c_str());
+                PALADIN_CHECK(icon);
+                for (int y = 0; y < icon->h; ++y)
+                {
+                    for (int x = 0; x < icon->w; ++x)
+                    {
+                        Uint8 r, g, b, a;
+                        SDL_ReadSurfacePixel(icon, x, y, &r, &g, &b, &a);
+                        PALADIN_CHECK(!a || !(g > r && g > b));
+                    }
+                }
+                SDL_DestroySurface(icon);
+            }
             // Test the final scene, not just PNG sizes: fitted roofs, animated
             // sprites, cached ground and lighting must obey the same lattice.
             const auto previousZoom = camera.zoom();
+            city.reloadArt();
+            SceneSpriteLibrary::setEnvironmentArtEnabled(true);
+            city.presentation.roofsVisible = true;
             camera.setZoom(16);
             map.naturalFeatures().set({10, 13}, NaturalFeatureKind::Rock);
+            for (int warm = 0; warm < 12; ++warm)
+            {
+                draw(12);
+                renderer.endFrame();
+            }
             draw(12);
             requireUniformWorldPixels(app, 4);
             capture(app, "uniform-pixels-day.bmp");
@@ -1468,6 +1517,83 @@ namespace Paladin
         {
             Application app;
             PALADIN_CHECK(app.renderer_ && app.renderer_->isValid());
+            {
+                WorldGenerationSettings settings;
+                settings.width = 180;
+                settings.height = 132;
+                settings.seed = 0xCAFEBEEFULL;
+                World review(settings);
+                Camera2D camera(90, 66);
+                TileRenderMetrics metrics;
+                WorldRenderer map;
+                camera.setZoom(1);
+                app.renderer_->beginFrame();
+                map.render(*app.renderer_, review, camera, metrics);
+                capture(app, "world-cartography.bmp");
+                WorldTilePosition hill{90, 66};
+                bool found = false;
+                for (int y = 20; y < 112 && !found; ++y)
+                {
+                    for (int x = 20; x < 160; ++x)
+                    {
+                        if (review.grid().tile({x, y})->biome ==
+                                BiomeType::Hills &&
+                            review.grid().tile({x + 1, y})->terrain ==
+                                TerrainType::Mountain)
+                        {
+                            hill = {x, y};
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                PALADIN_CHECK(found);
+                camera.setPosition(hill.x + .5, hill.y + .5);
+                camera.setZoom(8);
+                for (int i = 0; i < 12; ++i)
+                {
+                    app.renderer_->beginFrame();
+                    map.render(*app.renderer_, review, camera, metrics);
+                }
+                capture(app, "world-foothills.bmp");
+                camera.setZoom(16);
+                app.renderer_->beginFrame();
+                map.render(*app.renderer_, review, camera, metrics);
+                requireUniformWorldPixels(app, 4);
+                capture(app, "world-foothills-close.bmp");
+                WorldCartography cache;
+                SceneProjection p{
+                    90,
+                    66,
+                    4,
+                    app.renderer_->outputWidth(),
+                    app.renderer_->outputHeight()
+                };
+                cache.render(*app.renderer_, review, p);
+                const auto builds = cache.rebuildCount;
+                p.tilePixels = 16;
+                cache.render(*app.renderer_, review, p);
+                p.cameraX += 10;
+                cache.render(*app.renderer_, review, p);
+                PALADIN_CHECK(cache.rebuildCount == builds);
+                double totalMs = 0, worstMs = 0;
+                for (int frame = 0; frame < 36; ++frame)
+                {
+                    camera.setZoom(
+                        frame < 12 ? (frame % 2 ? .45 : .75) : 3. + (frame % 8)
+                    );
+                    camera.move(.7, .3);
+                    const auto start = SDL_GetTicksNS();
+                    app.renderer_->beginFrame();
+                    map.render(*app.renderer_, review, camera, metrics);
+                    app.renderer_->endFrame();
+                    const double ms = (SDL_GetTicksNS() - start) / 1e6;
+                    totalMs += ms;
+                    worstMs = std::max(worstMs, ms);
+                }
+                std::cout << "world pan/zoom mean_ms=" << totalMs / 36
+                          << " worst_ms=" << worstMs << std::endl;
+            }
             {
                 SimulationClock clock(20);
                 clock.setPaused(false);

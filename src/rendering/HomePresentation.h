@@ -29,6 +29,10 @@ namespace Paladin
         const auto start = queue.size();
         if (policy.roofsVisible)
         {
+            if (!sprites.find("home.detail.shutters"))
+            {
+                return;
+            }
             const int facing =
                 buildingView(f, home.door, policy.viewAzimuthDegrees);
             // Attach details to the visible wall plane. No ground containers

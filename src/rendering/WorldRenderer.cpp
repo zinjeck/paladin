@@ -45,8 +45,6 @@ namespace Paladin
             metrics.scaledTilePixels(camera.zoom())
         );
         artwork_.setTime(animationSeconds);
-        gridRenderer_
-            .render(renderer, world.grid(), camera, metrics, &artwork_);
 
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
 
@@ -75,13 +73,32 @@ namespace Paladin
             politicalViewActive_ = true;
         }
 
+        if (!politicalViewActive_)
+        {
+            gridRenderer_
+                .render(renderer, world.grid(), camera, metrics, &artwork_);
+        }
+        {
+            cartography_.render(
+                renderer,
+                world,
+                {camera.tileX(),
+                 camera.tileY(),
+                 tilePixels,
+                 renderer.outputWidth(),
+                 renderer.outputHeight()},
+                politicalViewActive_
+            );
+        }
+        auto presentation = territoryPresentationPolicy_;
+        presentation.cartographicBase = politicalViewActive_;
         territoryRenderer_.render(
             renderer,
             world,
             camera,
             metrics,
             politicalViewActive_,
-            territoryPresentationPolicy_
+            presentation
         );
 
         spriteRenderer_.render(renderer, sprites, camera, metrics);

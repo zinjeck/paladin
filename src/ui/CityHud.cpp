@@ -902,10 +902,10 @@ namespace Paladin
                         0,
                         float(icon->width()),
                         float(icon->height()),
-                        x - 14,
+                        x - icon->width() * .5F,
                         y,
-                        28,
-                        24
+                        float(icon->width()),
+                        float(icon->height())
                     );
                 }
                 else

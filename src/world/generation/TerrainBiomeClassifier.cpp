@@ -59,18 +59,6 @@ namespace Paladin
                     continue;
                 }
 
-                const double ridgeNoise =
-                    1.0 - std::abs(
-                              GenerationNoise::fractal(
-                                  static_cast<double>(x) * 0.017,
-                                  static_cast<double>(y) * 0.017,
-                                  settings.seed ^ 0x7351'7D93'2B4A'C861ULL,
-                                  4,
-                                  0.57,
-                                  2.2
-                              )
-                          );
-
                 const double landElevation = std::clamp(
                     (static_cast<double>(tile->elevation.value()) -
                      settings.seaLevel) /
@@ -79,16 +67,46 @@ namespace Paladin
                     1.0
                 );
 
-                const double mountainScore =
-                    ridgeNoise * 0.82 + landElevation * 0.18;
-
-                tile->terrain = mountainScore >= 0.76 ? TerrainType::Mountain
-                                                      : TerrainType::Land;
+                tile->terrain = landElevation >= .52 ? TerrainType::Mountain
+                                                     : TerrainType::Land;
 
                 tile->biome = classifyLandBiome(
                     tile->temperature.value(),
                     tile->rainfall.value()
                 );
+                // Foothills are usable land, with their own city vegetation
+                // and stone distribution. Height has no movement penalty.
+                if (tile->terrain == TerrainType::Land && landElevation >= .25)
+                {
+                    tile->biome = BiomeType::Hills;
+                }
+            }
+        }
+        // Even narrow ridges must descend through foothills before lowland.
+        // Read elevation rather than classifications so traversal order cannot
+        // change the generated result.
+        for (int y = 0; y < grid.height(); ++y)
+        {
+            for (int x = 0; x < grid.width(); ++x)
+            {
+                auto* tile = grid.tile({x, y});
+                if (tile->terrain != TerrainType::Land)
+                {
+                    continue;
+                }
+                for (int dy = -1; dy <= 1; ++dy)
+                {
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        const auto* neighbor = grid.tile({x + dx, y + dy});
+                        if (neighbor && neighbor->elevation.value() >=
+                                            settings.seaLevel +
+                                                (1 - settings.seaLevel) * .52)
+                        {
+                            tile->biome = BiomeType::Hills;
+                        }
+                    }
+                }
             }
         }
     }

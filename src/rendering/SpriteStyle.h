@@ -15,7 +15,8 @@ namespace Paladin
         SDL_Surface* source,
         double width,
         double height,
-        int frames
+        int frames,
+        bool applySunlight = false
     )
     {
         auto* rgba = SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
@@ -53,9 +54,10 @@ namespace Paladin
                           );
                 const auto* c = static_cast<const Uint8*>(rgba->pixels) +
                                 sy * rgba->pitch + sx * 4;
-                const auto color = sunlitMaterial(
-                    (unsigned(c[0]) << 16) | (unsigned(c[1]) << 8) | c[2]
-                );
+                const auto original =
+                    (unsigned(c[0]) << 16) | (unsigned(c[1]) << 8) | c[2];
+                const auto color =
+                    applySunlight ? sunlitMaterial(original) : original;
                 pixels[std::size_t(y) * stride + x] =
                     {Uint8(color >> 16), Uint8(color >> 8), Uint8(color), c[3]};
             }

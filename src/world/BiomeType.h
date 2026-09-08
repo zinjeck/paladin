@@ -12,6 +12,7 @@ namespace Paladin
         Desert,
         Tundra,
         Taiga,
-        Ocean
+        Ocean,
+        Hills
     };
 } // namespace Paladin

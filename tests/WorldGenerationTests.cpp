@@ -1,5 +1,7 @@
 #include "TestFramework.h"
 
+#include "rendering/WorldReliefPlacement.h"
+#include "rendering/WorldSurface.h"
 #include "world/BiomeType.h"
 #include "world/EnvironmentalValues.h"
 #include "world/TerrainType.h"
@@ -7,9 +9,12 @@
 #include "world/WorldGrid.h"
 #include "world/WorldTile.h"
 #include "world/generation/SettlementMapGenerator.h"
+#include "world/generation/TerrainBiomeClassifier.h"
 #include "world/generation/WorldGenerationSeed.h"
 #include "world/generation/WorldGenerationSettings.h"
+#include "world/generation/WorldRelief.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/SettlementNaturalFeatures.h"
 
 #include <bit>
 #include <cstddef>
@@ -83,6 +88,106 @@ namespace
         PALADIN_CHECK(
             worldHash(firstWorld.grid()) != worldHash(differentWorld.grid())
         );
+    }
+
+    void testFoothillsAndWaterTopology()
+    {
+        using namespace Paladin;
+        WorldGrid grid(24, 24);
+        for (int y = 0; y < 24; ++y)
+        {
+            for (int x = 0; x < 24; ++x)
+            {
+                grid.tile({x, y})->elevation = Elevation{.6F};
+            }
+        }
+        // A small inland pinhole is filled, a substantial lake and an
+        // edge-connected channel are retained, including diagonal access.
+        grid.tile({5, 5})->elevation = Elevation{.2F};
+        for (int y = 12; y < 16; ++y)
+        {
+            for (int x = 12; x < 16; ++x)
+            {
+                grid.tile({x, y})->elevation = Elevation{.2F};
+            }
+        }
+        for (int x = 0; x < 5; ++x)
+        {
+            grid.tile({x, x})->elevation = Elevation{.2F};
+        }
+        generateWorldRelief(grid, .46F, 912);
+        PALADIN_CHECK(grid.tile({5, 5})->elevation.value() <= .46F);
+        // The first pinhole actually connects diagonally to the channel;
+        // an isolated second hole must be treated differently.
+        grid.tile({8, 6})->elevation = Elevation{.2F};
+        generateWorldRelief(grid, .46F, 912);
+        PALADIN_CHECK(grid.tile({8, 6})->elevation.value() > .46F);
+        PALADIN_CHECK(grid.tile({13, 13})->elevation.value() <= .46F);
+        PALADIN_CHECK(grid.tile({3, 3})->elevation.value() <= .46F);
+
+        WorldGenerationSettings settings;
+        for (int y = 0; y < 24; ++y)
+        {
+            for (int x = 0; x < 24; ++x)
+            {
+                grid.tile({x, y})->elevation = Elevation{.50F};
+            }
+        }
+        grid.tile({12, 12})->elevation = Elevation{.90F};
+        TerrainBiomeClassifier{}.classify(grid, settings);
+        PALADIN_CHECK(grid.tile({12, 12})->terrain == TerrainType::Mountain);
+        PALADIN_CHECK(grid.tile({11, 12})->biome == BiomeType::Hills);
+        PALADIN_CHECK(grid.tile({11, 12})->terrain == TerrainType::Land);
+        PALADIN_CHECK(reliefFootprintFits(grid, 11, 12, 1, 1, true));
+        PALADIN_CHECK(!reliefFootprintFits(grid, 11, 12, 2, 1, true));
+        PALADIN_CHECK(reliefFootprintFits(grid, 12, 12, 1, 1, false));
+        PALADIN_CHECK(!reliefFootprintFits(grid, 11, 12, 1, 1, false));
+        PALADIN_CHECK(grid.tile({2, 2})->biome != BiomeType::Hills);
+
+        // Hills survive conversion to the local city map.
+        for (int y = 0; y < 24; ++y)
+        {
+            for (int x = 0; x < 24; ++x)
+            {
+                grid.tile({x, y})->biome = BiomeType::Hills;
+            }
+        }
+        SettlementMapGenerationSettings local;
+        local.localTilesPerWorldTile = 4;
+        auto city =
+            SettlementMapGenerator{}.generate(grid, {5, 5}, 3, 3, 812, local);
+        PALADIN_CHECK(city->grid().tile({6, 6})->biome == BiomeType::Hills);
+
+        SettlementGrid plain(192, 192), hills(192, 192);
+        for (int y = 0; y < 192; ++y)
+        {
+            for (int x = 0; x < 192; ++x)
+            {
+                auto t = *grid.tile({2, 2});
+                t.terrain = TerrainType::Land;
+                t.biome = BiomeType::Plain;
+                *plain.tile({x, y}) = t;
+                t.biome = BiomeType::Hills;
+                *hills.tile({x, y}) = t;
+            }
+        }
+        SettlementNaturalFeatures a(192, 192), b(192, 192);
+        a.generate(plain, 901);
+        b.generate(hills, 901);
+        int plainRocks = 0, hillRocks = 0;
+        for (int y = 0; y < 192; ++y)
+        {
+            for (int x = 0; x < 192; ++x)
+            {
+                plainRocks += a.at({x, y}).kind == NaturalFeatureKind::Rock;
+                hillRocks += b.at({x, y}).kind == NaturalFeatureKind::Rock;
+            }
+        }
+        PALADIN_CHECK(hillRocks > plainRocks * 1.4);
+        const auto left = WorldSurface::sphere(0, .5),
+                   right = WorldSurface::sphere(1, .5);
+        PALADIN_CHECK(std::abs(left.x - right.x) < 1e-12);
+        PALADIN_CHECK(std::abs(left.z - right.z) < 1e-12);
     }
 
     void testGeneratedWorldInvariants()
@@ -264,6 +369,7 @@ void runWorldGenerationTests()
     );
 
     testDeterministicWorldGeneration();
+    testFoothillsAndWaterTopology();
     testGeneratedWorldInvariants();
     testSettlementMapTranslatesSelectedRegion();
 }

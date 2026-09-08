@@ -412,6 +412,7 @@ namespace Paladin
             event.key.scancode == SDL_SCANCODE_F6)
         {
             cityRenderer_->reloadArt();
+            cityHud_->reloadArt();
             return;
         }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&

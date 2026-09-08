@@ -140,18 +140,31 @@ namespace Paladin
             );
 
             continent.lobes.reserve(static_cast<std::size_t>(lobeCount));
+            const double backboneAngle = random.range(0.0, 2.0 * pi);
 
             for (std::int32_t index = 0; index < lobeCount; ++index)
             {
-                const double offsetX = random.range(
-                    -worldWidth * definition.maximumOffsetWidthFraction,
-                    worldWidth * definition.maximumOffsetWidthFraction
-                );
+                const double along =
+                    (index / double(std::max(1, lobeCount - 1)) - .5) * 2.;
+                const double offsetX =
+                    along * worldWidth * definition.maximumOffsetWidthFraction *
+                        std::cos(backboneAngle) +
+                    .35 *
+                        random.range(
+                            -worldWidth * definition.maximumOffsetWidthFraction,
+                            worldWidth * definition.maximumOffsetWidthFraction
+                        );
 
-                const double offsetY = random.range(
-                    -worldHeight * definition.maximumOffsetHeightFraction,
-                    worldHeight * definition.maximumOffsetHeightFraction
-                );
+                const double offsetY =
+                    along * worldHeight *
+                        definition.maximumOffsetHeightFraction *
+                        std::sin(backboneAngle) +
+                    .35 *
+                        random.range(
+                            -worldHeight *
+                                definition.maximumOffsetHeightFraction,
+                            worldHeight * definition.maximumOffsetHeightFraction
+                        );
 
                 const double radiusX = random.range(
                     worldWidth * definition.minimumRadiusWidthFraction,
@@ -163,7 +176,7 @@ namespace Paladin
                     worldHeight * definition.maximumRadiusHeightFraction
                 );
 
-                const double angle = random.range(0.0, 2.0 * pi);
+                const double angle = backboneAngle + random.range(-.65, .65);
 
                 continent.lobes.push_back(
                     {offsetX,
@@ -446,8 +459,24 @@ namespace Paladin
                 const double positionY = static_cast<double>(y);
 
                 const double continentCore = continentCenterBias(
-                    positionX,
-                    positionY,
+                    positionX + grid.width() * .075 *
+                                    GenerationNoise::simplexFractal(
+                                        positionX / grid.width() * 3.8,
+                                        positionY / grid.height() * 3.8,
+                                        settings.seed + 771,
+                                        3,
+                                        .5,
+                                        2
+                                    ),
+                    positionY + grid.height() * .075 *
+                                    GenerationNoise::simplexFractal(
+                                        positionX / grid.width() * 3.8,
+                                        positionY / grid.height() * 3.8,
+                                        settings.seed + 997,
+                                        3,
+                                        .5,
+                                        2
+                                    ),
                     continents,
                     *definition
                 );

@@ -20,7 +20,7 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::size_t biomeCount = 7;
+        constexpr std::size_t biomeCount = 8;
 
         std::size_t biomeIndex(BiomeType biome) noexcept
         {
@@ -62,13 +62,14 @@ namespace Paladin
             double boundaryNoiseStrength
         ) noexcept
         {
-            constexpr std::array<BiomeType, 6> landBiomes{
+            constexpr std::array<BiomeType, 7> landBiomes{
                 BiomeType::Plain,
                 BiomeType::Forest,
                 BiomeType::Jungle,
                 BiomeType::Desert,
                 BiomeType::Tundra,
-                BiomeType::Taiga
+                BiomeType::Taiga,
+                BiomeType::Hills
             };
 
             BiomeType bestBiome = BiomeType::Plain;

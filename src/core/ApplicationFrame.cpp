@@ -6,6 +6,7 @@
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/DebugConsole.h"
+#include "ui/CityHud.h"
 #include "ui/LedgerPanel.h"
 #include "ui/SimulationSpeedControls.h"
 #include <SDL3/SDL.h>
@@ -211,6 +212,7 @@ namespace Paladin
         {
             cityRenderer_->reloadArt();
             worldRenderer_->reloadArt();
+            cityHud_->reloadArt();
             return true;
         }
         if (screen_ != Screen::MainMenu && simulation_ &&

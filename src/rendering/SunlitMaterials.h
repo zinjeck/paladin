@@ -8,6 +8,8 @@ namespace Paladin
     {
         switch (rgb)
         {
+        case 0x49975B:
+            return 0x79B56D;
         case 0x79B56D:
             return 0xA6CD59;
         case 0x337A58:

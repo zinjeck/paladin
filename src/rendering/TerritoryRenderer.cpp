@@ -362,7 +362,8 @@ namespace Paladin
         const double viewportHeight =
             static_cast<double>(renderer.outputHeight());
 
-        if (politicalView && cache_->politicalOverlay)
+        if (politicalView && !policy.cartographicBase &&
+            cache_->politicalOverlay)
         {
             renderer.drawTexture(
                 *cache_->politicalOverlay,
@@ -401,6 +402,10 @@ namespace Paladin
 
         for (const BoundaryEdge& boundary : cache_->boundaryEdges)
         {
+            if (politicalView && policy.cartographicBase)
+            {
+                break;
+            }
             const float screenX = static_cast<float>(
                 viewportWidth * 0.5 +
                 (static_cast<double>(boundary.position.x) - camera.tileX()) *
@@ -504,7 +509,8 @@ namespace Paladin
                                   587 * static_cast<int>(mapColor.green) +
                                   114 * static_cast<int>(mapColor.blue);
 
-            const bool useDarkText = luminance > 145000;
+            const bool useDarkText =
+                policy.cartographicBase || luminance > 145000;
             const RenderColor shadow = useDarkText
                                            ? RenderColor{255, 255, 255, 210}
                                            : RenderColor{0, 0, 0, 225};
@@ -522,7 +528,7 @@ namespace Paladin
                 labelX + 1.0F,
                 labelY + 1.0F,
                 pixelSize,
-                shadow
+                policy.cartographicBase ? RenderColor{0, 0, 0, 0} : shadow
             );
 
             fontRenderer_.drawText(

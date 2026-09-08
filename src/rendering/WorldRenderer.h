@@ -6,6 +6,7 @@
 #include "rendering/SpriteRenderer.h"
 #include "rendering/TerritoryPresentationPolicy.h"
 #include "rendering/TerritoryRenderer.h"
+#include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
 
 #include <span>
@@ -31,6 +32,7 @@ namespace Paladin
         void reloadArt() const
         {
             artwork_.reset();
+            cartography_.reset();
         }
 
         void render(
@@ -45,6 +47,7 @@ namespace Paladin
 
     private:
         WorldGridRenderer gridRenderer_;
+        mutable WorldCartography cartography_;
         mutable SceneSpriteLibrary artwork_;
         TerritoryRenderer territoryRenderer_;
         SpriteRenderer spriteRenderer_;

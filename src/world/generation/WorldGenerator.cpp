@@ -6,6 +6,7 @@
 #include "world/generation/LandmassGenerator.h"
 #include "world/generation/TerrainBiomeClassifier.h"
 #include "world/generation/WorldGenerationSettings.h"
+#include "world/generation/WorldRelief.h"
 
 #include <stdexcept>
 
@@ -79,6 +80,7 @@ namespace Paladin
         validateSettings(grid, settings);
 
         LandmassGenerator{}.generate(grid, settings);
+        generateWorldRelief(grid, settings.seaLevel, settings.seed);
         ClimateGenerator{}.generate(grid, settings);
         TerrainBiomeClassifier{}.classify(grid, settings);
     }

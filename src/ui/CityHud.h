@@ -123,6 +123,7 @@ namespace Paladin
         std::string_view selectedCommandTypeId() const noexcept;
 
         void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
+        void reloadArt() { goodsIconsLoaded_ = false; goodsIcons_ = {}; }
 
     private:
         bool worldMode_ = false;

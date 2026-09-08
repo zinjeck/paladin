@@ -81,7 +81,7 @@ namespace Paladin
     {
         constexpr int side = 16,
                       block = SettlementNaturalFeatures::OverviewSide;
-        constexpr int density = 8, textureSide = side * density;
+        constexpr int density = 16, textureSide = side * density;
         const int columns = (map.grid().width() + side - 1) / side,
                   rows = (map.grid().height() + side - 1) / side;
         const bool artwork = sprites && sprites->find("tree");
@@ -161,7 +161,7 @@ namespace Paladin
                 }
             }
         }
-        if (tp < 2)
+        if (tp < 4)
         {
             // One density image at strategic zoom. Refresh a bounded number of
             // dirty blocks.
@@ -246,7 +246,7 @@ namespace Paladin
         auto& textures = cachedTextures_;
         const auto deadline = SDL_GetTicksNS() + 2000000;
         int built = 0;
-        const double detail = blend(28, 44, tp);
+        const double detail = tp >= 40 ? 1.0 : 0.0;
         for (const auto& cell : visible)
         {
             auto& chunk = chunks_[std::size_t(cell.y) * columns + cell.x];
@@ -292,11 +292,10 @@ namespace Paladin
                     .updateTextureRegion(*overviewTexture_, x, y, w, h, pixels);
                 chunk.baseVersion = baseVersion;
             }
-            if (sprites && policy && tp >= 1 && detail < 1 && built < 2 &&
-                SDL_GetTicksNS() < deadline &&
+            if (sprites && policy && tp >= 4 && detail < 1 &&
                 (chunk.version != version ||
                  chunk.navigation != map.objectState().navigationVersion()) &&
-                (chunk.texture || textures < 256))
+                true)
             {
                 if (map.naturalFeatures().countIn(
                         {{cell.x * side - 2, cell.y * side - 2},
@@ -311,91 +310,72 @@ namespace Paladin
                     chunk.navigation = map.objectState().navigationVersion();
                     continue;
                 }
-                // Distant trees are tiny static crowns, not composed/animated
-                // sprites. Build directly in a small CPU buffer: no full
-                // renderer, sort or target switch.
-                std::vector<RenderColor> pixels(
-                    textureSide * textureSide,
-                    {0, 0, 0, 0}
+                // Cache the same silhouettes and placement as the close view.
+                // Only animation is omitted; no replacement circles or fade-in.
+                textures -= bool(chunk.texture);
+                chunk.texture.reset();
+                SceneDrawQueue snapshot;
+                submitDetailed(
+                    renderer,
+                    map,
+                    {(cell.x + .5) * side,
+                     (cell.y + .5) * side,
+                     double(density),
+                     textureSide,
+                     textureSide},
+                    snapshot,
+                    *sprites,
+                    *policy
                 );
-                const auto put = [&](int x, int y, RenderColor color)
+                auto ordered = snapshot.items();
+                std::stable_sort(
+                    ordered.begin(),
+                    ordered.end(),
+                    SceneDrawQueue::before
+                );
+                chunk.commands.clear();
+                for (const auto& item : ordered)
                 {
-                    if (x >= 0 && y >= 0 && x < textureSide && y < textureSide)
+                    const auto& d = item.bounds;
+                    const float l = std::max(0.f, d.x),
+                                top = std::max(0.f, d.y);
+                    const float r = std::min(float(textureSide), d.x + d.width),
+                                bottom = std::min(
+                                    float(textureSide),
+                                    d.y + d.height
+                                );
+                    if (r <= l || bottom <= top)
                     {
-                        pixels[std::size_t(y) * textureSide + x] = color;
+                        continue;
                     }
-                };
-                for (int yy = cell.y * side - 2; yy < (cell.y + 1) * side + 2;
-                     ++yy)
-                {
-                    for (int xx = cell.x * side - 2;
-                         xx < (cell.x + 1) * side + 2;
-                         ++xx)
+                    auto f = item.atlasFrame;
+                    if (item.texture)
                     {
-                        if (xx < 0 || yy < 0 || xx >= map.grid().width() ||
-                            yy >= map.grid().height())
-                        {
-                            continue;
-                        }
-                        const auto feature = map.naturalFeatures().at({xx, yy});
-                        if (feature.kind == NaturalFeatureKind::None)
-                        {
-                            continue;
-                        }
-                        if (const auto* object =
-                                map.objectState().completedObjectAt({xx, yy});
-                            object &&
-                            object->objectTypeId != SettlementObjectTypes::Road)
-                        {
-                            continue;
-                        }
-                        const int px = (xx - cell.x * side) * density + 4,
-                                  py = (yy - cell.y * side) * density + 4;
-                        const bool tree =
-                            feature.kind == NaturalFeatureKind::Tree;
-                        const int radius = tree ? 5 : 3;
-                        if (tree)
-                        {
-                            put(px, py, {0x63, 0x3E, 0x4B, 255});
-                            put(px, py - 1, {0x63, 0x3E, 0x4B, 255});
-                        }
-                        for (int dy = -radius; dy <= radius; ++dy)
-                        {
-                            for (int dx = -radius; dx <= radius; ++dx)
-                            {
-                                if (dx * dx + dy * dy > radius * radius)
-                                {
-                                    continue;
-                                }
-                                RenderColor color =
-                                    tree
-                                        ? (dx + dy < -2
-                                               ? RenderColor{0x49, 0x97, 0x5B, 255}
-                                               : RenderColor{0x23, 0x57, 0x47, 255})
-                                        : (dx + dy < 0
-                                               ? RenderColor{0xD9, 0xC7, 0x9F, 255}
-                                               : RenderColor{
-                                                     0x71,
-                                                     0x6D,
-                                                     0x70,
-                                                     255
-                                                 });
-                                if (feature.marked &&
-                                    dx * dx + dy * dy >
-                                        (radius - 1) * (radius - 1))
-                                {
-                                    color = {0xFF, 0xD7, 0x83, 255};
-                                }
-                                put(px + dx, py + dy - (tree ? 5 : 0), color);
-                            }
-                        }
+                        f.x += (l - d.x) * f.width / d.width;
+                        f.y += (top - d.y) * f.height / d.height;
+                        f.width *= (r - l) / d.width;
+                        f.height *= (bottom - top) / d.height;
                     }
+                    chunk.commands.push_back(
+                        {item.texture,
+                         f,
+                         {l, top, r - l, bottom - top},
+                         item.color,
+                         item.opacity}
+                    );
                 }
-                auto image = renderer.createTextureFromPixels(
-                    textureSide,
-                    textureSide,
-                    pixels
-                );
+                std::unique_ptr<Texture> image;
+                if (textures < 256 && built < 2 && SDL_GetTicksNS() < deadline)
+                {
+                    image = renderer.createTextureFromDrawItems(
+                        textureSide,
+                        textureSide,
+                        chunk.commands
+                    );
+                }
+                chunk.empty = false;
+                chunk.version = version;
+                chunk.navigation = map.objectState().navigationVersion();
                 if (image)
                 {
                     if (!chunk.texture)
@@ -414,6 +394,17 @@ namespace Paladin
                 chunk.navigation == map.objectState().navigationVersion())
             {
                 continue;
+            }
+            if (!chunk.texture && !chunk.commands.empty() && textures < 256 && built < 2 &&
+                SDL_GetTicksNS() < deadline)
+            {
+                chunk.texture = renderer.createTextureFromDrawItems(
+                    textureSide,
+                    textureSide,
+                    chunk.commands
+                );
+                textures += bool(chunk.texture);
+                ++built;
             }
             const auto draw = [&](const Texture& texture,
                                   float sx,
@@ -438,32 +429,49 @@ namespace Paladin
                     );
                 }
             };
-            const double cached =
-                chunk.texture
-                    ? blend(.6, 4, tp) *
-                          blend(0, .18, SDL_GetTicksNS() / 1e9 - chunk.readyAt)
-                    : 0;
-            if (overviewTexture_)
+            if (detail == 0)
             {
-                draw(
-                    *overviewTexture_,
-                    float(cell.x * side / block),
-                    float(cell.y * side / block),
-                    float(side / block),
-                    float(side / block),
-                    (1 - cached) * (1 - detail)
-                );
-            }
-            if (chunk.texture)
-            {
-                draw(
-                    *chunk.texture,
-                    0,
-                    0,
-                    textureSide,
-                    textureSide,
-                    cached * (1 - detail)
-                );
+                if (chunk.texture)
+                {
+                    draw(*chunk.texture, 0, 0, textureSide, textureSide, 1);
+                }
+                else
+                {
+                    for (const auto& item : chunk.commands)
+                    {
+                        const auto& d = item.destination;
+                        const float scale = float(tp / density);
+                        const float x = float(ox + cell.x * side * tp) +
+                                        d.x * scale,
+                                    y = float(oy + cell.y * side * tp) +
+                                        d.y * scale;
+                        if (item.texture)
+                        {
+                            renderer.drawTexture(
+                                *item.texture,
+                                item.source.x,
+                                item.source.y,
+                                item.source.width,
+                                item.source.height,
+                                x,
+                                y,
+                                d.width * scale,
+                                d.height * scale,
+                                item.opacity
+                            );
+                        }
+                        else
+                        {
+                            renderer.fillRectangle(
+                                x,
+                                y,
+                                d.width * scale,
+                                d.height * scale,
+                                item.fill
+                            );
+                        }
+                    }
+                }
             }
         }
         if (shared && sprites && policy && detail > 0)

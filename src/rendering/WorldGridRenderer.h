@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/Renderer.h"
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
@@ -82,7 +83,7 @@ namespace Paladin
             std::unique_ptr<Texture> texture;
             std::uint64_t lastUsed = 0;
             int resolution = 0;
-            double readyAt = 0;
+            std::vector<TextureDrawItem> commands;
         };
         // Strong references make an artwork reload detectable even if an
         // allocator would otherwise reuse the previous texture's address.

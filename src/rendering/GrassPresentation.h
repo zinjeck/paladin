@@ -169,7 +169,8 @@ namespace Paladin
                     if (!tile || tile->terrain != TerrainType::Land ||
                         (tile->biome != BiomeType::Plain &&
                          tile->biome != BiomeType::Forest &&
-                         tile->biome != BiomeType::Jungle))
+                         tile->biome != BiomeType::Jungle &&
+                         tile->biome != BiomeType::Hills))
                     {
                         continue;
                     }

@@ -53,6 +53,7 @@ namespace Paladin
             std::uint64_t baseVersion = 0, navigation = 0;
             double readyAt = 0;
             bool empty = false;
+            std::vector<TextureDrawItem> commands;
             std::uint64_t spriteVersion = ~std::uint64_t(0);
             std::vector<FeatureSprite> sprites;
         };
