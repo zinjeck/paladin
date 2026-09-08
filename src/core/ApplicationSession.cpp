@@ -60,7 +60,7 @@ namespace Paladin
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
         savedWorldCamera_.reset();
-        activeSettlementId_ = {};
+        activeCitySettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
         foundingAdditionalSettlement_ = false;
@@ -84,7 +84,7 @@ namespace Paladin
         SDL_StopTextInput(window_->nativeHandle());
 
         tileRenderMetrics_.reset();
-        settlementCameras_.clear();
+        cityCameras_.clear();
         cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
@@ -98,7 +98,7 @@ namespace Paladin
 
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
-        activeSettlementId_ = {};
+        activeCitySettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
         foundingAdditionalSettlement_ = false;
@@ -164,14 +164,14 @@ namespace Paladin
         {
             cityRenderer_ = std::make_unique<CityRenderer>();
         }
-        for (const auto& saved : settlementCameras_)
+        for (const auto& saved : cityCameras_)
         {
             if (saved.first == settlementId)
             {
                 *camera_ = *saved.second;
             }
         }
-        activeSettlementId_ = settlementId;
+        activeCitySettlementId_ = settlementId;
         cityHud_->setWorldMode(false);
         employmentPanel_->setWorldMode(false);
         edgeScrollDwellSeconds_ = 0.0;
@@ -212,7 +212,7 @@ namespace Paladin
         }
 
         const Settlement* leavingSettlement =
-            simulation_->world().settlement(activeSettlementId_);
+            simulation_->world().settlement(activeCitySettlementId_);
         const std::optional<WorldTilePosition> leavingPosition =
             leavingSettlement
                 ? std::optional<WorldTilePosition>(leavingSettlement->position())
@@ -231,15 +231,15 @@ namespace Paladin
         }
 
         auto saved = std::find_if(
-            settlementCameras_.begin(),
-            settlementCameras_.end(),
+            cityCameras_.begin(),
+            cityCameras_.end(),
             [&](const auto& entry)
-            { return entry.first == activeSettlementId_; }
+            { return entry.first == activeCitySettlementId_; }
         );
-        if (saved == settlementCameras_.end())
+        if (saved == cityCameras_.end())
         {
-            settlementCameras_.push_back(
-                {activeSettlementId_, std::make_unique<Camera2D>(*camera_)}
+            cityCameras_.push_back(
+                {activeCitySettlementId_, std::make_unique<Camera2D>(*camera_)}
             );
         }
         else
@@ -268,7 +268,7 @@ namespace Paladin
         }
 
         tileRenderMetrics_->tilePixels = 4.0;
-        activeSettlementId_ = {};
+        activeCitySettlementId_ = {};
         edgeScrollDwellSeconds_ = 0.0;
         screen_ = Screen::World;
         cityHud_->setWorldMode(simulationControlsUnlocked_);
