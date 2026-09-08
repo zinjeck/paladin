@@ -4,6 +4,7 @@
 #include "core/StrongId.h"
 #include "debug/ConsoleCommand.h"
 #include "rendering/Camera2D.h"
+#include "rendering/ScenePresentation.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <cmath>
@@ -127,6 +128,40 @@ namespace
         camera.setCityQuarterTurns(-1);
         PALADIN_CHECK(camera.cityQuarterTurns() == 3);
     }
+
+    void testNeutralSceneOrientationScope()
+    {
+        using Paladin::SceneProjection;
+        using Paladin::SceneQuarterTurnScope;
+        using Paladin::activeSceneQuarterTurns;
+
+        PALADIN_CHECK(activeSceneQuarterTurns == 0);
+        {
+            SceneQuarterTurnScope cityTurn(1);
+            PALADIN_CHECK(activeSceneQuarterTurns == 1);
+
+            const SceneProjection live{10, 10, 16, 256, 256};
+            PALADIN_CHECK(live.quarterTurns == 1);
+            const auto liveOffset = live.viewOffset(3, 2);
+            PALADIN_CHECK(liveOffset.first == 2 && liveOffset.second == -3);
+
+            {
+                // Offscreen reusable caches must be composable in canonical
+                // orientation even while the live city camera is rotated.
+                SceneQuarterTurnScope cacheTurn(0);
+                PALADIN_CHECK(activeSceneQuarterTurns == 0);
+                const SceneProjection cache{10, 10, 16, 256, 256};
+                PALADIN_CHECK(cache.quarterTurns == 0);
+                const auto cacheOffset = cache.viewOffset(3, 2);
+                PALADIN_CHECK(
+                    cacheOffset.first == 3 && cacheOffset.second == 2
+                );
+            }
+
+            PALADIN_CHECK(activeSceneQuarterTurns == 1);
+        }
+        PALADIN_CHECK(activeSceneQuarterTurns == 0);
+    }
 } // namespace
 
 
@@ -158,4 +193,5 @@ void runCoreTests()
     testEntityRegistry();
     testCameraZoomLimits();
     testCameraQuarterTurns();
+    testNeutralSceneOrientationScope();
 }
