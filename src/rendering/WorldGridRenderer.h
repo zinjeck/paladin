@@ -98,7 +98,6 @@ namespace Paladin
         {
             std::unique_ptr<Texture> texture;
             std::uint64_t lastUsed = 0;
-            double readyAt = 0;
             int resolution = 0;
             std::vector<TextureDrawItem> commands;
         };
@@ -119,7 +118,6 @@ namespace Paladin
         {
             std::array<std::array<double, 3>, 320> values{};
             std::bitset<320> ready;
-            double readyAt = 0;
         };
         mutable std::unordered_map<std::uint64_t, CoastFields> coastFields_;
 

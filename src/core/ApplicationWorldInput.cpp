@@ -210,6 +210,12 @@ namespace Paladin
 
     void Application::handleWorldEvent(const SDL_Event& event)
     {
+        if (!worldRenderer_->terrainDetailReady() &&
+            !(event.type == SDL_EVENT_KEY_DOWN &&
+              event.key.scancode == SDL_SCANCODE_ESCAPE))
+        {
+            return;
+        }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             event.key.scancode == SDL_SCANCODE_M && !foundingPanel_->isOpen())
         {

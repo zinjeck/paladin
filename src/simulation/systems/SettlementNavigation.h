@@ -47,5 +47,6 @@ namespace Paladin
         std::uint64_t sourceInstance_ = 0;
         std::uint64_t version_ = ~std::uint64_t(0);
         std::vector<std::uint8_t> roads_;
+        bool hasRoads_ = false;
     };
 } // namespace Paladin

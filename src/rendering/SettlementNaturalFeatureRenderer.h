@@ -51,8 +51,7 @@ namespace Paladin
             std::unique_ptr<Texture> texture;
             std::uint64_t version = 0;
             std::uint64_t baseVersion = 0, navigation = 0;
-            double readyAt = 0;
-            bool empty = false;
+            bool empty = false, textureDirty = false;
             std::vector<TextureDrawItem> commands;
             std::unique_ptr<PreparedQuadMesh> mesh;
             bool batchable = false;

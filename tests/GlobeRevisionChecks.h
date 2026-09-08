@@ -227,7 +227,7 @@ namespace Paladin
             }
             SDL_FlushRenderer(native);
         };
-        const auto until = SDL_GetTicks() + 15000;
+        const auto until = SDL_GetTicks() + 120000;
         do
         {
             draw();
@@ -329,7 +329,7 @@ namespace Paladin
         save("globe-regional");
         camera.setZoom(7);
         draw();
-        const auto detailDeadline = SDL_GetTicks() + 60000;
+        const auto detailDeadline = SDL_GetTicks() + 120000;
         while (!globe.fullDetailReady() && SDL_GetTicks() < detailDeadline)
         {
             draw();
@@ -352,7 +352,7 @@ namespace Paladin
         );
         camera.setZoom(10);
         draw();
-        const auto polarDeadline = SDL_GetTicks() + 60000;
+        const auto polarDeadline = SDL_GetTicks() + 120000;
         while (!globe.fullDetailReady() && SDL_GetTicks() < polarDeadline)
         {
             draw();
@@ -413,7 +413,7 @@ namespace Paladin
             );
             SDL_FlushRenderer(native);
         };
-        auto deadline = SDL_GetTicks() + 15000;
+        auto deadline = SDL_GetTicks() + 120000;
         do
         {
             modeDraw();

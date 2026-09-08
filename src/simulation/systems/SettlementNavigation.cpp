@@ -16,12 +16,14 @@ namespace Paladin
             return;
         }
         roads_.assign(map.grid().tileCount(), 0);
+        hasRoads_ = false;
         for (const auto& object : map.objectState().completedObjects())
         {
             if (object.objectTypeId != SettlementObjectTypes::Road)
             {
                 continue;
             }
+            hasRoads_ = true;
             const auto& f = object.footprint;
             for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
             {
@@ -132,7 +134,7 @@ namespace Paladin
             // Fastest possible terrain keeps A* admissible even with roads.
             return (std::max(dx, dy) +
                     (policy.diagonalCost - 1) * std::min(dx, dy)) /
-                   std::max(1.0, policy.roadSpeedMultiplier);
+                   (hasRoads_ ? std::max(1.0, policy.roadSpeedMultiplier) : 1.0);
         };
         struct Record
         {
@@ -149,6 +151,9 @@ namespace Paladin
                 {
                     return estimate > rhs.estimate;
                 }
+                // Equal estimates prefer progress toward the goal, avoiding
+                // broad expansion of equally promising long-distance routes.
+                if (cost != rhs.cost) { return cost < rhs.cost; }
                 return tile > rhs.tile;
             }
         };

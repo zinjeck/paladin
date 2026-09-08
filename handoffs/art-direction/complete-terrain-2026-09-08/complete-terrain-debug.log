@@ -1,0 +1,34 @@
+[0/2] Re-checking globbed directories...
+[1/16] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=225 cache_hits=229 rebuilt=0 atlas_pages=7 output_bytes=14377699 errors=0 warnings=0
+[2/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(97): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(185): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(243): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[3/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(284): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[4/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[5/16] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[6/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[7/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(454): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[8/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[9/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[10/16] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[11/16] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[12/16] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[13/16] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[14/16] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[15/16] Linking CXX executable Paladin.exe

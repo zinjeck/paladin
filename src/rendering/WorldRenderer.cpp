@@ -26,6 +26,20 @@ namespace Paladin
     }
 
 
+    bool WorldRenderer::prepareTerrain(
+        Renderer& renderer,
+        const World& world
+    ) const
+    {
+        std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
+#ifdef PALADIN_ART_ROOT
+        artRoot = PALADIN_ART_ROOT;
+#endif
+        artwork_.load(renderer, artRoot);
+        globe_.updateAtlas(renderer, world, artwork_);
+        return globe_.detailReady();
+    }
+
     void WorldRenderer::render(
         Renderer& renderer,
         const World& world,

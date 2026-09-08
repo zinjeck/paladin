@@ -437,7 +437,6 @@ namespace Paladin
                 {
                     continue;
                 }
-                chunk.readyAt = SDL_GetTicksNS() / 1e9;
                 SceneDrawQueue snapshot;
                 submitDetailed(
                     renderer,
@@ -516,6 +515,7 @@ namespace Paladin
                     ordered.end(),
                     SceneDrawQueue::before
                 );
+                chunk.textureDirty = true;
                 chunk.commands.clear();
                 for (const auto& item : ordered)
                 {
@@ -615,6 +615,7 @@ namespace Paladin
 
                     textures += !chunk.texture;
                     chunk.texture = std::move(image);
+                    chunk.textureDirty = false;
                     chunk.empty = false;
                     chunk.version = version;
                     chunk.navigation =
@@ -628,10 +629,11 @@ namespace Paladin
             {
                 continue;
             }
-            if (!chunk.texture && !chunk.commands.empty() &&
-                textures < textureBudget && built < 32 &&
-                SDL_GetTicksNS() < deadline)
+            if ((!chunk.texture || chunk.textureDirty) &&
+                !chunk.commands.empty() && textures < textureBudget &&
+                built < 32 && SDL_GetTicksNS() < deadline)
             {
+                const bool hadTexture = bool(chunk.texture);
                 chunk.texture = renderer.createTextureFromDrawItems(
                     textureSide,
                     textureSide,
@@ -640,7 +642,8 @@ namespace Paladin
                     foliageAtlas_.get(),
                     chunk.mesh.get()
                 );
-                textures += bool(chunk.texture);
+                textures += bool(chunk.texture) && !hadTexture;
+                chunk.textureDirty = false;
                 ++built;
             }
         }
@@ -672,29 +675,9 @@ namespace Paladin
                 );
                 continue;
             }
-            const double ready =
-                chunk.readyAt == 0
-                    ? 1
-                    : std::clamp(
-                          (SDL_GetTicksNS() / 1e9 - chunk.readyAt) / .2,
-                          0.,
-                          1.
-                      );
-            if (detail < 1 && ready < 1)
-            {
-                renderer.drawTexture(
-                    *overviewTexture_,
-                    float(cell.x * side / block),
-                    float(cell.y * side / block),
-                    float(side / block),
-                    float(side / block),
-                    float(ox + cell.x * side * tp),
-                    float(oy + cell.y * side * tp),
-                    float(side * tp),
-                    float(side * tp),
-                    std::uint8_t(255 * (1 - ready) * baseBlend)
-                );
-            }
+            // Rebuilding cached scenery is not a lighting transition. Keep
+            // the existing representation until its replacement is ready,
+            // then replace it without drawing a dark density square over it.
             const auto draw = [&](const Texture& texture,
                                   float sx,
                                   float sy,
@@ -728,7 +711,7 @@ namespace Paladin
                         0,
                         textureSide,
                         textureSide,
-                        (1 - detail) * baseBlend * ready
+                        (1 - detail) * baseBlend
                     );
                 }
                 else
@@ -741,7 +724,7 @@ namespace Paladin
                             float(ox + cell.x * side * tp),
                             float(oy + cell.y * side * tp),
                             float(tp / density),
-                            float((1 - detail) * baseBlend * ready)
+                            float((1 - detail) * baseBlend)
                         );
                         continue;
                     }
@@ -765,7 +748,9 @@ namespace Paladin
                                                  foliageAtlas_->width(),
                                             v1 = (src.y + src.height) /
                                                  foliageAtlas_->height();
-                                const auto a = item.opacity;
+                                const auto a = std::uint8_t(
+                                    item.opacity * (1 - detail) * baseBlend
+                                );
                                 const RenderColor tint{a, a, a, a};
                                 const int first = int(fallbackVertices_.size());
                                 fallbackVertices_.insert(
@@ -795,7 +780,9 @@ namespace Paladin
                                 y,
                                 d.width * scale,
                                 d.height * scale,
-                                item.opacity
+                                std::uint8_t(
+                                    item.opacity * (1 - detail) * baseBlend
+                                )
                             );
                         }
                         else
@@ -805,7 +792,15 @@ namespace Paladin
                                 y,
                                 d.width * scale,
                                 d.height * scale,
-                                item.fill
+                                RenderColor{
+                                    item.fill.red,
+                                    item.fill.green,
+                                    item.fill.blue,
+                                    std::uint8_t(
+                                        item.fill.alpha * (1 - detail) *
+                                        baseBlend
+                                    )
+                                }
                             );
                         }
                     }

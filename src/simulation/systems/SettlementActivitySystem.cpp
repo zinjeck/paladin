@@ -481,6 +481,9 @@ namespace Paladin
                 decide(map, citizens, c, minute);
             }
         }
+        // A full sweep otherwise returns to the same first citizen forever.
+        // Rotate priority as well as coverage so late arrivals share path credit.
+        if (count && count == citizens.citizens_.size()) { ++decisionCursor_; }
         citizens.tickMovement(
             map,
             elapsed,
@@ -517,6 +520,20 @@ namespace Paladin
         {
             return;
         }
+        // Lack of shared path credit is not a failed job search. Retry on the
+        // next turn instead of synchronizing every worker to a five-minute poll.
+        struct RetryWhenBudgetExhausted
+        {
+            SettlementCitizen& citizen;
+            const std::size_t& remaining;
+            double minute;
+            ~RetryWhenBudgetExhausted()
+            {
+                if (!remaining && (citizen.task.kind == CitizenTaskKind::None ||
+                                    citizen.task.kind == CitizenTaskKind::Home))
+                    citizen.nextWorkCheckMinutes = minute;
+            }
+        } retry{c, pathsRemaining_, minute};
         c.nextWorkCheckMinutes = minute + policy.retryMinutes;
         if (!c.child && c.homeId)
         {

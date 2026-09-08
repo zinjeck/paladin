@@ -800,14 +800,8 @@ namespace Paladin
                         continue;
                     }
                     cachedCoast = coastFields_.try_emplace(coastKey).first;
-                    cachedCoast->second.readyAt = SDL_GetTicksNS() / 1e9;
                 }
-                coastTileOpacity = std::clamp(
-                    (SDL_GetTicksNS() / 1e9 - cachedCoast->second.readyAt) /
-                        .18,
-                    0.,
-                    1.
-                );
+                coastTileOpacity = 1;
                 const bool isLand = land(x, y);
                 const auto* water = sprites.find(
                     kind(x, y) == CityTileType::DeepWater ? "terrain.water"
@@ -1812,7 +1806,6 @@ namespace Paladin
                 if (found->second.texture)
                 {
                     terrainBytes_ += std::size_t(textureSide) * textureSide * 4;
-                    found->second.readyAt = SDL_GetTicksNS() / 1e9;
                     found->second.commands.clear();
                     found->second.commands.shrink_to_fit();
                 }
@@ -1871,15 +1864,7 @@ namespace Paladin
                     float(originY + cell.y * chunkSide * tilePixels),
                     float(chunkSide * tilePixels),
                     float(chunkSide * tilePixels),
-                    std::uint8_t(
-                        255 * detailBlend(displayTilePixels, 8, 16) *
-                        std::clamp(
-                            (SDL_GetTicksNS() / 1e9 - found->second.readyAt) /
-                                .22,
-                            0.,
-                            1.
-                        )
-                    )
+                    std::uint8_t(255 * detailBlend(displayTilePixels, 8, 16))
                 );
             }
             else
@@ -1908,7 +1893,10 @@ namespace Paladin
                             y,
                             d.width * scale,
                             d.height * scale,
-                            item.opacity
+                            std::uint8_t(
+                                item.opacity *
+                                detailBlend(displayTilePixels, 8, 16)
+                            )
                         );
                     }
                     else
@@ -1918,7 +1906,15 @@ namespace Paladin
                             y,
                             d.width * scale,
                             d.height * scale,
-                            item.fill
+                            RenderColor{
+                                item.fill.red,
+                                item.fill.green,
+                                item.fill.blue,
+                                std::uint8_t(
+                                    item.fill.alpha *
+                                    detailBlend(displayTilePixels, 8, 16)
+                                )
+                            }
                         );
                     }
                 }

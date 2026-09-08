@@ -39,6 +39,10 @@ namespace Paladin
 
     void Application::updateWorldScreen()
     {
+        if (!worldRenderer_->terrainDetailReady())
+        {
+            return;
+        }
 
         if (!foundingPanel_->isOpen())
         {
@@ -63,6 +67,32 @@ namespace Paladin
 
     void Application::renderWorldScreen()
     {
+        if (!worldRenderer_->prepareTerrain(*renderer_, simulation_->world()))
+        {
+            renderer_->fillRectangle(
+                0,
+                0,
+                float(renderer_->outputWidth()),
+                float(renderer_->outputHeight()),
+                {8, 15, 27, 255}
+            );
+            const float x = renderer_->outputWidth() * .5F,
+                        y = renderer_->outputHeight() * .5F;
+            grayUiRenderer_
+                ->drawTitle(*renderer_, "PREPARING WORLD", x, y - 40);
+            grayUiRenderer_->drawLabel(
+                *renderer_,
+                "Preparing terrain " +
+                    std::to_string(
+                        int(worldRenderer_->terrainPreparationProgress() * 100)
+                    ) +
+                    "%",
+                x - 150,
+                y + 12,
+                2
+            );
+            return;
+        }
         std::array<TileOverlayRenderItem, 1> overlays{};
         std::array<TileOutlineRenderItem, 1> outlines{};
         std::size_t overlayCount = 0;

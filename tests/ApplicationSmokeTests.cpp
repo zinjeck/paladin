@@ -2357,6 +2357,14 @@ namespace Paladin
             }
             app.camera_->setPosition(32, 32);
             frame(app);
+            const auto terrainDeadline = SDL_GetTicks() + 120000;
+            while (!app.worldRenderer_->terrainDetailReady() &&
+                   SDL_GetTicks() < terrainDeadline)
+            {
+                frame(app);
+                SDL_Delay(1);
+            }
+            PALADIN_CHECK(app.worldRenderer_->terrainDetailReady());
             // A drag rotates the globe and never opens the founding modal;
             // space picking rejects the area outside the sphere.
             SDL_Event globeEvent{};

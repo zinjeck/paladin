@@ -11,6 +11,7 @@
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <thread>
 
 namespace Paladin
 {
@@ -42,6 +43,10 @@ namespace Paladin
         };
         std::vector<DetailRegion> detailRegions_;
         std::vector<std::pair<int, int>> wantedRegions_;
+        std::shared_ptr<std::atomic<float>> preparation_ =
+            std::make_shared<std::atomic<float>>(0.F);
+        int detailUploadX_ = 0, detailUploadY_ = 0;
+        bool completeDetail_ = false;
         std::uint64_t detailFrame_ = 0;
         static constexpr int RegionSide = 48;
         int patchUploadRow_ = 0;
@@ -120,7 +125,9 @@ namespace Paladin
             int left,
             int top,
             int tileWidth,
-            int tileHeight
+            int tileHeight,
+            bool detailOnly = false,
+            std::shared_ptr<std::atomic<float>> progress = {}
         )
         {
             Atlas a;
@@ -130,8 +137,11 @@ namespace Paladin
             a.density = density;
             a.w = tileWidth * density;
             a.h = tileHeight * density;
-            a.pixels[0].resize(std::size_t(a.w) * a.h);
-            a.pixels[2].resize(std::size_t(a.w) * a.h);
+            a.pixels[detailOnly ? 1 : 0].resize(std::size_t(a.w) * a.h);
+            if (!detailOnly)
+            {
+                a.pixels[2].resize(std::size_t(a.w) * a.h);
+            }
             // Distance from shore creates connected continental shelves rather
             // than repeating blue tile borders. Prepared on the atlas worker.
             std::vector<int> shore(std::size_t(w) * h, (w + h) * (w + h)),
@@ -185,10 +195,12 @@ namespace Paladin
                 }
             }
             std::vector<const SceneSprite*> materials(std::size_t(w) * h);
+            std::vector<RenderColor> baseColors(std::size_t(w) * h);
             for (int y = 0; y < h; ++y)
             {
                 for (int x = 0; x < w; ++x)
                 {
+                    baseColors[y * w + x] = base(*grid.tile({x, y}), art);
                     auto it = art.find(
                         "world.terrain." + climate(*grid.tile({x, y}))
                     );
@@ -198,11 +210,15 @@ namespace Paladin
                     }
                 }
             }
-            for (int py = 0; py < a.h; ++py)
+            // Independent rows share immutable source data; stamps remain ordered.
+            std::atomic<int> nextRow{0}, completedRows{0};
+            const auto paintRows = [&]()
+            {
+            for (int py; (py = nextRow.fetch_add(1)) < a.h;)
             {
                 if (cancelled->load())
                 {
-                    return Atlas{};
+                    return;
                 }
                 for (int px = 0; px < a.w; ++px)
                 {
@@ -281,7 +297,7 @@ namespace Paladin
                         }
                     }
                     const auto& t = *grid.tile({(x % w + w) % w, y});
-                    auto color = base(t, art);
+                    auto color = baseColors[y * w + x];
                     if (dry && materials[y * w + x])
                     {
                         color =
@@ -366,12 +382,28 @@ namespace Paladin
                                                   (basin - 1.5) / 2.5
                                               );
                     }
-                    a.pixels[2][std::size_t(py) * a.w + px] =
-                        {255, 255, 255, std::uint8_t(dry ? 0 : 255)};
-                    a.pixels[0][std::size_t(py) * a.w + px] = color;
+                    if (!detailOnly)
+                    {
+                        a.pixels[2][std::size_t(py) * a.w + px] =
+                            {255, 255, 255, std::uint8_t(dry ? 0 : 255)};
+                    }
+                    a.pixels[detailOnly ? 1 : 0][std::size_t(py) * a.w + px] =
+                        color;
                 }
+                const int done = completedRows.fetch_add(1) + 1;
+                if (progress) { progress->store(.75F * done / a.h); }
             }
-            a.pixels[1] = a.pixels[0];
+            };
+            const unsigned workers = detailOnly ? std::clamp(std::thread::hardware_concurrency() / 2, 1u, 8u) : 1u;
+            std::vector<std::jthread> painters;
+            for (unsigned i = 1; i < workers; ++i) { painters.emplace_back(paintRows); }
+            paintRows();
+            painters.clear(); // Join before ordered overlapping relief stamps.
+            if (cancelled->load()) { return Atlas{}; }
+            if (!detailOnly)
+            {
+                a.pixels[1] = a.pixels[0];
+            }
             const auto stamp = [&](int layer,
                                    const std::string& id,
                                    double x,
@@ -457,6 +489,22 @@ namespace Paladin
                                   );
                         auto color = (*s.materialPixels)
                             [std::size_t(sy) * s.materialWidth + sx];
+                        const auto& stampTile = *grid.tile(
+                            {(int(cx) % w + w) % w,
+                             std::clamp(int(cy), 0, h - 1)}
+                        );
+                        if (color.alpha &&
+                            stampTile.biome == BiomeType::Polar &&
+                            id.find(".hill.") != std::string::npos)
+                        {
+                            const double lum = color.red * .3 +
+                                               color.green * .5 +
+                                               color.blue * .2;
+                            color = lum < 70 ? RenderColor{126, 156, 170, 255}
+                                    : lum < 125
+                                        ? RenderColor{175, 201, 214, 255}
+                                        : RenderColor{244, 243, 232, 255};
+                        }
                         if (color.alpha &&
                             id.find(".ridge.") != std::string::npos)
                         {
@@ -588,31 +636,15 @@ namespace Paladin
         std::uint64_t atlasBuilds = 0;
         bool detailReady() const
         {
-            return uploadLayer_ == 3;
+            return uploadLayer_ == 3 && completeDetail_;
         }
         bool fullDetailReady() const
         {
-            if (patchPending_.valid() || patchReady_.w)
-            {
-                return false;
-            }
-            return !wantedRegions_.empty() &&
-                   std::all_of(
-                       wantedRegions_.begin(),
-                       wantedRegions_.end(),
-                       [&](auto key)
-                       {
-                           return std::any_of(
-                               detailRegions_.begin(),
-                               detailRegions_.end(),
-                               [&](const auto& region)
-                               {
-                                   return region.area.left == key.first &&
-                                          region.area.top == key.second;
-                               }
-                           );
-                       }
-                   );
+            return completeDetail_;
+        }
+        float preparationProgress() const
+        {
+            return completeDetail_ ? 1.F : preparation_->load();
         }
         std::uint64_t detailBuilds() const
         {
@@ -620,6 +652,7 @@ namespace Paladin
         }
         void reset()
         {
+            completeDetail_ = false;
             detailRegions_.clear();
             wantedRegions_.clear();
             detailReadyAt_ = 0;
@@ -704,12 +737,41 @@ namespace Paladin
             }
             terrainSource_ =
                 std::make_shared<Source>(Source{g, std::move(art)});
+            completeDetail_ = false;
             detailRegions_.clear();
             wantedRegions_.clear();
             patchUpload_.reset();
             patchWaterUpload_.reset();
             detailReadyAt_ = 0;
             patchReady_ = {};
+            preparation_ = std::make_shared<std::atomic<float>>(0.F);
+            if (patchPending_.valid())
+            {
+                retired_.push_back(std::move(patchPending_));
+            }
+            patchSource_ = terrainSource_;
+            ++patchBuilds_;
+            detailUploadX_ = detailUploadY_ = patchUploadRow_ = 0;
+            patchPending_ = std::async(
+                std::launch::async,
+                [source = terrainSource_,
+                 cancelled = cancelled_,
+                 progress = preparation_]
+                {
+                    return buildAtlas(
+                        source->grid,
+                        source->art,
+                        cancelled,
+                        16,
+                        0,
+                        0,
+                        source->grid.width(),
+                        source->grid.height(),
+                        true,
+                        progress
+                    );
+                }
+            );
             pending_ = std::async(
                 std::launch::async,
                 [source = terrainSource_, cancelled = cancelled_]()
@@ -754,55 +816,72 @@ namespace Paladin
                     patchUploadRow_ = 0;
                 }
             }
-            if (patchReady_.w)
+            const auto uploadDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(4);
+            while (patchReady_.w && std::chrono::steady_clock::now() < uploadDeadline)
             {
+                const int density = patchReady_.density;
+                const int tileW =
+                    std::min(RegionSide, world.grid().width() - detailUploadX_);
+                const int tileH = std::min(
+                    RegionSide,
+                    world.grid().height() - detailUploadY_
+                );
+                const int width = tileW * density, height = tileH * density;
                 if (!patchUpload_)
                 {
-                    patchUpload_ =
-                        r.createEmptyTexture(patchReady_.w, patchReady_.h);
-                    patchWaterUpload_ =
-                        r.createEmptyTexture(patchReady_.w, patchReady_.h);
+                    patchUpload_ = r.createEmptyTexture(width, height);
                 }
-                const int rows = std::min(32, patchReady_.h - patchUploadRow_);
+                const int rows = std::min(256, height - patchUploadRow_);
+                std::vector<RenderColor> strip(std::size_t(width) * rows);
+                for (int row = 0; row < rows; ++row)
+                {
+                    const auto source =
+                        std::size_t(
+                            detailUploadY_ * density + patchUploadRow_ + row
+                        ) * patchReady_.w +
+                        detailUploadX_ * density;
+                    std::copy_n(
+                        patchReady_.pixels[1].begin() + source,
+                        width,
+                        strip.begin() + std::size_t(row) * width
+                    );
+                }
                 r.updateTextureRegion(
                     *patchUpload_,
                     0,
                     patchUploadRow_,
-                    patchReady_.w,
+                    width,
                     rows,
-                    std::span(patchReady_.pixels[1])
-                        .subspan(
-                            std::size_t(patchUploadRow_) * patchReady_.w,
-                            std::size_t(rows) * patchReady_.w
-                        )
-                );
-                r.updateTextureRegion(
-                    *patchWaterUpload_,
-                    0,
-                    patchUploadRow_,
-                    patchReady_.w,
-                    rows,
-                    std::span(patchReady_.pixels[2])
-                        .subspan(
-                            std::size_t(patchUploadRow_) * patchReady_.w,
-                            std::size_t(rows) * patchReady_.w
-                        )
+                    strip
                 );
                 patchUploadRow_ += rows;
-                if (patchUploadRow_ == patchReady_.h)
+                if (patchUploadRow_ == height)
                 {
-                    patchReady_.pixels[1] = {};
-                    patchReady_.pixels[2] = {};
-                    // Completed regions remain resident. A camera move cannot
-                    // replace the detail underneath already visible terrain.
+                    Atlas area;
+                    area.left = detailUploadX_;
+                    area.top = detailUploadY_;
+                    area.w = width;
+                    area.h = height;
+                    area.density = density;
                     detailRegions_.push_back(
-                        {std::move(patchReady_),
-                         std::move(patchUpload_),
-                         std::move(patchWaterUpload_),
-                         SDL_GetTicksNS() / 1e9,
-                         detailFrame_}
+                        {std::move(area), std::move(patchUpload_), {}, 0, 0}
                     );
-                    patchReady_ = {};
+                    patchUploadRow_ = 0;
+                    detailUploadX_ += tileW;
+                    if (detailUploadX_ == world.grid().width())
+                    {
+                        detailUploadX_ = 0;
+                        detailUploadY_ += tileH;
+                    }
+                    preparation_->store(
+                        .8F + .2F * detailUploadY_ / world.grid().height()
+                    );
+                    if (detailUploadY_ == world.grid().height())
+                    {
+                        patchReady_ = {};
+                        completeDetail_ = true;
+                        preparation_->store(1);
+                    }
                 }
             }
             if (pending_.valid() &&
@@ -818,7 +897,7 @@ namespace Paladin
                     textures_[uploadLayer_] =
                         r.createEmptyTexture(ready_.w, ready_.h);
                 }
-                const int rows = std::min(32, ready_.h - uploadRow_);
+                const int rows = std::min(256, ready_.h - uploadRow_);
                 r.updateTextureRegion(
                     *textures_[uploadLayer_],
                     0,
@@ -836,11 +915,15 @@ namespace Paladin
                 {
                     ready_.pixels[uploadLayer_].clear();
                     ++uploadLayer_;
+                    if (uploadLayer_ == 2)
+                    {
+                        detailReadyAt_ = SDL_GetTicksNS() / 1e9 - 1;
+                    }
                     uploadRow_ = 0;
                 }
             }
         }
-        void requestDetail(
+        void updateDetailVisibility(
             const World& world,
             const Camera2D& camera,
             int screenWidth,
@@ -941,66 +1024,6 @@ namespace Paladin
                     region.used = detailFrame_;
                 }
             }
-            // Evict only offscreen regions. Active detail never falls back to
-            // the overview because a neighboring region finished preparing.
-            while (detailRegions_.size() > 64)
-            {
-                auto oldest = std::min_element(
-                    detailRegions_.begin(),
-                    detailRegions_.end(),
-                    [](const auto& a, const auto& b) { return a.used < b.used; }
-                );
-                if (oldest->used == detailFrame_)
-                {
-                    break;
-                }
-                detailRegions_.erase(oldest);
-            }
-            if (patchPending_.valid() || patchReady_.w)
-            {
-                return;
-            }
-            for (auto [x, y] : wantedRegions_)
-            {
-                if (std::any_of(
-                        detailRegions_.begin(),
-                        detailRegions_.end(),
-                        [&](const auto& region)
-                        {
-                            return region.area.left == x &&
-                                   region.area.top == y;
-                        }
-                    ))
-                {
-                    continue;
-                }
-                patchSource_ = terrainSource_;
-                ++patchBuilds_;
-                const int w = std::min(RegionSide, grid.width() - x),
-                          h = std::min(RegionSide, grid.height() - y);
-                patchPending_ = std::async(
-                    std::launch::async,
-                    [source = terrainSource_,
-                     cancelled = cancelled_,
-                     x,
-                     y,
-                     w,
-                     h]
-                    {
-                        return buildAtlas(
-                            source->grid,
-                            source->art,
-                            cancelled,
-                            16,
-                            x,
-                            y,
-                            w,
-                            h
-                        );
-                    }
-                );
-                break;
-            }
         }
         const Texture* mapTexture(double tilePixels) const
         {
@@ -1017,7 +1040,7 @@ namespace Paladin
         )
         {
             updateAtlas(r, world, art);
-            requestDetail(
+            updateDetailVisibility(
                 world,
                 camera,
                 r.outputWidth(),
@@ -1120,7 +1143,7 @@ namespace Paladin
                             )
                     );
                 }
-                if (pixels > 8)
+                if (completeDetail_ && pixels > 8)
                 {
                     for (const auto& region : detailRegions_)
                     {
@@ -1135,13 +1158,7 @@ namespace Paladin
                             a.top,
                             double(a.w) / a.density,
                             double(a.h) / a.density,
-                            detailBlend(pixels, 8, 16) *
-                                std::clamp(
-                                    (SDL_GetTicksNS() / 1e9 - region.readyAt) /
-                                        .3,
-                                    0.,
-                                    1.
-                                )
+                            detailBlend(pixels, 8, 16)
                         );
                     }
                 }
@@ -1352,10 +1369,9 @@ namespace Paladin
             }
             const double tilePixels =
                 view.radius * 6.283185307 / world.grid().width();
-            // A fixed-resolution local atlas is prepared off-thread. One
-            // coherent patch is promoted only after its upload is complete;
-            // terrain and relief share the same canonical 16-pixel samples.
-            requestDetail(
+            // All canonical detail is resident before interaction. Camera
+            // movement selects existing regions; it never generates terrain.
+            updateDetailVisibility(
                 world,
                 camera,
                 r.outputWidth(),
@@ -1473,7 +1489,7 @@ namespace Paladin
                     glint(*textures_[2], nullptr);
                 }
             }
-            if (tilePixels > 12)
+            if (completeDetail_ && tilePixels > 12)
             {
                 for (const auto& region : detailRegions_)
                 {
@@ -1512,14 +1528,8 @@ namespace Paladin
                     {
                         const double x = v.u * world.grid().width() - a.left,
                                      y = v.v * world.grid().height() - a.top;
-                        v.color.alpha = std::uint8_t(
-                            255 * detailBlend(tilePixels, 12, 24) *
-                            std::clamp(
-                                (SDL_GetTicksNS() / 1e9 - region.readyAt) / .3,
-                                0.,
-                                1.
-                            )
-                        );
+                        v.color.alpha =
+                            std::uint8_t(255 * detailBlend(tilePixels, 12, 24));
                         v.u = float(std::clamp(x / width, 0., 1.));
                         v.v = float(std::clamp(y / height, 0., 1.));
                     }

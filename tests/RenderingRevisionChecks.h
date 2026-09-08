@@ -3,6 +3,7 @@
 #include "TestFramework.h"
 #include "rendering/BuildingView.h"
 #include "rendering/SettlementGroundCache.h"
+#include "rendering/SettlementNaturalFeatureRenderer.h"
 #include "rendering/WorldFoliage.h"
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldSurface.h"
@@ -36,7 +37,7 @@ namespace Paladin
             northern += cityTreeSpecies(seed, BiomeType::Forest, .4F) ==
                         TreeSpecies::Conifer;
             coldTrees += cityTreeSpecies(seed, BiomeType::Taiga, .34F) ==
-                    TreeSpecies::Conifer;
+                         TreeSpecies::Conifer;
             PALADIN_CHECK(
                 cityTreeSpecies(seed, BiomeType::Plain, .8F) !=
                 TreeSpecies::Conifer
@@ -48,7 +49,9 @@ namespace Paladin
         }
         PALADIN_CHECK(birches > 300 && birches < 800);
         PALADIN_CHECK(temperate > 500 && temperate < 1800);
-        PALADIN_CHECK(northern > temperate && coldTrees > northern && coldTrees == 10000);
+        PALADIN_CHECK(
+            northern > temperate && coldTrees > northern && coldTrees == 10000
+        );
         if (const auto* folder = SDL_getenv("PALADIN_SMOKE_SCREENSHOTS"))
         {
             renderer.beginFrame();
@@ -120,7 +123,8 @@ namespace Paladin
             );
         }
         // Every shared enclosed recipe must hide doors in cutaway mode,
-        // regardless of entry orientation, with all four wall faces at the same low cut height.
+        // regardless of entry orientation, with all four wall faces at the same
+        // low cut height.
         for (const auto* type : {"house", "bakery", "city_keep"})
         {
             const auto& style = art.objectStyle(type);
@@ -504,6 +508,71 @@ namespace Paladin
         PALADIN_CHECK(cache.buildCount() == count + 1);
         SDL_Delay(210);
         PALADIN_CHECK(draw() == rebuilt);
+
+        // Cache invalidation while inside every city LOD blend range must
+        // not introduce a time-based shadow/density fade after construction.
+        map.naturalFeatures().set({8, 8}, NaturalFeatureKind::Tree);
+        map.naturalFeatures().set({20, 20}, NaturalFeatureKind::Tree);
+        SettlementNaturalFeatureRenderer natural;
+        Camera2D natureCamera(16, 16);
+        TileRenderMetrics natureMetrics;
+        CityPresentation naturePolicy;
+        const auto natureFrame = [&]()
+        {
+            renderer.beginFrame();
+            renderer.fillRectangle(
+                0,
+                0,
+                float(renderer.outputWidth()),
+                float(renderer.outputHeight()),
+                {18, 28, 39, 255}
+            );
+            SceneDrawQueue q;
+            natural.render(
+                renderer,
+                map,
+                natureCamera,
+                natureMetrics,
+                &q,
+                &art,
+                &naturePolicy
+            );
+            q.render(renderer);
+            auto* image = SDL_RenderReadPixels(native, nullptr);
+            PALADIN_CHECK(image);
+            auto* rgba = SDL_ConvertSurface(image, SDL_PIXELFORMAT_RGBA32);
+            PALADIN_CHECK(rgba);
+            std::uint64_t hash = 1469598103934665603ull;
+            for (int y = 0; y < rgba->h; ++y)
+            {
+                for (int x = 0; x < rgba->w * 4; ++x)
+                {
+                    hash = (hash ^ *(static_cast<Uint8*>(rgba->pixels) +
+                                     y * rgba->pitch + x)) *
+                           1099511628211ull;
+                }
+            }
+            SDL_DestroySurface(rgba);
+            SDL_DestroySurface(image);
+            return hash;
+        };
+        int roadX = 5;
+        for (double pixels : {4.5, 9., 12., 20., 24., 36., 40., 44.})
+        {
+            natureCamera.setZoom(pixels / natureMetrics.tilePixels);
+            for (int i = 0; i < 8; ++i)
+            {
+                natureFrame();
+            }
+            place(roadX++, 7);
+            for (int i = 0; i < 3; ++i)
+            {
+                natureFrame();
+            }
+            const auto updated = natureFrame();
+            SDL_Delay(220);
+            PALADIN_CHECK(natureFrame() == updated);
+        }
 
         // All six land biomes at the same warm temperature must remain
         // distinct. This reproduces the old shared temperature-variant aliasing

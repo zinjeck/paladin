@@ -42,7 +42,15 @@ namespace Paladin
         {
             return globe_.detailReady();
         }
-        bool terrainLocalDetailReady() const { return globe_.fullDetailReady(); }
+        bool terrainLocalDetailReady() const
+        {
+            return globe_.fullDetailReady();
+        }
+        bool prepareTerrain(Renderer&, const World&) const;
+        float terrainPreparationProgress() const
+        {
+            return globe_.preparationProgress();
+        }
         void reloadArt() const
         {
             artwork_.reset();
