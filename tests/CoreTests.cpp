@@ -6,10 +6,13 @@
 #include "interaction/GlobeCameraNavigation.h"
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
+#include "rendering/SettlementWorldPresentation.h"
 #include "world/WorldGrid.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <type_traits>
 
 namespace
@@ -132,6 +135,77 @@ namespace
         PALADIN_CHECK(std::abs(rotatedRight.x) < 1e-9);
         PALADIN_CHECK(rotatedRight.y > 0.999999999);
         PALADIN_CHECK(std::abs(rotatedRight.z) < 1e-9);
+
+        // Minimized/zero-radius surfaces must not contaminate camera state.
+        const auto safeOrientation = after.orientation();
+        Paladin::GlobeCameraNavigation::pan(
+            camera,
+            grid,
+            0,
+            0,
+            1.0,
+            0.0,
+            10.0
+        );
+        const auto stillSafe = camera.planetRotation();
+        PALADIN_CHECK(stillSafe.has_value());
+        PALADIN_CHECK(std::abs(stillSafe->w - safeOrientation.w) < 1e-9);
+        PALADIN_CHECK(std::abs(stillSafe->x - safeOrientation.x) < 1e-9);
+        PALADIN_CHECK(std::abs(stillSafe->y - safeOrientation.y) < 1e-9);
+        PALADIN_CHECK(std::abs(stillSafe->z - safeOrientation.z) < 1e-9);
+    }
+
+    void testGlobeNorthUpFocus()
+    {
+        Paladin::WorldGrid grid(360, 180);
+        Paladin::Camera2D camera(0.0, 0.0);
+        const Paladin::WorldTilePosition target{217, 64};
+
+        PALADIN_CHECK(Paladin::GlobeCameraNavigation::focusNorthUp(
+            camera,
+            grid,
+            target
+        ));
+
+        const auto view = Paladin::GlobeView::from(camera, grid, 1000, 800);
+        const auto projected = view.project(
+            (target.x + 0.5) / grid.width(),
+            (target.y + 0.5) / grid.height()
+        );
+        PALADIN_CHECK(std::abs(projected.x - view.cx) < 1e-8);
+        PALADIN_CHECK(std::abs(projected.y - view.cy) < 1e-8);
+        PALADIN_CHECK(projected.z > 0.999999999);
+
+        PALADIN_CHECK(!Paladin::GlobeCameraNavigation::focusNorthUp(
+            camera,
+            grid,
+            {-1, 0}
+        ));
+    }
+
+    void testSettlementWorldPresentationScale()
+    {
+        using Paladin::settlementWorldPresentation;
+
+        const auto empty = settlementWorldPresentation(0);
+        const auto hamletSized = settlementWorldPresentation(32);
+        const auto growing = settlementWorldPresentation(512);
+        const auto large = settlementWorldPresentation(4096);
+        const auto enormous = settlementWorldPresentation(
+            std::numeric_limits<std::uint64_t>::max()
+        );
+
+        PALADIN_CHECK(hamletSized.markerDiameterPixels >
+                      empty.markerDiameterPixels);
+        PALADIN_CHECK(growing.markerDiameterPixels >
+                      hamletSized.markerDiameterPixels);
+        PALADIN_CHECK(large.markerDiameterPixels >
+                      growing.markerDiameterPixels);
+        PALADIN_CHECK(std::abs(enormous.markerDiameterPixels -
+                               large.markerDiameterPixels) < 1e-6F);
+        PALADIN_CHECK(large.labelPixelSize >= growing.labelPixelSize);
+        PALADIN_CHECK(empty.markerDiameterPixels >= 1.0F);
+        PALADIN_CHECK(large.borderPixels > 0.0F);
     }
 } // namespace
 
@@ -164,4 +238,6 @@ void runCoreTests()
     testEntityRegistry();
     testCameraZoomLimits();
     testGlobeRollNavigation();
+    testGlobeNorthUpFocus();
+    testSettlementWorldPresentationScale();
 }
