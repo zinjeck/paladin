@@ -1,0 +1,20 @@
+world pan/zoom mean_ms=3.51936 worst_ms=35.4529
+foliage tp=4.00 textures=116 visible=620 built=1 fallback=0
+foliage tp=4.00 textures=216 visible=620 built=1 fallback=0
+dense forest zoom=0.25 mean=23.4131 worst=35.0208 cold_worst=4661.41 stages=0.20766,0.001445,20.7409,0.0226783,0.353502,
+foliage tp=8.00 textures=210 visible=160 built=0 fallback=0
+foliage tp=8.00 textures=213 visible=176 built=0 fallback=0
+dense forest zoom=0.5 mean=0.906303 worst=2.0116 cold_worst=5.5079 stages=0.112955,0.000736667,0.130442,0.00357333,0.26811,
+foliage tp=12.00 textures=165 visible=77 built=0 fallback=0
+foliage tp=12.00 textures=165 visible=77 built=0 fallback=0
+dense forest zoom=0.75 mean=3.93601 worst=5.5086 cold_worst=5.5814 stages=3.42717,0.000936667,0.06396,0.00487333,0.273847,
+foliage tp=16.00 textures=117 visible=45 built=0 fallback=0
+foliage tp=16.00 textures=108 visible=48 built=0 fallback=0
+dense forest zoom=1 mean=3.79385 worst=5.0902 cold_worst=5.5685 stages=3.31156,0.00105333,0.0483433,0.00539833,0.269142,
+foliage tp=24.00 textures=80 visible=24 built=0 fallback=0
+foliage tp=24.00 textures=80 visible=24 built=0 fallback=0
+dense forest zoom=1.5 mean=8.52821 worst=11.8409 cold_worst=11.8028 stages=2.06393,1.75489,0.03424,3.75215,0.296112,
+foliage tp=32.00 textures=72 visible=20 built=0 fallback=0
+foliage tp=32.00 textures=64 visible=16 built=0 fallback=0
+dense forest zoom=2 mean=4.12094 worst=5.4701 cold_worst=5.0499 stages=0.298423,0.960148,0.0241467,1.93649,0.275218,
+Application routing smoke test passed.

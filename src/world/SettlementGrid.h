@@ -18,6 +18,12 @@ namespace Paladin
     {
     public:
         using TileGrid<SettlementTilePosition>::TileGrid;
+        bool coastPassNeeded(int x, int y) const noexcept
+        {
+            return !coastRegions_.empty() &&
+                   coastRegions_
+                       [std::size_t(y / 32) * ((width() + 31) / 32) + x / 32];
+        }
         CityTileType cityTileType(SettlementTilePosition p) const noexcept
         {
             if (!isValidPosition(p) || surfaces_.empty())
@@ -30,6 +36,10 @@ namespace Paladin
         void classifyCoast(std::uint64_t seed)
         {
             surfaces_.assign(tileCount(), CityTileType::Inland);
+            coastRegions_.assign(
+                std::size_t((width() + 31) / 32) * ((height() + 31) / 32),
+                0
+            );
             std::vector<std::uint8_t> distance(tileCount(), 255);
             std::vector<SettlementTilePosition> frontier;
             constexpr SettlementTilePosition
@@ -46,6 +56,19 @@ namespace Paladin
                     }
                     else
                     {
+                        for (int yy = std::max(0, y - 3) / 32;
+                             yy <= std::min(height() - 1, y + 3) / 32;
+                             ++yy)
+                        {
+                            for (int xx = std::max(0, x - 3) / 32;
+                                 xx <= std::min(width() - 1, x + 3) / 32;
+                                 ++xx)
+                            {
+                                coastRegions_
+                                    [std::size_t(yy) * ((width() + 31) / 32) +
+                                     xx] = 1;
+                            }
+                        }
                         surfaces_[std::size_t(y) * width() + x] =
                             CityTileType::DeepWater;
                     }
@@ -129,5 +152,6 @@ namespace Paladin
 
     private:
         std::vector<CityTileType> surfaces_;
+        std::vector<std::uint8_t> coastRegions_;
     };
 } // namespace Paladin

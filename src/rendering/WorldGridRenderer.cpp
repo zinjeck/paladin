@@ -44,7 +44,9 @@ namespace Paladin
         std::size_t terrainIndex(const WorldTile& tile)
         {
             if (tile.biome == BiomeType::Polar)
+            {
                 return 4;
+            }
             if (tile.terrain == TerrainType::Water)
             {
                 return 6;
@@ -733,6 +735,13 @@ namespace Paladin
         {
             for (int x = x0; x < x1; ++x)
             {
+                if constexpr (std::is_same_v<Grid, SettlementGrid>)
+                {
+                    if (!grid.coastPassNeeded(x, y))
+                    {
+                        continue;
+                    }
+                }
                 const bool isLand = land(x, y);
                 const auto* water = sprites.find(
                     kind(x, y) == CityTileType::DeepWater ? "terrain.water"
@@ -993,6 +1002,34 @@ namespace Paladin
             std::unordered_map<const SceneSprite*, SceneSprite> cpuArt;
             std::vector<const SceneSprite*> materials(grid.tileCount());
             std::vector<RenderColor> pixels(grid.tileCount());
+            // Only 81 city terrain/biome/temperature combinations exist. The
+            // overview used to build and hash the same asset strings once per
+            // map tile on the first city frame.
+            std::array<const SceneSprite*, 81> resolved{};
+            std::array<bool, 81> resolvedOnce{};
+            const auto resolve =
+                [&](const WorldTile& tile) -> const SceneSprite*
+            {
+                if constexpr (std::is_same_v<Grid, SettlementGrid>)
+                {
+                    const double t = tile.temperature.value();
+                    const int climate = t > .68 ? 2 : t > 0 && t < .32 ? 1 : 0;
+                    const int key =
+                        int(tile.terrain) * 27 + int(tile.biome) * 3 + climate;
+                    if (!resolvedOnce[key])
+                    {
+                        resolved[key] =
+                            sprites->find(terrainArtId(tile, *sprites, false));
+                        resolvedOnce[key] = true;
+                    }
+                    return resolved[key];
+                }
+                else
+                {
+                    return sprites->find(terrainArtId(tile, *sprites, true));
+                }
+            };
+
 
             for (std::int32_t y = 0; y < grid.height(); ++y)
             {
@@ -1019,14 +1056,9 @@ namespace Paladin
                                 index = 8;
                             }
                         }
-                        if (const auto* art = sprites->find(
-                                index < 8 ? terrainArtId(
-                                                tile,
-                                                *sprites,
-                                                std::is_same_v<Grid, WorldGrid>
-                                            )
-                                          : std::string(terrainIds[index])
-                            );
+                        if (const auto* art =
+                                index < 8 ? resolve(tile)
+                                          : sprites->find(terrainIds[index]);
                             art && art->overviewColor.alpha == 255)
                         {
                             color = art->overviewColor;
@@ -1287,15 +1319,16 @@ namespace Paladin
         const std::function<void(const Texture&, int, int)>& project
     ) const
     {
-        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
-        // The overview cache is the appropriate representation once several
-        // authored pixels occupy the same display pixel. Never traverse the
-        // entire world to draw tiny sprites at strategic zoom.
-        if (tilePixels < 10 && !project)
-        {
-            return;
-        }
-        constexpr int chunkSide = 8;
+        const double displayTilePixels =
+            metrics.scaledTilePixels(camera.zoom());
+        const bool drawDetail = displayTilePixels >= 10 || bool(project);
+        // Prepare canonical ground while zoomed out, within the same per-frame
+        // budget. Entering normal city zoom should not discover every ground
+        // chunk cold and expose a central patch of detail over the overview.
+        const double tilePixels = drawDetail ? displayTilePixels : 12.;
+        // A 4-tile work unit keeps CPU composition bounded even in /Od
+        // debugger builds. Resolution and the resulting artwork are unchanged.
+        constexpr int chunkSide = 4;
         int resolution = 16;
         constexpr std::size_t cacheBytes = 64 * 1024 * 1024;
         if (terrainPixelsPerTile_ != resolution)
@@ -1486,13 +1519,21 @@ namespace Paladin
                                     }
                                 }
                             }
+                            const bool buriedMountain =
+                                mountainInterior(grid, x, y);
+                            const bool uniformMaterial = std::all_of(
+                                std::begin(materials),
+                                std::end(materials),
+                                [&](const SceneSprite* material)
+                                { return !material || material == sprite; }
+                            );
                             const auto paint = [&](int px, int py)
                             {
                                 const double xx = x + (px + .5) / resolution,
                                              yy = y + (py + .5) / resolution;
                                 auto color =
                                     landscapePaint(*sprite, xx, yy, world);
-                                if (true)
+                                if (world || !uniformMaterial)
                                 {
                                     if (tile.terrain != TerrainType::Water)
                                     {
@@ -1539,39 +1580,43 @@ namespace Paladin
                                                 }
                                             }
                                         }
-                                        const double patch =
-                                            .55 * landscapeField(
-                                                      xx * .38,
-                                                      yy * .38,
-                                                      931
-                                                  ) +
-                                            .45 * landscapeField(
-                                                      xx * 5,
-                                                      yy * 5,
-                                                      981
-                                                  );
-                                        if (world && patch < exposure)
+                                        if constexpr (world)
                                         {
-                                            const double grain = landscapeField(
-                                                xx * 4,
-                                                yy * 4,
-                                                713
-                                            );
-                                            color =
-                                                grain < .24
-                                                    ? RenderColor{116, 81, 63, 255}
-                                                : grain > .79
-                                                    ? RenderColor{113, 109, 112, 255}
-                                                    : RenderColor{
-                                                          78,
-                                                          59,
-                                                          57,
-                                                          255
-                                                      };
+                                            const double patch =
+                                                .55 * landscapeField(
+                                                          xx * .38,
+                                                          yy * .38,
+                                                          931
+                                                      ) +
+                                                .45 * landscapeField(
+                                                          xx * 5,
+                                                          yy * 5,
+                                                          981
+                                                      );
+                                            if (world && patch < exposure)
+                                            {
+                                                const double grain =
+                                                    landscapeField(
+                                                        xx * 4,
+                                                        yy * 4,
+                                                        713
+                                                    );
+                                                color =
+                                                    grain < .24
+                                                        ? RenderColor{116, 81, 63, 255}
+                                                    : grain > .79
+                                                        ? RenderColor{113, 109, 112, 255}
+                                                        : RenderColor{
+                                                              78,
+                                                              59,
+                                                              57,
+                                                              255
+                                                          };
+                                            }
                                         }
                                     }
                                 }
-                                if (mountainInterior(grid, x, y))
+                                if (buriedMountain)
                                 {
                                     color = {8, 15, 27, 255};
                                 }
@@ -1686,6 +1731,10 @@ namespace Paladin
             }
 
             found->second.lastUsed = terrainFrame_;
+            if (!drawDetail)
+            {
+                continue;
+            }
             // Retained textures at different resolutions share one byte cap.
             while (terrainBytes_ > cacheBytes && terrainChunks_.size() > 1)
             {

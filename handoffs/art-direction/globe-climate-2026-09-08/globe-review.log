@@ -1,0 +1,4 @@
+world pan/zoom mean_ms=3.23838 worst_ms=32.3128
+globe renderer=direct3d11
+globe generation land=29927 hills=3706 mountains=5480 supported=5472
+Test failed: mountains > 20 && hills > 20 && supported == mountains

@@ -1,0 +1,13 @@
+Test project C:/Paladin/out/build/x64-Release
+    Start 1: PaladinTests
+1/4 Test #1: PaladinTests .....................   Passed    1.71 sec
+    Start 2: PaladinGitIgnoreTests
+2/4 Test #2: PaladinGitIgnoreTests ............   Passed    2.16 sec
+    Start 3: PaladinApplicationSmokeTests
+3/4 Test #3: PaladinApplicationSmokeTests .....   Passed   16.86 sec
+    Start 4: PaladinRenderPerformanceTests
+4/4 Test #4: PaladinRenderPerformanceTests ....   Passed    2.89 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Total Test time (real) =  23.65 sec

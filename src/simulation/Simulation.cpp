@@ -1,4 +1,5 @@
 #include "simulation/Simulation.h"
+#include "world/PlanetAstronomy.h"
 
 #include "simulation/WorldSimulationPipeline.h"
 

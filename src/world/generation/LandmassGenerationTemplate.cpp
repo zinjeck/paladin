@@ -12,8 +12,8 @@ namespace Paladin
             LandmassGenerationTemplate definition;
             definition.id = defaultLandmassTemplateId;
             definition.displayName = "Godot Base";
-            definition.defaultMinimumContinentCount = 3;
-            definition.defaultMaximumContinentCount = 5;
+            definition.defaultMinimumContinentCount = 5;
+            definition.defaultMaximumContinentCount = 6;
 
             definition.continentSlots = {
                 {0.22, 0.24},
@@ -24,8 +24,8 @@ namespace Paladin
                 {0.82, 0.70}
             };
 
-            definition.centerJitterX = 0.08;
-            definition.centerJitterY = 0.08;
+            definition.centerJitterX = 0.035;
+            definition.centerJitterY = 0.035;
             definition.minimumCenterX = 0.14;
             definition.maximumCenterX = 0.86;
             definition.minimumCenterY = 0.14;
@@ -34,12 +34,12 @@ namespace Paladin
             definition.continentLobes = {
                 6,
                 9,
-                0.17,
-                0.15,
+                0.11,
+                0.11,
+                0.060,
+                0.13,
                 0.075,
-                0.18,
-                0.075,
-                0.19,
+                0.16,
                 0.50,
                 0.86,
                 1.35,

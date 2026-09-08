@@ -15,9 +15,9 @@
 # Proxy lighting/shadows also disappear: transparent sprite pixels stay clear.
 # Define all desired sprite layers explicitly; '-' layers stay absent with art.
 # Open-area modules are clipped to the viewport and omitted at overview zoom.
-city_keep enclosed city_keep.floor wall.adobe roof.thatch - 3 7 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
-house enclosed house.floor wall.adobe roof.thatch - 3 3 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
-bakery enclosed bakery.floor wall.adobe roof.thatch - 3 3 .75 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+city_keep enclosed city_keep.floor wall.adobe roof.thatch - 3 5 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+house enclosed house.floor wall.adobe roof.thatch - 3 3 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+bakery enclosed bakery.floor wall.adobe roof.thatch - 3 3 .75 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
 market modules market.floor - - market.stall 3 4 .65 .12 30 65 32 65 1 ca7e48 683724 .6 .45
 stockpile ground stockpile.floor - - - 2 2 .35 .12 30 65 32 50 1 d1a352 754d1f .6 .45
 fishing_grounds modules fishing_grounds.floor - - fishing_grounds.station 4 4 .3 .12 30 65 32 45 1 bd864c 633e4b .6 .45

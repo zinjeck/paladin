@@ -659,17 +659,10 @@ namespace Paladin
                     c.stepDuration = duration;
                     position = next;
                 }
-                while (footprint.contains(position) && position != door)
+                if (footprint.contains(position))
                 {
-                    if (position.x != door.x)
-                    {
-                        position.x += position.x < door.x ? 1 : -1;
-                    }
-                    else
-                    {
-                        position.y += position.y < door.y ? 1 : -1;
-                    }
-                    c.path.push_back(position);
+                    appendRoomPath(c.path, position, door, footprint, door);
+                    position = door;
                 }
                 if (footprint.contains(position))
                 {
@@ -793,7 +786,8 @@ namespace Paladin
                         c.tilePosition.x + offset.x,
                         c.tilePosition.y + offset.y
                     };
-                    if (!home->footprint.contains(next))
+                    if (!buildingInterior(home->footprint, home->objectTypeId)
+                             .contains(next))
                     {
                         continue;
                     }

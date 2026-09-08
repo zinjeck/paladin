@@ -1,0 +1,35 @@
+[1/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldInput.cpp.obj
+[5/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityInput.cpp.obj
+[6/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[7/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[8/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationDebug.cpp.obj
+[9/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[10/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[11/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+[12/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SceneSpriteLibrary.cpp.obj
+[13/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[14/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[15/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+[16/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[17/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+[18/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[19/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldGridRenderer.cpp.obj
+[20/22] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\CityHud.cpp.obj
+[21/22] Linking CXX executable PaladinApplicationSmokeTests.exe
+[22/22] Verify final world pixel grid, daylight/night rendering and sprite integration
+FAILED: [code=1] CMakeFiles/PaladinArtCheck C:/Paladin/out/build/x64-Release/CMakeFiles/PaladinArtCheck 
+C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software C:/Paladin/out/build/x64-Release/PaladinApplicationSmokeTests.exe"
+world pan/zoom mean_ms=4.38648 worst_ms=9.1509
+globe renderer=software
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=49.1938 worst=73.8882
+city coast zoom mean_ms=9.25439 worst_ms=25.3181
+globe warm zoom/rotation mean_ms=49.1938 worst_ms=73.8882 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Test failed: moved
+ninja: build stopped: subcommand failed.

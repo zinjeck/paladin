@@ -1,0 +1,14 @@
+{
+  "x64-Debug": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Debug\\Paladin.exe",
+    "sha256": "b7abe5f52bf613230bfa68b919801b35a18cd49de25ae318e056a6123ed28197",
+    "packaged_sprite_files": 228,
+    "mismatches": []
+  },
+  "x64-Release": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Release\\Paladin.exe",
+    "sha256": "adab748c3da06af7a79889ffd2bf669699759781920813a101720e90ac4aa847",
+    "packaged_sprite_files": 228,
+    "mismatches": []
+  }
+}

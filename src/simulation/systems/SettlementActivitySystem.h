@@ -122,9 +122,16 @@ namespace Paladin
             shiftEndMinute = 720 + hours * 30;
         }
 
+        double solarTimeOffsetMinutes = 0;
+        double localMinute(double minute) const noexcept
+        {
+            const double time =
+                std::fmod(minute + solarTimeOffsetMinutes, 1440.0);
+            return time < 0 ? time + 1440.0 : time;
+        }
         bool isWorkTime(double minute) const noexcept
         {
-            const double time = std::fmod(minute, 1440.0);
+            const double time = localMinute(minute);
             return time >= shiftStartMinute && time < shiftEndMinute;
         }
     };

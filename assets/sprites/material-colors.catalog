@@ -1,0 +1,12 @@
+# Shared material palette substitutions; file sourceRGB destinationRGB.
+# Source artwork stays intact. Applied once on load before texture creation.
+modular-v1/adobe-front.png B78350 A78D72
+modular-v1/adobe-front.png C18B5A A99478
+modular-v1/adobe-front.png D9C79F D7C8A2
+environment-v4/nature/planks.png A78D72 D5A454
+environment-v4/nature/planks.png 95655F C18B5A
+environment-v4/nature/planks.png 633E4B 886044
+environment-v4/nature/planks.png A99478 EBC46B
+modular-v1/hall-floor.png 7A5038 D5A454
+modular-v1/hall-floor.png 886044 C18B5A
+modular-v1/hall-floor.png 49352F 886044

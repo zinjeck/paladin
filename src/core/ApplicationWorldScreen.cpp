@@ -165,7 +165,8 @@ namespace Paladin
             outlineCount = 1;
         }
 
-        worldRenderer_->animationSeconds = simulationClock_->presentationSeconds();
+        worldRenderer_->animationSeconds =
+            simulationClock_->presentationSeconds();
         worldRenderer_->render(
             *renderer_,
             simulation_->world(),
@@ -183,6 +184,13 @@ namespace Paladin
         );
 
         renderWorldManagement();
+        worldRenderer_->renderNavigator(
+            *renderer_,
+            simulation_->world(),
+            *camera_,
+            *tileRenderMetrics_,
+            *grayUiRenderer_
+        );
 
         worldHud_->render(
             *renderer_,

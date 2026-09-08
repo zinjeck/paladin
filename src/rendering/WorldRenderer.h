@@ -10,6 +10,8 @@
 #include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
 
+#include "rendering/WorldMapNavigation.h"
+#include "ui/GrayUiRenderer.h"
 #include <span>
 
 namespace Paladin
@@ -32,6 +34,15 @@ namespace Paladin
             TerritoryPresentationPolicy territoryPresentationPolicy
         );
 
+        std::uint64_t terrainAtlasBuilds() const
+        {
+            return globe_.atlasBuilds;
+        }
+        bool terrainDetailReady() const
+        {
+            return globe_.detailReady();
+        }
+        bool terrainLocalDetailReady() const { return globe_.fullDetailReady(); }
         void reloadArt() const
         {
             artwork_.reset();
@@ -49,7 +60,23 @@ namespace Paladin
             std::span<const TileOutlineRenderItem> outlines = {}
         ) const;
 
+        void renderNavigator(
+            Renderer&,
+            const World&,
+            const Camera2D&,
+            const TileRenderMetrics&,
+            const GrayUiRenderer&
+        ) const;
+        void toggleProjection(
+            Camera2D&,
+            const WorldGrid&,
+            int,
+            int,
+            const TileRenderMetrics&
+        );
+
     private:
+        std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
         mutable WorldCartography cartography_;
         mutable SceneSpriteLibrary artwork_;

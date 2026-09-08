@@ -187,6 +187,7 @@ namespace Paladin
         SettlementId activeCitySettlementId_;
         bool cityHudCapturedPointer_ = false;
         bool globePointerDown_ = false, globeDragging_ = false;
+        int worldNavigatorPress_ = 0;
         float globePressX_ = 0, globePressY_ = 0;
         bool simulationControlsUnlocked_ = false;
         bool simulationControlsCapturedPointer_ = false;

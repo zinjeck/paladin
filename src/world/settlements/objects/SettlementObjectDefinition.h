@@ -67,6 +67,8 @@ namespace Paladin
         bool hasDoor = true;
         bool constructionCostPerTile = false;
         bool allowsFootprintRotation = false;
+        // Reserved outer wall band; zero for outdoor workplaces.
+        int wallThickness = 0;
     };
 
     namespace SettlementObjectTypes

@@ -1,0 +1,6 @@
+land 31131
+hills 4322
+mountains 7212
+mean_ms 3.8787
+worst_ms 6.6452
+atlas_builds 1

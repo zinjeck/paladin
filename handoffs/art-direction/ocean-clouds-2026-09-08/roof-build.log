@@ -1,0 +1,36 @@
+[1/47] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/47] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/47] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[5/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+[6/47] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[7/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+[8/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+[9/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[10/47] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementSimulationLoopTests.cpp.obj
+[11/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[12/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+[13/47] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[14/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+[15/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SceneSpriteLibrary.cpp.obj
+[16/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[17/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[18/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+[19/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+[20/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[21/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[22/47] Linking CXX executable PaladinTests.exe
+[23/47] Building CXX object CMakeFiles\Paladin.dir\src\ui\CityHud.cpp.obj
+[24/47] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+[25/47] Linking CXX executable Paladin.exe
+[26/47] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+FAILED: [code=2] CMakeFiles/PaladinApplicationSmokeTests.dir/tests/ApplicationSmokeTests.cpp.obj 
+C:\PROGRA~1\MIB055~1\18\COMMUN~1\VC\Tools\MSVC\1451~1.362\bin\Hostx64\x64\cl.exe  /nologo /TP  -IC:\Paladin\src -IC:\Paladin\tests -IC:\Paladin\out\build\x64-Release\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_ttf-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_image-src\include /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++latest -MD /showIncludes /FoCMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj /FdCMakeFiles\PaladinApplicationSmokeTests.dir\ /FS -c C:\Paladin\tests\ApplicationSmokeTests.cpp
+C:\Paladin\tests\CityCloudChecks.h(15): error C2660: 'Paladin::Renderer::fillRectangle': function does not take 2 arguments
+C:\Paladin\src\rendering/Renderer.h(88): note: see declaration of 'Paladin::Renderer::fillRectangle'
+C:\Paladin\tests\CityCloudChecks.h(15): note: while trying to match the argument list '(initializer list, initializer list)'
+C:\Paladin\tests\CityCloudChecks.h(41): error C3861: 'SDL_ReadSurfacePixelRGBA': identifier not found
+[27/47] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+[28/47] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityScreen.cpp.obj
+[29/47] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+ninja: build stopped: subcommand failed.

@@ -6,6 +6,12 @@
 
 namespace Paladin
 {
+    enum class ReliefType : std::uint8_t
+    {
+        Lowland,
+        Hills,
+        Mountain
+    };
     struct WorldTile
     {
         TerrainType terrain = TerrainType::Water;
@@ -15,5 +21,8 @@ namespace Paladin
         Elevation elevation{};
         Temperature temperature{};
         Rainfall rainfall{};
+        // Landform is independent of climate: tundra and polar slopes may
+        // still be hills even though their biome remains cold.
+        ReliefType relief = ReliefType::Lowland;
     };
 } // namespace Paladin

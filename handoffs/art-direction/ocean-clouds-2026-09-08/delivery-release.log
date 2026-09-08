@@ -1,0 +1,71 @@
+[1/55] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/55] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/55] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\EntityAttributeTests.cpp.obj
+[5/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldReliefTests.cpp.obj
+[6/55] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[7/55] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[8/55] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[9/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementSimulationLoopTests.cpp.obj
+[10/55] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[11/55] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[12/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[13/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[14/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[15/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+[16/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[17/55] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[18/55] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[19/55] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[20/55] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[21/55] Linking CXX executable Paladin.exe
+[22/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\CoreTests.cpp.obj
+[23/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementEmploymentTests.cpp.obj
+[24/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementActivityTests.cpp.obj
+[25/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[26/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[27/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[28/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[29/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[30/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[31/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[32/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+[33/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[34/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[35/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[36/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[37/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[38/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[39/55] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[40/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldGenerationTests.cpp.obj
+[41/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[42/55] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[43/55] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldTests.cpp.obj
+[44/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[45/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+[46/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[47/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[48/55] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[49/55] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[50/55] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[51/55] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[52/55] Building CXX object CMakeFiles\PaladinTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[53/55] Linking CXX executable PaladinApplicationSmokeTests.exe
+[54/55] Linking CXX executable PaladinTests.exe
+[55/55] Verify final world pixel grid, daylight/night rendering and sprite integration
+world pan/zoom mean_ms=4.09159 worst_ms=8.8497
+globe renderer=software
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=39.1948 worst=53.8251
+city coast zoom mean_ms=7.99981 worst_ms=18.9278
+globe warm zoom/rotation mean_ms=39.1948 worst_ms=53.8251 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Invalid object presentation recipe; using flat fallback
+Rejected off-palette or partial-alpha artwork: alpha.png
+Rejected off-palette or partial-alpha artwork: alpha.png
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Application routing smoke test passed.

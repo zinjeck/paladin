@@ -1,0 +1,7 @@
+world pan/zoom mean_ms=1.95906 worst_ms=3.0227
+globe renderer=direct3d11
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=3.96236 worst=5.5542
+city coast zoom mean_ms=5.58709 worst_ms=20.1496
+globe warm zoom/rotation mean_ms=3.96236 worst_ms=5.5542 atlas_builds=1
+Application routing smoke test passed.

@@ -92,12 +92,19 @@ namespace Paladin
 
         const WorldTime& worldTime = simulation_->world().time();
 
+        const double localMinute =
+            citySettlement ? PlanetAstronomy::localMinute(
+                                 worldTime.totalGameMinutes(),
+                                 (citySettlement->position().x + .5) /
+                                     simulation_->world().grid().width()
+                             )
+                           : worldTime.hour() * 60 + worldTime.minute();
         cityHud_->setCityInformation(
             citySettlement ? std::string(citySettlement->name())
                            : std::string(),
             worldTime.day(),
-            worldTime.hour(),
-            worldTime.minute()
+            int(localMinute) / 60,
+            int(localMinute) % 60
         );
 
         cityHud_->setHousingCapacity(
@@ -162,7 +169,8 @@ namespace Paladin
                 simulation_->world().settlement(activeCitySettlementId_);
             if (renderedSettlement)
             {
-                cityRenderer_->animationSeconds = simulationClock_->presentationSeconds();
+                cityRenderer_->animationSeconds =
+                    simulationClock_->presentationSeconds();
                 cityRenderer_->render(
                     *renderer_,
                     *settlementMap,
@@ -173,7 +181,18 @@ namespace Paladin
                     renderedSettlement->simulationState().citizens(),
                     *settlementInspectionController_,
                     simulationClock_->interpolationAlpha(),
-                    simulation_->world().time().secondsIntoDay() / 3600.0
+                    PlanetAstronomy::localMinute(
+                        simulation_->world().time().totalGameMinutes(),
+                        (renderedSettlement->position().x + .5) /
+                            simulation_->world().grid().width()
+                    ) / 60.,
+                    globeSunDot(
+                        (renderedSettlement->position().x + .5) /
+                            simulation_->world().grid().width(),
+                        (renderedSettlement->position().y + .5) /
+                            simulation_->world().grid().height(),
+                        simulation_->world().time().secondsIntoDay()
+                    )
                 );
 
                 settlementInspectionPanel_->render(

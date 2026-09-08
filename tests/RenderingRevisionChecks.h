@@ -7,6 +7,7 @@
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldSurface.h"
 #include "world/WorldGrid.h"
+#include "world/generation/GenerationNoise.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <filesystem>
 #include <unordered_set>
@@ -24,10 +25,88 @@ namespace Paladin
             (std::filesystem::path(SDL_GetBasePath()) / "assets/sprites")
                 .string()
         );
+        int birches = 0, temperate = 0, northern = 0, coldTrees = 0;
+        for (unsigned sample = 0; sample < 10000; ++sample)
+        {
+            const auto seed = GenerationNoise::mix(sample);
+            birches += cityTreeSpecies(seed, BiomeType::Forest, .5F) ==
+                       TreeSpecies::Birch;
+            temperate += cityTreeSpecies(seed, BiomeType::Forest, .5F) ==
+                         TreeSpecies::Conifer;
+            northern += cityTreeSpecies(seed, BiomeType::Forest, .4F) ==
+                        TreeSpecies::Conifer;
+            coldTrees += cityTreeSpecies(seed, BiomeType::Taiga, .34F) ==
+                    TreeSpecies::Conifer;
+            PALADIN_CHECK(
+                cityTreeSpecies(seed, BiomeType::Plain, .8F) !=
+                TreeSpecies::Conifer
+            );
+            PALADIN_CHECK(
+                cityTreeSpecies(seed, BiomeType::Tundra, .34F) ==
+                TreeSpecies::Conifer
+            );
+        }
+        PALADIN_CHECK(birches > 300 && birches < 800);
+        PALADIN_CHECK(temperate > 500 && temperate < 1800);
+        PALADIN_CHECK(northern > temperate && coldTrees > northern && coldTrees == 10000);
+        if (const auto* folder = SDL_getenv("PALADIN_SMOKE_SCREENSHOTS"))
+        {
+            renderer.beginFrame();
+            {
+                WorldPixelScene pixels(renderer, 64);
+                renderer.fillRectangle(
+                    0,
+                    0,
+                    float(renderer.outputWidth()),
+                    float(renderer.outputHeight()),
+                    {121, 181, 109, 255}
+                );
+                SceneProjection view{
+                    0,
+                    0,
+                    64,
+                    renderer.outputWidth(),
+                    renderer.outputHeight()
+                };
+                SceneDrawQueue grove;
+                for (int i = 0; i < 3; ++i)
+                {
+                    PALADIN_CHECK(art.submitTree(
+                        grove,
+                        view,
+                        -2.5 + i * 2.5,
+                        1,
+                        77,
+                        1,
+                        1,
+                        i == 0   ? TreeSpecies::Broadleaf
+                        : i == 1 ? TreeSpecies::Birch
+                                 : TreeSpecies::Conifer
+                    ));
+                }
+                grove.render(renderer);
+            }
+            auto* shot = SDL_RenderReadPixels(native, nullptr);
+            PALADIN_CHECK(shot);
+            PALADIN_CHECK(SDL_SaveBMP(
+                shot,
+                (std::string(folder) + "/tree-species.bmp").c_str()
+            ));
+            SDL_DestroySurface(shot);
+        }
         const auto& home = art.objectStyle("house");
         PALADIN_CHECK(home.wall == art.objectStyle("bakery").wall);
         PALADIN_CHECK(home.wall == art.objectStyle("city_keep").wall);
         PALADIN_CHECK(home.roof == art.objectStyle("city_keep").roof);
+        const auto wallBase = art.find(home.wall + ".front")->materialBase;
+        PALADIN_CHECK(
+            wallBase.red == 167 && wallBase.green == 141 && wallBase.blue == 114
+        );
+        const auto floorBase = art.find("stockpile.floor")->materialBase;
+        PALADIN_CHECK(
+            floorBase.red == 213 && floorBase.green == 164 &&
+            floorBase.blue == 84
+        );
         const auto* roof = art.find(home.roof + ".full");
         PALADIN_CHECK(roof);
         for (int i = 1; i <= 4; ++i)
@@ -39,6 +118,49 @@ namespace Paladin
                 variant->height == roof->height &&
                 variant->elevation == roof->elevation
             );
+        }
+        // Every shared enclosed recipe must hide doors in cutaway mode,
+        // regardless of entry orientation, with all four wall faces at the same low cut height.
+        for (const auto* type : {"house", "bakery", "city_keep"})
+        {
+            const auto& style = art.objectStyle(type);
+            const auto* leaf = art.find(style.wall + ".door");
+            const auto* face = art.find(style.wall + ".front");
+            PALADIN_CHECK(leaf && face);
+            const SettlementObjectFootprint footprint{
+                {10, 10},
+                5,
+                std::string(type) == "city_keep" ? 7 : 5
+            };
+            const SceneProjection projection{12, 13, 32, 800, 600};
+            CityPresentation cutaway;
+            cutaway.roofsVisible = false;
+            for (int heading = 0; heading < 4; ++heading)
+            {
+                SceneDrawQueue walls;
+                PALADIN_CHECK(modularBuilding(
+                    walls,
+                    projection,
+                    art,
+                    cutaway,
+                    type,
+                    footprint,
+                    centerDoor(footprint, heading),
+                    91,
+                    1
+                ));
+                bool lowFace = false;
+                for (const auto& item : walls.items())
+                {
+                    PALADIN_CHECK(item.texture != leaf->texture.get());
+                    if (item.texture == face->texture.get())
+                    {
+                        PALADIN_CHECK(item.bounds.height <= 8.01F);
+                        lowFace = true;
+                    }
+                }
+                PALADIN_CHECK(lowFace);
+            }
         }
         std::unordered_set<const Texture*> biomes;
         for (const auto* name :
@@ -195,7 +317,7 @@ namespace Paladin
         for (double zoom : {.5, 1., 2.})
         {
             reliefCamera.setZoom(zoom);
-            for (int i = 0; i < 80; ++i)
+            for (int i = 0; i < 400; ++i)
             {
                 SDL_Delay(1);
                 renderer.beginFrame();

@@ -1,0 +1,26 @@
+[1/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[5/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[6/17] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[7/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[8/17] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[9/17] Linking CXX executable Paladin.exe
+[10/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+FAILED: [code=2] CMakeFiles/PaladinApplicationSmokeTests.dir/tests/ApplicationSmokeTests.cpp.obj 
+C:\PROGRA~1\MIB055~1\18\COMMUN~1\VC\Tools\MSVC\1451~1.362\bin\Hostx64\x64\cl.exe  /nologo /TP  -IC:\Paladin\src -IC:\Paladin\tests -IC:\Paladin\out\build\x64-Release\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_ttf-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_image-src\include /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++latest -MD /showIncludes /FoCMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj /FdCMakeFiles\PaladinApplicationSmokeTests.dir\ /FS -c C:\Paladin\tests\ApplicationSmokeTests.cpp
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1014): error C2065: 'native': undeclared identifier
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1014): error C3535: cannot deduce type for 'auto *' from '<error>'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1020): error C2664: 'bool SDL_ReadSurfacePixel(SDL_Surface *,int,int,Uint8 *,Uint8 *,Uint8 *,Uint8 *)': cannot convert argument 1 from '<error type> *' to 'SDL_Surface *'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1020): note: Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+C:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include\SDL3/SDL_surface.h(1482): note: see declaration of 'SDL_ReadSurfacePixel'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1020): note: while trying to match the argument list '(<error type> *, int, int, Uint8 *, Uint8 *, Uint8 *, Uint8 *)'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1025): error C2664: 'void SDL_DestroySurface(SDL_Surface *)': cannot convert argument 1 from '<error type> *' to 'SDL_Surface *'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1025): note: Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or parenthesized function-style cast
+C:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include\SDL3/SDL_surface.h(213): note: see declaration of 'SDL_DestroySurface'
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1025): note: while trying to match the argument list '(<error type> *)'
+[11/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+[12/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[13/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+ninja: build stopped: subcommand failed.

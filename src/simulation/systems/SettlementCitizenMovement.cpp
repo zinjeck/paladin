@@ -137,23 +137,7 @@ namespace Paladin
                     citizen.exitingHomeId ? citizen.exitingHomeId
                                           : citizen.homeId
                 );
-                const bool enteringHome =
-                    home && home->door &&
-                    std::abs(next.x - citizen.tilePosition.x) <= 1 &&
-                    std::abs(next.y - citizen.tilePosition.y) <= 1 &&
-                    ((home->footprint.contains(citizen.tilePosition) &&
-                      home->footprint.contains(next)) ||
-                     (citizen.tilePosition == *home->door &&
-                      next == outsideDoor(home->footprint, *home->door)) ||
-                     ((citizen.task.kind == CitizenTaskKind::Home ||
-                       citizen.task.kind == CitizenTaskKind::Care ||
-                       citizen.task.kind == CitizenTaskKind::FamilyMeal ||
-                       citizen.task.kind == CitizenTaskKind::Sleep) &&
-                      citizen.tilePosition ==
-                          outsideDoor(home->footprint, *home->door) &&
-                      next == *home->door));
-                if (!enteringHome &&
-                    !navigation_.canStep(map, citizen.tilePosition, next))
+                if (!navigation_.canStep(map, citizen.tilePosition, next))
                 {
                     citizen.stepProgress = 0;
                     if (requests >= movementPolicy.pathRequestsPerTick)

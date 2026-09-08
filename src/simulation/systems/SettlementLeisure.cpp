@@ -92,7 +92,7 @@ namespace Paladin
         {
             return;
         }
-        if (std::fmod(minute, 1440.0) + policy.workBreakMinutes >
+        if (policy.localMinute(minute) + policy.workBreakMinutes >
             policy.shiftEndMinute)
         {
             return;

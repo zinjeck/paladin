@@ -1,6 +1,7 @@
 #include "world/settlements/SettlementLogistics.h"
 #include "world/settlements/SettlementEmploymentState.h"
 #include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
@@ -489,6 +490,15 @@ namespace Paladin
             {
                 continue;
             }
+            const auto room =
+                buildingInterior(object.footprint, object.objectTypeId);
+            const auto* keepDefinition = SettlementObjectCatalog::definition(
+                SettlementObjectTypes::CityKeep
+            );
+            const int keepArea = (keepDefinition->previewWidth -
+                                  2 * keepDefinition->wallThickness) *
+                                 (keepDefinition->previewHeight -
+                                  2 * keepDefinition->wallThickness);
             const auto id = ids_.generate();
             inventories_.push_back(
                 {id,
@@ -500,10 +510,9 @@ namespace Paladin
                  object.id,
                  {},
                  object.footprint,
-                 keep ? int((std::int64_t(100) * object.footprint.width *
-                                 object.footprint.height +
-                             20) /
-                            21)
+                 keep ? int((std::int64_t(100) * room.width * room.height +
+                             keepArea - 1) /
+                            keepArea)
                  : object.objectTypeId == SettlementObjectTypes::Market
                      ? int((std::int64_t(object.footprint.width) *
                                 object.footprint.height *
@@ -514,8 +523,7 @@ namespace Paladin
                            1,
                            std::int64_t(workplaceDefinition(object.objectTypeId)
                                             ->storageCapacity) *
-                               object.footprint.width *
-                               object.footprint.height /
+                               room.width * room.height /
                                workplaceDefinition(object.objectTypeId)
                                    ->referenceArea
                        ))}

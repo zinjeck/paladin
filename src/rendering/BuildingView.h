@@ -1,5 +1,6 @@
 #pragma once
 #include "rendering/CityPresentation.h"
+#include "rendering/FramedWall.h"
 #include "rendering/SceneDetail.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "world/settlements/objects/SettlementDoor.h"
@@ -64,6 +65,10 @@ namespace Paladin
         }
         const double x = f.topLeft.x, y = f.topLeft.y, w = f.width,
                      h = f.height;
+        const auto interior = buildingInterior(f, type);
+        const double ix = interior.topLeft.x, iy = interior.topLeft.y,
+                     iw = interior.width, ih = interior.height;
+        const double wallBand = (w - iw) * .5;
         const int facing = buildingView(f, door, policy.viewAzimuthDegrees);
         const bool side = h > w * 1.4 || (std::abs(w - h) < .5 && facing % 2);
         const auto roof = style.roof + (side ? ".full.side" : ".full");
@@ -79,13 +84,13 @@ namespace Paladin
                     queue,
                     p,
                     style.floor + ".full",
-                    x,
-                    y,
+                    ix,
+                    iy,
                     y,
                     id,
                     0,
-                    w,
-                    h
+                    iw,
+                    ih
                 );
             }
             else
@@ -94,7 +99,21 @@ namespace Paladin
                     queue,
                     p,
                     style.floor,
-                    {x, y, 0, w, h, 0, 0},
+                    {ix, iy, 0, iw, ih, 0, 0},
+                    {},
+                    y,
+                    id,
+                    0,
+                    false
+                );
+            }
+            if (door)
+            {
+                sprites.surface(
+                    queue,
+                    p,
+                    style.floor,
+                    {double(door->x), double(door->y), 0, 1, 1, 0, 0},
                     {},
                     y,
                     id,
@@ -103,6 +122,56 @@ namespace Paladin
                 );
             }
             queue.setLayerFrom(start, -2);
+            if (policy.shadowsVisible)
+            {
+                // Non-overlapping penumbra bands stay inside the room; these
+                // lie above the floor and below furniture and occupants.
+                const double reach = std::min(ih, .25 * 1.1);
+                for (int band = 0; band < 4; ++band)
+                {
+                    const double step = reach / 4;
+                    queue.submit(
+                        {p.bounds({ix, iy + band * step, 0, iw, step, 0, 0}),
+                         {57, 43, 60, std::uint8_t(68 - band * 14)},
+                         y - .01,
+                         id,
+                         -1,
+                         0}
+                    );
+                }
+                queue.submit(
+                    {p.bounds(
+                         {ix,
+                          iy + reach,
+                          0,
+                          .125,
+                          std::max(0., ih - reach),
+                          0,
+                          0}
+                     ),
+                     {57, 43, 60, 42},
+                     y - .01,
+                     id,
+                     -1,
+                     0}
+                );
+                queue.submit(
+                    {p.bounds(
+                         {ix + iw - .125,
+                          iy + reach,
+                          0,
+                          .125,
+                          std::max(0., ih - reach),
+                          0,
+                          0}
+                     ),
+                     {57, 43, 60, 28},
+                     y - .01,
+                     id,
+                     -1,
+                     0}
+                );
+            }
         }
         if (roofVisible)
         {
@@ -121,18 +190,44 @@ namespace Paladin
                     h + .08
                 );
             }
-            sprites.placed(
+            framedWall(
                 queue,
                 p,
+                sprites,
                 face,
                 x,
                 y + h,
+                w,
+                0,
+                style.height,
                 y + h,
                 id,
                 12,
-                w,
-                style.height
+                true
             );
+            if (policy.shadowsVisible)
+            {
+                // The thatch overhang shades the top of the plaster face.
+                for (int band = 0; band < 2; ++band)
+                {
+                    queue.submit(
+                        {p.bounds(
+                             {x,
+                              y + h - style.height + band / 16.,
+                              0,
+                              w,
+                              1. / 16.,
+                              0,
+                              0}
+                         ),
+                         {57, 43, 60, std::uint8_t(74 - band * 28)},
+                         y + h,
+                         id,
+                         0,
+                         13}
+                    );
+                }
+            }
             // Door is an attachment, not baked into a work object's wall.
             if (door && facing == 2)
             {
@@ -169,49 +264,201 @@ namespace Paladin
         }
         else
         {
-            const auto wallStrip = [&](double xx,
-                                       double yy,
-                                       double ww,
-                                       double hh,
-                                       double depth,
-                                       int part)
+            // Keep the back wall tall; section the sides down and retain
+            // only the front sill. Openings show floor, never a door leaf.
+            const auto band = [&](double xx,
+                                  double yy,
+                                  double ww,
+                                  double dd,
+                                  double height,
+                                  double depth,
+                                  int part,
+                                  bool horizontal)
             {
-                sprites.placed(queue, p, face, xx, yy, depth, id, part, ww, hh);
-            };
-            wallStrip(x, y + style.thickness, w, style.height, y, 1);
-            // Caps follow actual doorway openings; changing art never changes
-            // navigation.
-            for (int row = 0; row < f.height; ++row)
-            {
-                if (!door ||
-                    *door !=
-                        SettlementTilePosition{f.topLeft.x, f.topLeft.y + row})
+                const bool opening = door && door->x >= xx &&
+                                     door->x < xx + ww && door->y >= yy &&
+                                     door->y < yy + dd;
+                const auto segment =
+                    [&](double sx, double sy, double sw, double sd)
                 {
-                    wallStrip(x, y + row + 1, style.thickness, 1, y + row, 2);
-                }
-                if (!door || *door != SettlementTilePosition{
-                                          f.topLeft.x + f.width - 1,
-                                          f.topLeft.y + row
-                                      })
-                {
-                    wallStrip(
-                        x + w - style.thickness,
-                        y + row + 1,
-                        style.thickness,
-                        1,
-                        y + row,
-                        2
+                    if (sw <= 0 || sd <= 0)
+                    {
+                        return;
+                    }
+                    framedWall(
+                        queue,
+                        p,
+                        sprites,
+                        face,
+                        sx,
+                        sy,
+                        sw,
+                        sd,
+                        height,
+                        depth,
+                        id,
+                        part,
+                        horizontal,
+                        height < style.height
                     );
-                }
-            }
-            for (int col = 0; col < f.width; ++col)
-            {
-                if (!door || *door != SettlementTilePosition{
-                                          f.topLeft.x + col,
-                                          f.topLeft.y + f.height - 1
-                                      })
+                };
+                if (!opening)
                 {
-                    wallStrip(x + col, y + h, 1, style.thickness, y + h, 12);
+                    segment(xx, yy, ww, dd);
+                }
+                else if (horizontal)
+                {
+                    segment(xx, yy, door->x - xx, dd);
+                    segment(door->x + 1, yy, xx + ww - door->x - 1, dd);
+                }
+                else
+                {
+                    segment(xx, yy, ww, door->y - yy);
+                    segment(xx, door->y + 1, ww, yy + dd - door->y - 1);
+                }
+            };
+            band(x, y, w, wallBand, .25, y, 2, true);
+            band(
+                x,
+                y + wallBand,
+                wallBand,
+                h - 2 * wallBand,
+                .25,
+                y + h,
+                2,
+                false
+            );
+            band(
+                x + w - wallBand,
+                y + wallBand,
+                wallBand,
+                h - 2 * wallBand,
+                .25,
+                y + h,
+                2,
+                false
+            );
+            band(x, y + h - wallBand, w, wallBand, .25, y + h, 12, true);
+            // One cap surface for the connected low ring, with boundary shading
+            // only at its actual outline. Front corners have no join/divider.
+            constexpr double cutHeight = .25, pixel = 1. / 16.;
+            const auto* wallArt = sprites.find(face);
+            const RenderColor base = wallArt->materialBase.alpha
+                                         ? wallArt->materialBase
+                                         : RenderColor{167, 141, 114, 255};
+            const int width = f.width * 16, height = f.height * 16;
+            const int border = int(wallBand * 16);
+            const auto occupied = [&](int px, int py)
+            {
+                if (px < 0 || px >= width || py < 0 || py >= height)
+                {
+                    return false;
+                }
+                if (door && px / 16 == door->x - f.topLeft.x &&
+                    py / 16 == door->y - f.topLeft.y)
+                {
+                    return false;
+                }
+                return px < border || px >= width - border || py < border ||
+                       py >= height - border;
+            };
+            const auto capColor = [&](int px, int py)
+            {
+                if (!occupied(px, py))
+                {
+                    return RenderColor{0, 0, 0, 0};
+                }
+                if (!occupied(px - 1, py) || !occupied(px, py - 1))
+                {
+                    return RenderColor{169, 148, 120, 255};
+                }
+                if (!occupied(px + 1, py) || !occupied(px, py + 1))
+                {
+                    return RenderColor{116, 81, 63, 255};
+                }
+                const unsigned seed = unsigned(px + int(x * 16)) * 374761393u ^
+                                      unsigned(py + int(y * 16)) * 668265263u;
+                if ((seed ^ (seed >> 13)) % 31 == 0)
+                {
+                    return RenderColor{136, 96, 68, 255};
+                }
+                return base;
+            };
+            const auto colorAt = [&](int px, int py)
+            {
+                auto c = capColor(px, py);
+                if (!c.alpha || !policy.shadowsVisible)
+                {
+                    return c;
+                }
+                // Equal-height caps have no taller wall casting onto them.
+                // Their outline shading above preserves depth at every corner.
+                const double shade = .035;
+                c.red = std::uint8_t(c.red * (1 - shade) + 57 * shade);
+                c.green = std::uint8_t(c.green * (1 - shade) + 43 * shade);
+                c.blue = std::uint8_t(c.blue * (1 - shade) + 60 * shade);
+                return c;
+            };
+            const int firstRow = std::max(
+                0,
+                int((p.cameraY - p.screenHeight * .5 / p.tilePixels - y +
+                     cutHeight) *
+                    16)
+            );
+            const int lastRow = std::min(
+                height,
+                int((p.cameraY + p.screenHeight * .5 / p.tilePixels - y +
+                     cutHeight) *
+                    16) +
+                    1
+            );
+            const int left = std::max(
+                0,
+                int((p.cameraX - p.screenWidth * .5 / p.tilePixels - x) * 16)
+            );
+            const int right = std::min(
+                width,
+                int((p.cameraX + p.screenWidth * .5 / p.tilePixels - x) * 16) +
+                    1
+            );
+            for (int py = firstRow; py < lastRow; ++py)
+            {
+                for (int px = left; px < right;)
+                {
+                    const auto color = colorAt(px, py);
+                    int end = px + 1;
+                    while (end < right)
+                    {
+                        const auto next = colorAt(end, py);
+                        if (color.red != next.red ||
+                            color.green != next.green ||
+                            color.blue != next.blue ||
+                            color.alpha != next.alpha)
+                        {
+                            break;
+                        }
+                        ++end;
+                    }
+                    if (color.alpha)
+                    {
+                        queue.submit(
+                            {p.bounds(
+                                 {x + px * pixel,
+                                  y + py * pixel - cutHeight,
+                                  0,
+                                  (end - px) * pixel,
+                                  pixel,
+                                  0,
+                                  0}
+                             ),
+                             color,
+                             y + h,
+                             id,
+                             0,
+                             20}
+                        );
+                    }
+                    px = end;
                 }
             }
         }
@@ -233,6 +480,10 @@ namespace Paladin
                 {
                     continue;
                 }
+                if (!roofVisible && piece.y < 0)
+                {
+                    continue;
+                }
                 // Rows sharing a choices count use the same draw, allowing
                 // mutually exclusive decorations at one attachment slot.
                 const auto seed = id ^ (id >> 3) ^ (id >> 17);
@@ -241,13 +492,19 @@ namespace Paladin
                     continue;
                 }
                 // Negative Y anchors a wall attachment to the front wall plane.
-                const double yy = piece.y < 0 ? y + h + piece.y : y + piece.y;
+                const double yy =
+                    piece.y < 0 ? y + h + piece.y
+                                : iy + std::min(piece.y, std::max(.5, ih - .4));
+                const double px =
+                    piece.y < 0
+                        ? x + w * piece.x / std::max(1., style.moduleWidth)
+                        : ix + std::min(piece.x, std::max(.5, iw - .4));
                 const auto first = queue.size();
                 sprites.placed(
                     queue,
                     p,
                     piece.sprite,
-                    x + piece.x,
+                    px,
                     yy,
                     piece.y < 0 ? y + h + .02 : yy + piece.depth,
                     id,

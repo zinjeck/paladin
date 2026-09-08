@@ -1,0 +1,45 @@
+[1/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/30] Linking CXX executable PaladinTests.exe
+[5/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[6/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+[7/30] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[9/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+[10/30] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[11/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+[12/30] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[13/30] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[14/30] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+[15/30] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[16/30] Linking CXX executable Paladin.exe
+[17/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+[18/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityScreen.cpp.obj
+[19/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[20/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityInput.cpp.obj
+[21/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[22/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[23/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[24/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[25/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationDebug.cpp.obj
+[26/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[27/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[28/30] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldGridRenderer.cpp.obj
+[29/30] Linking CXX executable PaladinApplicationSmokeTests.exe
+[30/30] Verify final world pixel grid, daylight/night rendering and sprite integration
+world pan/zoom mean_ms=2.59576 worst_ms=8.1229
+globe renderer=software
+globe generation land=29927 hills=3706 mountains=5480 supported=5480
+city coast zoom mean_ms=7.75942 worst_ms=16.4129
+globe warm zoom/rotation mean_ms=31.6254 worst_ms=49.8039 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Invalid object presentation recipe; using flat fallback
+Rejected off-palette or partial-alpha artwork: alpha.png
+Rejected off-palette or partial-alpha artwork: alpha.png
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Application routing smoke test passed.

@@ -54,14 +54,23 @@ namespace Paladin
             double readyAt = 0;
             bool empty = false;
             std::vector<TextureDrawItem> commands;
+            std::unique_ptr<PreparedQuadMesh> mesh;
+            bool batchable = false;
             std::uint64_t spriteVersion = ~std::uint64_t(0);
             std::vector<FeatureSprite> sprites;
         };
         mutable std::unique_ptr<Texture> placeholderAtlas_;
         mutable std::unique_ptr<Texture> contactShadow_;
+        mutable std::unique_ptr<Texture> foliageAtlas_;
+        mutable std::unordered_map<const Texture*, RenderRectangle>
+            foliageSources_;
+        mutable std::vector<MeshVertex> fallbackVertices_;
+        mutable std::vector<int> fallbackIndices_;
         mutable RenderColor contactShadowColor_{0, 0, 0, 0};
         mutable std::uint64_t sourceInstance_ = 0;
         mutable bool overviewArt_ = false;
+        mutable std::uint64_t navigationSource_ = ~std::uint64_t(0);
+        mutable std::vector<std::uint64_t> navigationKeys_;
         mutable std::size_t refreshCursor_ = 0, cachedTextures_ = 0;
         mutable std::vector<Chunk> chunks_, featureChunks_;
         mutable std::unique_ptr<Texture> overviewTexture_;

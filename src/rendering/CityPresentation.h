@@ -10,6 +10,7 @@ namespace Paladin
     {
         bool roofsVisible = true;
         bool shadowsVisible = true;
+        bool cloudsEnabled = true;
         bool daylightEnabled = true;
         bool localLightsEnabled = true;
         double treeElevation = .45;

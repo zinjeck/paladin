@@ -1,0 +1,8 @@
+world pan/zoom mean_ms=1.42188 worst_ms=3.804
+dense forest zoom=0.25 mean=16.8512 worst=20.0341 stages=0.0737717,0.000795,14.5793,0.00692833,0.180475,
+dense forest zoom=0.5 mean=0.503408 worst=1.7833 stages=0.00776333,0.00018,0.0468683,0.000661667,0.0788417,
+dense forest zoom=0.75 mean=2.92784 worst=3.6551 stages=2.71682,0.000315,0.013495,0.000928333,0.0801,
+dense forest zoom=1 mean=2.55582 worst=3.5217 stages=2.34716,0.000335,0.0104917,0.000925,0.0773833,
+dense forest zoom=1.5 mean=1.33496 worst=2.9521 stages=0.519243,0.0777333,0.00433667,0.255285,0.0713267,
+dense forest zoom=2 mean=0.841905 worst=1.3365 stages=0.23546,0.0471117,0.00417167,0.142635,0.0655583,
+Application routing smoke test passed.

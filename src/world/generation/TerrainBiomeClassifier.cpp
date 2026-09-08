@@ -60,6 +60,7 @@ namespace Paladin
                 {
                     tile->terrain = TerrainType::Water;
                     tile->biome = BiomeType::Ocean;
+                    tile->relief = ReliefType::Lowland;
                     continue;
                 }
 
@@ -73,6 +74,9 @@ namespace Paladin
 
                 tile->terrain = landElevation >= .52 ? TerrainType::Mountain
                                                      : TerrainType::Land;
+                tile->relief = landElevation >= .52   ? ReliefType::Mountain
+                               : landElevation >= .25 ? ReliefType::Hills
+                                                      : ReliefType::Lowland;
 
                 tile->biome = classifyLandBiome(
                     tile->temperature.value(),
@@ -96,9 +100,7 @@ namespace Paladin
             for (int x = 0; x < grid.width(); ++x)
             {
                 auto* tile = grid.tile({x, y});
-                if (tile->terrain != TerrainType::Land ||
-                    tile->biome == BiomeType::Polar ||
-                    tile->biome == BiomeType::Tundra)
+                if (tile->terrain != TerrainType::Land)
                 {
                     continue;
                 }
@@ -111,7 +113,12 @@ namespace Paladin
                                             settings.seaLevel +
                                                 (1 - settings.seaLevel) * .52)
                         {
-                            tile->biome = BiomeType::Hills;
+                            tile->relief = ReliefType::Hills;
+                            if (tile->biome != BiomeType::Polar &&
+                                tile->biome != BiomeType::Tundra)
+                            {
+                                tile->biome = BiomeType::Hills;
+                            }
                         }
                     }
                 }

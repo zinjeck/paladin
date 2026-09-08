@@ -1,6 +1,7 @@
 #pragma once
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <algorithm>
 #include <array>
@@ -15,7 +16,7 @@ namespace Paladin
         int slot
     )
     {
-        const auto& f = home.footprint;
+        const auto f = buildingInterior(home.footprint, home.objectTypeId);
         // Four corner sleeping spaces leave the entrance and central aisle
         // clear.
         return {

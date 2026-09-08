@@ -1,4 +1,5 @@
 #include "TestFramework.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
@@ -29,6 +30,145 @@ namespace
 void runSettlementActivityTests()
 {
     {
+        CitizenSimulationPolicy east, west;
+        east.solarTimeOffsetMinutes = PlanetAstronomy::solarOffsetMinutes(.75);
+        west.solarTimeOffsetMinutes = PlanetAstronomy::solarOffsetMinutes(.25);
+        PALADIN_CHECK(east.isWorkTime(360));  // local noon
+        PALADIN_CHECK(!west.isWorkTime(360)); // local midnight
+        PALADIN_CHECK(east.localMinute(360) == 720);
+        PALADIN_CHECK(west.localMinute(0) == 1080);
+        PALADIN_CHECK(
+            std::abs(
+                PlanetAstronomy::declination(.25) - PlanetAstronomy::AxialTilt
+            ) < 1e-12
+        );
+        PALADIN_CHECK(
+            std::abs(
+                PlanetAstronomy::declination(.75) + PlanetAstronomy::AxialTilt
+            ) < 1e-12
+        );
+        PALADIN_CHECK(PlanetAstronomy::CurrentOrbitalPhase == 0);
+        PALADIN_CHECK(PlanetAstronomy::sunIncidence(.75, .5, 21600) > .999);
+        PALADIN_CHECK(PlanetAstronomy::sunIncidence(.25, .5, 21600) < -.999);
+        PALADIN_CHECK(
+            PlanetAstronomy::sunIncidence(.5, .1, 43200, .25) >
+            PlanetAstronomy::sunIncidence(.5, .9, 43200, .25)
+        );
+    }
+
+    {
+        auto map = makeMap(24);
+        for (const auto& d : SettlementObjectCatalog::definitions())
+        {
+            if (d.selectionMode !=
+                    SettlementFootprintSelectionMode::DragRectangle ||
+                d.placementLayer != SettlementObjectPlacementLayer::Structure)
+            {
+                continue;
+            }
+            const int minimum = d.wallThickness > 0 ? 5 : 3;
+            SettlementObjectPlacementController placement;
+            PALADIN_CHECK(placement.beginPlacement(d.id));
+            placement.pointerMoved(SettlementTilePosition{4, 4});
+            PALADIN_CHECK(
+                placement.visibleFootprint()->width == 1 &&
+                placement.visibleFootprint()->height == 1
+            );
+            PALADIN_CHECK(!placement.visibleFootprintIsValid(map));
+            PALADIN_CHECK(
+                d.minimumWidth >= minimum && d.minimumHeight >= minimum
+            );
+            PALADIN_CHECK(!map.objectState().canPlace(
+                map.grid(),
+                d,
+                {{4, 4}, minimum - 1, minimum}
+            ));
+            (void)placement.pointerPressed(SettlementTilePosition{4, 4}, map);
+            placement.pointerMoved(
+                SettlementTilePosition{4 + minimum - 1, 4 + minimum - 1}
+            );
+            PALADIN_CHECK(
+                placement.visibleFootprint()->width == minimum &&
+                placement.visibleFootprint()->height == minimum
+            );
+        }
+    }
+    {
+        auto map = makeMap(24);
+        auto house =
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
+        const auto& bakery =
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::Bakery);
+        const auto& keep = *SettlementObjectCatalog::definition(
+            SettlementObjectTypes::CityKeep
+        );
+        PALADIN_CHECK(
+            house.previewWidth == 5 && house.previewHeight == 5 &&
+            house.wallThickness == 1
+        );
+        PALADIN_CHECK(keep.previewWidth == 5 && keep.previewHeight == 7);
+        PALADIN_CHECK(
+            !map.objectState().canPlace(map.grid(), house, {{4, 4}, 3, 3})
+        );
+        PALADIN_CHECK(
+            !map.objectState().canPlace(map.grid(), bakery, {{4, 4}, 4, 5})
+        );
+        PALADIN_CHECK(
+            map.objectState().canPlace(map.grid(), bakery, {{4, 4}, 5, 5})
+        );
+        house.bypassesConstruction = true;
+        const SettlementObjectFootprint outer{{4, 4}, 5, 5};
+        const auto room = buildingInterior(outer, house.id);
+        PALADIN_CHECK(
+            room.width == 3 && room.height == 3 && room.topLeft.x == 5
+        );
+        PALADIN_CHECK(!map.objectState().placeCompletedObject(
+            map.grid(),
+            house,
+            outer,
+            SettlementTilePosition{6, 6}
+        ));
+        PALADIN_CHECK(map.objectState().placeCompletedObject(
+            map.grid(),
+            house,
+            outer,
+            SettlementTilePosition{6, 8}
+        ));
+        PALADIN_CHECK(map.objectState().blocksMovement({4, 6}));
+        PALADIN_CHECK(map.objectState().blocksMovement({8, 6}));
+        PALADIN_CHECK(!map.objectState().blocksMovement({6, 6}));
+        PALADIN_CHECK(!map.objectState().blocksMovement({6, 8}));
+        // A stale home path aimed at the wall must not use the old
+        // footprint-wide interior exception, even with partial step progress.
+        SettlementCitizenState walkers;
+        PALADIN_CHECK(walkers.initialize(1, 99));
+        walkers.idlePolicy.decisionsPerTick = 0;
+        auto& walker =
+            const_cast<SettlementCitizen&>(walkers.citizens().front());
+        walker.tilePosition = {5, 6};
+        walker.destination = {4, 6};
+        walker.homeId = map.objectState().completedObjects().front().id;
+        walker.insideHome = true;
+        walker.path = {{4, 6}};
+        walker.stepDuration = 1;
+        walker.stepProgress = .5;
+        walkers.tickMovement(map, .1);
+        PALADIN_CHECK(walker.tilePosition == SettlementTilePosition(5, 6));
+        PALADIN_CHECK(walker.stepProgress == 0);
+        SettlementNavigation navigation;
+        navigation.synchronize(map);
+        const auto path = navigation.findPath(map, {6, 10}, {6, 6}, {});
+        PALADIN_CHECK(!path.empty());
+        PALADIN_CHECK(
+            std::find(path.begin(), path.end(), SettlementTilePosition{6, 8}) !=
+            path.end()
+        );
+        for (auto tile : path)
+        {
+            PALADIN_CHECK(!map.objectState().blocksMovement(tile));
+        }
+    }
+    {
         auto map = makeMap(16);
         auto house =
             *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
@@ -36,7 +176,7 @@ void runSettlementActivityTests()
         PALADIN_CHECK(map.objectState().placeCompletedObject(
             map.grid(),
             house,
-            {{3, 3}, 3, 3}
+            {{3, 3}, 5, 5}
         ));
         const auto home = map.objectState().completedObjects().back().id;
         std::array<SettlementCitizen, 4> residents;
@@ -287,7 +427,8 @@ void runSettlementActivityTests()
         citizens
     ));
     PALADIN_CHECK(
-        commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens, 0) == 1
+        commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens, 0) ==
+        1
     );
     PALADIN_CHECK(!commandsMap.naturalFeatures().at({1, 1}).marked);
     PALADIN_CHECK(!commands.contains(commandsMap, commandId, {1, 1}, {}, {}));

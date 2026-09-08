@@ -1,10 +1,12 @@
 #pragma once
 #include "rendering/CityPresentation.h"
+#include "rendering/GlobeLighting.h"
 #include "rendering/SceneDetail.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "world/settlements/SettlementMap.h"
 #include <array>
 #include <cmath>
+#include <limits>
 
 namespace Paladin
 {
@@ -43,15 +45,20 @@ namespace Paladin
             const SettlementMap& map,
             const SceneSpriteLibrary& sprites,
             const CityPresentation& policy,
-            double hour
+            double hour,
+            double sunIncidence = std::numeric_limits<double>::quiet_NaN()
         )
         {
             if (!policy.daylightEnabled)
             {
                 return;
             }
-            const double day =
-                std::clamp(std::min((hour - 5) / 2, (21 - hour) / 2), 0.0, 1.0);
+            // Live city views receive the geographic sun at their settlement.
+            // Standalone art previews use an equatorial local clock.
+            const double day = solarIllumination(
+                std::isfinite(sunIncidence) ? sunIncidence
+                                            : globeSunDot(.5, .5, hour * 3600.)
+            );
             if (day >= 1)
             {
                 return;

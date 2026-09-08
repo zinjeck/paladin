@@ -1,0 +1,36 @@
+world pan/zoom mean_ms=3.45127 worst_ms=34.1493
+first frame zoom=0.25 ms=1598.83 stages=403.725,0.0129,1053.59,5.7376,2.5477,
+foliage tp=4.00 textures=298 visible=620 built=6 fallback=0
+foliage tp=4.00 textures=620 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=620 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=620 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=621 visible=589 built=0 fallback=0
+foliage tp=4.00 textures=621 visible=589 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+foliage tp=4.00 textures=652 visible=620 built=0 fallback=0
+dense forest zoom=0.25 mean=2.78734 worst=7.7467 cold_worst=1598.83 stages=0.120068,0.000783333,1.51722,0.00527333,0.261147,
+first frame zoom=0.5 ms=0.8667 stages=0.1718,0.0021,0.179,0.0118,0.349,
+foliage tp=8.00 textures=280 visible=160 built=0 fallback=0
+foliage tp=8.00 textures=280 visible=160 built=0 fallback=0
+dense forest zoom=0.5 mean=0.88862 worst=3.0937 cold_worst=3.114 stages=0.107172,0.00061,0.108355,0.00339,0.266108,
+first frame zoom=0.75 ms=3.8063 stages=3.3194,0.0021,0.1014,0.0124,0.3021,
+foliage tp=12.00 textures=165 visible=77 built=0 fallback=0
+foliage tp=12.00 textures=165 visible=77 built=0 fallback=0
+dense forest zoom=0.75 mean=3.85568 worst=5.1813 cold_worst=6.1015 stages=3.36958,0.00089,0.06822,0.00481,0.271737,
+first frame zoom=1 ms=3.8442 stages=3.4142,0.0022,0.0666,0.0121,0.2959,
+foliage tp=16.00 textures=108 visible=40 built=0 fallback=0
+foliage tp=16.00 textures=108 visible=54 built=0 fallback=0
+dense forest zoom=1 mean=3.64218 worst=4.9478 cold_worst=4.8869 stages=3.22017,0.000785,0.0395183,0.00434167,0.255688,
+first frame zoom=1.5 ms=10.0298 stages=2.8198,1.9842,0.0492,3.7313,0.3426,
+foliage tp=24.00 textures=80 visible=24 built=0 fallback=0
+foliage tp=24.00 textures=80 visible=24 built=0 fallback=0
+dense forest zoom=1.5 mean=5.95624 worst=8.7431 cold_worst=10.2414 stages=1.20688,1.32143,0.023865,2.63129,0.26051,
+first frame zoom=2 ms=3.1073 stages=0.3714,0.7167,0.0277,1.4093,0.3093,
+foliage tp=32.00 textures=72 visible=20 built=0 fallback=0
+foliage tp=32.00 textures=72 visible=20 built=0 fallback=0
+dense forest zoom=2 mean=3.07529 worst=3.9901 cold_worst=4.7653 stages=0.20643,0.712017,0.0188017,1.43656,0.243112,
+Application routing smoke test passed.

@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/ScenePresentation.h"
 #include "rendering/Texture.h"
+#include "rendering/TreeSpecies.h"
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -78,6 +79,14 @@ namespace Paladin
         {
             return pieces_;
         }
+        void setShadowsEnabled(bool enabled)
+        {
+            shadowsEnabled_ = enabled;
+        }
+        bool shadowsEnabled() const
+        {
+            return shadowsEnabled_;
+        }
         void setTime(double seconds)
         {
             seconds_ = seconds;
@@ -111,7 +120,8 @@ namespace Paladin
             double y,
             std::uint64_t id,
             double scale,
-            double crownScale = 1
+            double crownScale = 1,
+            TreeSpecies species = TreeSpecies::Broadleaf
         ) const;
         const ObjectPresentation& objectStyle(const std::string& id) const;
         bool objectHasArt(const std::string& id) const;
@@ -139,6 +149,7 @@ namespace Paladin
         ) const;
 
     private:
+        bool shadowsEnabled_ = true;
         void submitWind(
             SceneDrawQueue&,
             const SceneSprite&,

@@ -2,6 +2,7 @@
 #include "world/FoundingIdentity.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/jobs/LoggingGroundsJob.h"
 #include "world/settlements/objects/jobs/bakery/BakeryJob.h"
@@ -161,7 +162,8 @@ namespace Paladin
             found->objectId = objectId;
             found->constructionId = siteId;
             found->footprint = footprint;
-            const auto area = std::uint64_t(footprint.width) * footprint.height;
+            const auto room = buildingInterior(footprint, type);
+            const auto area = std::uint64_t(room.width) * room.height;
             const auto capacity =
                 (area * d->workersPerReferenceArea + d->referenceArea - 1) /
                 d->referenceArea;

@@ -21,7 +21,10 @@ namespace Paladin
         {
             return;
         }
-        const auto& f = home.footprint;
+        const auto f =
+            policy.roofsVisible
+                ? home.footprint
+                : buildingInterior(home.footprint, home.objectTypeId);
         const double x = f.topLeft.x, y = f.topLeft.y, w = f.width,
                      h = f.height;
         std::uint64_t seed = home.id.value() * 0x9E3779B185EBCA87ull;

@@ -88,8 +88,7 @@ namespace Paladin
         {
             return false;
         }
-        const auto& season = seasonDefinition(seasonAtMinute(minute));
-        const double time = std::fmod(minute, 1440.0);
+        const double time = policy.localMinute(minute);
         const double recoveryMinutes =
             (policy.fullRestEnergy - c.energy) / policy.sleepEnergyPerMinute;
         if (c.workplaceId && policy.shiftEndMinute > policy.shiftStartMinute)
@@ -125,7 +124,7 @@ namespace Paladin
             }
         }
         const bool night =
-            time < season.sunriseMinute || time >= season.sunsetMinute;
+            time < 360 || time >= 1080;
         return c.energy <=
                (night ? c.restThreshold : policy.fatigueEnergy - 10);
     }
@@ -163,7 +162,10 @@ namespace Paladin
             c.pathIndex = 0;
             c.stepProgress = 0;
             c.stepDuration = citizens.navigation_.stepCost(
-                map, c.tilePosition, interior, citizens.movementPolicy
+                map,
+                c.tilePosition,
+                interior,
+                citizens.movementPolicy
             );
             c.explicitMovement = true;
             return false;
@@ -187,7 +189,7 @@ namespace Paladin
         }
         auto best = c.tilePosition;
         int bestScore = -1000000;
-        const auto& f = home->footprint;
+        const auto f = buildingInterior(home->footprint, home->objectTypeId);
         for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
         {
             for (int x = f.topLeft.x; x < f.topLeft.x + f.width; ++x)

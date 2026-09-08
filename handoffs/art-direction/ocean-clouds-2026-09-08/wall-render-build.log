@@ -1,0 +1,32 @@
+[1/32] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/32] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/32] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/32] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[5/32] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[6/32] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[7/32] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementSimulationLoopTests.cpp.obj
+[8/32] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[9/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[10/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[11/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+[12/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[13/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[14/32] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[15/32] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[16/32] Linking CXX executable PaladinTests.exe
+[17/32] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[18/32] Linking CXX executable Paladin.exe
+[19/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[20/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[21/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[22/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[23/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[24/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[25/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[26/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+[27/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[28/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[29/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[30/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[31/32] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[32/32] Linking CXX executable PaladinApplicationSmokeTests.exe

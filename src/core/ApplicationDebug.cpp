@@ -5,6 +5,8 @@
 #include "interaction/SettlementObjectPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityRenderer.h"
+#include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "simulation/Simulation.h"
@@ -166,6 +168,12 @@ namespace Paladin
               << "\nSettlements: " << world.settlementCount()
               << " | Detailed: #"
               << simulation_->detailedSimulationSettlementId().value();
+            if (screen_ == Screen::City)
+            {
+                const auto& r = cityRenderer_->renderTimings;
+                s << "\nRender ms - terrain: " << r[0] << " | foliage: " << r[2]
+                  << "\nGrass: " << r[1] << " | objects: " << r[3] << " | lighting: " << r[4];
+            }
             auto id = simulation_->presentedSettlementId();
             if (!id)
             {
@@ -230,10 +238,10 @@ namespace Paladin
             SDL_GetMouseState(&mx, &my);
             const auto pixels =
                 tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-            const int x = int(std::floor(
+            int x = int(std::floor(
                 camera_->tileX() + (mx - renderer_->outputWidth() * .5) / pixels
             ));
-            const int y = int(std::floor(
+            int y = int(std::floor(
                 camera_->tileY() +
                 (my - renderer_->outputHeight() * .5) / pixels
             ));
@@ -248,7 +256,13 @@ namespace Paladin
             }
             else
             {
-                tile = world.grid().tile({x, y});
+                const auto view = GlobeView::from(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight());
+                if (const auto hit = view.pick(mx,my))
+                {
+                    x = std::clamp(int(hit->u*world.grid().width()),0,world.grid().width()-1);
+                    y = std::clamp(int(hit->v*world.grid().height()),0,world.grid().height()-1);
+                    tile = world.grid().tile({x,y});
+                }
             }
             s << "\nCursor tile: " << x << ", " << y
               << " | Zoom: " << camera_->zoom();

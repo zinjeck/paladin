@@ -1,0 +1,27 @@
+[1/162] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/162] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/162] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/162] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\SimulationReports.cpp.obj
+[5/162] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementActivityTests.cpp.obj
+[6/162] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[7/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[8/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+[9/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[10/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+[11/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+[12/162] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementSimulationLoopTests.cpp.obj
+[13/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[14/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[15/162] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementCommandController.cpp.obj
+[16/162] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+[17/162] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+FAILED: [code=2] CMakeFiles/Paladin.dir/src/interaction/SettlementObjectPlacementController.cpp.obj 
+C:\PROGRA~1\MIB055~1\18\COMMUN~1\VC\Tools\MSVC\1451~1.362\bin\Hostx64\x64\cl.exe  /nologo /TP  -IC:\Paladin\src -IC:\Paladin\out\build\x64-Release\_deps\sdl3-build\include-revision -IC:\Paladin\out\build\x64-Debug\_deps\sdl3-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_ttf-src\include -IC:\Paladin\out\build\x64-Debug\_deps\sdl3_image-src\include /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 /DNDEBUG -std:c++latest -MD /showIncludes /FoCMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj /FdCMakeFiles\Paladin.dir\ /FS -c C:\Paladin\src\interaction\SettlementObjectPlacementController.cpp
+C:\Paladin\src\world/settlements/objects/SettlementDoor.h(10): error C2653: 'SettlementObjectCatalog': is not a class or namespace name
+C:\Paladin\src\world/settlements/objects/SettlementDoor.h(10): error C3861: 'definition': identifier not found
+C:\Paladin\src\world/settlements/objects/SettlementDoor.h(10): error C3535: cannot deduce type for 'const auto *' from '<error>'
+C:\Paladin\src\world/settlements/objects/SettlementDoor.h(11): error C2737: 'band': const object must be initialized
+[18/162] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementInspectionController.cpp.obj
+[19/162] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementPlacementController.cpp.obj
+[20/162] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+ninja: build stopped: subcommand failed.

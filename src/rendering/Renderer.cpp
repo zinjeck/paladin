@@ -11,6 +11,63 @@
 
 namespace Paladin
 {
+    struct PreparedQuadMesh::Data
+    {
+        std::vector<SDL_Vertex> vertices;
+        std::vector<SDL_FPoint> positions;
+        std::vector<int> indices;
+    };
+    PreparedQuadMesh::PreparedQuadMesh(std::span<const MeshVertex> input)
+        : data_(std::make_unique<Data>())
+    {
+        data_->vertices.reserve(input.size());
+        data_->positions.reserve(input.size());
+        for (const auto& v : input)
+        {
+            data_->vertices.push_back(
+                {{v.x, v.y},
+                 {v.color.red / 255.F,
+                  v.color.green / 255.F,
+                  v.color.blue / 255.F,
+                  v.color.alpha / 255.F},
+                 {v.u, v.v}}
+            );
+            data_->positions.push_back({v.x, v.y});
+        }
+        for (int n = 0; n < int(input.size()); n += 4)
+        {
+            for (int k : {0, 1, 2, 0, 2, 3})
+            {
+                data_->indices.push_back(n + k);
+            }
+        }
+    }
+    PreparedQuadMesh::~PreparedQuadMesh() = default;
+    void Renderer::drawTranslatedQuads(
+        const Texture& texture,
+        PreparedQuadMesh& mesh,
+        float x,
+        float y,
+        float scale
+    )
+    {
+        auto& data = *mesh.data_;
+        auto* out = data.vertices.data();
+        const auto* in = data.positions.data();
+        const auto count = data.vertices.size();
+        for (std::size_t i = 0; i < count; ++i, ++out, ++in)
+        {
+            out->position = {x + in->x * scale, y + in->y * scale};
+        }
+        SDL_RenderGeometry(
+            renderer_,
+            texture.texture_,
+            data.vertices.data(),
+            int(count),
+            data.indices.data(),
+            int(data.indices.size())
+        );
+    }
     void Renderer::drawMesh(
         const Texture& texture,
         std::span<const MeshVertex> vertices,
@@ -323,7 +380,9 @@ namespace Paladin
         int width,
         int height,
         std::span<const TextureDrawItem> items,
-        bool premultiplied
+        bool premultiplied,
+        const Texture* batchTexture,
+        PreparedQuadMesh* batch
     )
     {
         if (width <= 0 || height <= 0)
@@ -361,28 +420,35 @@ namespace Paladin
         SDL_SetRenderClipRect(renderer_, nullptr);
         SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 0);
         SDL_RenderClear(renderer_);
-        for (const auto& item : items)
+        if (batchTexture && batch)
         {
-            const auto& d = item.destination;
-            if (item.texture)
+            drawTranslatedQuads(*batchTexture, *batch, 0, 0, 1);
+        }
+        else
+        {
+            for (const auto& item : items)
             {
-                const auto& s = item.source;
-                drawTexture(
-                    *item.texture,
-                    s.x,
-                    s.y,
-                    s.width,
-                    s.height,
-                    d.x,
-                    d.y,
-                    d.width,
-                    d.height,
-                    item.opacity
-                );
-            }
-            else
-            {
-                fillRectangle(d.x, d.y, d.width, d.height, item.fill);
+                const auto& d = item.destination;
+                if (item.texture)
+                {
+                    const auto& s = item.source;
+                    drawTexture(
+                        *item.texture,
+                        s.x,
+                        s.y,
+                        s.width,
+                        s.height,
+                        d.x,
+                        d.y,
+                        d.width,
+                        d.height,
+                        item.opacity
+                    );
+                }
+                else
+                {
+                    fillRectangle(d.x, d.y, d.width, d.height, item.fill);
+                }
             }
         }
         const bool restored = SDL_SetRenderTarget(renderer_, previousTarget);

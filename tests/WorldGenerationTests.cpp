@@ -20,6 +20,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <type_traits>
 
@@ -53,6 +54,7 @@ namespace
                 addValue(static_cast<std::uint64_t>(tile->terrain));
 
                 addValue(static_cast<std::uint64_t>(tile->biome));
+                addValue(static_cast<std::uint64_t>(tile->relief));
 
                 addValue(std::bit_cast<std::uint32_t>(tile->elevation.value()));
 
@@ -360,7 +362,36 @@ void runWorldGenerationTests()
 {
     PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Hills) == "Hills");
     PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Polar) == "Polar");
-    PALADIN_CHECK(Paladin::biomeName(static_cast<Paladin::BiomeType>(255)) == "Unknown");
+    PALADIN_CHECK(
+        Paladin::biomeName(static_cast<Paladin::BiomeType>(255)) == "Unknown"
+    );
+    // A cold biome must not erase the shape of its hills or mountain collar.
+    {
+        Paladin::WorldGrid grid(7, 7);
+        Paladin::WorldGenerationSettings settings;
+        for (int y = 0; y < 7; ++y)
+        {
+            for (int x = 0; x < 7; ++x)
+            {
+                auto& t = *grid.tile({x, y});
+                t.elevation = Paladin::Elevation{
+                    float(settings.seaLevel + (1 - settings.seaLevel) * .1)
+                };
+                t.temperature = Paladin::Temperature{.25F};
+                t.rainfall = Paladin::Rainfall{.1F};
+            }
+        }
+        grid.tile({3, 3})->elevation = Paladin::Elevation{.95F};
+        Paladin::TerrainBiomeClassifier{}.classify(grid, settings);
+        PALADIN_CHECK(
+            grid.tile({3, 3})->relief == Paladin::ReliefType::Mountain
+        );
+        PALADIN_CHECK(grid.tile({2, 3})->biome == Paladin::BiomeType::Tundra);
+        PALADIN_CHECK(grid.tile({2, 3})->relief == Paladin::ReliefType::Hills);
+        PALADIN_CHECK(
+            grid.tile({0, 0})->relief == Paladin::ReliefType::Lowland
+        );
+    }
     // Sun position is geographic, periodic, and independent of camera yaw.
     PALADIN_CHECK(Paladin::globeSunDot(.5, .5, 43200) > .999);
     PALADIN_CHECK(Paladin::globeSunDot(0, .5, 43200) < -.999);
@@ -371,6 +402,23 @@ void runWorldGenerationTests()
             Paladin::globeSunDot(.23, .35, 86400)
         ) < 1e-8
     );
+    PALADIN_CHECK(
+        Paladin::globeLight(.5, .5, 43200, 1).red >
+        Paladin::globeLight(.7, .5, 43200, 1).red + 20
+    );
+    PALADIN_CHECK(Paladin::solarIllumination(-.1) == 0);
+    PALADIN_CHECK(Paladin::solarIllumination(1.) == 1.);
+    PALADIN_CHECK(
+        Paladin::solarIllumination(Paladin::globeSunDot(.5, .5, 18 * 3600.)) <
+        .21
+    );
+    PALADIN_CHECK(
+        Paladin::solarIllumination(Paladin::globeSunDot(0., .5, 18 * 3600.)) <
+        .21
+    );
+    PALADIN_CHECK(Paladin::oceanSunGlint(.5, .5, 43200, .5, .5) > .6);
+    PALADIN_CHECK(Paladin::oceanSunGlint(0, .5, 43200, .5, .5) == 0);
+    PALADIN_CHECK(Paladin::oceanSunGlint(.6, .5, 43200, .5, .5) < .02);
     const auto night = Paladin::globeLight(0, .5, 43200, 1);
     PALADIN_CHECK(night.red >= 120 && night.blue > night.red);
     for (auto seed : {73517ULL, 84391ULL, 992ULL})
@@ -396,6 +444,71 @@ void runWorldGenerationTests()
                 }
             }
         }
+        std::vector<bool> seen(s.width * s.height);
+        std::vector<int> component;
+        int substantial = 0;
+        for (int start = 0; start < s.width * s.height; ++start)
+        {
+            if (seen[start] ||
+                w.grid().tile({start % s.width, start / s.width})->terrain ==
+                    Paladin::TerrainType::Water)
+            {
+                continue;
+            }
+            component.clear();
+            component.push_back(start);
+            seen[start] = true;
+            for (std::size_t i = 0; i < component.size(); ++i)
+            {
+                int x = component[i] % s.width, y = component[i] / s.width;
+                for (auto d : std::array<Paladin::WorldTilePosition, 4>{
+                         {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+                     })
+                {
+                    int xx = (x + d.x + s.width) % s.width, yy = y + d.y;
+                    if (yy < 0 || yy >= s.height)
+                    {
+                        continue;
+                    }
+                    int n = yy * s.width + xx;
+                    if (!seen[n] && w.grid().tile({xx, yy})->terrain !=
+                                        Paladin::TerrainType::Water)
+                    {
+                        seen[n] = true;
+                        component.push_back(n);
+                    }
+                }
+            }
+            substantial +=
+                component.size() > std::size_t(s.width * s.height / 100);
+        }
+        std::cout << "geography seed=" << seed
+                  << " substantial_landmasses=" << substantial << std::endl;
+        PALADIN_CHECK(substantial >= 4);
+        // Latitude rows represent different areas on the globe. Check physical
+        // coverage as well as flat-grid coverage so polar land cannot skew it.
+        double oceanArea = 0, totalArea = 0;
+        int waterCells = 0;
+        for (int y = 0; y < s.height; ++y)
+        {
+            for (int x = 0; x < s.width; ++x)
+            {
+                const double area =
+                    std::sin(3.141592653589793 * (y + .5) / s.height);
+                totalArea += area;
+                if (w.grid().tile({x, y})->terrain ==
+                    Paladin::TerrainType::Water)
+                {
+                    oceanArea += area;
+                    ++waterCells;
+                }
+            }
+        }
+        std::cout << "ocean coverage globe=" << oceanArea / totalArea
+                  << " grid=" << double(waterCells) / (s.width * s.height)
+                  << std::endl;
+        PALADIN_CHECK(oceanArea / totalArea > .65);
+        PALADIN_CHECK(double(waterCells) / (s.width * s.height) > .60);
         PALADIN_CHECK(polar > 100);
         PALADIN_CHECK(tundra > 0);
     }

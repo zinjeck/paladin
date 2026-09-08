@@ -34,6 +34,32 @@ namespace Paladin
         q.setLayerFrom(floorStart, -2);
         const double shedW = std::min(2.5, std::max(1., w - .3)),
                      shedH = std::min(1.2, h * .4);
+        if (sprites.shadowsEnabled())
+        {
+            // The shelter shades its platform, not the inventory drawn above.
+            q.submit(
+                {p.bounds({x + .16, y + .20, 0, shedW, shedH, 0, 0}),
+                 {57, 43, 60, 46},
+                 y,
+                 id,
+                 -1,
+                 0}
+            );
+            for (const double xx : {x + .10, x + w - .10})
+            {
+                for (const double yy : {y + .15, y + h - .1})
+                {
+                    q.submit(
+                        {p.bounds({xx, yy, 0, .28, .125, 0, 0}),
+                         {57, 43, 60, 64},
+                         y,
+                         id,
+                         -1,
+                         0}
+                    );
+                }
+            }
+        }
         // A modest open storage shelter, with the goods visible in its yard.
         sprites.placed(
             q,

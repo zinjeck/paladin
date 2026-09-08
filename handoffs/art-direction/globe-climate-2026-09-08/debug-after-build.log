@@ -1,0 +1,40 @@
+[1/28] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Debug/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/lights.catalog"
+[2/28] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Debug/assets/sprites"
+[3/28] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/objects.catalog"
+[4/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(224): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[5/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[6/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[7/28] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/28] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[9/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[10/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[11/28] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[12/28] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[13/28] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+[14/28] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[15/28] Linking CXX executable Paladin.exe
+[16/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(224): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[17/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[18/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[19/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[20/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[21/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[22/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[23/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[24/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[25/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldGridRenderer.cpp.obj
+[26/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[27/28] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[28/28] Linking CXX executable PaladinApplicationSmokeTests.exe

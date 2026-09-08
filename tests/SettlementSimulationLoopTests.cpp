@@ -1,11 +1,10 @@
 #include "TestFramework.h"
 #include "interaction/SettlementCommandController.h"
-#include "world/generation/GenerationNoise.h"
-#include <limits>
 #include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/ScenePresentation.h"
 #include "world/Season.h"
+#include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -20,6 +19,7 @@
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <set>
 
 using namespace Paladin;
@@ -35,7 +35,8 @@ namespace Paladin
         )
         {
             map.activities.pathsRemaining_ = 0;
-            return map.activities.route(map, citizens, citizen, {goal, 1, 1}, true);
+            return map.activities
+                .route(map, citizens, citizen, {goal, 1, 1}, true);
         }
         static bool enterHome(
             SettlementMap& map,
@@ -114,11 +115,17 @@ namespace
     {
         auto definition = *SettlementObjectCatalog::definition(type);
         definition.bypassesConstruction = true;
-        PALADIN_CHECK(map.objectState().placeCompletedObject(
-            map.grid(),
-            definition,
-            footprint
-        ));
+        if (!map.objectState()
+                 .placeCompletedObject(map.grid(), definition, footprint))
+        {
+            throw std::runtime_error(
+                "Fixture placement failed: " + std::string(type) + " at " +
+                std::to_string(footprint.topLeft.x) + "," +
+                std::to_string(footprint.topLeft.y) + " size " +
+                std::to_string(footprint.width) + "x" +
+                std::to_string(footprint.height)
+            );
+        }
         map.logistics.synchronize(map.objectState(), 0);
         return map.objectState().completedObjects().back().id;
     }
@@ -133,7 +140,7 @@ namespace
         // introduced.
         map.commerce.treasury->balance = 100000;
         map.commerce.policy.startingSavings = 600;
-        completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 3, 7});
+        completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 5, 7});
         citizens.placeUnpositionedCitizens(map);
     }
     void advance(
@@ -187,11 +194,12 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 1);
         constexpr double minute = 23 * 1440 + 610.25;
-        const auto& house = *SettlementObjectCatalog::definition(
-            SettlementObjectTypes::House
-        );
+        const auto& house =
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::House);
         PALADIN_CHECK(map.objectState().createConstructionSites(
-            map.grid(), house, {{15, 14}, 3, 3}
+            map.grid(),
+            house,
+            {{15, 14}, 5, 5}
         ));
         const auto site = map.objectState().constructionSites().back().id;
         map.logistics.synchronize(map.objectState(), minute - 10);
@@ -209,14 +217,22 @@ void runSettlementSimulationLoopTests()
             PALADIN_CHECK(controller.begin(SettlementCommandTypes::Cancel));
             controller.pointerPressed(SettlementTilePosition{15, 14});
             PALADIN_CHECK(controller.pointerReleased(
-                SettlementTilePosition{17, 16}, map, citizens, minute
+                SettlementTilePosition{17, 16},
+                map,
+                citizens,
+                minute
             ));
         }
         else
         {
-            PALADIN_CHECK(map.commandState().cancelIntersecting(
-                map, {{15, 14}, 3, 3}, citizens, minute
-            ) == 1);
+            PALADIN_CHECK(
+                map.commandState().cancelIntersecting(
+                    map,
+                    {{15, 14}, 5, 5},
+                    citizens,
+                    minute
+                ) == 1
+            );
         }
         PALADIN_CHECK(!map.objectState().constructionSite(site));
         PALADIN_CHECK(!map.logistics.forSite(site));
@@ -230,15 +246,22 @@ void runSettlementSimulationLoopTests()
                 continue;
             }
             PALADIN_CHECK(pile.createdMinute == minute);
-            PALADIN_CHECK(minute - pile.createdMinute <
-                          map.activities.policy.stockpile.employeePreferenceMinutes);
+            PALADIN_CHECK(
+                minute - pile.createdMinute <
+                map.activities.policy.stockpile.employeePreferenceMinutes
+            );
             recoveredLumber += pile.amount("lumber");
             recoveredStone += pile.amount("stone");
         }
         PALADIN_CHECK(recoveredLumber == 3 && recoveredStone == 1);
-        PALADIN_CHECK(map.commandState().cancelIntersecting(
-            map, {{15, 14}, 3, 3}, citizens, minute + 1
-        ) == 0);
+        PALADIN_CHECK(
+            map.commandState().cancelIntersecting(
+                map,
+                {{15, 14}, 5, 5},
+                citizens,
+                minute + 1
+            ) == 0
+        );
         PALADIN_CHECK(allGoods(map, citizens, "lumber") == lumber);
         PALADIN_CHECK(allGoods(map, citizens, "stone") == stone);
     }
@@ -249,7 +272,8 @@ void runSettlementSimulationLoopTests()
     // repeated and carried resources are returned exactly once.
     for (const bool alreadyDead : {false, true})
     {
-        for (const std::size_t victimIndex : {std::size_t(0), std::size_t(1), std::size_t(3)})
+        for (const std::size_t victimIndex :
+             {std::size_t(0), std::size_t(1), std::size_t(3)})
         {
             auto map = land();
             SettlementCitizenState citizens;
@@ -259,7 +283,8 @@ void runSettlementSimulationLoopTests()
             citizens.idlePolicy.decisionsPerTick = 0;
             for (std::size_t i = 0; i < citizens.citizens().size(); ++i)
             {
-                auto& resident = SettlementActivityTestFixture::resident(citizens, i);
+                auto& resident =
+                    SettlementActivityTestFixture::resident(citizens, i);
                 resident.health = 100;
                 resident.hunger = 0;
                 resident.energy = 100;
@@ -271,12 +296,15 @@ void runSettlementSimulationLoopTests()
                     }
                 }
             }
-            auto& victim = SettlementActivityTestFixture::resident(citizens, victimIndex);
+            auto& victim =
+                SettlementActivityTestFixture::resident(citizens, victimIndex);
             const auto victimId = victim.id;
             const auto keep = map.logistics.forObject(
                 map.objectState().completedObjects().front().id
             );
-            PALADIN_CHECK(map.logistics.reserve(victimId, keep, {}, "lumber", 2));
+            PALADIN_CHECK(
+                map.logistics.reserve(victimId, keep, {}, "lumber", 2)
+            );
             PALADIN_CHECK(map.logistics.pickUp(victimId));
             victim.carriedResource = "lumber";
             victim.carriedAmount = 2;
@@ -322,23 +350,27 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
         c.stepProgress = 3;
         PALADIN_CHECK(c.visualX() == 12 && c.visualY() == 22);
-        for (const double duration : {
-                 0.0, -1.0, std::numeric_limits<double>::infinity(),
-                 std::numeric_limits<double>::quiet_NaN()})
+        for (const double duration :
+             {0.0,
+              -1.0,
+              std::numeric_limits<double>::infinity(),
+              std::numeric_limits<double>::quiet_NaN()})
         {
             c.stepDuration = duration;
             for (const double progress : {0.0, .5})
             {
                 c.stepProgress = progress;
-                PALADIN_CHECK(std::isfinite(c.visualX()) && std::isfinite(c.visualY()));
+                PALADIN_CHECK(
+                    std::isfinite(c.visualX()) && std::isfinite(c.visualY())
+                );
                 PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
             }
         }
         c.stepDuration = 1;
-        for (const double progress : {
-                 std::numeric_limits<double>::infinity(),
-                 -std::numeric_limits<double>::infinity(),
-                 std::numeric_limits<double>::quiet_NaN()})
+        for (const double progress :
+             {std::numeric_limits<double>::infinity(),
+              -std::numeric_limits<double>::infinity(),
+              std::numeric_limits<double>::quiet_NaN()})
         {
             c.stepProgress = progress;
             PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
@@ -353,14 +385,16 @@ void runSettlementSimulationLoopTests()
     std::cout << "[audit] finite and ordinary interpolation passed\n";
 
     // Direct home, childcare and bed paths initialize their actual first-edge
-    // cost, including non-default diagonal costs, before the next movement tick.
-    for (const auto task : {CitizenTaskKind::Home, CitizenTaskKind::Care,
-                           CitizenTaskKind::Sleep})
+    // cost, including non-default diagonal costs, before the next movement
+    // tick.
+    for (const auto task :
+         {CitizenTaskKind::Home, CitizenTaskKind::Care, CitizenTaskKind::Sleep})
     {
         auto map = land();
         SettlementCitizenState citizens;
         found(map, citizens, 1);
-        const auto home = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto home =
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 5, 5});
         auto& c = SettlementActivityTestFixture::resident(citizens);
         c.tilePosition = {13, 13};
         c.destination = c.tilePosition;
@@ -384,18 +418,27 @@ void runSettlementSimulationLoopTests()
         // interior fallback or a zero-search exit; both must initialize timing.
         for (std::uint64_t sequence = 0; sequence < 100; ++sequence)
         {
-            const auto random = GenerationNoise::mix(c.id.value() ^ (sequence + 1));
+            const auto random =
+                GenerationNoise::mix(c.id.value() ^ (sequence + 1));
             if (random % 3 != 1 || (random >> 8) % 3 != 1)
             {
                 c.choiceSequence = sequence;
                 break;
             }
         }
-        SettlementActivityTestFixture::executeWithoutPathSearch(map, citizens, c, 600);
+        SettlementActivityTestFixture::executeWithoutPathSearch(
+            map,
+            citizens,
+            c,
+            600
+        );
         PALADIN_CHECK(!c.path.empty());
         PALADIN_CHECK(c.pathIndex == 0 && c.stepProgress == 0);
         const auto expected = citizens.navigationDiagnostics().stepCost(
-            map, c.tilePosition, c.path.front(), citizens.movementPolicy
+            map,
+            c.tilePosition,
+            c.path.front(),
+            citizens.movementPolicy
         );
         PALADIN_CHECK(c.stepDuration == expected);
         PALADIN_CHECK(c.stepDuration > 0 && c.stepDuration < 99);
@@ -408,10 +451,12 @@ void runSettlementSimulationLoopTests()
         auto map = land();
         SettlementCitizenState citizens;
         found(map, citizens, 1);
-        const auto homeId = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto homeId =
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 5, 5});
         const auto* home = map.objectState().completedObject(homeId);
         PALADIN_CHECK(home && home->door);
-        map.grid().tile(outsideDoor(home->footprint, *home->door))->terrain = TerrainType::Water;
+        map.grid().tile(outsideDoor(home->footprint, *home->door))->terrain =
+            TerrainType::Water;
         auto& c = SettlementActivityTestFixture::resident(citizens);
         c.homeId = homeId;
         c.insideHome = true;
@@ -429,12 +474,22 @@ void runSettlementSimulationLoopTests()
                 break;
             }
         }
-        SettlementActivityTestFixture::executeWithoutPathSearch(map, citizens, c, 600);
+        SettlementActivityTestFixture::executeWithoutPathSearch(
+            map,
+            citizens,
+            c,
+            600
+        );
         PALADIN_CHECK(c.path.size() == 1);
         PALADIN_CHECK(home->footprint.contains(c.path.front()));
-        PALADIN_CHECK(c.stepDuration == citizens.navigationDiagnostics().stepCost(
-            map, c.tilePosition, c.path.front(), citizens.movementPolicy
-        ));
+        PALADIN_CHECK(
+            c.stepDuration == citizens.navigationDiagnostics().stepCost(
+                                  map,
+                                  c.tilePosition,
+                                  c.path.front(),
+                                  citizens.movementPolicy
+                              )
+        );
     }
     // Door-entry and prepended-exit paths use the first physical edge, while
     // a route replacement halfway through a step preserves its progress.
@@ -442,7 +497,8 @@ void runSettlementSimulationLoopTests()
         auto map = land();
         SettlementCitizenState citizens;
         found(map, citizens, 1);
-        const auto homeId = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto homeId =
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 5, 5});
         const auto* home = map.objectState().completedObject(homeId);
         PALADIN_CHECK(home && home->door);
         const auto outside = outsideDoor(home->footprint, *home->door);
@@ -451,7 +507,9 @@ void runSettlementSimulationLoopTests()
         c.tilePosition = outside;
         c.destination = outside;
         c.stepDuration = 99;
-        PALADIN_CHECK(!SettlementActivityTestFixture::enterHome(map, citizens, c));
+        PALADIN_CHECK(
+            !SettlementActivityTestFixture::enterHome(map, citizens, c)
+        );
         PALADIN_CHECK(c.path.size() == 1 && c.path.front() == *home->door);
         PALADIN_CHECK(c.stepDuration == 1);
         c.tilePosition = {13, 13};
@@ -461,32 +519,48 @@ void runSettlementSimulationLoopTests()
         c.pathIndex = 0;
         c.stepProgress = 0;
         c.stepDuration = 99;
-        PALADIN_CHECK(SettlementActivityTestFixture::routeWithoutPathSearch(
-            map, citizens, c, outside
-        ));
+        PALADIN_CHECK(
+            SettlementActivityTestFixture::routeWithoutPathSearch(
+                map,
+                citizens,
+                c,
+                outside
+            )
+        );
         PALADIN_CHECK(!c.path.empty() && c.path.back() == outside);
-        PALADIN_CHECK(c.stepDuration == citizens.navigationDiagnostics().stepCost(
-            map, c.tilePosition, c.path.front(), citizens.movementPolicy
-        ));
+        PALADIN_CHECK(
+            c.stepDuration == citizens.navigationDiagnostics().stepCost(
+                                  map,
+                                  c.tilePosition,
+                                  c.path.front(),
+                                  citizens.movementPolicy
+                              )
+        );
         citizens.movementPolicy.diagonalCost = 1.75;
         c.path = {{14, 14}};
         c.pathIndex = 0;
         c.stepDuration = 1.75;
         c.stepProgress = .7;
         const auto x = c.visualX(), y = c.visualY();
-        PALADIN_CHECK(SettlementActivityTestFixture::routeWithoutPathSearch(
-            map, citizens, c, outside
-        ));
+        PALADIN_CHECK(
+            SettlementActivityTestFixture::routeWithoutPathSearch(
+                map,
+                citizens,
+                c,
+                outside
+            )
+        );
         PALADIN_CHECK(c.path.front().x == 14 && c.path.front().y == 14);
         PALADIN_CHECK(c.stepProgress == .7 && c.stepDuration == 1.75);
         PALADIN_CHECK(std::abs(c.visualX() - x) < 1e-9);
         PALADIN_CHECK(std::abs(c.visualY() - y) < 1e-9);
     }
-    std::cout << "[audit] entry, exit, fallback and mid-step rerouting passed\n";
+    std::cout
+        << "[audit] entry, exit, fallback and mid-step rerouting passed\n";
     {
         auto map = land();
         const auto home =
-            completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 5, 5});
         const auto inventory = map.logistics.forObject(home);
         PALADIN_CHECK(
             map.logistics.inventory(inventory)->kind == InventoryKind::Home
@@ -574,7 +648,7 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 1);
         const auto home =
-            completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{12, 12}, 5, 5});
         const auto grounds = completed(
             map,
             SettlementObjectTypes::LoggingGrounds,
@@ -710,7 +784,7 @@ void runSettlementSimulationLoopTests()
             SettlementObjectTypes::Pastureland,
             {{12, 20}, 4, 4}
         );
-        completed(map, SettlementObjectTypes::House, {{20, 23}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{20, 23}, 5, 5});
         const auto id = map.animals.spawn(map, "cow", {30, 25});
         PALADIN_CHECK(id);
         map.animals.designate({{30, 25}, 1, 1}, AnimalOrder::Gather);
@@ -778,7 +852,7 @@ void runSettlementSimulationLoopTests()
         child.fatherId = father.id;
         SettlementActivityTestFixture::rematch(citizens);
         const auto home =
-            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         map.activities.policy.dailyBirthChance = 0;
         child.tilePosition = child.destination = {20, 12};
@@ -981,9 +1055,9 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 6);
         map.activities.policy.dailyBirthChance = 0;
-        completed(map, SettlementObjectTypes::House, {{8, 3}, 3, 3});
-        completed(map, SettlementObjectTypes::House, {{12, 3}, 3, 3});
-        completed(map, SettlementObjectTypes::House, {{16, 3}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{8, 3}, 5, 5});
+        completed(map, SettlementObjectTypes::House, {{14, 3}, 5, 5});
+        completed(map, SettlementObjectTypes::House, {{2, 11}, 5, 5});
         SettlementObjectId producer;
         if (livestock)
         {
@@ -1145,7 +1219,7 @@ void runSettlementSimulationLoopTests()
         const auto small = completed(
             map,
             SettlementObjectTypes::Pastureland,
-            {{40, 40}, 2, 2}
+            {{40, 40}, 3, 3}
         );
         const auto female = map.animals.spawn(map, "cow", {40, 40});
         const auto male = map.animals.spawn(map, "cow", {41, 40});
@@ -1154,10 +1228,20 @@ void runSettlementSimulationLoopTests()
         map.animals.find(female)->breedingTarget = .000001;
         map.animals.find(male)->pasture = small;
         map.animals.find(male)->female = false;
+        // Fill the new 3x3 minimum to retain the no-room-for-birth check.
+        for (int i = 0; i < 2; ++i)
+        {
+            const auto extra = map.animals.spawn(map, "cow", {42, 40 + i});
+            map.animals.find(extra)->pasture = small;
+            map.animals.find(extra)->female = false;
+        }
+        const auto fillerChicken = map.animals.spawn(map, "chicken", {42, 42});
+        map.animals.find(fillerChicken)->pasture = small;
+        map.animals.find(fillerChicken)->female = false;
         const auto stationary = map.animals.find(female)->tilePosition;
         map.animals.tick(map, citizens, 800, 1440, false);
-        PALADIN_CHECK(map.animals.containedCount(small) == 2);
-        PALADIN_CHECK(map.animals.usedSpace(small) == 4);
+        PALADIN_CHECK(map.animals.containedCount(small) == 5);
+        PALADIN_CHECK(map.animals.usedSpace(small) == 9);
         PALADIN_CHECK(map.animals.find(female)->tilePosition == stationary);
     }
     {
@@ -1247,10 +1331,10 @@ void runSettlementSimulationLoopTests()
             placement.beginPlacement(SettlementObjectTypes::CityKeep)
         );
         placement.pointerMoved(SettlementTilePosition{20, 20});
-        PALADIN_CHECK(placement.visibleFootprint()->width == 3);
+        PALADIN_CHECK(placement.visibleFootprint()->width == 5);
         placement.rotatePlacement();
         PALADIN_CHECK(placement.visibleFootprint()->width == 7);
-        PALADIN_CHECK(placement.visibleFootprint()->height == 3);
+        PALADIN_CHECK(placement.visibleFootprint()->height == 5);
         PALADIN_CHECK(
             placement.visibleDoor() == SettlementTilePosition(17, 20)
         );
@@ -1275,7 +1359,7 @@ void runSettlementSimulationLoopTests()
             *SettlementObjectCatalog::definition(
                 SettlementObjectTypes::Stockpile
             ),
-            {{5, 5}, 2, 2}
+            {{5, 5}, 3, 3}
         ));
         map.logistics.synchronize(map.objectState(), 0);
         const auto site = map.objectState().constructionSites().back().id;
@@ -1297,9 +1381,9 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState people;
         PALADIN_CHECK(people.initialize(3, 1));
         const auto keep =
-            completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 3, 7});
+            completed(map, SettlementObjectTypes::CityKeep, {{2, 2}, 5, 7});
         const auto store =
-            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 3, 3});
         map.employment().synchronize(map.objectState(), people);
         PALADIN_CHECK(map.employment().adjust(
             map.employment().forObject(store),
@@ -1401,27 +1485,28 @@ void runSettlementSimulationLoopTests()
         const auto small = completed(
             map,
             SettlementObjectTypes::Stockpile,
-            {{150, 150}, 2, 2}
+            {{150, 150}, 3, 3}
         );
         const auto large = completed(
             map,
             SettlementObjectTypes::Stockpile,
             {{160, 150}, 4, 6}
         );
-        PALADIN_CHECK(
-            map.logistics.inventory(map.logistics.forObject(large))->capacity ==
-            6 * map.logistics.inventory(map.logistics.forObject(small))
-                    ->capacity
-        );
+        const int smallCapacity = map.logistics.inventory(map.logistics.forObject(small))->capacity;
+        const int largeCapacity = map.logistics.inventory(map.logistics.forObject(large))->capacity;
+        // Capacity scales with area, rounded down to whole resource units.
+        PALADIN_CHECK(largeCapacity > smallCapacity);
+        PALADIN_CHECK(std::abs(9 * largeCapacity - 24 * smallCapacity) < 24);
+
     }
     {
         auto map = land();
         SettlementCitizenState people;
         found(map, people, 3);
         const auto producer =
-            completed(map, SettlementObjectTypes::Bakery, {{8, 8}, 3, 2});
+            completed(map, SettlementObjectTypes::Bakery, {{8, 8}, 5, 5});
         const auto stock =
-            completed(map, SettlementObjectTypes::Stockpile, {{16, 8}, 2, 2});
+            completed(map, SettlementObjectTypes::Stockpile, {{16, 8}, 3, 3});
         const auto market =
             completed(map, SettlementObjectTypes::Market, {{24, 8}, 4, 6});
         map.employment().synchronize(map.objectState(), people);
@@ -1708,7 +1793,7 @@ void runSettlementSimulationLoopTests()
         child.fatherId = father.id;
         SettlementActivityTestFixture::rematch(citizens);
         const auto home =
-            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         mother.tilePosition = mother.destination = {9, 9};
         child.tilePosition = child.destination = {9, 9};
@@ -1769,7 +1854,7 @@ void runSettlementSimulationLoopTests()
                 completed(
                     map,
                     SettlementObjectTypes::House,
-                    {{2 + (i % 8) * 8, 2 + (i / 8) * 8}, 3, 3}
+                    {{2 + (i % 8) * 8, 2 + (i / 8) * 8}, 5, 5}
                 );
             }
             SettlementFamilySystem families;
@@ -1800,8 +1885,8 @@ void runSettlementSimulationLoopTests()
             c.sex = i % 2 == 0 ? CitizenSex::Female : CitizenSex::Male;
         }
         SettlementActivityTestFixture::rematch(citizens);
-        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
-        completed(map, SettlementObjectTypes::House, {{16, 8}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
+        completed(map, SettlementObjectTypes::House, {{16, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         // Two families must not block one another's births by sharing a
         // full home while another completed home stands empty.
@@ -1831,7 +1916,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(c.visualX() >= before);
         PALADIN_CHECK(c.visualX() - before < .1);
         const auto farm =
-            completed(map, SettlementObjectTypes::WheatFarm, {{20, 20}, 2, 2});
+            completed(map, SettlementObjectTypes::WheatFarm, {{20, 20}, 3, 3});
         PALADIN_CHECK(!map.objectState().completedObject(farm)->door);
     }
     {
@@ -1896,7 +1981,7 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 1);
         const auto stockpile =
-            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+            completed(map, SettlementObjectTypes::Stockpile, {{14, 12}, 3, 3});
         map.employment().synchronize(map.objectState(), citizens);
         PALADIN_CHECK(map.employment().adjust(
             map.employment().forObject(stockpile),
@@ -1908,7 +1993,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(
             citizens.citizens().front().task.kind == CitizenTaskKind::Work
         );
-        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         SettlementActivityTestFixture::resident(citizens).energy = 65;
         advance(map, citizens, 9 * 1440 + 1140, 239);
         PALADIN_CHECK(citizens.citizens().front().sleptMinutes == 0);
@@ -1925,7 +2010,7 @@ void runSettlementSimulationLoopTests()
             const auto stockpile = completed(
                 map,
                 SettlementObjectTypes::Stockpile,
-                {{12, 12}, 2, 2}
+                {{12, 12}, 3, 3}
             );
             map.employment().synchronize(map.objectState(), citizens);
             PALADIN_CHECK(map.employment().adjust(
@@ -1949,8 +2034,8 @@ void runSettlementSimulationLoopTests()
         auto map = land();
         SettlementCitizenState citizens;
         found(map, citizens, 8);
-        completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
-        completed(map, SettlementObjectTypes::House, {{12, 8}, 3, 3});
+        completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
+        completed(map, SettlementObjectTypes::House, {{14, 8}, 5, 5});
         advance(map, citizens, 720, 1);
         std::set<double> starts;
         for (const auto& c : citizens.citizens())
@@ -2039,7 +2124,7 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 1);
         const auto house =
-            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         auto& c = SettlementActivityTestFixture::resident(citizens);
         c.tilePosition = c.destination = homeBedPosition(
@@ -2110,7 +2195,7 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 1);
         const auto house =
-            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         const auto keep = map.logistics.forObject(
             map.objectState().completedObjects().front().id
@@ -2167,9 +2252,10 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.total("fish") == 20);
         PALADIN_CHECK(!map.logistics.add(keep, "stone", 1));
         const auto stock = map.logistics.forObject(
-            completed(map, SettlementObjectTypes::Stockpile, {{10, 10}, 2, 2})
+            completed(map, SettlementObjectTypes::Stockpile, {{10, 10}, 3, 3})
         );
-        PALADIN_CHECK(map.logistics.add(stock, "stone", 249));
+        const int stockCapacity = map.logistics.inventory(stock)->capacity;
+        PALADIN_CHECK(map.logistics.add(stock, "stone", stockCapacity - 1));
         PALADIN_CHECK(
             map.logistics.reserve(CitizenId{1}, keep, stock, "fish", 1)
         );
@@ -2180,7 +2266,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.freeSpace(stock) == 0);
         PALADIN_CHECK(map.logistics.deliver(CitizenId{1}));
         PALADIN_CHECK(map.logistics.total("fish") == 20);
-        PALADIN_CHECK(map.logistics.inventory(stock)->used() == 250);
+        PALADIN_CHECK(map.logistics.inventory(stock)->used() == stockCapacity);
         map.logistics.synchronize(map.objectState(), 100);
         PALADIN_CHECK(map.logistics.total("lumber") == 40);
     }
@@ -2249,7 +2335,7 @@ void runSettlementSimulationLoopTests()
         }
         SettlementActivityTestFixture::rematch(citizens);
         const auto house =
-            completed(map, SettlementObjectTypes::House, {{8, 8}, 3, 3});
+            completed(map, SettlementObjectTypes::House, {{8, 8}, 5, 5});
         map.activities.synchronizeHomes(map, citizens);
         PALADIN_CHECK(
             citizens.citizens()[0].spouseId == citizens.citizens()[1].id
@@ -2322,7 +2408,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *SettlementObjectCatalog::definition(SettlementObjectTypes::Road),
-            {{10, 12}, 2, 1}
+            {{10, 14}, 2, 1}
         ));
         advance(map, citizens, 742, 5);
         PALADIN_CHECK(
@@ -2433,7 +2519,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
-            {{12, 5}, 3, 3}
+            {{12, 5}, 5, 5}
         ));
         advance(map, citizens, 580, 240);
         PALADIN_CHECK(map.objectState().constructionSites().empty());
@@ -2486,7 +2572,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
-            {{12, 12}, 3, 3}
+            {{12, 12}, 5, 5}
         ));
         const auto site = map.objectState().constructionSites().front().id;
         PALADIN_CHECK(map.objectState().deliverMaterials(site, "lumber", 16));
@@ -2614,7 +2700,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *SettlementObjectCatalog::definition(SettlementObjectTypes::House),
-            {{15, 14}, 3, 3}
+            {{15, 14}, 5, 5}
         ));
         bool carrying = false;
         double minute = 480;
@@ -2630,7 +2716,8 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(carrying);
         PALADIN_CHECK(
             map.commandState()
-                .cancelIntersecting(map, {{15, 14}, 3, 3}, citizens, minute) == 1
+                .cancelIntersecting(map, {{15, 14}, 5, 5}, citizens, minute) ==
+            1
         );
         advance(map, citizens, minute, 1);
         PALADIN_CHECK(allGoods(map, citizens, "lumber") == 40);
@@ -2651,21 +2738,22 @@ void runSettlementSimulationLoopTests()
             map.objectState().completedObjects().front().id
         );
         const auto storeObject =
-            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 3, 3});
         const auto store = map.logistics.forObject(storeObject);
-        PALADIN_CHECK(map.logistics.add(store, "stone", 250));
+        const int storeCapacity = map.logistics.inventory(store)->capacity;
+        PALADIN_CHECK(map.logistics.add(store, "stone", storeCapacity));
         map.employment().synchronize(map.objectState(), citizens);
         const auto job = map.employment().forObject(storeObject);
         PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
         map.logistics.drop({10, 12}, "lumber", 4, 480);
         advance(map, citizens, 480, 180);
         PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 40);
-        PALADIN_CHECK(map.logistics.inventory(store)->used() == 250);
+        PALADIN_CHECK(map.logistics.inventory(store)->used() == storeCapacity);
         PALADIN_CHECK(map.logistics.total("lumber") == 44);
         PALADIN_CHECK(citizens.spawn(1));
         advance(map, citizens, 660, 180);
         PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 44);
-        PALADIN_CHECK(map.logistics.inventory(store)->used() == 250);
+        PALADIN_CHECK(map.logistics.inventory(store)->used() == storeCapacity);
         // Once its own storage has room, its employee delivers there, even
         // when the keep is a closer possible destination.
         PALADIN_CHECK(
@@ -2683,7 +2771,7 @@ void runSettlementSimulationLoopTests()
         SettlementCitizenState citizens;
         found(map, citizens, 2);
         const auto object =
-            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 2, 2});
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 3, 3});
         map.employment().synchronize(map.objectState(), citizens);
         const auto job = map.employment().forObject(object);
         PALADIN_CHECK(map.employment().adjust(job, 1, citizens));

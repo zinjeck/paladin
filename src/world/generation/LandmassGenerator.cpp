@@ -141,9 +141,20 @@ namespace Paladin
 
             continent.lobes.reserve(static_cast<std::size_t>(lobeCount));
             const double backboneAngle = random.range(0.0, 2.0 * pi);
-            const double massScale = random.range(.65, 1.18);
+            const double massScale = random.range(.75, 1.05);
             const double bend = random.range(-1.1, 1.1);
 
+            // A broad interior anchors each landmass; peripheral lobes change
+            // its outline instead of making a chain of thin connected islands.
+            continent.lobes.push_back(
+                {0,
+                 0,
+                 1.0 / (worldWidth * .13 * massScale),
+                 1.0 / (worldHeight * .17 * massScale),
+                 1.05,
+                 std::cos(backboneAngle),
+                 std::sin(backboneAngle)}
+            );
             for (std::int32_t index = 0; index < lobeCount; ++index)
             {
                 const double along =
@@ -194,15 +205,15 @@ namespace Paladin
                 );
             }
 
-            // Narrow arms create navigable bays and peninsulas. Independent
+            // Short, broad shoulders create bays and peninsulas. Independent
             // shelf fragments introduce substantial offshore land, between
             // the scale of the main continents and tiny archipelago islands.
             const double armAngle = backboneAngle + random.range(.8, 2.1);
             continent.lobes.push_back(
-                {std::cos(armAngle) * worldWidth * .105,
-                 std::sin(armAngle) * worldHeight * .105,
-                 1.0 / (worldWidth * .145 * massScale),
-                 1.0 / (worldHeight * .038),
+                {std::cos(armAngle) * worldWidth * .075,
+                 std::sin(armAngle) * worldHeight * .075,
+                 1.0 / (worldWidth * .085 * massScale),
+                 1.0 / (worldHeight * .075),
                  .82,
                  std::cos(armAngle),
                  std::sin(armAngle)}
@@ -307,6 +318,20 @@ namespace Paladin
                 }
             }
 
+            // Preserve each connected outline while opening wider ocean basins
+            // between continents. Scale offsets and radii together so broad
+            // interiors and peninsulas keep their proportions.
+            constexpr double footprintScale = .80;
+            for (auto& continent : continents)
+            {
+                for (auto& lobe : continent.lobes)
+                {
+                    lobe.offsetX *= footprintScale;
+                    lobe.offsetY *= footprintScale;
+                    lobe.inverseRadiusX /= footprintScale;
+                    lobe.inverseRadiusY /= footprintScale;
+                }
+            }
             return continents;
         }
 
@@ -503,7 +528,7 @@ namespace Paladin
                 const double positionY = static_cast<double>(y);
 
                 const double continentCore = continentCenterBias(
-                    positionX + grid.width() * .075 *
+                    positionX + grid.width() * .035 *
                                     GenerationNoise::simplexFractal(
                                         positionX / grid.width() * 3.8,
                                         positionY / grid.height() * 3.8,
@@ -512,7 +537,7 @@ namespace Paladin
                                         .5,
                                         2
                                     ),
-                    positionY + grid.height() * .075 *
+                    positionY + grid.height() * .035 *
                                     GenerationNoise::simplexFractal(
                                         positionX / grid.width() * 3.8,
                                         positionY / grid.height() * 3.8,
@@ -578,9 +603,9 @@ namespace Paladin
                 );
                 const double riftStrength =
                     std::clamp((.045 - rift) / .045, 0., 1.);
-                if (continentCore < .85)
+                if (continentCore < .40)
                 {
-                    rawElevation -= riftStrength * .28;
+                    rawElevation -= riftStrength * .07;
                 }
 
                 // A seed-selected polar continent gives the coldest biome

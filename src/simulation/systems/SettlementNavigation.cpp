@@ -52,17 +52,6 @@ namespace Paladin
     ) const
     {
         const int dx = std::abs(a.x - b.x), dy = std::abs(a.y - b.y);
-        const auto* enclosing = map.objectState().blocksMovement(a)
-                                    ? map.objectState().completedObjectAt(a)
-                                    : nullptr;
-        const bool exiting = map.objectState().blocksMovement(a) && enclosing &&
-                             enclosing->footprint.contains(b) &&
-                             map.grid().tile(b) &&
-                             map.grid().tile(b)->terrain == TerrainType::Land;
-        if (exiting && dx <= 1 && dy <= 1 && dx + dy > 0)
-        {
-            return true;
-        }
         return dx <= 1 && dy <= 1 && dx + dy > 0 && walkable(map, b) &&
                (dx == 0 || dy == 0 ||
                 (walkable(map, {a.x, b.y}) && walkable(map, {b.x, a.y})));

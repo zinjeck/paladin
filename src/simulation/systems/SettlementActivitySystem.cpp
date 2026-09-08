@@ -973,17 +973,30 @@ namespace Paladin
                 // tile, after entering through the physical door.
                 auto p = c.tilePosition;
                 c.path.clear();
-                while (p != c.task.target)
+                if (home && home->door)
                 {
-                    if (p.x != c.task.target.x)
+                    appendRoomPath(
+                        c.path,
+                        p,
+                        c.task.target,
+                        home->footprint,
+                        *home->door
+                    );
+                }
+                else
+                {
+                    while (p != c.task.target)
                     {
-                        p.x += p.x < c.task.target.x ? 1 : -1;
+                        if (p.x != c.task.target.x)
+                        {
+                            p.x += p.x < c.task.target.x ? 1 : -1;
+                        }
+                        else
+                        {
+                            p.y += p.y < c.task.target.y ? 1 : -1;
+                        }
+                        c.path.push_back(p);
                     }
-                    else
-                    {
-                        p.y += p.y < c.task.target.y ? 1 : -1;
-                    }
-                    c.path.push_back(p);
                 }
                 c.pathIndex = 0;
                 c.stepProgress = 0;
@@ -1042,7 +1055,11 @@ namespace Paladin
                             c.tilePosition.x + offset.x,
                             c.tilePosition.y + offset.y
                         };
-                        if (!home->footprint.contains(next))
+                        if (!buildingInterior(
+                                 home->footprint,
+                                 home->objectTypeId
+                            )
+                                 .contains(next))
                         {
                             continue;
                         }

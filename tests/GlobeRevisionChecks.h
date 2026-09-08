@@ -1,7 +1,9 @@
 #pragma once
 #include "TestFramework.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "rendering/GlobeRenderer.h"
 #include "rendering/WorldPixelGrid.h"
+#include "rendering/WorldRenderer.h"
 #include "world/SettlementGrid.h"
 #include <SDL3/SDL.h>
 #include <fstream>
@@ -43,7 +45,7 @@ namespace Paladin
                             }
                             auto* n = world.grid().tile({x + i, y + j});
                             if (n && (n->terrain == TerrainType::Mountain ||
-                                      n->biome == BiomeType::Hills))
+                                      n->relief == ReliefType::Hills))
                             {
                                 ++supported;
                                 i = 2;
@@ -59,6 +61,138 @@ namespace Paladin
                   << std::endl;
         PALADIN_CHECK(mountains > 20 && hills > 20 && supported == mountains);
         Camera2D camera(settings.width * .5, settings.height * .5);
+        // Screen-relative motion remains continuous through both poles.
+        const int vw = renderer.outputWidth(), vh = renderer.outputHeight();
+        Camera2D orbit(settings.width * .5, settings.height * .5);
+        orbit.setPlanetRotation({}, settings.width, settings.height);
+        const double radius =
+            GlobeView::from(orbit, world.grid(), vw, vh).radius;
+        double minV = 1, maxV = 0;
+        for (int i = 0; i < 720; ++i)
+        {
+            GlobeCameraNavigation::pan(
+                orbit,
+                world.grid(),
+                vw,
+                vh,
+                0,
+                -1,
+                6.283185307179586 * radius / 720
+            );
+            const auto ov = GlobeView::from(orbit, world.grid(), vw, vh);
+            const auto uv = ov.pick(ov.cx, ov.cy);
+            PALADIN_CHECK(uv);
+            minV = std::min(minV, uv->v);
+            maxV = std::max(maxV, uv->v);
+            PALADIN_CHECK(
+                std::isfinite(orbit.tileX()) && std::isfinite(orbit.tileY())
+            );
+        }
+        PALADIN_CHECK(minV < 1e-6 && maxV > 1 - 1e-6);
+        PALADIN_CHECK(orbit.planetRotation()->apply({0, 0, 1}).z > .999999);
+        for (double roll : {0., .7, 2., 3.141592653589793})
+        {
+            orbit.setPlanetRotation(
+                PlanetRotation::axis(0, 0, 1, roll),
+                settings.width,
+                settings.height
+            );
+            auto ov = GlobeView::from(orbit, world.grid(), vw, vh);
+            auto origin = ov.pick(ov.cx, ov.cy);
+            PALADIN_CHECK(origin);
+            GlobeCameraNavigation::pan(orbit, world.grid(), vw, vh, 1, 0, 10);
+            auto moved = GlobeView::from(orbit, world.grid(), vw, vh)
+                             .project(origin->u, origin->v);
+            PALADIN_CHECK(moved.x < ov.cx && std::abs(moved.y - ov.cy) < 1e-8);
+            auto before = GlobeView::from(orbit, world.grid(), vw, vh);
+            const double x0 = before.cx + radius * .25,
+                         y0 = before.cy - radius * .2,
+                         x1 = before.cx - radius * .15,
+                         y1 = before.cy + radius * .25;
+            auto grabbed = before.pick(x0, y0);
+            PALADIN_CHECK(grabbed);
+            GlobeCameraNavigation::drag(
+                orbit,
+                world.grid(),
+                vw,
+                vh,
+                x0,
+                y0,
+                x1,
+                y1
+            );
+            auto after = GlobeView::from(orbit, world.grid(), vw, vh)
+                             .project(grabbed->u, grabbed->v);
+            PALADIN_CHECK(std::hypot(after.x - x1, after.y - y1) < 1e-7);
+        }
+        const auto mb = WorldMapNavigation::mapBounds(vw, vh);
+        const auto middle = WorldMapNavigation::minimapPoint(
+            mb,
+            mb.x + mb.width * .5,
+            mb.y + mb.height * .5
+        );
+        PALADIN_CHECK(
+            std::abs(middle.u - .5) < 1e-6 && std::abs(middle.v - .5) < 1e-6
+        );
+        WorldRenderer modes;
+        modes.globeEnabled = true;
+        for (int i = 0; i < 20; ++i)
+        {
+            const auto old =
+                GlobeView::from(orbit, world.grid(), vw, vh).orientation();
+            const double x = orbit.tileX(), y = orbit.tileY(),
+                         zoom = orbit.zoom();
+            modes.toggleProjection(
+                orbit,
+                world.grid(),
+                vw,
+                vh,
+                TileRenderMetrics{16}
+            );
+            PALADIN_CHECK(!modes.globeEnabled && !orbit.planetRotation());
+            PALADIN_CHECK(
+                std::abs(orbit.tileX() - x) < 1e-8 &&
+                std::abs(orbit.tileY() - y) < 1e-8
+            );
+            modes.toggleProjection(
+                orbit,
+                world.grid(),
+                vw,
+                vh,
+                TileRenderMetrics{16}
+            );
+            auto relative =
+                GlobeView::from(orbit, world.grid(), vw, vh).orientation() *
+                old.inverse();
+            PALADIN_CHECK(
+                std::abs(relative.w) > .999999999 &&
+                std::abs(orbit.zoom() - zoom) < 1e-8
+            );
+        }
+        WorldMapNavigation::focus(
+            orbit,
+            world.grid(),
+            vw,
+            vh,
+            true,
+            {.999, .001}
+        );
+        PALADIN_CHECK(
+            std::abs(orbit.tileX() / settings.width - .999) < 1e-8 &&
+            std::abs(orbit.tileY() / settings.height - .001) < 1e-8
+        );
+        Camera2D flat(-1, settings.height * .5);
+        auto seam = WorldMapNavigation::pick(
+            flat,
+            world.grid(),
+            vw,
+            vh,
+            16,
+            false,
+            vw * .5,
+            vh * .5
+        );
+        PALADIN_CHECK(seam && seam->u > .99);
         GlobeRenderer globe;
         const auto draw = [&]()
         {
@@ -116,6 +250,21 @@ namespace Paladin
             renderer.outputHeight()
         );
         PALADIN_CHECK(!view.pick(view.cx + view.radius + 1, view.cy));
+        // Off-center picking must undo the axial tilt as well as yaw/pitch.
+        for (double u : {.4, .5, .6})
+        {
+            for (double v : {.35, .5, .65})
+            {
+                const auto point = view.project(u, v);
+                const auto hit = view.pick(point.x, point.y);
+                PALADIN_CHECK(
+                    hit && std::abs(hit->u - u) < 1e-9 &&
+                    std::abs(hit->v - v) < 1e-9
+                );
+            }
+        }
+        const auto north = view.project(.5, .25);
+        PALADIN_CHECK(north.x < view.cx); // 23.5 degree tilted northern axis
         for (double u : {.01, .25, .5, .99})
         {
             for (double v : {.1, .5, .9})
@@ -178,7 +327,72 @@ namespace Paladin
             worst = std::max(worst, ms);
         }
         PALADIN_CHECK(globe.atlasBuilds == 1);
+        std::cout << "globe measured mean=" << total / 90 << " worst=" << worst
+                  << std::endl;
         PALADIN_CHECK(worst < 80);
+        // Switching projections reuses atlases. Both views refresh on one edit.
+        GrayUiRenderer navigationUi;
+        modes.globeEnabled = true;
+        orbit.setZoom(1);
+        const auto modeDraw = [&]()
+        {
+            renderer.beginFrame();
+            modes.render(renderer, world, orbit, TileRenderMetrics{16});
+            modes.renderNavigator(
+                renderer,
+                world,
+                orbit,
+                TileRenderMetrics{16},
+                navigationUi
+            );
+            SDL_FlushRenderer(native);
+        };
+        auto deadline = SDL_GetTicks() + 15000;
+        do
+        {
+            modeDraw();
+            SDL_Delay(1);
+        } while (!modes.terrainDetailReady() && SDL_GetTicks() < deadline);
+        PALADIN_CHECK(modes.terrainDetailReady());
+        save("globe-navigator");
+        for (int i = 0; i < 20; ++i)
+        {
+            modes.toggleProjection(
+                orbit,
+                world.grid(),
+                vw,
+                vh,
+                TileRenderMetrics{16}
+            );
+            modeDraw();
+        }
+        PALADIN_CHECK(modes.terrainAtlasBuilds() == 1);
+        modes.toggleProjection(
+            orbit,
+            world.grid(),
+            vw,
+            vh,
+            TileRenderMetrics{16}
+        );
+        modeDraw();
+        save("flat-navigator");
+        const auto revision = world.grid().revision();
+        auto changed = *world.grid().tile({10, 10});
+        changed.terrain = TerrainType::Water;
+        changed.biome = BiomeType::Ocean;
+        PALADIN_CHECK(world.grid().setTile({10, 10}, changed));
+        PALADIN_CHECK(world.grid().revision() == revision + 1);
+        modeDraw();
+        PALADIN_CHECK(modes.terrainAtlasBuilds() == 2);
+        modes.toggleProjection(
+            orbit,
+            world.grid(),
+            vw,
+            vh,
+            TileRenderMetrics{16}
+        );
+        modeDraw();
+        PALADIN_CHECK(modes.terrainAtlasBuilds() == 2);
         SettlementGrid coast(128, 128);
         for (int y = 0; y < 128; ++y)
         {

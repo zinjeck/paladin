@@ -1,0 +1,298 @@
+[0/2] Re-checking globbed directories...
+[1/208] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Debug/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/lights.catalog"
+[2/208] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Debug/assets/sprites"
+[3/208] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/objects.catalog"
+[4/208] Building CXX object CMakeFiles\Paladin.dir\src\main.cpp.obj
+[5/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationMainMenu.cpp.obj
+[6/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[7/208] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(97): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(185): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(243): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[9/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[10/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationReports.cpp.obj
+[11/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[12/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(371): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[13/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[14/208] Building CXX object CMakeFiles\Paladin.dir\src\interaction\CameraNavigationPolicy.cpp.obj
+[15/208] Building CXX object CMakeFiles\Paladin.dir\src\core\SimulationClock.cpp.obj
+[16/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[17/208] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[18/208] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[19/208] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementCommandController.cpp.obj
+[20/208] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementInspectionController.cpp.obj
+[21/208] Building CXX object CMakeFiles\Paladin.dir\src\platform\Window.cpp.obj
+[22/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\Renderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[23/208] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementPlacementController.cpp.obj
+[24/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[25/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[26/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\Texture.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[27/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SceneSpriteLibrary.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[28/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[29/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SpriteRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[30/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\OverlayRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[31/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[32/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCommandRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[33/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[34/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[35/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\TerritoryPresentationPolicy.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[36/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[37/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[38/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\TerritoryRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[39/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\Simulation.cpp.obj
+[40/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\SimulationReports.cpp.obj
+[41/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[42/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[43/208] Building CXX object CMakeFiles\Paladin.dir\src\world\WorldTime.cpp.obj
+[44/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[45/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\GenerationNoise.cpp.obj
+[46/208] Building CXX object CMakeFiles\Paladin.dir\src\world\World.cpp.obj
+[47/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\LandmassGenerationTemplate.cpp.obj
+[48/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[49/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\LandmassGenerator.cpp.obj
+[50/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\ClimateGenerator.cpp.obj
+[51/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\TerrainBiomeClassifier.cpp.obj
+[52/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\WorldGenerator.cpp.obj
+[53/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\ResourceStockpile.cpp.obj
+[54/208] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\WorldGenerationSeed.cpp.obj
+[55/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementMap.cpp.obj
+[56/208] Building CXX object CMakeFiles\Paladin.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[57/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[58/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[59/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementNaturalFeatures.cpp.obj
+[60/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[61/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[62/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[63/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[64/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(327): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[65/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[66/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[67/208] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[68/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[69/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\jobs\fishery\FisheryJob.cpp.obj
+[70/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[71/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementEconomy.cpp.obj
+[72/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[73/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementFoundationProfile.cpp.obj
+[74/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementResourceDefinition.cpp.obj
+[75/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementSimulationPolicy.cpp.obj
+[76/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementPopulation.cpp.obj
+[77/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[78/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[79/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[80/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[81/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\commands\SettlementCommandDefinition.cpp.obj
+[82/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectDefinition.cpp.obj
+[83/208] Building CXX object CMakeFiles\Paladin.dir\src\world\territory\TerritoryFoundationPolicy.cpp.obj
+[84/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[85/208] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[86/208] Building CXX object CMakeFiles\Paladin.dir\src\world\territory\TerritoryMap.cpp.obj
+[87/208] Building CXX object CMakeFiles\Paladin.dir\src\world\territory\TerritoryFoundationSystem.cpp.obj
+[88/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\BitmapFontRenderer.cpp.obj
+[89/208] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[90/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\LedgerPanel.cpp.obj
+[91/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\CityHud.cpp.obj
+[92/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\LedgerPanelData.cpp.obj
+[93/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\DebugConsole.cpp.obj
+[94/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPopulation.cpp.obj
+[95/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\GrayUiRenderer.cpp.obj
+[96/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPanel.cpp.obj
+[97/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\FoundingPanel.cpp.obj
+[98/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\UiButton.cpp.obj
+[99/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\UiTextField.cpp.obj
+[100/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\MainMenu.cpp.obj
+[101/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\SimulationSpeedControls.cpp.obj
+[102/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\WorldHud.cpp.obj
+[103/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\NormalFontRenderer.cpp.obj
+[104/208] Building CXX object CMakeFiles\Paladin.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(325): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[105/208] Linking CXX executable Paladin.exe
+[106/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationMainMenu.cpp.obj
+[107/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[108/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[109/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[110/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(97): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(185): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(243): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[111/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationReports.cpp.obj
+[112/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[113/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(371): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[114/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[115/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\SimulationClock.cpp.obj
+[116/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCamera.cpp.obj
+[117/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[118/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\CameraNavigationPolicy.cpp.obj
+[119/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[120/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[121/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementCommandController.cpp.obj
+[122/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementInspectionController.cpp.obj
+[123/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\platform\Window.cpp.obj
+[124/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\Renderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[125/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementPlacementController.cpp.obj
+[126/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[127/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SceneSpriteLibrary.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[128/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[129/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\Texture.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[130/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[131/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SpriteRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[132/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\OverlayRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[133/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[134/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[135/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementCommandRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[136/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[137/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[138/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\TerritoryPresentationPolicy.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[139/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[140/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\TerritoryRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[141/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\Simulation.cpp.obj
+[142/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\SimulationReports.cpp.obj
+[143/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[144/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\WorldTime.cpp.obj
+[145/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[146/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[147/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\GenerationNoise.cpp.obj
+[148/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\World.cpp.obj
+[149/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\LandmassGenerationTemplate.cpp.obj
+[150/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\LandmassGenerator.cpp.obj
+[151/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[152/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\ClimateGenerator.cpp.obj
+[153/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\TerrainBiomeClassifier.cpp.obj
+[154/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\WorldGenerator.cpp.obj
+[155/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\ResourceStockpile.cpp.obj
+[156/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\WorldGenerationSeed.cpp.obj
+[157/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementMap.cpp.obj
+[158/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[159/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[160/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementNaturalFeatures.cpp.obj
+[161/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[162/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[163/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[164/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[165/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[166/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(327): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[167/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[168/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[169/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[170/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[171/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\jobs\fishery\FisheryJob.cpp.obj
+[172/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectLifecycle.cpp.obj
+[173/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementFoundationProfile.cpp.obj
+[174/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementEconomy.cpp.obj
+[175/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[176/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementResourceDefinition.cpp.obj
+[177/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementSimulationPolicy.cpp.obj
+[178/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementPopulation.cpp.obj
+[179/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[180/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[181/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[182/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\commands\SettlementCommandDefinition.cpp.obj
+[183/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[184/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectDefinition.cpp.obj
+[185/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\territory\TerritoryFoundationPolicy.cpp.obj
+[186/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[187/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[188/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\territory\TerritoryFoundationSystem.cpp.obj
+[189/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\territory\TerritoryMap.cpp.obj
+[190/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\BitmapFontRenderer.cpp.obj
+[191/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\CityHud.cpp.obj
+[192/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\LedgerPanel.cpp.obj
+[193/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldGridRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[194/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\LedgerPanelData.cpp.obj
+[195/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\DebugConsole.cpp.obj
+[196/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\EmploymentPopulation.cpp.obj
+[197/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\GrayUiRenderer.cpp.obj
+[198/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\EmploymentPanel.cpp.obj
+[199/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\FoundingPanel.cpp.obj
+[200/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\UiButton.cpp.obj
+[201/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\UiTextField.cpp.obj
+[202/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\MainMenu.cpp.obj
+[203/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\SimulationSpeedControls.cpp.obj
+[204/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\WorldHud.cpp.obj
+[205/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\NormalFontRenderer.cpp.obj
+[206/208] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(325): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[207/208] Linking CXX executable PaladinApplicationSmokeTests.exe

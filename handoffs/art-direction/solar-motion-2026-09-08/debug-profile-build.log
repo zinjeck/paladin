@@ -1,0 +1,130 @@
+[1/108] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Debug/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/lights.catalog"
+[2/108] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Debug/assets/sprites"
+[3/108] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Debug/assets/sprites/objects.catalog"
+[4/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(96): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(181): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(237): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[5/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[6/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[7/108] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(371): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[9/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[10/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[11/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[12/108] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementInspectionController.cpp.obj
+[13/108] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementCommandController.cpp.obj
+[14/108] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[15/108] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[16/108] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementPlacementController.cpp.obj
+[17/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+[18/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[19/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[20/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[21/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+[22/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+[23/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[24/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[25/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\Simulation.cpp.obj
+[26/108] Building CXX object CMakeFiles\Paladin.dir\src\rendering\TerritoryRenderer.cpp.obj
+[27/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\SimulationReports.cpp.obj
+[28/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[29/108] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[30/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[31/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[32/108] Building CXX object CMakeFiles\Paladin.dir\src\world\World.cpp.obj
+[33/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementMap.cpp.obj
+[34/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[35/108] Building CXX object CMakeFiles\Paladin.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[36/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[37/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[38/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[39/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[40/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[41/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(327): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[42/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[43/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[44/108] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[45/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[46/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[47/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[48/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[49/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[50/108] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[51/108] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPanel.cpp.obj
+[52/108] Building CXX object CMakeFiles\Paladin.dir\src\ui\LedgerPanelData.cpp.obj
+[53/108] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPopulation.cpp.obj
+[54/108] Building CXX object CMakeFiles\Paladin.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(325): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[55/108] Linking CXX executable Paladin.exe
+[56/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\core\ApplicationCityScreen.cpp(42): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(96): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(181): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(237): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[57/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(246): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[58/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[59/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[60/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(371): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[61/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\core\ApplicationCityInput.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(255): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[62/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[63/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[64/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCamera.cpp.obj
+[65/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementCommandController.cpp.obj
+[66/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\core\ApplicationDebug.cpp(95): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[67/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementInspectionController.cpp.obj
+[68/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[69/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\interaction\SettlementPlacementController.cpp.obj
+[70/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+[71/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\CityRenderer.cpp.obj
+[72/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[73/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[74/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+[75/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[76/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[77/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+[78/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[79/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\Simulation.cpp.obj
+[80/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\TerritoryRenderer.cpp.obj
+[81/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\SimulationReports.cpp.obj
+[82/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[83/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[84/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[85/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\World.cpp.obj
+[86/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementMap.cpp.obj
+[87/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[88/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[89/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[90/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[91/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[92/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[93/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[94/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(327): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[95/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[96/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[97/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[98/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[99/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[100/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[101/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[102/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[103/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[104/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\LedgerPanelData.cpp.obj
+[105/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\EmploymentPanel.cpp.obj
+[106/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\EmploymentPopulation.cpp.obj
+[107/108] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(325): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[108/108] Linking CXX executable PaladinApplicationSmokeTests.exe

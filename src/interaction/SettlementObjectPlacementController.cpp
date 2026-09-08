@@ -223,9 +223,14 @@ namespace Paladin
             return std::nullopt;
         }
 
+        if (definition->selectionMode !=
+                SettlementFootprintSelectionMode::Fixed &&
+            (!dragging_ || !dragStart_))
+        {
+            return SettlementObjectFootprint{*hoveredPosition_, 1, 1};
+        }
         if (definition->selectionMode ==
-                SettlementFootprintSelectionMode::Fixed ||
-            !dragging_ || !dragStart_)
+            SettlementFootprintSelectionMode::Fixed)
         {
             const bool sideways = quarterTurns_ % 2 != 0;
             const int width =

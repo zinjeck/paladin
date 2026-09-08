@@ -321,3 +321,20 @@ add_custom_target(PaladinArtSettings ALL
  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/pieces.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/pieces.catalog
  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/lights.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/lights.catalog)
 add_dependencies(Paladin PaladinArtSettings)
+
+# Keep the interactive raster/mesh path optimized in the Visual Studio Debug
+# executable too. Simulation and application code remain fully debuggable.
+# These files generate the identical pixels; /Od's per-pixel STL overhead made
+# moving into cold terrain/forest chunks exceed the frame budget.
+if(MSVC)
+    string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    file(GLOB_RECURSE PALADIN_DEBUG_SOURCES CONFIGURE_DEPENDS "src/*.cpp" "tests/*.cpp")
+    foreach(PALADIN_DEBUG_SOURCE IN LISTS PALADIN_DEBUG_SOURCES)
+        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/rendering/")
+            set_property(SOURCE ${PALADIN_DEBUG_SOURCE} APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:/RTC1>")
+        endif()
+    endforeach()
+    file(GLOB PALADIN_RENDER_SOURCES CONFIGURE_DEPENDS "src/rendering/*.cpp")
+    set_property(SOURCE ${PALADIN_RENDER_SOURCES} APPEND PROPERTY COMPILE_OPTIONS
+        "$<$<CONFIG:Debug>:/O2>" "$<$<CONFIG:Debug>:/Ob2>")
+endif()

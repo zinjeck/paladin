@@ -808,6 +808,19 @@ namespace Paladin
 
         overlayRenderer_.render(renderer, overlays, camera, metrics);
         overlayRenderer_.renderOutlines(renderer, outlines, camera, metrics);
+        if (definition->wallThickness > 0 && preview->width > 2 &&
+            preview->height > 2)
+        {
+            const std::array<TileOutlineRenderItem, 1> room{
+                {{double(preview->topLeft.x + 1),
+                  double(preview->topLeft.y + 1),
+                  double(preview->width - 2),
+                  double(preview->height - 2),
+                  2.F,
+                  outlineColor}}
+            };
+            overlayRenderer_.renderOutlines(renderer, room, camera, metrics);
+        }
         drawDoor();
     }
 } // namespace Paladin

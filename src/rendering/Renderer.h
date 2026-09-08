@@ -51,6 +51,18 @@ namespace Paladin
         std::uint8_t opacity = 255;
     };
 
+    class PreparedQuadMesh
+    {
+    public:
+        explicit PreparedQuadMesh(std::span<const MeshVertex> vertices);
+        ~PreparedQuadMesh();
+
+    private:
+        friend class Renderer;
+        struct Data;
+        std::unique_ptr<Data> data_;
+    };
+
     class Renderer
 
     {
@@ -99,6 +111,13 @@ namespace Paladin
             std::span<const MeshVertex> vertices,
             std::span<const int> indices
         );
+        void drawTranslatedQuads(
+            const Texture&,
+            PreparedQuadMesh&,
+            float x,
+            float y,
+            float scale
+        );
 
         void fillRectangles(
             std::span<const RenderRectangle> rectangles,
@@ -130,7 +149,9 @@ namespace Paladin
             int width,
             int height,
             std::span<const TextureDrawItem> items,
-            bool premultiplied = false
+            bool premultiplied = false,
+            const Texture* batchTexture = nullptr,
+            PreparedQuadMesh* batch = nullptr
         );
 
         [[nodiscard]]

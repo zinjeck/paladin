@@ -90,6 +90,7 @@ namespace Paladin
             sourceInstance_ = map.instanceId();
             overviewArt_ = artwork;
             cachedTextures_ = 0;
+            navigationSource_ = ~std::uint64_t(0);
             chunks_.clear();
             chunks_.resize(std::size_t(columns) * rows);
             featureChunks_.clear();
@@ -98,6 +99,64 @@ namespace Paladin
                 ((map.grid().height() + 31) / 32)
             );
             overviewTexture_.reset();
+            foliageAtlas_.reset();
+            foliageSources_.clear();
+        }
+        if (navigationSource_ != map.objectState().navigationVersion())
+        {
+            navigationSource_ = map.objectState().navigationVersion();
+            navigationKeys_.assign(chunks_.size(), 0);
+            // A road or building changes clearance locally. Global navigation
+            // revisions must not force every visible forest cache to rebuild.
+            for (const auto& object : map.objectState().completedObjects())
+            {
+                const auto& f = object.footprint;
+                const auto& style =
+                    sprites ? sprites->objectStyle(object.objectTypeId)
+                            : ObjectPresentation{};
+                double pad = std::max(3., style.height + 3.);
+                if (sprites)
+                {
+                    if (const auto* roof =
+                            sprites->find(object.objectTypeId + ".roof.full"))
+                    {
+                        pad =
+                            std::max(pad, roof->height + roof->elevation + 3.);
+                    }
+                }
+                const auto key = GenerationNoise::mix(
+                    std::hash<std::string>{}(object.objectTypeId) ^
+                    (std::uint64_t(f.topLeft.x) << 32) ^
+                    std::uint32_t(f.topLeft.y) ^
+                    (std::uint64_t(f.width) << 16) ^ std::uint32_t(f.height)
+                );
+                for (int y = std::max(
+                         0,
+                         int(std::floor((f.topLeft.y - pad) / side))
+                     );
+                     y <
+                     std::min(
+                         rows,
+                         int(std::ceil((f.topLeft.y + f.height + pad) / side))
+                     );
+                     ++y)
+                {
+                    for (int x = std::max(
+                             0,
+                             int(std::floor((f.topLeft.x - pad) / side))
+                         );
+                         x < std::min(
+                                 columns,
+                                 int(std::ceil(
+                                     (f.topLeft.x + f.width + pad) / side
+                                 ))
+                             );
+                         ++x)
+                    {
+                        navigationKeys_[std::size_t(y) * columns + x] ^= key;
+                    }
+                }
+            }
         }
         const auto blend = [](double a, double b, double x)
         {
@@ -228,6 +287,48 @@ namespace Paladin
             visible.end(),
             [](const auto& a, const auto& b) { return a.distance < b.distance; }
         );
+        const auto visibleCount = visible.size();
+        // Prepare the next zoom-out footprint while the player is zoomed in,
+        // with a one-chunk pan margin. This uses the same bounded upload budget
+        // and never replaces visible art with lower-resolution placeholders.
+        // Prepare one adjacent zoom level, not the entire strategic view.
+        // At close zoom the former constant 4px target rebuilt hundreds of
+        // irrelevant forest chunks while the player was dragging the camera.
+        const double warmTp = std::max(4., tp * .75);
+        const int warmX0 = std::max(
+            0,
+            int(std::floor(
+                (camera.tileX() - renderer.outputWidth() * .5 / warmTp) / side
+            )) - 1
+        );
+        const int warmY0 = std::max(
+            0,
+            int(std::floor(
+                (camera.tileY() - renderer.outputHeight() * .5 / warmTp) / side
+            )) - 1
+        );
+        const int warmX1 = std::min(
+            columns,
+            int(std::ceil(
+                (camera.tileX() + renderer.outputWidth() * .5 / warmTp) / side
+            )) + 1
+        );
+        const int warmY1 = std::min(
+            rows,
+            int(std::ceil(
+                (camera.tileY() + renderer.outputHeight() * .5 / warmTp) / side
+            )) + 1
+        );
+        for (int y = warmY0; y < warmY1; ++y)
+        {
+            for (int x = warmX0; x < warmX1; ++x)
+            {
+                if (x < firstX || x >= lastX || y < firstY || y >= lastY)
+                {
+                    visible.push_back({x, y, 0});
+                }
+            }
+        }
         // Amortize eviction; never sweep every map chunk on a camera frame.
         for (std::size_t n = 0; n < std::min(std::size_t(32), chunks_.size());
              ++n)
@@ -235,20 +336,31 @@ namespace Paladin
             const auto index = refreshCursor_++ % chunks_.size();
             auto& c = chunks_[index];
             const int x = int(index % columns), y = int(index / columns);
-            if (c.texture && (x < firstX - 2 || x >= lastX + 2 ||
-                              y < firstY - 2 || y >= lastY + 2))
+            if (cachedTextures_ >= 1024 && c.texture &&
+                (x < firstX - 2 || x >= lastX + 2 || y < firstY - 2 ||
+                 y >= lastY + 2))
             {
                 c.texture.reset();
-                c.version = 0;
                 --cachedTextures_;
             }
         }
         auto& textures = cachedTextures_;
-        const auto deadline = SDL_GetTicksNS() + 2000000;
+        // At desktop resolution the visible forest can exceed 256 chunks.
+        // Keep their original 16px/tile textures; budget at most 256 MiB.
+        constexpr std::size_t textureBudget = 1024;
+        fallbackVertices_.clear();
+        fallbackIndices_.clear();
+        const auto deadline = SDL_GetTicksNS() + 3000000;
         int built = 0;
         const double detail = tp >= 40 ? 1.0 : 0.0;
-        for (const auto& cell : visible)
+        for (std::size_t cellIndex = 0; cellIndex < visible.size(); ++cellIndex)
         {
+            if (cellIndex >= visibleCount &&
+                (built >= 32 || SDL_GetTicksNS() >= deadline))
+            {
+                break;
+            }
+            const auto& cell = visible[cellIndex];
             auto& chunk = chunks_[std::size_t(cell.y) * columns + cell.x];
             const auto baseVersion = map.naturalFeatures().chunkVersion(
                 cell.x * side / 32,
@@ -292,9 +404,11 @@ namespace Paladin
                     .updateTextureRegion(*overviewTexture_, x, y, w, h, pixels);
                 chunk.baseVersion = baseVersion;
             }
-            if (sprites && policy && tp >= 4 && detail < 1 &&
+            if (sprites && policy && tp >= 4 &&
+                (detail < 1 || cellIndex >= visibleCount) &&
                 (chunk.version != version ||
-                 chunk.navigation != map.objectState().navigationVersion()))
+                 chunk.navigation !=
+                     navigationKeys_[std::size_t(cell.y) * columns + cell.x]))
             {
                 if (map.naturalFeatures().countIn(
                         {{cell.x * side - 2, cell.y * side - 2},
@@ -306,7 +420,8 @@ namespace Paladin
                     chunk.texture.reset();
                     chunk.empty = true;
                     chunk.version = version;
-                    chunk.navigation = map.objectState().navigationVersion();
+                    chunk.navigation =
+                        navigationKeys_[std::size_t(cell.y) * columns + cell.x];
                     continue;
                 }
                 // Cache the same silhouettes and placement as the close view.
@@ -327,6 +442,65 @@ namespace Paladin
                     *policy
                 );
                 auto ordered = snapshot.items();
+                if (!foliageAtlas_ && sprites->find("tree.trunk.1"))
+                {
+                    std::vector<TextureDrawItem> atlasItems;
+                    int ax = 1, ay = 1, rowHeight = 0;
+                    const auto add = [&](const Texture* t)
+                    {
+                        if (!t || foliageSources_.contains(t) ||
+                            t->width() > 2046)
+                        {
+                            return;
+                        }
+                        if (ax + t->width() + 1 > 2048)
+                        {
+                            ax = 1;
+                            ay += rowHeight + 2;
+                            rowHeight = 0;
+                        }
+                        RenderRectangle at{
+                            float(ax),
+                            float(ay),
+                            float(t->width()),
+                            float(t->height())
+                        };
+                        foliageSources_[t] = at;
+                        atlasItems.push_back(
+                            {t, {0, 0, at.width, at.height}, at}
+                        );
+                        ax += t->width() + 2;
+                        rowHeight = std::max(rowHeight, t->height());
+                    };
+                    for (const char* type :
+                         {"tree",
+                          "rock",
+                          "tree.trunk",
+                          "tree.birch-trunk",
+                          "tree.conifer-crown",
+                          "tree.branch",
+                          "tree.crown"})
+                    {
+                        for (int i = 0; i <= 4; ++i)
+                        {
+                            if (auto* sprite = sprites->find(
+                                    std::string(type) +
+                                    (i ? "." + std::to_string(i) : "")
+                                ))
+                            {
+                                add(sprite->texture.get());
+                                add(sprite->shadow.get());
+                            }
+                        }
+                    }
+                    add(contactShadow_.get());
+                    foliageAtlas_ = renderer.createTextureFromDrawItems(
+                        2048,
+                        ay + rowHeight + 1,
+                        atlasItems,
+                        true
+                    );
+                }
                 std::stable_sort(
                     ordered.begin(),
                     ordered.end(),
@@ -355,26 +529,77 @@ namespace Paladin
                         f.width *= (r - l) / d.width;
                         f.height *= (bottom - top) / d.height;
                     }
+                    auto* source = item.texture;
+                    if (foliageAtlas_)
+                    {
+                        if (const auto at = foliageSources_.find(source);
+                            at != foliageSources_.end())
+                        {
+                            f.x += at->second.x;
+                            f.y += at->second.y;
+                            source = foliageAtlas_.get();
+                        }
+                    }
                     chunk.commands.push_back(
-                        {item.texture,
+                        {source,
                          f,
                          {l, top, r - l, bottom - top},
                          item.color,
                          item.opacity}
                     );
                 }
+                chunk.batchable =
+                    foliageAtlas_ &&
+                    std::all_of(
+                        chunk.commands.begin(),
+                        chunk.commands.end(),
+                        [&](const auto& command)
+                        { return command.texture == foliageAtlas_.get(); }
+                    );
+                chunk.mesh.reset();
+                if (chunk.batchable)
+                {
+                    std::vector<MeshVertex> mesh;
+                    mesh.reserve(chunk.commands.size() * 4);
+                    for (const auto& item : chunk.commands)
+                    {
+                        const auto& d = item.destination;
+                        const auto& src = item.source;
+                        const float u0 = src.x / foliageAtlas_->width(),
+                                    v0 = src.y / foliageAtlas_->height(),
+                                    u1 = (src.x + src.width) /
+                                         foliageAtlas_->width(),
+                                    v1 = (src.y + src.height) /
+                                         foliageAtlas_->height();
+                        const auto a = item.opacity;
+                        const RenderColor tint{a, a, a, a};
+                        mesh.insert(
+                            mesh.end(),
+                            {{d.x, d.y, u0, v0, tint},
+                             {d.x + d.width, d.y, u1, v0, tint},
+                             {d.x + d.width, d.y + d.height, u1, v1, tint},
+                             {d.x, d.y + d.height, u0, v1, tint}}
+                        );
+                    }
+                    chunk.mesh = std::make_unique<PreparedQuadMesh>(mesh);
+                }
                 std::unique_ptr<Texture> image;
-                if (textures < 256 && built < 2 && SDL_GetTicksNS() < deadline)
+                if (textures < textureBudget && built < 32 &&
+                    SDL_GetTicksNS() < deadline)
                 {
                     image = renderer.createTextureFromDrawItems(
                         textureSide,
                         textureSide,
-                        chunk.commands
+                        chunk.commands,
+                        true,
+                        foliageAtlas_.get(),
+                        chunk.mesh.get()
                     );
                 }
                 chunk.empty = false;
                 chunk.version = version;
-                chunk.navigation = map.objectState().navigationVersion();
+                chunk.navigation =
+                    navigationKeys_[std::size_t(cell.y) * columns + cell.x];
                 if (image)
                 {
                     if (!chunk.texture)
@@ -385,25 +610,44 @@ namespace Paladin
                     chunk.texture = std::move(image);
                     chunk.empty = false;
                     chunk.version = version;
-                    chunk.navigation = map.objectState().navigationVersion();
+                    chunk.navigation =
+                        navigationKeys_[std::size_t(cell.y) * columns + cell.x];
                 }
                 ++built;
             }
             if (chunk.empty && chunk.version == version &&
-                chunk.navigation == map.objectState().navigationVersion())
+                chunk.navigation ==
+                    navigationKeys_[std::size_t(cell.y) * columns + cell.x])
             {
                 continue;
             }
-            if (!chunk.texture && !chunk.commands.empty() && textures < 256 && built < 2 &&
+            if (!chunk.texture && !chunk.commands.empty() &&
+                textures < textureBudget && built < 32 &&
                 SDL_GetTicksNS() < deadline)
             {
                 chunk.texture = renderer.createTextureFromDrawItems(
                     textureSide,
                     textureSide,
-                    chunk.commands
+                    chunk.commands,
+                    true,
+                    foliageAtlas_.get(),
+                    chunk.mesh.get()
                 );
                 textures += bool(chunk.texture);
                 ++built;
+            }
+        }
+        // Finish offscreen uploads before submitting scene geometry. Switching
+        // render targets between forest chunks otherwise flushes the entire
+        // visible fallback forest and consumes the upload budget after one
+        // chunk.
+        for (std::size_t cellIndex = 0; cellIndex < visibleCount; ++cellIndex)
+        {
+            const auto& cell = visible[cellIndex];
+            auto& chunk = chunks_[std::size_t(cell.y) * columns + cell.x];
+            if (chunk.empty)
+            {
+                continue;
             }
             const auto draw = [&](const Texture& texture,
                                   float sx,
@@ -436,6 +680,17 @@ namespace Paladin
                 }
                 else
                 {
+                    if (chunk.batchable)
+                    {
+                        renderer.drawTranslatedQuads(
+                            *foliageAtlas_,
+                            *chunk.mesh,
+                            float(ox + cell.x * side * tp),
+                            float(oy + cell.y * side * tp),
+                            float(tp / density)
+                        );
+                        continue;
+                    }
                     for (const auto& item : chunk.commands)
                     {
                         const auto& d = item.destination;
@@ -446,6 +701,36 @@ namespace Paladin
                                         d.y * scale;
                         if (item.texture)
                         {
+                            if (item.texture == foliageAtlas_.get())
+                            {
+                                const auto& src = item.source;
+                                const float u0 = src.x / foliageAtlas_->width(),
+                                            v0 =
+                                                src.y / foliageAtlas_->height(),
+                                            u1 = (src.x + src.width) /
+                                                 foliageAtlas_->width(),
+                                            v1 = (src.y + src.height) /
+                                                 foliageAtlas_->height();
+                                const auto a = item.opacity;
+                                const RenderColor tint{a, a, a, a};
+                                const int first = int(fallbackVertices_.size());
+                                fallbackVertices_.insert(
+                                    fallbackVertices_.end(),
+                                    {{x, y, u0, v0, tint},
+                                     {x + d.width * scale, y, u1, v0, tint},
+                                     {x + d.width * scale,
+                                      y + d.height * scale,
+                                      u1,
+                                      v1,
+                                      tint},
+                                     {x, y + d.height * scale, u0, v1, tint}}
+                                );
+                                for (int k : {0, 1, 2, 0, 2, 3})
+                                {
+                                    fallbackIndices_.push_back(first + k);
+                                }
+                                continue;
+                            }
                             renderer.drawTexture(
                                 *item.texture,
                                 item.source.x,
@@ -472,6 +757,25 @@ namespace Paladin
                     }
                 }
             }
+        }
+        static int diagnosticFrame = 0;
+        if (SDL_getenv("PALADIN_CITY_ZOOM_REVIEW") &&
+            ++diagnosticFrame % 50 == 0)
+        {
+            SDL_Log(
+                "foliage tp=%.2f textures=%zu visible=%zu built=%d "
+                "fallback=%zu",
+                tp,
+                textures,
+                visible.size(),
+                built,
+                fallbackIndices_.size() / 6
+            );
+        }
+        if (foliageAtlas_ && !fallbackIndices_.empty())
+        {
+            renderer
+                .drawMesh(*foliageAtlas_, fallbackVertices_, fallbackIndices_);
         }
         if (shared && sprites && policy && detail > 0)
         {
@@ -786,6 +1090,17 @@ namespace Paladin
                 }
                 for (const auto& f : chunk.sprites)
                 {
+                    // Resource indexes are 32 tiles wide; a cache request may
+                    // cover only 16. Cull using the full authored overhang
+                    // before composing tree parts, shadows and collision
+                    // clearance.
+                    if (f.tile.x + .5 < projection.cameraX - halfW - pad ||
+                        f.tile.x + .5 > projection.cameraX + halfW + pad ||
+                        f.tile.y + .5 < projection.cameraY - halfH - pad ||
+                        f.tile.y + .5 > projection.cameraY + halfH + pad)
+                    {
+                        continue;
+                    }
                     const auto* occupant =
                         map.objectState().completedObjectAt(f.tile);
                     if (occupant && occupant->objectTypeId ==
@@ -887,7 +1202,14 @@ namespace Paladin
                              y,
                              GenerationNoise::mix(id ^ map.generationSeed()),
                              treeScale,
-                             crownScale
+                             crownScale,
+                             cityTreeSpecies(
+                                 GenerationNoise::mix(
+                                     id ^ map.generationSeed()
+                                 ),
+                                 map.grid().tile(f.tile)->biome,
+                                 map.grid().tile(f.tile)->temperature.value()
+                             )
                          )) ||
                         sprites.submit(
                             queue,
@@ -909,6 +1231,43 @@ namespace Paladin
                     );
                     if (policy.shadowsVisible && custom && contactShadow_)
                     {
+                        // A low, offset crown/rock silhouette supplies cast
+                        // depth while the existing tight mask anchors contact.
+                        // It is included in the existing cached feature chunk.
+                        if (stride == 1)
+                        {
+                            const auto* art =
+                                sprites.find(f.tree ? "tree" : "rock");
+                            if (art && art->shadow)
+                            {
+                                const auto cast = projection.bounds(
+                                    {x + .24,
+                                     y + .16,
+                                     0,
+                                     f.tree ? 1.05 * treeScale * crownScale
+                                            : .75 * rockScale,
+                                     f.tree ? .55 * treeScale : .30,
+                                     .5,
+                                     .5}
+                                );
+                                if (projection.visible(cast))
+                                {
+                                    queue.submit(
+                                        {cast,
+                                         {},
+                                         y,
+                                         id,
+                                         -1,
+                                         0,
+                                         art->shadow.get(),
+                                         {0,
+                                          0,
+                                          float(art->shadow->width()),
+                                          float(art->shadow->height())}}
+                                    );
+                                }
+                            }
+                        }
                         const auto shadow = projection.bounds(
                             {x + .12 * stride,
                              y + .08 * stride,

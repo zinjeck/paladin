@@ -143,8 +143,17 @@ namespace Paladin
                     }
                 }
             }
-        } restore{c, original, exitPath, successful, progress, duration,
-                  map, citizens.navigation_, citizens.movementPolicy};
+        } restore{
+            c,
+            original,
+            exitPath,
+            successful,
+            progress,
+            duration,
+            map,
+            citizens.navigation_,
+            citizens.movementPolicy
+        };
         // Finish the current physical step before changing direction. Planning
         // from its endpoint preserves interpolation instead of snapping
         // backward.
@@ -157,18 +166,13 @@ namespace Paladin
             home && home->door && home->footprint.contains(c.tilePosition))
         {
             auto p = c.tilePosition;
-            while (p != *home->door)
-            {
-                if (p.x != home->door->x)
-                {
-                    p.x += p.x < home->door->x ? 1 : -1;
-                }
-                else
-                {
-                    p.y += p.y < home->door->y ? 1 : -1;
-                }
-                exitPath.push_back(p);
-            }
+            appendRoomPath(
+                exitPath,
+                p,
+                *home->door,
+                home->footprint,
+                *home->door
+            );
             p = outsideDoor(home->footprint, *home->door);
             const auto* tile = map.grid().tile(p);
             if (!tile || tile->terrain == TerrainType::Water ||

@@ -1,10 +1,12 @@
 #include "core/Application.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -164,6 +166,20 @@ namespace Paladin
             directionLength = 1.0;
         }
 
+        if (screen_ == Screen::World && worldRenderer_->globeEnabled)
+        {
+            GlobeCameraNavigation::pan(
+                *camera_,
+                simulation_->world().grid(),
+                renderer_->outputWidth(),
+                renderer_->outputHeight(),
+                directionX,
+                directionY,
+                panSpeedTilesPerSecondAtZoomOne * baseTilePixels *
+                    frameDeltaSeconds
+            );
+            return;
+        }
         const double panSpeedTilesPerSecond =
             panSpeedTilesPerSecondAtZoomOne / camera_->zoom();
 
@@ -226,17 +242,24 @@ namespace Paladin
     {
         if (screen_ == Screen::World)
         {
-            const auto& grid = simulation_->world().grid();
-            auto hit = GlobeView::from(
-                           *camera_,
-                           grid,
-                           renderer_->outputWidth(),
-                           renderer_->outputHeight()
-            )
-                           .pick(screenX, screenY);
+            const auto& g = simulation_->world().grid();
+            auto hit = WorldMapNavigation::pick(
+                *camera_,
+                g,
+                renderer_->outputWidth(),
+                renderer_->outputHeight(),
+                tileRenderMetrics_->scaledTilePixels(camera_->zoom()),
+                worldRenderer_->globeEnabled,
+                screenX,
+                screenY
+            );
+            if (activeHudContainsPoint(float(screenX), float(screenY)))
+            {
+                hit.reset();
+            }
             settlementPlacementController_->setHoveredPosition(
                 hit ? std::optional<
-                          WorldTilePosition>{{std::clamp(int(hit->u * grid.width()), 0, grid.width() - 1), std::clamp(int(hit->v * grid.height()), 0, grid.height() - 1)}}
+                          WorldTilePosition>{{std::clamp(int(hit->u * g.width()), 0, g.width() - 1), std::clamp(int(hit->v * g.height()), 0, g.height() - 1)}}
                     : std::nullopt
             );
             return;
@@ -303,7 +326,7 @@ namespace Paladin
             return;
         }
 
-        if (screen_ == Screen::World)
+        if (screen_ == Screen::World && worldRenderer_->globeEnabled)
         {
             camera_->setZoom(
                 std::clamp(camera_->zoom() * multiplier, .65, 24.)
@@ -328,7 +351,21 @@ namespace Paladin
         const double worldTileYUnderCursor =
             camera_->tileY() + screenOffsetY / oldTilePixels;
 
-        camera_->multiplyZoom(multiplier);
+        if (screen_ == Screen::World)
+        {
+            camera_->setWorldZoom(
+                std::clamp(
+                    camera_->zoom() * multiplier,
+                    viewportWidth / (2. * simulation_->world().grid().width() *
+                                     tileRenderMetrics_->tilePixels),
+                    80.
+                )
+            );
+        }
+        else
+        {
+            camera_->multiplyZoom(multiplier);
+        }
 
         const double newTilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
@@ -348,28 +385,35 @@ namespace Paladin
             return;
         }
 
+        if (screen_ == Screen::World && worldRenderer_->globeEnabled)
+        {
+            // A free sphere has no north/south camera bounds.
+            return;
+        }
         if (screen_ == Screen::World)
         {
-            const auto& grid = simulation_->world().grid();
-            double x = std::fmod(camera_->tileX(), double(grid.width()));
+            const auto& g = simulation_->world().grid();
+            double x = std::fmod(camera_->tileX(), double(g.width()));
             if (x < 0)
             {
-                x += grid.width();
+                x += g.width();
             }
             camera_->setPosition(
                 x,
-                std::clamp(camera_->tileY(), .001, grid.height() - .001)
+                std::clamp(
+                    camera_->tileY(),
+                    0.,
+                    std::nextafter(double(g.height()), 0.)
+                )
             );
             return;
         }
         const double tilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-
-        if (tilePixels <= 0.0)
+        if (tilePixels <= 0)
         {
             return;
         }
-
         std::int32_t gridWidth = simulation_->world().grid().width();
         std::int32_t gridHeight = simulation_->world().grid().height();
 
@@ -442,7 +486,17 @@ namespace Paladin
                    settlementInspectionPanel_->containsPoint(x, y);
         }
 
-        return worldHud_->containsInteractivePoint(x, y) ||
+        return WorldMapNavigation::mapBounds(
+                   renderer_->outputWidth(),
+                   renderer_->outputHeight()
+               )
+                   .contains(x, y) ||
+               WorldMapNavigation::buttonBounds(
+                   renderer_->outputWidth(),
+                   renderer_->outputHeight()
+               )
+                   .contains(x, y) ||
+               worldHud_->containsInteractivePoint(x, y) ||
                (simulationControlsUnlocked_ &&
                 !settlementPlacementController_->isActive() &&
                 (cityHud_->containsInteractivePoint(x, y) ||

@@ -1,0 +1,3 @@
+[1/3] Building CXX object CMakeFiles\PaladinTests.dir\src\world\generation\LandmassGenerator.cpp.obj
+[2/3] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldGenerationTests.cpp.obj
+[3/3] Linking CXX executable PaladinTests.exe

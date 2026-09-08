@@ -17,7 +17,8 @@ namespace Paladin
             {
                 const auto* t = grid.tile({xx, yy});
                 if (!t || (hill ? t->terrain != TerrainType::Land ||
-                                      t->biome != BiomeType::Hills
+                                      (t->biome != BiomeType::Hills &&
+                                       t->relief != ReliefType::Hills)
                                 : t->terrain != TerrainType::Mountain))
                 {
                     return false;

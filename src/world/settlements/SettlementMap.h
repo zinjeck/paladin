@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simulation/systems/SettlementActivitySystem.h"
+#include "world/PlanetAstronomy.h"
 #include "world/SettlementGrid.h"
 #include "world/WorldTilePosition.h"
 #include "world/entities/animals/SettlementAnimals.h"
@@ -93,6 +94,12 @@ namespace Paladin
             return employment_;
         }
 
+        // Geographic inputs for future seasons; orbital phase stays fixed.
+        double planetU = .5, planetV = .5;
+        double latitudeRadians() const
+        {
+            return PlanetAstronomy::latitude(planetV);
+        }
         SettlementLogistics logistics;
         SettlementHomeHeating heating;
         SettlementCommerce commerce;

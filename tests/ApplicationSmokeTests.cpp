@@ -1,3 +1,4 @@
+#include "CityCloudChecks.h"
 #include "CityZoomPerformanceChecks.h"
 #include "EnvironmentTerrainSmokeChecks.h"
 #include "RenderingRevisionChecks.h"
@@ -262,6 +263,10 @@ namespace Paladin
                 renderer,
                 SDL_GetRenderer(app.window_->nativeHandle())
             );
+            cityCloudChecks(
+                renderer,
+                SDL_GetRenderer(app.window_->nativeHandle())
+            );
             SettlementGrid grid(32, 32);
             for (int y = 0; y < 32; ++y)
             {
@@ -280,8 +285,8 @@ namespace Paladin
             PALADIN_CHECK(map.objectState().placeCompletedObject(
                 map.grid(),
                 fixtureHouse,
-                {{12, 12}, 3, 3},
-                SettlementTilePosition{13, 14}
+                {{12, 12}, 5, 5},
+                SettlementTilePosition{14, 16}
             ));
             map.naturalFeatures().set({10, 12}, NaturalFeatureKind::Tree);
             map.naturalFeatures().set({16, 13}, NaturalFeatureKind::Tree);
@@ -291,6 +296,7 @@ namespace Paladin
             camera.setZoom(16);
             TileRenderMetrics metrics;
             CityRenderer city;
+            city.presentation.cloudsEnabled = false;
             const auto fixtureRoot = std::filesystem::path(SDL_GetBasePath()) /
                                      "presentation-fixture";
             std::filesystem::create_directories(fixtureRoot);
@@ -386,9 +392,9 @@ namespace Paladin
             PALADIN_CHECK(uncovered.red == 210 && uncovered.green == 180);
             // Real indoor state, including front/corner tiles previously
             // covered by the full-height south wall.
-            for (int y = 12; y < 15; ++y)
+            for (int y = 13; y < 16; ++y)
             {
-                for (int x = 12; x < 15; ++x)
+                for (int x = 13; x < 16; ++x)
                 {
                     SettlementActivityTestFixture::setRenderPerson(
                         people,
@@ -748,7 +754,7 @@ namespace Paladin
                 animal->health = 0;
                 auto house = *map.objectState().completedObjectAt({12, 12});
                 house.objectTypeId = SettlementObjectTypes::House;
-                house.footprint = {{8, 8}, 3, 3};
+                house.footprint = {{8, 8}, 5, 5};
                 CityPresentation cutaway;
                 cutaway.roofsVisible = false;
                 for (unsigned rows : {0u, 1u, 3u})
@@ -766,7 +772,18 @@ namespace Paladin
                     int bedCount = 0;
                     for (const auto& item : beds.items())
                     {
-                        if (item.part == 3 && item.texture)
+                        bool bedArtwork = false;
+                        for (int variant = 0; variant < 8; ++variant)
+                        {
+                            if (const auto* bed = installed.find(
+                                    "home.bed." + std::to_string(variant)
+                                ))
+                            {
+                                bedArtwork |=
+                                    item.texture == bed->texture.get();
+                            }
+                        }
+                        if (item.part == 3 && bedArtwork)
                         {
                             ++bedCount;
                         }
@@ -1005,13 +1022,44 @@ namespace Paladin
                             installed.submit(b, motionView, name, 0, 0, 0);
                         }
                         PALADIN_CHECK(a.size() == b.size());
-                        bool moved = false;
-                        for (std::size_t i = 0; i < a.size(); i++)
+                        const auto renderedHash = [&](SceneDrawQueue& queue)
                         {
-                            moved |=
-                                a.items()[i].bounds.x != b.items()[i].bounds.x;
-                        }
-                        PALADIN_CHECK(moved);
+                            renderer.beginFrame();
+                            {
+                                WorldPixelScene pixels(renderer, 64);
+                                queue.render(renderer);
+                            }
+                            auto* surface = SDL_RenderReadPixels(
+                                SDL_GetRenderer(app.window_->nativeHandle()),
+                                nullptr
+                            );
+                            PALADIN_CHECK(surface);
+                            std::uint64_t hash = 1469598103934665603ULL;
+                            for (int y = 0; y < surface->h; ++y)
+                            {
+                                for (int x = 0; x < surface->w; ++x)
+                                {
+                                    Uint8 r, g, b, a;
+                                    SDL_ReadSurfacePixel(
+                                        surface,
+                                        x,
+                                        y,
+                                        &r,
+                                        &g,
+                                        &b,
+                                        &a
+                                    );
+                                    hash = (hash ^ r) * 1099511628211ULL;
+                                    hash = (hash ^ g) * 1099511628211ULL;
+                                    hash = (hash ^ b) * 1099511628211ULL;
+                                }
+                            }
+                            SDL_DestroySurface(surface);
+                            return hash;
+                        };
+                        const auto paused = renderedHash(a);
+                        PALADIN_CHECK(paused == renderedHash(a));
+                        PALADIN_CHECK(paused != renderedHash(b));
                     }
                     {
                         GrassPresentation grass;
@@ -1080,7 +1128,7 @@ namespace Paladin
                     SettlementCitizenState passer;
                     SettlementActivityTestFixture::setRenderPerson(
                         passer,
-                        {13, 14}
+                        {14, 16}
                     );
                     const auto doorVisible =
                         [&](double seconds,
@@ -1320,8 +1368,8 @@ namespace Paladin
                 PALADIN_CHECK(coastMap.objectState().placeCompletedObject(
                     coastMap.grid(),
                     fixtureHouse,
-                    {{25, 22}, 3, 3},
-                    SettlementTilePosition{26, 24}
+                    {{25, 22}, 5, 5},
+                    SettlementTilePosition{27, 26}
                 ));
                 Camera2D coastCamera(31, 24);
                 coastCamera.setZoom(8);
@@ -1358,20 +1406,20 @@ namespace Paladin
             {
                 for (const auto at :
                      {SettlementTilePosition{11, 12},
-                      {15, 12},
+                      {17, 12},
                       {11, 14},
-                      {15, 14},
-                      {12, 15},
-                      {14, 15},
+                      {17, 14},
+                      {12, 17},
+                      {16, 17},
                       {12, 10},
-                      {14, 10}})
+                      {16, 10}})
                 {
                     map.naturalFeatures().set(at, NaturalFeatureKind::Tree);
                 }
                 for (int x = 7; x <= 21; x += 2)
                 {
                     map.naturalFeatures().set(
-                        {x, 17},
+                        {x, 19},
                         NaturalFeatureKind::Tree
                     );
                 }
@@ -1396,7 +1444,7 @@ namespace Paladin
                     renderer.outputHeight()
                 };
                 const auto protectedHouse =
-                    clearanceView.bounds({11.70, 11.07, 0, 3.60, 4.01, 0, 0});
+                    clearanceView.bounds({11.70, 11.07, 0, 5.60, 6.01, 0, 0});
                 int crowns = 0;
                 for (const auto& item : clearanceQueue.items())
                 {
@@ -1406,6 +1454,11 @@ namespace Paladin
                         crown |=
                             item.texture ==
                             installed.find("tree.crown." + std::to_string(i))
+                                ->texture.get();
+                        crown |=
+                            item.texture ==
+                            installed
+                                .find("tree.conifer-crown." + std::to_string(i))
                                 ->texture.get();
                     }
                     if (!crown)
@@ -1572,11 +1625,13 @@ namespace Paladin
                 PALADIN_CHECK(found);
                 camera.setPosition(hill.x + .5, hill.y + .5);
                 camera.setZoom(8);
-                for (int i = 0; i < 12; ++i)
-                {
+                const auto terrainDeadline=SDL_GetTicks()+15000;
+                do {
                     app.renderer_->beginFrame();
                     map.render(*app.renderer_, review, camera, metrics);
-                }
+                    SDL_Delay(1);
+                } while ((!map.terrainDetailReady() || !map.terrainLocalDetailReady()) && SDL_GetTicks()<terrainDeadline);
+                PALADIN_CHECK(map.terrainDetailReady() && map.terrainLocalDetailReady());
                 capture(app, "world-foothills.bmp");
                 camera.setZoom(16);
                 app.renderer_->beginFrame();
@@ -1643,7 +1698,12 @@ namespace Paladin
             if (SDL_getenv("PALADIN_CITY_ZOOM_REVIEW"))
             {
                 SDL_HideWindow(app.window_->nativeHandle());
-                cityZoomPerformanceChecks(*app.renderer_,SDL_GetRenderer(app.window_->nativeHandle()));
+                SDL_SetWindowSize(app.window_->nativeHandle(), 1920, 1200);
+                SDL_SyncWindow(app.window_->nativeHandle());
+                cityZoomPerformanceChecks(
+                    *app.renderer_,
+                    SDL_GetRenderer(app.window_->nativeHandle())
+                );
                 return;
             }
             if (SDL_getenv("PALADIN_GLOBE_REVIEW_ONLY"))
@@ -1698,17 +1758,17 @@ namespace Paladin
                 for (int side = 0; side < 4; ++side)
                 {
                     add(SettlementObjectTypes::House,
-                        {{15 + side * 5, 16}, 3, 3},
+                        {{15 + side * 6, 16}, 5, 5},
                         side);
                 }
-                add(SettlementObjectTypes::CityKeep, {{11, 22}, 3, 7});
-                add(SettlementObjectTypes::Bakery, {{18, 23}, 3, 3});
+                add(SettlementObjectTypes::CityKeep, {{11, 22}, 5, 7});
+                add(SettlementObjectTypes::Bakery, {{18, 23}, 5, 5});
                 const auto stockpile =
                     add(SettlementObjectTypes::Stockpile, {{25, 23}, 6, 4});
                 add(SettlementObjectTypes::WheatFarm, {{33, 23}, 4, 4});
                 for (int x = 13; x <= 35; ++x)
                 {
-                    add(SettlementObjectTypes::Road, {{x, 20}, 1, 1});
+                    add(SettlementObjectTypes::Road, {{x, 21}, 1, 1});
                 }
                 for (int x = 9; x <= 36; x += 3)
                 {
@@ -1953,11 +2013,11 @@ namespace Paladin
                         PALADIN_CHECK(map.objectState().placeCompletedObject(
                             map.grid(),
                             house,
-                            {{x, y}, 3, 3}
+                            {{x, y}, 5, 5}
                         ));
                     }
                 }
-                for (int y = 44; y < 92; y += 6)
+                for (int y = 45; y < 93; y += 6)
                 {
                     for (int x = 40; x < 88; ++x)
                     {
@@ -2089,6 +2149,9 @@ namespace Paladin
                     );
                     if (tp < StaticDetailPixels)
                     {
+                        // Terrain LOD stays static. Weather intentionally moves
+                        // at these zooms and has separate pause/motion checks.
+                        city.presentation.cloudsEnabled = false;
                         for (int i = 0; i < 280; ++i)
                         {
                             frame(0);
@@ -2101,6 +2164,7 @@ namespace Paladin
                         frame(10, 23);
                         PALADIN_CHECK(night == imageHash());
                         PALADIN_CHECK(day != night);
+                        city.presentation.cloudsEnabled = true;
                         frame(0);
                     }
                     capture(
@@ -2150,8 +2214,8 @@ namespace Paladin
                 SettlementGroundCache groundCache;
                 SceneDrawQueue groundQueue;
                 const auto roadId =
-                    map.objectState().completedObjectAt({40, 44})->id;
-                const SceneProjection groundProjection{40, 44, 32, 1280, 720};
+                    map.objectState().completedObjectAt({45, 45})->id;
+                const SceneProjection groundProjection{45, 45, 32, 1280, 720};
                 const auto cachedRoad = [&]()
                 {
                     groundQueue.clear();
@@ -2178,7 +2242,7 @@ namespace Paladin
                 PALADIN_CHECK(map.objectState().placeCompletedObject(
                     map.grid(),
                     road,
-                    {{40, 43}, 1, 1}
+                    {{45, 44}, 1, 1}
                 ));
                 cachedRoad();
                 PALADIN_CHECK(groundCache.buildCount() == firstBuilds + 1);
@@ -2268,6 +2332,26 @@ namespace Paladin
             PALADIN_CHECK(
                 !app.settlementPlacementController_->hoveredPosition()
             );
+            const auto mini =
+                WorldMapNavigation::mapBounds(int(width), int(height));
+            PALADIN_CHECK(click(
+                app,
+                mini.x + mini.width * .25F,
+                mini.y + mini.height * .4F
+            ));
+            PALADIN_CHECK(
+                !app.foundingPanel_->isOpen() && !app.globePointerDown_ &&
+                app.worldNavigatorPress_ == 0
+            );
+            PALADIN_CHECK(
+                std::abs(app.camera_->tileX() / grid.width() - .25) < 1e-5
+            );
+            const auto switcher =
+                WorldMapNavigation::buttonBounds(int(width), int(height));
+            PALADIN_CHECK(click(app, switcher.x + 20, switcher.y + 15));
+            PALADIN_CHECK(!app.worldRenderer_->globeEnabled);
+            PALADIN_CHECK(click(app, switcher.x + 20, switcher.y + 15));
+            PALADIN_CHECK(app.worldRenderer_->globeEnabled);
             const auto globeZoom = app.camera_->zoom();
             app.applyCameraZoom(1.2, width * .5F, height * .5F);
             PALADIN_CHECK(app.camera_->zoom() > globeZoom);
@@ -2398,7 +2482,7 @@ namespace Paladin
             PALADIN_CHECK(map->objectState().placeCompletedObject(
                 map->grid(),
                 keepDefinition,
-                {{2, 2}, 3, 7}
+                {{2, 2}, 5, 7}
             ));
             map->logistics.synchronize(map->objectState(), 360);
             auto& people = app.simulation_->world()
@@ -2708,4 +2792,3 @@ int main()
         return 1;
     }
 }
-

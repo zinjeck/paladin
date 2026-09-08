@@ -9,7 +9,8 @@
         if (!(condition))                                                      \
         {                                                                      \
             throw std::runtime_error(                                          \
-                std::string("Test failed: ") + #condition                      \
+                std::string(__FILE__) + ":" + std::to_string(__LINE__) +       \
+                " Test failed: " + #condition                                  \
             );                                                                 \
         }                                                                      \
     } while (false)

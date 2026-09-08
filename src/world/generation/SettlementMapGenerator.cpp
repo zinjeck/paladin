@@ -243,6 +243,7 @@ namespace Paladin
                 double rainfall = 0.0;
                 double waterWeight = 0.0;
                 double mountainWeight = 0.0;
+                double hillWeight = 0.0;
                 std::array<double, biomeCount> biomeWeights{};
 
                 for (std::size_t index = 0; index < samples.size(); ++index)
@@ -270,6 +271,11 @@ namespace Paladin
                         sampleWeight
                     );
 
+                    hillWeight += weight(
+                        sample.relief == ReliefType::Hills ||
+                            sample.biome == BiomeType::Hills,
+                        sampleWeight
+                    );
                     biomeWeights[biomeIndex(sample.biome)] += sampleWeight;
                 }
 
@@ -334,6 +340,10 @@ namespace Paladin
                 output->terrain = mountainWeight > mountainThreshold
                                       ? TerrainType::Mountain
                                       : TerrainType::Land;
+                output->relief = output->terrain == TerrainType::Mountain
+                                     ? ReliefType::Mountain
+                                 : hillWeight > .5 ? ReliefType::Hills
+                                                   : ReliefType::Lowland;
             }
         }
 
@@ -346,6 +356,10 @@ namespace Paladin
             settings.localTilesPerWorldTile,
             seed
         );
+        result->planetU = (sourceRegionCenter.x + .5) / sourceGrid.width();
+        result->planetV = (sourceRegionCenter.y + .5) / sourceGrid.height();
+        result->activities.policy.solarTimeOffsetMinutes =
+            PlanetAstronomy::solarOffsetMinutes(result->planetU);
         result->naturalFeatures().generate(result->grid(), seed);
         result->animals.initialize(*result, seed);
         return result;

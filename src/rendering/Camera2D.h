@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/PlanetRotation.h"
 #include <algorithm>
 
 namespace Paladin
@@ -30,10 +31,12 @@ namespace Paladin
         {
             tileX_ = tileX;
             tileY_ = tileY;
+            planetRotation_.reset();
         }
 
         void move(double deltaTileX, double deltaTileY) noexcept
         {
+            planetRotation_.reset();
             tileX_ += deltaTileX;
             tileY_ += deltaTileY;
         }
@@ -49,12 +52,32 @@ namespace Paladin
             zoom_ = std::clamp(zoom, MinimumZoom, MaximumZoom);
         }
 
+        void setWorldZoom(double zoom) noexcept
+        {
+            zoom_ = std::clamp(zoom, .001, 80.);
+        }
+
         void multiplyZoom(double multiplier) noexcept
         {
             setZoom(zoom_ * multiplier);
         }
 
+        const std::optional<PlanetRotation>& planetRotation() const
+        {
+            return planetRotation_;
+        }
+        void setPlanetRotation(PlanetRotation rotation, int width, int height)
+        {
+            planetRotation_ = rotation.normalized();
+            const auto uv = WorldSurface::coordinates(
+                planetRotation_->inverse().apply({0, 0, 1})
+            );
+            tileX_ = uv.u * width;
+            tileY_ = uv.v * height;
+        }
+
     private:
+        std::optional<PlanetRotation> planetRotation_;
         static constexpr double MinimumZoom = 0.25;
         static constexpr double MaximumZoom = 80.0;
 

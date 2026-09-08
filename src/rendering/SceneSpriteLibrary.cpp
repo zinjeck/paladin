@@ -40,6 +40,25 @@ namespace Paladin
                 }
             }
         }
+        std::unordered_map<std::string, std::unordered_map<unsigned, unsigned>>
+            materialColors;
+        std::ifstream colorRules(base / "material-colors.catalog");
+        std::string rule;
+        while (std::getline(colorRules, rule))
+        {
+            if (rule.empty() || rule[0] == '#')
+            {
+                continue;
+            }
+            std::istringstream row(rule);
+            std::string file;
+            unsigned from, to;
+            if (row >> file >> std::hex >> from >> to &&
+                palette.contains(from) && palette.contains(to))
+            {
+                materialColors[file][from] = to;
+            }
+        }
         std::ifstream lights(settings / "lights.catalog");
         std::string lightLine;
         while (std::getline(lights, lightLine))
@@ -311,6 +330,39 @@ namespace Paladin
                         SDL_DestroySurface(source);
                         source = simplified;
                     }
+                    // Material-level recoloring is shared by every building
+                    // recipe, done once, and restricted to the loaded palette.
+                    if (const auto rules = materialColors.find(file);
+                        rules != materialColors.end())
+                    {
+                        if (auto* rgba = SDL_ConvertSurface(
+                                source,
+                                SDL_PIXELFORMAT_RGBA32
+                            ))
+                        {
+                            for (int y = 0; y < rgba->h; ++y)
+                            {
+                                for (int x = 0; x < rgba->w; ++x)
+                                {
+                                    auto* c =
+                                        static_cast<Uint8*>(rgba->pixels) +
+                                        y * rgba->pitch + x * 4;
+                                    const unsigned rgb =
+                                        (unsigned(c[0]) << 16) |
+                                        (unsigned(c[1]) << 8) | c[2];
+                                    if (const auto to = rules->second.find(rgb);
+                                        c[3] && to != rules->second.end())
+                                    {
+                                        c[0] = Uint8(to->second >> 16);
+                                        c[1] = Uint8(to->second >> 8);
+                                        c[2] = Uint8(to->second);
+                                    }
+                                }
+                            }
+                            SDL_DestroySurface(source);
+                            source = rgba;
+                        }
+                    }
                     // Sample once at load time; distant terrain retains an
                     // authored palette color without building tile textures.
                     RenderColor color{};
@@ -335,7 +387,9 @@ namespace Paladin
                     {
                         if (id.starts_with("world.") ||
                             id.find("terrain.") != std::string::npos ||
-                            id.find(".floor") != std::string::npos)
+                            id.find(".floor") != std::string::npos ||
+                            id.starts_with("wall.") ||
+                            id.starts_with("tree.crown."))
                         {
                             auto paint =
                                 std::make_shared<std::vector<RenderColor>>();
@@ -377,7 +431,7 @@ namespace Paladin
                                     static_cast<const Uint8*>(rgba->pixels) +
                                     sy * rgba->pitch + sx * 4;
                                 mask[std::size_t(my) * sw + mx] =
-                                    {32, 44, 67, std::uint8_t(p[3] ? 58 : 0)};
+                                    {57, 43, 60, std::uint8_t(p[3] ? 68 : 0)};
                             }
                         }
                         const auto coverage = mask;
@@ -450,6 +504,121 @@ namespace Paladin
             sprite.materialWidth = texture->width();
             sprite.materialHeight = texture->height();
             sprites_[id] = std::move(sprite);
+        }
+        // New birch bark is generated once on the canonical grid and packed
+        // with foliage. Keeping it textured preserves chunk mesh batching.
+        if (const auto* original = find("tree.trunk.1");
+            original && palette.contains(0xD7E0E3) &&
+            palette.contains(0x7E9CAA) && palette.contains(0x4E3B39))
+        {
+            const auto prototype = *original;
+            for (int variant = 1; variant <= 3; ++variant)
+            {
+                std::vector<RenderColor> pixels(9 * 13, {0, 0, 0, 0});
+                for (int y = 0; y < 13; ++y)
+                {
+                    const int center = 4 + (variant == 2 && y < 6   ? 1
+                                            : variant == 3 && y < 4 ? -1
+                                                                    : 0);
+                    for (int dx = -1; dx <= 1; ++dx)
+                    {
+                        pixels[y * 9 + center + dx] =
+                            dx == 1 ? RenderColor{126, 156, 170, 255}
+                                    : RenderColor{215, 224, 227, 255};
+                    }
+                    if ((y + variant) % 4 == 0)
+                    {
+                        pixels[y * 9 + center] = {78, 59, 57, 255};
+                        pixels[y * 9 + center - 1] = {78, 59, 57, 255};
+                    }
+                }
+                auto birch = prototype;
+                birch.texture = renderer.createTextureFromPixels(9, 13, pixels);
+                birch.width = 9. / 16.;
+                birch.height = 13. / 16.;
+                sprites_["tree.birch-trunk." + std::to_string(variant)] =
+                    std::move(birch);
+            }
+        }
+        // Derive a pointed evergreen silhouette from the existing authored
+        // foliage clusters. Source PNGs are untouched; all colors stay in the
+        // approved green ramp, and the result joins the cached foliage atlas.
+        for (int variant = 1; variant <= 3; ++variant)
+        {
+            const auto* foliage = find("tree.crown." + std::to_string(variant));
+            if (!foliage || !foliage->materialPixels)
+            {
+                continue;
+            }
+            auto evergreen = *foliage;
+            std::vector<RenderColor> paint(24 * 24, {0, 0, 0, 0});
+            for (int y = 0; y < 24; ++y)
+            {
+                const int half =
+                    std::max(0, int(y * .44) - (y % 6 < 2 && y > 5 ? 1 : 0));
+                for (int x = 11 - half; x <= 11 + half; ++x)
+                {
+                    const int sx = (x + variant * 3) % foliage->materialWidth;
+                    const int sy = y * foliage->materialHeight / 24;
+                    auto c = (*foliage->materialPixels)
+                        [sy * foliage->materialWidth + sx];
+                    const unsigned rgb = (unsigned(c.red) << 16) |
+                                         (unsigned(c.green) << 8) | c.blue;
+                    switch (rgb)
+                    {
+                    case 0xA6CD59:
+                    case 0xD0E58A:
+                        c = {121, 181, 109, 255};
+                        break;
+                    case 0x79B56D:
+                        c = {73, 151, 91, 255};
+                        break;
+                    case 0x49975B:
+                        c = {51, 122, 88, 255};
+                        break;
+                    default:
+                        c = {35, 87, 71, 255};
+                        break;
+                    }
+                    // Needle clusters break up the broad planes, with a lit
+                    // left shoulder and deep interleaved branch pockets.
+                    unsigned cluster = unsigned(x / 2) * 374761393u ^
+                                       unsigned(y / 2) * 668265263u ^
+                                       unsigned(variant) * 2246822519u;
+                    cluster = (cluster ^ (cluster >> 13)) * 1274126177u;
+                    if (cluster % 7 < 3)
+                    {
+                        c = x <= 11 ? RenderColor{51, 122, 88, 255}
+                                    : RenderColor{35, 87, 71, 255};
+                    }
+                    if (x <= 11 && cluster % 11 < 4)
+                    {
+                        c = {73, 151, 91, 255};
+                    }
+                    if (x <= 10 && cluster % 19 < 2)
+                    {
+                        c = {121, 181, 109, 255};
+                    }
+                    if (x > 11 && cluster % 9 < 2)
+                    {
+                        c = {25, 62, 66, 255};
+                    }
+                    if (std::abs(x - 11) == half && y > 3)
+                    {
+                        c = {35, 87, 71, 255};
+                    }
+                    if (y % 6 == 5 && x > 10)
+                    {
+                        c = {25, 62, 66, 255};
+                    }
+                    paint[y * 24 + x] = c;
+                }
+            }
+            evergreen.texture = renderer.createTextureFromPixels(24, 24, paint);
+            evergreen.width = 1.5;
+            evergreen.height = 1.5;
+            sprites_["tree.conifer-crown." + std::to_string(variant)] =
+                std::move(evergreen);
         }
     }
     RenderRectangle SceneSpriteLibrary::frame(
@@ -557,6 +726,79 @@ namespace Paladin
         );
         if (p.visible(b))
         {
+            // Grounded props use their cached alpha silhouette, flattened
+            // onto the receiving surface. No shadow textures are made here.
+            const bool grounded =
+                name.starts_with("home.bed.") ||
+                name.starts_with("furniture.") || name == "home.detail.jars" ||
+                name == "home.detail.basket" || name == "stockpile.crate" ||
+                name == "stockpile.stack" || name == "fishing_grounds.station";
+            const bool mounted = name == "home.detail.shutters" ||
+                                 name == "home.detail.hide" ||
+                                 name.ends_with(".door");
+            if (shadowsEnabled_ && sprite->shadow && (grounded || mounted))
+            {
+                const auto shadow =
+                    grounded
+                        ? RenderRectangle{b.x + b.width * .08F, b.y + b.height * .70F, b.width * .96F, b.height * .40F}
+                        : RenderRectangle{
+                              b.x + float(p.tilePixels / 16.),
+                              b.y + float(p.tilePixels / 16.),
+                              b.width,
+                              b.height
+                          };
+                q.submit(
+                    {shadow,
+                     {},
+                     depth,
+                     id,
+                     0,
+                     part - 1,
+                     sprite->shadow.get(),
+                     {0,
+                      0,
+                      float(sprite->shadow->width()),
+                      float(sprite->shadow->height())}}
+                );
+                if (grounded)
+                {
+                    q.submit(
+                        {{b.x + b.width * .16F,
+                          b.y + b.height * .90F,
+                          b.width * .70F,
+                          std::max(float(p.tilePixels / 16), b.height * .10F)},
+                         {57, 43, 60, 52},
+                         depth,
+                         id,
+                         0,
+                         part - 1}
+                    );
+                }
+            }
+            const auto roofSuffix = name.find(".roof.full");
+            const bool thatch =
+                name.starts_with("roof.thatch.full") ||
+                (roofSuffix != std::string::npos &&
+                 objectStyle(name.substr(0, roofSuffix)).roof == "roof.thatch");
+            if (thatch)
+            {
+                SceneDrawItem item{
+                    b,
+                    {},
+                    depth,
+                    id,
+                    0,
+                    part,
+                    sprite->texture.get(),
+                    frame(*sprite)
+                };
+                item.thatchPixelPitch = float(p.tilePixels / 16.);
+                item.ridgeAlongDepth = name.find(".side") != std::string::npos;
+                item.windSeconds =
+                    p.tilePixels >= AnimationDetailPixels ? seconds_ : 0;
+                q.submit(item);
+                return true;
+            }
             if ((name.find(".roof.full") != std::string::npos ||
                  (name.starts_with("roof.") &&
                   name.find(".full") != std::string::npos)) &&
@@ -664,7 +906,8 @@ namespace Paladin
         double y,
         std::uint64_t id,
         double scale,
-        double crownScale
+        double crownScale,
+        TreeSpecies species
     ) const
     {
         std::uint64_t seed = id;
@@ -719,9 +962,48 @@ namespace Paladin
                 );
             }
         };
-        part(*trunk, 0, 1, 0, 0);
-        part(*branch, .32, crownScale, sway * .35, 1);
-        part(*crown, .48, crownScale, sway, 2);
+        if (species == TreeSpecies::Birch)
+        {
+            const auto* bark =
+                find("tree.birch-trunk." + std::to_string(1 + id % 3));
+            part(bark ? *bark : *trunk, 0, 1, 0, 0);
+            part(*branch, .40 * crownScale, crownScale * .75, sway * .35, 1);
+            part(
+                *crown,
+                .62 * crownScale,
+                crownScale * .66,
+                sway - .16 * crownScale,
+                2
+            );
+            part(
+                *crown,
+                .80 * crownScale,
+                crownScale * .55,
+                sway + .16 * crownScale,
+                3
+            );
+        }
+        else if (species == TreeSpecies::Conifer)
+        {
+            // A pointed, tiered evergreen crown keeps the original foliage
+            // texture language and fits the common tree-clearance envelope.
+            part(*trunk, 0, .85, 0, 0);
+            const auto* evergreen =
+                find("tree.conifer-crown." + std::to_string(1 + id % 3));
+            part(
+                evergreen ? *evergreen : *crown,
+                .20 * crownScale,
+                crownScale,
+                sway,
+                1
+            );
+        }
+        else
+        {
+            part(*trunk, 0, 1, 0, 0);
+            part(*branch, .32, crownScale, sway * .35, 1);
+            part(*crown, .48, crownScale, sway, 2);
+        }
         return true;
     }
     bool SceneSpriteLibrary::submit(

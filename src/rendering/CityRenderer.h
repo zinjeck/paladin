@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/CityClouds.h"
 #include "rendering/CityDistantObjects.h"
 #include "rendering/CityLighting.h"
 #include "rendering/CityPresentation.h"
@@ -57,7 +58,8 @@ namespace Paladin
             const SettlementCitizenState& citizens,
             const SettlementInspectionController& inspection,
             double interpolationAlpha = 1,
-            double hour = 12
+            double hour = 12,
+            double sunIncidence = std::numeric_limits<double>::quiet_NaN()
         ) const;
 
         void renderMinimap(
@@ -70,6 +72,7 @@ namespace Paladin
 
     private:
         CityDistantObjects distantObjects_;
+        CityClouds clouds_;
         GrassPresentation grass_;
         mutable CityLighting lighting_;
         mutable SceneSpriteLibrary sprites_;

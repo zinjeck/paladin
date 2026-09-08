@@ -99,7 +99,8 @@ namespace Paladin
         const SettlementCitizenState& citizens,
         const SettlementInspectionController& inspection,
         double interpolationAlpha,
-        double hour
+        double hour,
+        double sunIncidence
     ) const
     {
         std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
@@ -111,6 +112,7 @@ namespace Paladin
             artRoot = artRootOverride;
         }
         sprites_.load(renderer, artRoot);
+        sprites_.setShadowsEnabled(presentation.shadowsVisible);
         WorldPixelScene pixelScene(
             renderer,
             metrics.scaledTilePixels(camera.zoom())
@@ -235,6 +237,18 @@ namespace Paladin
             &sprites_
         );
         raised_.render(renderer, 0);
+        const double weatherTime = animationTimeOverride >= 0
+                                       ? animationTimeOverride
+                                       : animationSeconds;
+        const double weatherDay = solarIllumination(
+            std::isfinite(sunIncidence) ? sunIncidence
+                                        : globeSunDot(.5, .5, hour * 3600.)
+        );
+        if (presentation.cloudsEnabled)
+        {
+            clouds_
+                .render(renderer, projection, weatherTime, weatherDay, false);
+        }
         stage(3);
         lighting_.render(
             renderer,
@@ -242,8 +256,13 @@ namespace Paladin
             settlementMap,
             sprites_,
             presentation,
-            hour
+            hour,
+            sunIncidence
         );
+        if (presentation.cloudsEnabled)
+        {
+            clouds_.render(renderer, projection, weatherTime, weatherDay, true);
+        }
         stage(4);
         objectRenderer_.renderOverlay(
             renderer,

@@ -1,3 +1,4 @@
+#include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
 #include <algorithm>
@@ -30,9 +31,7 @@ namespace Paladin
                 occupy(*definition, object.footprint);
                 // Outdoor workplaces remain walkable while keeping their
                 // building footprint exclusive.
-                if (object.objectTypeId == SettlementObjectTypes::CityKeep ||
-                    object.objectTypeId == SettlementObjectTypes::House ||
-                    object.objectTypeId == SettlementObjectTypes::Bakery)
+                if (definition->wallThickness > 0)
                 {
                     const auto& f = object.footprint;
                     for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
@@ -40,7 +39,17 @@ namespace Paladin
                         for (int x = f.topLeft.x; x < f.topLeft.x + f.width;
                              ++x)
                         {
-                            movementBlockedTiles_[tileIndex({x, y})] = 1;
+                            const int band = definition->wallThickness;
+                            const bool wall =
+                                x < f.topLeft.x + band ||
+                                y < f.topLeft.y + band ||
+                                x >= f.topLeft.x + f.width - band ||
+                                y >= f.topLeft.y + f.height - band;
+                            movementBlockedTiles_[tileIndex({x, y})] =
+                                wall &&
+                                (!object.door ||
+                                 !validDoorTile(f, *object.door) ||
+                                 *object.door != SettlementTilePosition{x, y});
                         }
                     }
                 }

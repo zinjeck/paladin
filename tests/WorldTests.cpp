@@ -734,17 +734,18 @@ void runWorldTests()
         );
 
     PALADIN_CHECK(stockpileDefinition != nullptr);
-    Paladin::SettlementGrid unrestrictedSizeGrid(30, 2);
+    Paladin::SettlementGrid unrestrictedSizeGrid(30, 3);
     for (std::int32_t x = 0; x < unrestrictedSizeGrid.width(); ++x)
     {
         unrestrictedSizeGrid.tile({x, 0})->terrain = Paladin::TerrainType::Land;
         unrestrictedSizeGrid.tile({x, 1})->terrain = Paladin::TerrainType::Land;
+        unrestrictedSizeGrid.tile({x, 2})->terrain = Paladin::TerrainType::Land;
     }
-    const Paladin::SettlementObjectState unrestrictedSizeState(30, 2);
+    const Paladin::SettlementObjectState unrestrictedSizeState(30, 3);
     PALADIN_CHECK(unrestrictedSizeState.canPlace(
         unrestrictedSizeGrid,
         *stockpileDefinition,
-        {{0, 0}, 30, 2}
+        {{0, 0}, 30, 3}
     ));
 
     PALADIN_CHECK(
@@ -852,9 +853,9 @@ void runWorldTests()
         objectPlacement.pointerPressed({{12, 15}}, localMap) ==
         Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
-    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 6);
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 4);
 
-    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 6);
+    PALADIN_CHECK(localMap.objectState().constructionSites().size() == 4);
     PALADIN_CHECK(
         inspection.selectAt({19, 10}, localMap.objectState(), citizens, false)
     );
