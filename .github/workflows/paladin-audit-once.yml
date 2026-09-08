@@ -1,0 +1,83 @@
+name: Verify isolated Paladin audit fixes
+on:
+  push:
+    branches: [fix/audit-state-and-movement-2026-09-07]
+    paths:
+      - .github/workflows/paladin-audit-once.yml
+      - .github/paladin-audit-apply.py
+      - .github/paladin-audit-regressions.txt
+permissions:
+  contents: write
+concurrency:
+  group: paladin-audit-state-and-movement
+  cancel-in-progress: false
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Apply only verified baseline replacements
+        run: python3 .github/paladin-audit-apply.py
+      - name: Configure the existing simulation test source set without private art
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          root = Path.cwd()
+          text = (root / 'CMakeLists.txt').read_text()
+          block = re.search(r'add_executable\(PaladinTests\s*\n(.*?)\n\)', text, re.S)
+          assert block, 'PaladinTests source list not found'
+          sources = [line.strip() for line in block.group(1).splitlines()
+                     if line.strip() and not line.lstrip().startswith('#')]
+          assert all(s.endswith('.cpp') and (root / s).is_file() for s in sources)
+          project = Path(os.environ['RUNNER_TEMP']) / 'paladin-audit-project'
+          project.mkdir()
+          cmake = ['cmake_minimum_required(VERSION 3.24)',
+                   'project(PaladinAudit LANGUAGES CXX)',
+                   'set(CMAKE_CXX_STANDARD 23)', 'set(CMAKE_CXX_STANDARD_REQUIRED ON)',
+                   'set(CMAKE_CXX_EXTENSIONS OFF)', 'add_executable(PaladinTests']
+          cmake += ['  "' + str(root / s) + '"' for s in sources]
+          cmake += [')', 'target_include_directories(PaladinTests PRIVATE "' + str(root / 'src') + '" "' + str(root / 'tests') + '")',
+                    'enable_testing()', 'add_test(NAME PaladinTests COMMAND PaladinTests)']
+          (project / 'CMakeLists.txt').write_text('\n'.join(cmake) + '\n')
+          print('Using all', len(sources), 'sources from the repository PaladinTests target.')
+          PY
+          cmake -S "$RUNNER_TEMP/paladin-audit-project" -B "$RUNNER_TEMP/paladin-audit-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-O1 -fsanitize=address,undefined -fno-omit-frame-pointer"
+      - name: Build all simulation tests with address and undefined-behavior checks
+        run: cmake --build "$RUNNER_TEMP/paladin-audit-build" --parallel 2
+      - name: Run the full simulation suite and new regressions
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir "$RUNNER_TEMP/paladin-audit-build" --verbose
+      - name: Fetch pinned SDL headers for presentation syntax checks
+        uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: release-3.2.20
+          path: .audit-sdl
+          persist-credentials: false
+      - name: Syntax-check the modified application and renderer translation units
+        run: |
+          c++ -std=c++23 -fsyntax-only -Isrc -I.audit-sdl/include \
+            src/core/ApplicationCityInput.cpp \
+            src/rendering/WorldGridRenderer.cpp \
+            src/rendering/SettlementNaturalFeatureRenderer.cpp
+      - name: Commit only verified source changes to the isolated fix branch
+        shell: bash
+        run: |
+          test "${GITHUB_REF}" = "refs/heads/fix/audit-state-and-movement-2026-09-07"
+          git diff --check
+          git add -u -- src tests
+          git diff --cached --check
+          git diff --cached --stat
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix cancellation time, death cleanup and movement timing with regressions'
+          git push origin HEAD:refs/heads/fix/audit-state-and-movement-2026-09-07
