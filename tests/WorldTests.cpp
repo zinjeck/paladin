@@ -911,7 +911,7 @@ void runWorldTests()
     );
     PALADIN_CHECK(
         localMap.commandState()
-            .cancelIntersecting(localMap, {{0, 0}, 1, 1}, citizens) == 1
+            .cancelIntersecting(localMap, {{0, 0}, 1, 1}, citizens, 0) == 1
     );
     PALADIN_CHECK(
         citizens.citizens().front().activity == Paladin::CitizenActivity::Idle

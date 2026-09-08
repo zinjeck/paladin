@@ -1,4 +1,7 @@
 #include "TestFramework.h"
+#include "interaction/SettlementCommandController.h"
+#include "world/generation/GenerationNoise.h"
+#include <limits>
 #include "interaction/SettlementObjectPlacementController.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/ScenePresentation.h"
@@ -24,6 +27,34 @@ namespace Paladin
 {
     struct SettlementActivityTestFixture
     {
+        static bool routeWithoutPathSearch(
+            SettlementMap& map,
+            SettlementCitizenState& citizens,
+            SettlementCitizen& citizen,
+            SettlementTilePosition goal
+        )
+        {
+            map.activities.pathsRemaining_ = 0;
+            return map.activities.route(map, citizens, citizen, {goal, 1, 1}, true);
+        }
+        static bool enterHome(
+            SettlementMap& map,
+            const SettlementCitizenState& citizens,
+            SettlementCitizen& citizen
+        )
+        {
+            return map.activities.enterHome(map, citizens, citizen);
+        }
+        static void executeWithoutPathSearch(
+            SettlementMap& map,
+            SettlementCitizenState& citizens,
+            SettlementCitizen& citizen,
+            double minute
+        )
+        {
+            map.activities.pathsRemaining_ = 0;
+            map.activities.execute(map, citizens, citizen, minute, 1);
+        }
         static void needs(
             SettlementMap& map,
             SettlementCitizen& c,
@@ -148,6 +179,310 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    // Audit regression: cancellation preserves goods and their real creation
+    // time through both the state API and the player command controller.
+    for (const bool throughController : {false, true})
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        constexpr double minute = 23 * 1440 + 610.25;
+        const auto& house = *SettlementObjectCatalog::definition(
+            SettlementObjectTypes::House
+        );
+        PALADIN_CHECK(map.objectState().createConstructionSites(
+            map.grid(), house, {{15, 14}, 3, 3}
+        ));
+        const auto site = map.objectState().constructionSites().back().id;
+        map.logistics.synchronize(map.objectState(), minute - 10);
+        const auto inventory = map.logistics.forSite(site);
+        PALADIN_CHECK(inventory);
+        PALADIN_CHECK(map.logistics.add(inventory, "lumber", 3, minute - 10));
+        PALADIN_CHECK(map.logistics.add(inventory, "stone", 1, minute - 10));
+        PALADIN_CHECK(map.objectState().deliverMaterials(site, "lumber", 3));
+        PALADIN_CHECK(map.objectState().deliverMaterials(site, "stone", 1));
+        const auto lumber = allGoods(map, citizens, "lumber");
+        const auto stone = allGoods(map, citizens, "stone");
+        if (throughController)
+        {
+            SettlementCommandController controller;
+            PALADIN_CHECK(controller.begin(SettlementCommandTypes::Cancel));
+            controller.pointerPressed(SettlementTilePosition{15, 14});
+            PALADIN_CHECK(controller.pointerReleased(
+                SettlementTilePosition{17, 16}, map, citizens, minute
+            ));
+        }
+        else
+        {
+            PALADIN_CHECK(map.commandState().cancelIntersecting(
+                map, {{15, 14}, 3, 3}, citizens, minute
+            ) == 1);
+        }
+        PALADIN_CHECK(!map.objectState().constructionSite(site));
+        PALADIN_CHECK(!map.logistics.forSite(site));
+        PALADIN_CHECK(allGoods(map, citizens, "lumber") == lumber);
+        PALADIN_CHECK(allGoods(map, citizens, "stone") == stone);
+        int recoveredLumber = 0, recoveredStone = 0;
+        for (const auto& pile : map.logistics.inventories())
+        {
+            if (pile.kind != InventoryKind::Groundpile)
+            {
+                continue;
+            }
+            PALADIN_CHECK(pile.createdMinute == minute);
+            PALADIN_CHECK(minute - pile.createdMinute <
+                          map.activities.policy.stockpile.employeePreferenceMinutes);
+            recoveredLumber += pile.amount("lumber");
+            recoveredStone += pile.amount("stone");
+        }
+        PALADIN_CHECK(recoveredLumber == 3 && recoveredStone == 1);
+        PALADIN_CHECK(map.commandState().cancelIntersecting(
+            map, {{15, 14}, 3, 3}, citizens, minute + 1
+        ) == 0);
+        PALADIN_CHECK(allGoods(map, citizens, "lumber") == lumber);
+        PALADIN_CHECK(allGoods(map, citizens, "stone") == stone);
+    }
+    std::cout << "[audit] cancellation timestamps and conservation passed\n";
+
+    // Both death paths must clear relationships before dense-vector erasure.
+    // Exercise first, middle and last residents, then verify cleanup is not
+    // repeated and carried resources are returned exactly once.
+    for (const bool alreadyDead : {false, true})
+    {
+        for (const std::size_t victimIndex : {std::size_t(0), std::size_t(1), std::size_t(3)})
+        {
+            auto map = land();
+            SettlementCitizenState citizens;
+            found(map, citizens, 4);
+            map.activities.policy.decisionsPerMinute = 0;
+            map.activities.policy.dailyBirthChance = 0;
+            citizens.idlePolicy.decisionsPerTick = 0;
+            for (std::size_t i = 0; i < citizens.citizens().size(); ++i)
+            {
+                auto& resident = SettlementActivityTestFixture::resident(citizens, i);
+                resident.health = 100;
+                resident.hunger = 0;
+                resident.energy = 100;
+                for (const auto& other : citizens.citizens())
+                {
+                    if (resident.id != other.id)
+                    {
+                        resident.familiarities[other.id] = 17;
+                    }
+                }
+            }
+            auto& victim = SettlementActivityTestFixture::resident(citizens, victimIndex);
+            const auto victimId = victim.id;
+            const auto keep = map.logistics.forObject(
+                map.objectState().completedObjects().front().id
+            );
+            PALADIN_CHECK(map.logistics.reserve(victimId, keep, {}, "lumber", 2));
+            PALADIN_CHECK(map.logistics.pickUp(victimId));
+            victim.carriedResource = "lumber";
+            victim.carriedAmount = 2;
+            victim.hunger = 100;
+            victim.health = alreadyDead ? 0 : .1;
+            const auto before = allGoods(map, citizens, "lumber");
+            advance(map, citizens, 600, 1);
+            // Never retain a reference into the compacted citizen vector.
+            PALADIN_CHECK(citizens.citizen(victimId) == nullptr);
+            PALADIN_CHECK(citizens.citizens().size() == 3);
+            PALADIN_CHECK(map.logistics.reservation(victimId) == nullptr);
+            PALADIN_CHECK(allGoods(map, citizens, "lumber") == before);
+            for (const auto& survivor : citizens.citizens())
+            {
+                PALADIN_CHECK(!survivor.familiarities.contains(victimId));
+                PALADIN_CHECK(survivor.familiarities.size() == 2);
+                for (const auto& other : citizens.citizens())
+                {
+                    if (survivor.id != other.id)
+                    {
+                        PALADIN_CHECK(survivor.familiarityWith(other.id) == 17);
+                    }
+                }
+            }
+            advance(map, citizens, 601, 1);
+            PALADIN_CHECK(citizens.citizens().size() == 3);
+            PALADIN_CHECK(allGoods(map, citizens, "lumber") == before);
+        }
+    }
+    std::cout << "[audit] both death paths and cargo cleanup passed\n";
+
+    // Rendering/capture must stay finite even for malformed timing, without
+    // changing ordinary interpolation or accessing an exhausted path.
+    {
+        SettlementCitizen c;
+        c.tilePosition = {10, 20};
+        c.path = {{11, 20}, {12, 22}};
+        c.pathIndex = 1;
+        c.stepDuration = 2;
+        c.stepProgress = .5;
+        PALADIN_CHECK(c.visualX() == 10.5 && c.visualY() == 20.5);
+        c.stepProgress = -1;
+        PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
+        c.stepProgress = 3;
+        PALADIN_CHECK(c.visualX() == 12 && c.visualY() == 22);
+        for (const double duration : {
+                 0.0, -1.0, std::numeric_limits<double>::infinity(),
+                 std::numeric_limits<double>::quiet_NaN()})
+        {
+            c.stepDuration = duration;
+            for (const double progress : {0.0, .5})
+            {
+                c.stepProgress = progress;
+                PALADIN_CHECK(std::isfinite(c.visualX()) && std::isfinite(c.visualY()));
+                PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
+            }
+        }
+        c.stepDuration = 1;
+        for (const double progress : {
+                 std::numeric_limits<double>::infinity(),
+                 -std::numeric_limits<double>::infinity(),
+                 std::numeric_limits<double>::quiet_NaN()})
+        {
+            c.stepProgress = progress;
+            PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
+        }
+        c.stepDuration = 0;
+        c.pathIndex = c.path.size();
+        PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
+        c.path.clear();
+        c.pathIndex = 0;
+        PALADIN_CHECK(c.visualX() == 10 && c.visualY() == 20);
+    }
+    std::cout << "[audit] finite and ordinary interpolation passed\n";
+
+    // Direct home, childcare and bed paths initialize their actual first-edge
+    // cost, including non-default diagonal costs, before the next movement tick.
+    for (const auto task : {CitizenTaskKind::Home, CitizenTaskKind::Care,
+                           CitizenTaskKind::Sleep})
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        const auto home = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        auto& c = SettlementActivityTestFixture::resident(citizens);
+        c.tilePosition = {13, 13};
+        c.destination = c.tilePosition;
+        c.homeId = home;
+        c.insideHome = true;
+        c.path.clear();
+        c.pathIndex = 0;
+        c.stepProgress = 0;
+        c.stepDuration = 99;
+        c.task = {};
+        c.task.kind = task;
+        c.task.object = home;
+        c.task.target = {14, 14};
+        c.youngDependents = task == CitizenTaskKind::Care ? 1 : 0;
+        c.nextHomeWander = 0;
+        c.bedHomeId = {};
+        c.bedSlot = -1;
+        citizens.movementPolicy.diagonalCost = 1.75;
+        map.activities.policy.leisureRadius = 1;
+        // Select a nonzero offset deterministically. Home may use an
+        // interior fallback or a zero-search exit; both must initialize timing.
+        for (std::uint64_t sequence = 0; sequence < 100; ++sequence)
+        {
+            const auto random = GenerationNoise::mix(c.id.value() ^ (sequence + 1));
+            if (random % 3 != 1 || (random >> 8) % 3 != 1)
+            {
+                c.choiceSequence = sequence;
+                break;
+            }
+        }
+        SettlementActivityTestFixture::executeWithoutPathSearch(map, citizens, c, 600);
+        PALADIN_CHECK(!c.path.empty());
+        PALADIN_CHECK(c.pathIndex == 0 && c.stepProgress == 0);
+        const auto expected = citizens.navigationDiagnostics().stepCost(
+            map, c.tilePosition, c.path.front(), citizens.movementPolicy
+        );
+        PALADIN_CHECK(c.stepDuration == expected);
+        PALADIN_CHECK(c.stepDuration > 0 && c.stepDuration < 99);
+        PALADIN_CHECK(c.visualX() == 13 && c.visualY() == 13);
+    }
+    std::cout << "[audit] direct interior path timing passed\n";
+
+    // A blocked exit forces Home's one-tile interior fallback specifically.
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        const auto homeId = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto* home = map.objectState().completedObject(homeId);
+        PALADIN_CHECK(home && home->door);
+        map.grid().tile(outsideDoor(home->footprint, *home->door))->terrain = TerrainType::Water;
+        auto& c = SettlementActivityTestFixture::resident(citizens);
+        c.homeId = homeId;
+        c.insideHome = true;
+        c.tilePosition = {13, 13};
+        c.destination = c.tilePosition;
+        c.task.kind = CitizenTaskKind::Home;
+        c.task.object = homeId;
+        c.stepDuration = 99;
+        for (std::uint64_t sequence = 0; sequence < 100; ++sequence)
+        {
+            const auto r = GenerationNoise::mix(c.id.value() ^ (sequence + 1));
+            if (r % 3 != 1 || (r >> 8) % 3 != 1)
+            {
+                c.choiceSequence = sequence;
+                break;
+            }
+        }
+        SettlementActivityTestFixture::executeWithoutPathSearch(map, citizens, c, 600);
+        PALADIN_CHECK(c.path.size() == 1);
+        PALADIN_CHECK(home->footprint.contains(c.path.front()));
+        PALADIN_CHECK(c.stepDuration == citizens.navigationDiagnostics().stepCost(
+            map, c.tilePosition, c.path.front(), citizens.movementPolicy
+        ));
+    }
+    // Door-entry and prepended-exit paths use the first physical edge, while
+    // a route replacement halfway through a step preserves its progress.
+    {
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        const auto homeId = completed(map, SettlementObjectTypes::House, {{12, 12}, 3, 3});
+        const auto* home = map.objectState().completedObject(homeId);
+        PALADIN_CHECK(home && home->door);
+        const auto outside = outsideDoor(home->footprint, *home->door);
+        auto& c = SettlementActivityTestFixture::resident(citizens);
+        c.homeId = homeId;
+        c.tilePosition = outside;
+        c.destination = outside;
+        c.stepDuration = 99;
+        PALADIN_CHECK(!SettlementActivityTestFixture::enterHome(map, citizens, c));
+        PALADIN_CHECK(c.path.size() == 1 && c.path.front() == *home->door);
+        PALADIN_CHECK(c.stepDuration == 1);
+        c.tilePosition = {13, 13};
+        c.destination = c.tilePosition;
+        c.insideHome = true;
+        c.path.clear();
+        c.pathIndex = 0;
+        c.stepProgress = 0;
+        c.stepDuration = 99;
+        PALADIN_CHECK(SettlementActivityTestFixture::routeWithoutPathSearch(
+            map, citizens, c, outside
+        ));
+        PALADIN_CHECK(!c.path.empty() && c.path.back() == outside);
+        PALADIN_CHECK(c.stepDuration == citizens.navigationDiagnostics().stepCost(
+            map, c.tilePosition, c.path.front(), citizens.movementPolicy
+        ));
+        citizens.movementPolicy.diagonalCost = 1.75;
+        c.path = {{14, 14}};
+        c.pathIndex = 0;
+        c.stepDuration = 1.75;
+        c.stepProgress = .7;
+        const auto x = c.visualX(), y = c.visualY();
+        PALADIN_CHECK(SettlementActivityTestFixture::routeWithoutPathSearch(
+            map, citizens, c, outside
+        ));
+        PALADIN_CHECK(c.path.front().x == 14 && c.path.front().y == 14);
+        PALADIN_CHECK(c.stepProgress == .7 && c.stepDuration == 1.75);
+        PALADIN_CHECK(std::abs(c.visualX() - x) < 1e-9);
+        PALADIN_CHECK(std::abs(c.visualY() - y) < 1e-9);
+    }
+    std::cout << "[audit] entry, exit, fallback and mid-step rerouting passed\n";
     {
         auto map = land();
         const auto home =
@@ -2295,7 +2630,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(carrying);
         PALADIN_CHECK(
             map.commandState()
-                .cancelIntersecting(map, {{15, 14}, 3, 3}, citizens) == 1
+                .cancelIntersecting(map, {{15, 14}, 3, 3}, citizens, minute) == 1
         );
         advance(map, citizens, minute, 1);
         PALADIN_CHECK(allGoods(map, citizens, "lumber") == 40);

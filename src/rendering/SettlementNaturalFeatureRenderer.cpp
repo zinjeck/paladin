@@ -294,8 +294,7 @@ namespace Paladin
             }
             if (sprites && policy && tp >= 4 && detail < 1 &&
                 (chunk.version != version ||
-                 chunk.navigation != map.objectState().navigationVersion()) &&
-                true)
+                 chunk.navigation != map.objectState().navigationVersion()))
             {
                 if (map.naturalFeatures().countIn(
                         {{cell.x * side - 2, cell.y * side - 2},

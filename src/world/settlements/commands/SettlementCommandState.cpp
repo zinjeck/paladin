@@ -152,14 +152,15 @@ namespace Paladin
     std::size_t SettlementCommandState::cancelIntersecting(
         SettlementMap& map,
         const SettlementObjectFootprint& area,
-        SettlementCitizenState& citizens
+        SettlementCitizenState& citizens,
+        double minute
     )
     {
         std::size_t removed = map.objectState().cancelConstructionWithin(area);
         removed += map.animals.cancel(area);
         if (removed)
         {
-            map.logistics.synchronize(map.objectState(), 0);
+            map.logistics.synchronize(map.objectState(), minute);
         }
         if (removed)
         {

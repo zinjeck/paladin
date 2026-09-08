@@ -131,6 +131,7 @@ namespace Paladin
     }
     bool SettlementActivitySystem::enterHome(
         SettlementMap& map,
+        const SettlementCitizenState& citizens,
         SettlementCitizen& c
     )
     {
@@ -161,6 +162,9 @@ namespace Paladin
             c.path = {interior};
             c.pathIndex = 0;
             c.stepProgress = 0;
+            c.stepDuration = citizens.navigation_.stepCost(
+                map, c.tilePosition, interior, citizens.movementPolicy
+            );
             c.explicitMovement = true;
             return false;
         }
