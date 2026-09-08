@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/GlobeRenderer.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementMarkerRenderer.h"
@@ -23,6 +24,8 @@ namespace Paladin
     {
     public:
         double animationSeconds = 0;
+        bool globeEnabled = false;
+        bool politicalViewRequested = false;
         WorldRenderer();
 
         explicit WorldRenderer(
@@ -33,6 +36,7 @@ namespace Paladin
         {
             artwork_.reset();
             cartography_.reset();
+            globe_.reset();
         }
 
         void render(
@@ -49,6 +53,7 @@ namespace Paladin
         WorldGridRenderer gridRenderer_;
         mutable WorldCartography cartography_;
         mutable SceneSpriteLibrary artwork_;
+        mutable GlobeRenderer globe_;
         TerritoryRenderer territoryRenderer_;
         SpriteRenderer spriteRenderer_;
         SettlementMarkerRenderer settlementMarkerRenderer_;

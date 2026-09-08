@@ -141,6 +141,8 @@ namespace Paladin
 
             continent.lobes.reserve(static_cast<std::size_t>(lobeCount));
             const double backboneAngle = random.range(0.0, 2.0 * pi);
+            const double massScale = random.range(.65, 1.18);
+            const double bend = random.range(-1.1, 1.1);
 
             for (std::int32_t index = 0; index < lobeCount; ++index)
             {
@@ -148,7 +150,7 @@ namespace Paladin
                     (index / double(std::max(1, lobeCount - 1)) - .5) * 2.;
                 const double offsetX =
                     along * worldWidth * definition.maximumOffsetWidthFraction *
-                        std::cos(backboneAngle) +
+                        std::cos(backboneAngle + bend * along) +
                     .35 *
                         random.range(
                             -worldWidth * definition.maximumOffsetWidthFraction,
@@ -158,7 +160,7 @@ namespace Paladin
                 const double offsetY =
                     along * worldHeight *
                         definition.maximumOffsetHeightFraction *
-                        std::sin(backboneAngle) +
+                        std::sin(backboneAngle + bend * along) +
                     .35 *
                         random.range(
                             -worldHeight *
@@ -181,8 +183,8 @@ namespace Paladin
                 continent.lobes.push_back(
                     {offsetX,
                      offsetY,
-                     1.0 / radiusX,
-                     1.0 / radiusY,
+                     1.0 / (radiusX * massScale),
+                     1.0 / (radiusY * massScale),
                      random.range(
                          definition.minimumStrength,
                          definition.maximumStrength
@@ -191,6 +193,20 @@ namespace Paladin
                      std::sin(angle)}
                 );
             }
+
+            // Narrow arms create navigable bays and peninsulas. Independent
+            // shelf fragments introduce substantial offshore land, between
+            // the scale of the main continents and tiny archipelago islands.
+            const double armAngle = backboneAngle + random.range(.8, 2.1);
+            continent.lobes.push_back(
+                {std::cos(armAngle) * worldWidth * .105,
+                 std::sin(armAngle) * worldHeight * .105,
+                 1.0 / (worldWidth * .145 * massScale),
+                 1.0 / (worldHeight * .038),
+                 .82,
+                 std::cos(armAngle),
+                 std::sin(armAngle)}
+            );
 
             return continent;
         }
@@ -261,6 +277,34 @@ namespace Paladin
                     worldHeight,
                     definition.continentLobes
                 ));
+                if (index % 2 == 0)
+                {
+                    const double angle = random.range(0., 2 * pi);
+                    ContinentShape fragment;
+                    fragment.position = {
+                        std::clamp(
+                            position.x + std::cos(angle) * worldWidth * .20,
+                            worldWidth * .08,
+                            worldWidth * .92
+                        ),
+                        std::clamp(
+                            position.y + std::sin(angle) * worldHeight * .23,
+                            worldHeight * .09,
+                            worldHeight * .91
+                        )
+                    };
+                    const double scale = random.range(.65, 1.3);
+                    fragment.lobes.push_back(
+                        {0,
+                         0,
+                         1.0 / (worldWidth * .085 * scale),
+                         1.0 / (worldHeight * .10 * scale),
+                         .93,
+                         std::cos(angle),
+                         std::sin(angle)}
+                    );
+                    continents.push_back(std::move(fragment));
+                }
             }
 
             return continents;
@@ -481,41 +525,81 @@ namespace Paladin
                     *definition
                 );
 
-                const double rawElevation = continentCore +
-                                            sampleShapeNoise(
-                                                definition->continentNoise,
-                                                positionX,
-                                                positionY,
-                                                settings.seed
-                                            ) * continentCore +
-                                            sampleShapeNoise(
-                                                definition->regionalNoise,
-                                                positionX,
-                                                positionY,
-                                                settings.seed
-                                            ) +
-                                            coastlineBreakup(
-                                                positionX,
-                                                positionY,
-                                                continentCore,
-                                                settings.seed,
-                                                definition->coastline
-                                            ) +
-                                            islandValue(
-                                                positionX,
-                                                positionY,
-                                                continentCore,
-                                                settings.seed,
-                                                definition->islands
-                                            ) -
-                                            edgeFalloff(
-                                                positionX,
-                                                positionY,
-                                                grid.width(),
-                                                grid.height(),
-                                                definition->edgeFalloff
-                                            ) +
-                                            definition->elevationBias;
+                double rawElevation = continentCore +
+                                      sampleShapeNoise(
+                                          definition->continentNoise,
+                                          positionX,
+                                          positionY,
+                                          settings.seed
+                                      ) * continentCore +
+                                      sampleShapeNoise(
+                                          definition->regionalNoise,
+                                          positionX,
+                                          positionY,
+                                          settings.seed
+                                      ) +
+                                      coastlineBreakup(
+                                          positionX,
+                                          positionY,
+                                          continentCore,
+                                          settings.seed,
+                                          definition->coastline
+                                      ) +
+                                      islandValue(
+                                          positionX,
+                                          positionY,
+                                          continentCore,
+                                          settings.seed,
+                                          definition->islands
+                                      ) -
+                                      edgeFalloff(
+                                          positionX,
+                                          positionY,
+                                          grid.width(),
+                                          grid.height(),
+                                          definition->edgeFalloff
+                                      ) +
+                                      definition->elevationBias;
+
+                // Broad, winding flooded rifts can split a shelf into a large
+                // island and mainland. Their width varies, creating straits
+                // and sheltered inland seas rather than a uniform channel.
+                const double nx = positionX / grid.width(),
+                             ny = positionY / grid.height();
+                const double rift = std::abs(
+                    GenerationNoise::simplexFractal(
+                        nx * 3.8,
+                        ny * 3.8,
+                        settings.seed + 84391,
+                        2,
+                        .4,
+                        2.
+                    )
+                );
+                const double riftStrength =
+                    std::clamp((.045 - rift) / .045, 0., 1.);
+                if (continentCore < .85)
+                {
+                    rawElevation -= riftStrength * .28;
+                }
+
+                // A seed-selected polar continent gives the coldest biome
+                // real land. The other pole may remain ocean or island coast.
+                const double pole = (settings.seed & 1) ? ny : 1 - ny;
+                const double polarEdge =
+                    .88 + .025 * GenerationNoise::simplexFractal(
+                                     nx * 9,
+                                     0,
+                                     settings.seed + 773,
+                                     2,
+                                     .4,
+                                     2.
+                                 );
+                if (pole > polarEdge)
+                {
+                    rawElevation =
+                        std::max(rawElevation, (pole - polarEdge) * 3.5 - .035);
+                }
 
                 WorldTile* tile = grid.tile({x, y});
 

@@ -1,6 +1,7 @@
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/SceneDetail.h"
+#include "rendering/TerrainMaterialField.h"
 #include "rendering/WorldReliefPlacement.h"
 
 #include "rendering/Camera2D.h"
@@ -42,6 +43,8 @@ namespace Paladin
 
         std::size_t terrainIndex(const WorldTile& tile)
         {
+            if (tile.biome == BiomeType::Polar)
+                return 4;
             if (tile.terrain == TerrainType::Water)
             {
                 return 6;
@@ -114,11 +117,23 @@ namespace Paladin
         )
         {
             std::string id = terrainIds[terrainIndex(tile)];
-            if (worldScale && tile.terrain != TerrainType::Mountain &&
-                tile.biome != BiomeType::Hills)
+            if (worldScale)
             {
-                // Strategic art has its own biome identity, never city climate
-                // variants.
+                if (tile.terrain == TerrainType::Mountain ||
+                    tile.biome == BiomeType::Hills)
+                {
+                    // Relief exposes rock through the local climate's ground;
+                    // hills never receive a universal green or brown carpet.
+                    const auto t = tile.temperature.value(),
+                               rain = tile.rainfall.value();
+                    id = t >= .62 ? (rain < .24   ? "terrain.desert"
+                                     : rain < .68 ? "terrain.plain"
+                                                  : "terrain.jungle")
+                         : t <= .34
+                             ? (rain < .45 ? "terrain.tundra" : "terrain.taiga")
+                         : rain < .42 ? "terrain.plain"
+                                      : "terrain.forest";
+                }
                 return "world." + id;
             }
             if (tile.terrain == TerrainType::Land &&
@@ -164,6 +179,9 @@ namespace Paladin
 
             case BiomeType::Tundra:
                 return {163, 184, 173, 255};
+
+            case BiomeType::Polar:
+                return {215, 224, 227, 255};
 
             case BiomeType::Taiga:
                 return {51, 97, 82, 255};
@@ -304,7 +322,7 @@ namespace Paladin
                             }
                         }
                     }
-                    if (!coast && !ridge)
+                    if (!coast)
                     {
                         continue;
                     }
@@ -321,10 +339,7 @@ namespace Paladin
                         {
                             return l > .40 ? 1 : 0;
                         }
-                        if (surfaceField(xx, yy, mountain) > .5)
-                        {
-                            return 3;
-                        }
+
                         // Sparse sand margin at strategic scale; no city-sized
                         // foam.
                         return l < .55 && std::sin(xx * .9 + yy * .7) > .2 ? 4
@@ -360,22 +375,22 @@ namespace Paladin
                                         : green
                             )
                             {
-                                auto frame = sprites.frame(*art, false);
-                                const int mw = std::max(1, int(art->width)),
-                                          mh = std::max(1, int(art->height));
-                                renderer.drawTexture(
-                                    *art->texture,
-                                    frame.x +
-                                        float((x % mw + u) * frame.width / mw),
-                                    frame.y +
-                                        float((y % mh + v) * frame.height / mh),
-                                    float(width * frame.width / mw),
-                                    float(frame.height / mh / 16),
-                                    float(ox + (x + u) * tp),
-                                    float(oy + (y + v) * tp),
-                                    float(width * tp),
-                                    float(tp / 16)
-                                );
+                                for (int c = first; c < col; ++c)
+                                {
+                                    const auto color = landscapePaint(
+                                        *art,
+                                        x + (c + .5) / 16.,
+                                        y + (row + .5) / 16.,
+                                        true
+                                    );
+                                    renderer.fillRectangle(
+                                        float(ox + (x + c / 16.) * tp),
+                                        float(oy + (y + row / 16.) * tp),
+                                        float(tp / 16),
+                                        float(tp / 16),
+                                        color
+                                    );
+                                }
                             }
                         }
                     }
@@ -388,7 +403,8 @@ namespace Paladin
             const WorldGrid& grid,
             const Camera2D& camera,
             const TileRenderMetrics& metrics,
-            const SceneSpriteLibrary& sprites
+            const SceneSpriteLibrary& sprites,
+            bool includeHills = true
         )
         {
             const double tp = metrics.scaledTilePixels(camera.zoom());
@@ -409,86 +425,106 @@ namespace Paladin
                 grid.height(),
                 int(std::ceil((renderer.outputHeight() - oy) / tp)) + 5
             );
-            // Fixed tile-space cells prevent popping/reseeding while panning.
-            // Large silhouettes require their entire area to match the biome;
-            // small mounds/peaks keep narrow ridges represented too.
-            for (int row = y0 / 2; row <= (y1 + 1) / 2; ++row)
+            // Stable irregular anchors. Different connected silhouettes overlap
+            // into ranges; sparse foothills leave broad open slopes between
+            // them.
+            for (int row = y0 / 3 - 1; row <= y1 / 3 + 1; ++row)
             {
-                for (int col = x0 / 3; col <= (x1 + 2) / 3; ++col)
+                for (int col = x0 / 4 - 1; col <= x1 / 4 + 1; ++col)
                 {
-                    const int x = col * 3, y = row * 2;
-                    const bool largeHill =
-                        reliefFootprintFits(grid, x, y, 3, 2, true);
-                    const bool largeMountain =
-                        reliefFootprintFits(grid, x, y, 3, 2, false);
-                    const auto draw =
-                        [&](const char* id, int xx, int yy, int w, int h)
+                    const auto hash = landscapeHash(col, row, 431);
+                    const int x = col * 4 + int(hash % 3),
+                              y = row * 3 + int((hash >> 4) % 3);
+                    const auto* tile = grid.tile({x, y});
+                    if (!tile || tile->terrain == TerrainType::Water)
                     {
-                        const auto* art = sprites.find(id);
-                        if (!art)
-                        {
-                            return;
-                        }
-                        const auto frame = sprites.frame(*art, false);
-                        renderer.drawTexture(
-                            *art->texture,
-                            frame.x,
-                            frame.y,
-                            frame.width,
-                            frame.height,
-                            float(ox + xx * tp),
-                            float(oy + yy * tp),
-                            float(w * tp),
-                            float(h * tp),
-                            std::uint8_t(255)
-                        );
-                    };
-                    if (largeHill)
-                    {
-                        draw("hill.mound", x, y, 3, 2);
+                        continue;
                     }
-                    else if (largeMountain)
+                    const bool hill = tile->terrain != TerrainType::Mountain &&
+                                      tile->biome == BiomeType::Hills;
+                    if (!hill && tile->terrain != TerrainType::Mountain)
                     {
-                        draw(
-                            (col + row) % 2 ? "mountain.range.a"
-                                            : "mountain.range.b",
-                            x,
-                            y,
-                            3,
-                            2
+                        continue;
+                    }
+                    if (hill && hash % 4 == 0)
+                    {
+                        continue;
+                    }
+                    if (hill && !includeHills)
+                    {
+                        continue;
+                    }
+                    bool core = !hill;
+                    for (const auto& d : std::array<std::pair<int, int>, 4>{
+                             {{-1, 0}, {1, 0}, {0, -1}, {0, 1}}
+                         })
+                    {
+                        const auto* neighbor =
+                            grid.tile({x + d.first, y + d.second});
+                        core &= neighbor &&
+                                neighbor->terrain == TerrainType::Mountain;
+                    }
+                    const auto name =
+                        std::string(
+                            hill ? "world.relief.hill." : "world.relief.ridge."
+                        ) +
+                        std::to_string(1 + (hash >> 8) % 2);
+                    const auto climate = terrainArtId(*tile, sprites, true);
+                    const auto* art = sprites.find(
+                        name + "." + climate.substr(climate.rfind('.') + 1)
+                    );
+                    if (!art)
+                    {
+                        art = sprites.find(name);
+                    }
+                    if (!art)
+                    {
+                        art = sprites.find(
+                            hill ? "hill.mound" : "mountain.range.a"
                         );
                     }
-                    else
+                    if (!art)
                     {
-                        for (int yy = y; yy < y + 2; ++yy)
+                        continue;
+                    }
+                    const double xx = x - .5 + (hash % 17) / 34., yy = y - .5;
+                    const double w = hill ? 3.0 + ((hash >> 12) % 13) / 10.
+                                          : 3.7 + ((hash >> 12) % 17) / 10.;
+                    const double h =
+                        hill ? 1.6 + ((hash >> 18) % 9) / 10.
+                             : (core ? 3.5 : 2.6) + ((hash >> 18) % 9) / 10.;
+                    const auto frame = sprites.frame(*art, false);
+                    // Cut only at coastlines, never draw a mountain across
+                    // water.
+                    for (int ty = int(std::floor(yy));
+                         ty < int(std::ceil(yy + h));
+                         ++ty)
+                    {
+                        for (int tx = int(std::floor(xx));
+                             tx < int(std::ceil(xx + w));
+                             ++tx)
                         {
-                            for (int xx = x; xx < x + 3; ++xx)
+                            const auto* under = grid.tile({tx, ty});
+                            if (!under || under->terrain == TerrainType::Water)
                             {
-                                if (reliefFootprintFits(
-                                        grid,
-                                        xx,
-                                        yy,
-                                        1,
-                                        1,
-                                        true
-                                    ))
-                                {
-                                    draw("hill.mound.small", xx, yy, 1, 1);
-                                }
-                                else if (
-                                    reliefFootprintFits(
-                                        grid,
-                                        xx,
-                                        yy,
-                                        1,
-                                        1,
-                                        false
-                                    )
-                                )
-                                {
-                                    draw("mountain.peak.small", xx, yy, 1, 1);
-                                }
+                                continue;
                             }
+                            const double l = std::max(xx, double(tx)),
+                                         t = std::max(yy, double(ty));
+                            const double r = std::min(xx + w, tx + 1.),
+                                         b = std::min(yy + h, ty + 1.);
+                            renderer.drawTexture(
+                                *art->texture,
+                                float(frame.x + (l - xx) / w * frame.width),
+                                float(frame.y + (t - yy) / h * frame.height),
+                                float((r - l) / w * frame.width),
+                                float((b - t) / h * frame.height),
+                                float(ox + l * tp),
+                                float(oy + t * tp),
+                                float((r - l) * tp),
+                                float((b - t) * tp),
+                                255
+                            );
                         }
                     }
                 }
@@ -500,7 +536,47 @@ namespace Paladin
     WorldGridRenderer::WorldGridRenderer() = default;
 
 
-    WorldGridRenderer::~WorldGridRenderer() = default;
+    WorldGridRenderer::~WorldGridRenderer()
+    {
+        if (overviewCancelled_)
+        {
+            overviewCancelled_->store(true);
+        }
+    }
+    void WorldGridRenderer::reset() const
+    {
+        if (overviewCancelled_)
+        {
+            overviewCancelled_->store(true);
+        }
+        cachedGrid_ = nullptr;
+        cachedTerrainTexture_.reset();
+        cacheBuildAttempted_ = false;
+        overviewReady_ = {};
+        overviewUpload_.reset();
+        overviewUploadRow_ = 0;
+        terrainChunks_.clear();
+        terrainSources_.clear();
+        terrainDimensions_.clear();
+        terrainBytes_ = 0;
+    }
+    void WorldGridRenderer::renderGlobeTerrain(
+        Renderer& renderer,
+        const WorldGrid& grid,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics,
+        const SceneSpriteLibrary& art,
+        const std::function<void(const Texture&, int, int)>& project
+    ) const
+    {
+        if (cachedGrid_ != &grid)
+        {
+            cachedGrid_ = &grid;
+            terrainChunks_.clear();
+            terrainBytes_ = 0;
+        }
+        renderSpriteTerrain(renderer, grid, camera, metrics, art, project);
+    }
 
 
     void WorldGridRenderer::render(
@@ -545,7 +621,7 @@ namespace Paladin
     ) const
     {
         const double tp = metrics.scaledTilePixels(camera.zoom());
-        if (tp < AnimationDetailPixels || !sprites.find("terrain.shallow") ||
+        if (tp < 10 || !sprites.find("terrain.shallow") ||
             !sprites.find("terrain.beach"))
         {
             return;
@@ -598,10 +674,40 @@ namespace Paladin
             {
                 return;
             }
-            auto f = sprites.frame(*s);
+            if (s->materialPixels && s->materialWidth >= 16 && s->frames == 1 &&
+                s != sprites.find("terrain.water") &&
+                s != sprites.find("terrain.shallow"))
+            {
+                const int x0 = int(std::round(u * 16)),
+                          x1 = int(std::round((u + w) * 16));
+                const int y0 = int(std::round(v * 16)),
+                          y1 = int(std::round((v + h) * 16));
+                for (int py = y0; py < y1; ++py)
+                {
+                    for (int px = x0; px < x1; ++px)
+                    {
+                        auto color = landscapePaint(
+                            *s,
+                            x + (px + .5) / 16.,
+                            y + (py + .5) / 16.,
+                            false
+                        );
+                        color.alpha = std::uint8_t(alpha);
+                        renderer.fillRectangle(
+                            float(ox + (x + px / 16.) * tp),
+                            float(oy + (y + py / 16.) * tp),
+                            float(tp / 16),
+                            float(tp / 16),
+                            color
+                        );
+                    }
+                }
+                return;
+            }
+            auto f = sprites.frame(*s, tp >= AnimationDetailPixels);
             const int mw = std::max(1, int(s->width)),
                       mh = std::max(1, int(s->height));
-            if (s->frames > 1 && s->fps > 0)
+            if (tp >= AnimationDetailPixels && s->frames > 1 && s->fps > 0)
             {
                 f.x = float(
                           int(sprites.time() * s->fps +
@@ -699,7 +805,8 @@ namespace Paladin
                                 {
                                     return 1; // narrow wet shoreline
                                 }
-                                if (std::abs(
+                                if (tp >= AnimationDetailPixels &&
+                                    std::abs(
                                         landField -
                                         (.29 + .075 * std::sin(
                                                           sprites.time() * 1.4 +
@@ -848,6 +955,18 @@ namespace Paladin
                 hasTerrainArt |= sprite != nullptr;
             }
         }
+        if constexpr (std::is_same_v<Grid, WorldGrid>)
+        {
+            for (const auto* id :
+                 {"world.relief.hill.1",
+                  "world.relief.hill.2",
+                  "world.relief.ridge.1",
+                  "world.relief.ridge.2"})
+            {
+                const auto* art = sprites ? sprites->find(id) : nullptr;
+                sources.push_back(art ? art->texture : nullptr);
+            }
+        }
         if (cachedGrid_ != &grid || sources != terrainSources_ ||
             dimensions != terrainDimensions_)
         {
@@ -863,6 +982,16 @@ namespace Paladin
         if (!cacheBuildAttempted_)
         {
             cacheBuildAttempted_ = true;
+            if (overviewCancelled_)
+            {
+                overviewCancelled_->store(true);
+            }
+            overviewCancelled_ = std::make_shared<std::atomic_bool>(false);
+            overviewReady_ = {};
+            overviewUpload_.reset();
+            overviewUploadRow_ = 0;
+            std::unordered_map<const SceneSprite*, SceneSprite> cpuArt;
+            std::vector<const SceneSprite*> materials(grid.tileCount());
             std::vector<RenderColor> pixels(grid.tileCount());
 
             for (std::int32_t y = 0; y < grid.height(); ++y)
@@ -901,6 +1030,18 @@ namespace Paladin
                             art && art->overviewColor.alpha == 255)
                         {
                             color = art->overviewColor;
+                            if (art->materialPixels && art->materialWidth >= 16)
+                            {
+                                auto [entry, inserted] =
+                                    cpuArt.try_emplace(art, *art);
+                                if (inserted)
+                                {
+                                    entry->second.texture.reset();
+                                    entry->second.shadow.reset();
+                                }
+                                materials[std::size_t(y) * grid.width() + x] =
+                                    &entry->second;
+                            }
                         }
                     }
                     if (hasTerrainArt && tile.terrain == TerrainType::Water)
@@ -914,6 +1055,10 @@ namespace Paladin
                         color = mountainInterior(grid, x, y)
                                     ? RenderColor{0x08, 0x0F, 0x1B, 255}
                                     : RenderColor{0x39, 0x46, 0x58, 255};
+                        if constexpr (std::is_same_v<Grid, WorldGrid>)
+                        {
+                            color = {78, 59, 57, 255};
+                        }
                     }
                     pixels
                         [static_cast<std::size_t>(y) *
@@ -922,74 +1067,181 @@ namespace Paladin
                 }
             }
 
-            // Four samples per tile retain curved material contours at distant
-            // zoom, without traversing coastline geometry on camera frames.
-            constexpr int density = 4;
-            const int w = grid.width(), h = grid.height();
-            std::vector<RenderColor> smooth(
-                std::size_t(w * density) * h * density
+            // A cheap authored fallback is visible immediately. Contour and
+            // material sampling runs off the render thread, never at a zoom
+            // boundary, and uploads in small strips when ready.
+            cachedTerrainTexture_ = renderer.createTextureFromPixels(
+                grid.width(),
+                grid.height(),
+                pixels
             );
-            for (int py = 0; py < h * density; ++py)
-            {
-                for (int px = 0; px < w * density; ++px)
+            overviewPending_ = std::async(
+                std::launch::async,
+                [grid,
+                 pixels = std::move(pixels),
+                 cpuArt = std::move(cpuArt),
+                 materials = std::move(materials),
+                 cancelled = overviewCancelled_]()
                 {
-                    const auto sample = coastSample(
-                        (px + .5) / density,
-                        (py + .5) / density,
-                        std::is_same_v<Grid, WorldGrid>
+                    // Four samples per tile retain curved material contours at
+                    // distant zoom, without traversing coastline geometry on
+                    // camera frames.
+                    constexpr int density = 4;
+                    const int w = grid.width(), h = grid.height();
+                    std::vector<RenderColor> smooth(
+                        std::size_t(w * density) * h * density
                     );
-                    const double xx = sample.x - .5, yy = sample.y - .5;
-                    const int ix = int(std::floor(xx)),
-                              iy = int(std::floor(yy));
-                    double u = xx - ix, v = yy - iy;
-                    u = u * u * (3 - 2 * u);
-                    v = v * v * (3 - 2 * v);
-                    double weights[3] = {}, r[3] = {}, g[3] = {}, b[3] = {};
-                    for (int j = 0; j < 2; ++j)
+                    for (int py = 0; py < h * density; ++py)
                     {
-                        for (int i = 0; i < 2; ++i)
+                        if (cancelled->load())
                         {
-                            const int x = std::clamp(ix + i, 0, w - 1),
-                                      y = std::clamp(iy + j, 0, h - 1);
-                            const auto* tile = grid.tile({x, y});
-                            const int k =
-                                tile->terrain == TerrainType::Water      ? 0
-                                : tile->terrain == TerrainType::Mountain ? 2
-                                                                         : 1;
-                            const double weight =
-                                (i ? u : 1 - u) * (j ? v : 1 - v);
-                            auto c = pixels[std::size_t(y) * w + x];
-                            if constexpr (std::is_same_v<Grid, WorldGrid>)
+                            return OverviewData{};
+                        }
+                        for (int px = 0; px < w * density; ++px)
+                        {
+                            const auto sample = coastSample(
+                                (px + .5) / density,
+                                (py + .5) / density,
+                                std::is_same_v<Grid, WorldGrid>
+                            );
+                            const double xx = sample.x - .5, yy = sample.y - .5;
+                            const int ix = int(std::floor(xx)),
+                                      iy = int(std::floor(yy));
+                            double u = xx - ix, v = yy - iy;
+                            u = u * u * (3 - 2 * u);
+                            v = v * v * (3 - 2 * v);
+                            double weights[3] = {}, r[3] = {}, g[3] = {},
+                                   b[3] = {};
+                            for (int j = 0; j < 2; ++j)
                             {
-                                if (k == 0)
+                                for (int i = 0; i < 2; ++i)
                                 {
-                                    c = {0x20, 0x2C, 0x43, 255};
+                                    const int x = std::clamp(ix + i, 0, w - 1),
+                                              y = std::clamp(iy + j, 0, h - 1);
+                                    const auto* tile = grid.tile({x, y});
+                                    const int k =
+                                        tile->terrain == TerrainType::Water ? 0
+                                        : tile->terrain == TerrainType::Mountain
+                                            ? 2
+                                            : 1;
+                                    const double weight =
+                                        (i ? u : 1 - u) * (j ? v : 1 - v);
+                                    auto c = pixels[std::size_t(y) * w + x];
+                                    if constexpr (
+                                        std::is_same_v<Grid, WorldGrid>
+                                    )
+                                    {
+                                        if (k == 0)
+                                        {
+                                            c = {0x20, 0x2C, 0x43, 255};
+                                        }
+                                    }
+                                    weights[k] += weight;
+                                    r[k] += c.red * weight;
+                                    g[k] += c.green * weight;
+                                    b[k] += c.blue * weight;
                                 }
                             }
-                            weights[k] += weight;
-                            r[k] += c.red * weight;
-                            g[k] += c.green * weight;
-                            b[k] += c.blue * weight;
+                            const int k = weights[0] > .5   ? 0
+                                          : weights[2] > .5 ? 2
+                                          : weights[1] > 0  ? 1
+                                                            : 2;
+                            const double sum = std::max(weights[k], .0001);
+                            smooth[std::size_t(py) * w * density + px] = {
+                                std::uint8_t(r[k] / sum),
+                                std::uint8_t(g[k] / sum),
+                                std::uint8_t(b[k] / sum),
+                                255
+                            };
+                            if (k == 1)
+                            {
+                                double accumulated = 0;
+                                const double choice = landscapeField(
+                                                          sample.x * 2.1,
+                                                          sample.y * 2.1,
+                                                          193
+                                                      ) *
+                                                      sum;
+                                bool chosen = false;
+                                for (int j = 0; j < 2; ++j)
+                                {
+                                    for (int i = 0; i < 2; ++i)
+                                    {
+                                        int x = std::clamp(ix + i, 0, w - 1),
+                                            y = std::clamp(iy + j, 0, h - 1);
+                                        const auto* t = grid.tile({x, y});
+                                        if (t->terrain != TerrainType::Land)
+                                        {
+                                            continue;
+                                        }
+                                        accumulated +=
+                                            (i ? u : 1 - u) * (j ? v : 1 - v);
+                                        const auto* material =
+                                            materials[std::size_t(y) * w + x];
+                                        if (!chosen && choice < accumulated &&
+                                            material)
+                                        {
+                                            smooth
+                                                [std::size_t(py) * w * density +
+                                                 px] =
+                                                    landscapePaint(
+                                                        *material,
+                                                        (px + .5) / density,
+                                                        (py + .5) / density,
+                                                        std::is_same_v<
+                                                            Grid,
+                                                            WorldGrid>
+                                                    );
+                                            chosen = true;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                    const int k = weights[0] > .5   ? 0
-                                  : weights[2] > .5 ? 2
-                                  : weights[1] > 0  ? 1
-                                                    : 2;
-                    const double sum = std::max(weights[k], .0001);
-                    smooth[std::size_t(py) * w * density + px] = {
-                        std::uint8_t(r[k] / sum),
-                        std::uint8_t(g[k] / sum),
-                        std::uint8_t(b[k] / sum),
-                        255
+                    return OverviewData{
+                        w * density,
+                        h * density,
+                        std::move(smooth)
                     };
                 }
-            }
-            cachedTerrainTexture_ = renderer.createTextureFromPixels(
-                w * density,
-                h * density,
-                smooth
             );
+        }
+        if (overviewPending_.valid() &&
+            overviewPending_.wait_for(std::chrono::seconds(0)) ==
+                std::future_status::ready)
+        {
+            overviewReady_ = overviewPending_.get();
+        }
+        if (overviewReady_.width)
+        {
+            if (!overviewUpload_)
+            {
+                overviewUpload_ = renderer.createEmptyTexture(
+                    overviewReady_.width,
+                    overviewReady_.height
+                );
+            }
+            const int rows =
+                std::min(32, overviewReady_.height - overviewUploadRow_);
+            renderer.updateTextureRegion(
+                *overviewUpload_,
+                0,
+                overviewUploadRow_,
+                overviewReady_.width,
+                rows,
+                std::span(overviewReady_.pixels)
+                    .subspan(
+                        std::size_t(overviewUploadRow_) * overviewReady_.width,
+                        std::size_t(rows) * overviewReady_.width
+                    )
+            );
+            overviewUploadRow_ += rows;
+            if (overviewUploadRow_ == overviewReady_.height)
+            {
+                cachedTerrainTexture_ = std::move(overviewUpload_);
+                overviewReady_ = {};
+            }
         }
 
         if (!cachedTerrainTexture_)
@@ -1031,18 +1283,19 @@ namespace Paladin
         const Grid& grid,
         const Camera2D& camera,
         const TileRenderMetrics& metrics,
-        const SceneSpriteLibrary& sprites
+        const SceneSpriteLibrary& sprites,
+        const std::function<void(const Texture&, int, int)>& project
     ) const
     {
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
         // The overview cache is the appropriate representation once several
         // authored pixels occupy the same display pixel. Never traverse the
         // entire world to draw tiny sprites at strategic zoom.
-        if (tilePixels < 10)
+        if (tilePixels < 10 && !project)
         {
             return;
         }
-        constexpr int chunkSide = 16;
+        constexpr int chunkSide = 8;
         int resolution = 16;
         constexpr std::size_t cacheBytes = 64 * 1024 * 1024;
         if (terrainPixelsPerTile_ != resolution)
@@ -1121,6 +1374,13 @@ namespace Paladin
             if (found == terrainChunks_.end() ||
                 found->second.resolution != resolution)
             {
+                // Bound CPU composition as well as texture uploads. The
+                // overview covers newly exposed areas while detail arrives.
+                if (rebuildBudget == 0 ||
+                    (rebuildBudget < 2 && SDL_GetTicksNS() >= deadline))
+                {
+                    continue;
+                }
                 if (found == terrainChunks_.end() &&
                     terrainChunks_.size() >= cacheLimit)
                 {
@@ -1181,64 +1441,202 @@ namespace Paladin
                                      : "terrain.shallow";
                         }
                         const auto* sprite = sprites.find(id);
-                        // A variant belongs to a whole module, so changing
-                        // tile coordinates never splits an artist's 2x2 tile.
-                        const int baseWidth =
-                            sprite ? std::max(1, int(std::round(sprite->width)))
-                                   : 1;
-                        const int baseHeight =
-                            sprite
-                                ? std::max(1, int(std::round(sprite->height)))
-                                : 1;
-                        const auto stable = std::uint64_t(x / baseWidth) *
-                                                0x9E3779B185EBCA87ull ^
-                                            std::uint64_t(y / baseHeight) *
-                                                0xC2B2AE3D27D4EB4Full;
-                        if (const auto* variation = sprites.find(
-                                id + "." +
-                                std::to_string(
-                                    1 + ((stable ^ (stable >> 17)) % 4)
-                                )
-                            ))
+                        if (sprite && sprite->materialPixels &&
+                            sprite->materialWidth >= 16)
                         {
-                            sprite = variation;
-                        }
-                        TextureDrawItem item;
-                        item.destination = {
-                            float(localX * resolution),
-                            float(localY * resolution),
-                            float(resolution),
-                            float(resolution)
-                        };
-                        if (sprite)
-                        {
-                            const int width =
-                                std::max(1, int(std::round(sprite->width)));
-                            const int height =
-                                std::max(1, int(std::round(sprite->height)));
-                            const float sourceWidth =
-                                float(sprite->texture->width()) /
-                                std::max(1, sprite->frames) / width;
-                            const float sourceHeight =
-                                float(sprite->texture->height()) / height;
-                            item.texture = sprite->texture.get();
-                            item.source = {
-                                float(x % width) * sourceWidth,
-                                float(y % height) * sourceHeight,
-                                sourceWidth,
-                                sourceHeight
+                            constexpr bool world =
+                                std::is_same_v<Grid, WorldGrid>;
+                            const SceneSprite* materials[9] = {};
+                            double exposures[9] = {};
+                            if (true)
+                            {
+                                for (int j = 0; j < 3; ++j)
+                                {
+                                    for (int i = 0; i < 3; ++i)
+                                    {
+                                        const auto& adjacent = *grid.tile(
+                                            {std::clamp(
+                                                 x + i - 1,
+                                                 0,
+                                                 grid.width() - 1
+                                             ),
+                                             std::clamp(
+                                                 y + j - 1,
+                                                 0,
+                                                 grid.height() - 1
+                                             )}
+                                        );
+                                        if (adjacent.terrain !=
+                                            TerrainType::Water)
+                                        {
+                                            materials[j * 3 + i] =
+                                                sprites.find(terrainArtId(
+                                                    adjacent,
+                                                    sprites,
+                                                    world
+                                                ));
+                                        }
+                                        exposures[j * 3 + i] =
+                                            adjacent.terrain ==
+                                                    TerrainType::Mountain
+                                                ? .88
+                                            : adjacent.biome == BiomeType::Hills
+                                                ? .42
+                                                : 0;
+                                    }
+                                }
+                            }
+                            const auto paint = [&](int px, int py)
+                            {
+                                const double xx = x + (px + .5) / resolution,
+                                             yy = y + (py + .5) / resolution;
+                                auto color =
+                                    landscapePaint(*sprite, xx, yy, world);
+                                if (true)
+                                {
+                                    if (tile.terrain != TerrainType::Water)
+                                    {
+                                        const double sx = xx - .5, sy = yy - .5;
+                                        const int ix = int(std::floor(sx)),
+                                                  iy = int(std::floor(sy));
+                                        double u = sx - ix, v = sy - iy;
+                                        u = u * u * (3 - 2 * u);
+                                        v = v * v * (3 - 2 * v);
+                                        const double weights[4] = {
+                                            (1 - u) * (1 - v),
+                                            u * (1 - v),
+                                            (1 - u) * v,
+                                            u * v
+                                        };
+                                        double exposure = 0, cumulative = 0;
+                                        const double choose = landscapeField(
+                                            xx * 2.1,
+                                            yy * 2.1,
+                                            193
+                                        );
+                                        bool chosen = false;
+                                        for (int n = 0; n < 4; ++n)
+                                        {
+                                            const int cell =
+                                                (iy + n / 2 - y + 1) * 3 + ix +
+                                                n % 2 - x + 1;
+                                            exposure +=
+                                                weights[n] * exposures[cell];
+                                            cumulative += weights[n];
+                                            if (!chosen &&
+                                                choose < cumulative &&
+                                                materials[cell])
+                                            {
+                                                chosen = true;
+                                                if (materials[cell] != sprite)
+                                                {
+                                                    color = landscapePaint(
+                                                        *materials[cell],
+                                                        xx,
+                                                        yy,
+                                                        world
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        const double patch =
+                                            .55 * landscapeField(
+                                                      xx * .38,
+                                                      yy * .38,
+                                                      931
+                                                  ) +
+                                            .45 * landscapeField(
+                                                      xx * 5,
+                                                      yy * 5,
+                                                      981
+                                                  );
+                                        if (world && patch < exposure)
+                                        {
+                                            const double grain = landscapeField(
+                                                xx * 4,
+                                                yy * 4,
+                                                713
+                                            );
+                                            color =
+                                                grain < .24
+                                                    ? RenderColor{116, 81, 63, 255}
+                                                : grain > .79
+                                                    ? RenderColor{113, 109, 112, 255}
+                                                    : RenderColor{
+                                                          78,
+                                                          59,
+                                                          57,
+                                                          255
+                                                      };
+                                        }
+                                    }
+                                }
+                                if (mountainInterior(grid, x, y))
+                                {
+                                    color = {8, 15, 27, 255};
+                                }
+                                return color;
                             };
+                            for (int py = 0; py < resolution; ++py)
+                            {
+                                std::array<RenderColor, 16> rowColors;
+                                for (int px = 0; px < resolution; ++px)
+                                {
+                                    rowColors[px] = paint(px, py);
+                                }
+                                for (int px = 0; px < resolution;)
+                                {
+                                    const int first = px++;
+                                    const auto color = rowColors[first];
+                                    while (px < resolution &&
+                                           samePaint(color, rowColors[px]))
+                                    {
+                                        ++px;
+                                    }
+                                    items.push_back(
+                                        {nullptr,
+                                         {},
+                                         {float(localX * resolution + first),
+                                          float(localY * resolution + py),
+                                          float(px - first),
+                                          1},
+                                         color,
+                                         255}
+                                    );
+                                }
+                            }
                         }
                         else
                         {
-                            item.fill = tileColor(tile);
+                            TextureDrawItem item;
+                            item.destination = {
+                                float(localX * resolution),
+                                float(localY * resolution),
+                                float(resolution),
+                                float(resolution)
+                            };
+                            if (sprite)
+                            {
+                                const int w = std::max(1, int(sprite->width)),
+                                          h = std::max(1, int(sprite->height));
+                                const float
+                                    sw = float(sprite->texture->width()) /
+                                         sprite->frames / w,
+                                    sh = float(sprite->texture->height()) / h;
+                                item.texture = sprite->texture.get();
+                                item.source = {
+                                    float(x % w) * sw,
+                                    float(y % h) * sh,
+                                    sw,
+                                    sh
+                                };
+                            }
+                            else
+                            {
+                                item.fill = tileColor(tile);
+                            }
+                            items.push_back(item);
                         }
-                        if (mountainInterior(grid, x, y))
-                        {
-                            item.texture = nullptr;
-                            item.fill = {0x08, 0x0F, 0x1B, 255};
-                        }
-                        items.push_back(item);
                     }
                 }
                 if constexpr (std::is_same_v<Grid, WorldGrid>)
@@ -1256,7 +1654,14 @@ namespace Paladin
                         localMetrics,
                         sprites
                     );
-                    mountainRanges(target, grid, local, localMetrics, sprites);
+                    mountainRanges(
+                        target,
+                        grid,
+                        local,
+                        localMetrics,
+                        sprites,
+                        !project
+                    );
                 }
                 TerrainChunk chunk;
                 chunk.resolution = resolution;
@@ -1264,8 +1669,7 @@ namespace Paladin
                 found = terrainChunks_.insert_or_assign(key, std::move(chunk))
                             .first;
             }
-            if (!found->second.texture && rebuildBudget > 0 &&
-                SDL_GetTicksNS() < deadline)
+            if (!found->second.texture && rebuildBudget > 0)
             {
                 --rebuildBudget;
                 found->second.texture = renderer.createTextureFromDrawItems(
@@ -1276,6 +1680,8 @@ namespace Paladin
                 if (found->second.texture)
                 {
                     terrainBytes_ += std::size_t(textureSide) * textureSide * 4;
+                    found->second.commands.clear();
+                    found->second.commands.shrink_to_fit();
                 }
             }
 
@@ -1309,6 +1715,15 @@ namespace Paladin
             }
             if (found->second.texture)
             {
+                if (project)
+                {
+                    project(
+                        *found->second.texture,
+                        cell.x * chunkSide,
+                        cell.y * chunkSide
+                    );
+                    continue;
+                }
                 renderer.drawTexture(
                     *found->second.texture,
                     0,

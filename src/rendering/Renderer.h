@@ -35,6 +35,12 @@ namespace Paladin
         float height = 0.0F;
     };
 
+    struct MeshVertex
+    {
+        float x, y, u, v;
+        RenderColor color;
+    };
+
     // Reusable artwork can be composed into a bounded terrain cache without
     // retaining a second CPU copy of every source image.
     struct TextureDrawItem
@@ -88,6 +94,11 @@ namespace Paladin
             float y2,
             RenderColor color
         );
+        void drawMesh(
+            const Texture& texture,
+            std::span<const MeshVertex> vertices,
+            std::span<const int> indices
+        );
 
         void fillRectangles(
             std::span<const RenderRectangle> rectangles,
@@ -107,6 +118,7 @@ namespace Paladin
             int height,
             std::span<const RenderColor> pixels
         );
+        std::unique_ptr<Texture> createEmptyTexture(int width, int height);
 
         [[nodiscard]]
         std::unique_ptr<Texture> createTextureFromSurface(

@@ -33,7 +33,7 @@ namespace Paladin
     };
     struct NaturalFeatureGenerationPolicy
     {
-        std::array<NaturalFeatureBiomePolicy, 8> biomes{
+        std::array<NaturalFeatureBiomePolicy, 9> biomes{
             {{BiomeType::Plain, .11, .66, .82, .05, .0034, .14, .52, false},
              {BiomeType::Forest, .62, .34, .58, .28, .0028, .12, .52, true},
              {BiomeType::Jungle, .68, .34, .58, .28, .0025, .10, .82, true},
@@ -41,7 +41,8 @@ namespace Paladin
              {BiomeType::Tundra, .025, .74, .88, .02, .0032, .16, .18, false},
              {BiomeType::Desert, 0, .40, .62, .24, .0026, .15, .78, false},
              {BiomeType::Ocean, 0, 0, 1, 0, 0, 0, .52, false},
-             {BiomeType::Hills, .10, .62, .80, .06, .0040, .34, .52, false}}
+             {BiomeType::Hills, .10, .62, .80, .06, .0040, .34, .52, false},
+             {BiomeType::Polar, 0, 0, 1, 0, .001, .06, .04, false}}
         };
         double treeFrequency = .018;
         double clearingFrequency = .034;

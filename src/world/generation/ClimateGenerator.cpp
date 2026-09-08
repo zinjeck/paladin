@@ -126,7 +126,10 @@ namespace Paladin
                 (static_cast<double>(y) + 0.5) /
                 static_cast<double>(grid.height());
 
-            const double latitudeHeat = std::sin(normalizedLatitude * pi);
+            // Annual latitude envelope: broad cold polar belts, tropical
+            // equator, and temperate shoulders. Weather noise stays secondary.
+            const double latitudeHeat =
+                std::pow(std::sin(normalizedLatitude * pi), 1.7);
 
             for (std::int32_t x = 0; x < grid.width(); ++x)
             {
@@ -148,7 +151,7 @@ namespace Paladin
                     2.0
                 );
 
-                const double temperature = 0.06 + latitudeHeat * 0.92 -
+                const double temperature = 0.02 + latitudeHeat * 0.92 -
                                            landElevation * 0.30 +
                                            temperatureNoise * 0.07;
 

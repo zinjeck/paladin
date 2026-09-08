@@ -200,3 +200,35 @@ world.terrain.taiga world-biomes/taiga.png 2 2 0 0 0 0
 world.terrain.water world-biomes/water.png 2 2 0 0 0 0
 world.terrain.shallow world-biomes/shallow.png 2 2 0 0 0 0
 world.terrain.beach world-biomes/beach.png 2 2 0 0 0 0
+
+# Organic relief and forest canopy
+world.relief.hill.1 organic-relief/hill-1.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.plain organic-relief/hill-1-plain.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.forest organic-relief/hill-1-forest.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.jungle organic-relief/hill-1-jungle.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.taiga organic-relief/hill-1-taiga.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.desert organic-relief/hill-1-desert.png 4.0 2.0 0 0 0 0
+world.relief.hill.1.tundra organic-relief/hill-1-tundra.png 4.0 2.0 0 0 0 0
+world.relief.hill.2 organic-relief/hill-2.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.plain organic-relief/hill-2-plain.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.forest organic-relief/hill-2-forest.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.jungle organic-relief/hill-2-jungle.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.taiga organic-relief/hill-2-taiga.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.desert organic-relief/hill-2-desert.png 4.0 2.0 0 0 0 0
+world.relief.hill.2.tundra organic-relief/hill-2-tundra.png 4.0 2.0 0 0 0 0
+world.relief.ridge.1 organic-relief/ridge-1.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.plain organic-relief/ridge-1-plain.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.forest organic-relief/ridge-1-forest.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.jungle organic-relief/ridge-1-jungle.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.taiga organic-relief/ridge-1-taiga.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.desert organic-relief/ridge-1-desert.png 4.0 2.5 0 0 0 0
+world.relief.ridge.1.tundra organic-relief/ridge-1-tundra.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2 organic-relief/ridge-2.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.plain organic-relief/ridge-2-plain.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.forest organic-relief/ridge-2-forest.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.jungle organic-relief/ridge-2-jungle.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.taiga organic-relief/ridge-2-taiga.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.desert organic-relief/ridge-2-desert.png 4.0 2.5 0 0 0 0
+world.relief.ridge.2.tundra organic-relief/ridge-2-tundra.png 4.0 2.5 0 0 0 0
+world.canopy.1 organic-relief/canopy-1.png 1.0 0.75 0 0 0 0
+world.canopy.2 organic-relief/canopy-2.png 1.0 0.75 0 0 0 0

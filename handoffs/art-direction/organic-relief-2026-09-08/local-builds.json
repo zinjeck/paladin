@@ -1,0 +1,12 @@
+{
+  "x64-Debug": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Debug\\Paladin.exe",
+    "sha256": "76145a6decff08c5caf2f448c3273d891e1154e1818b4603fd825410d7714651",
+    "all_30_assets_and_catalog": "match"
+  },
+  "x64-Release": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Release\\Paladin.exe",
+    "sha256": "b94131ceb1489c4674b47673453ef77be4e8d1c5aaceed792cb54dbfb81b87bd",
+    "all_30_assets_and_catalog": "match"
+  }
+}

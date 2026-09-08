@@ -48,6 +48,7 @@ namespace Paladin
             std::make_unique<SettlementCommandController>();
 
         worldRenderer_ = std::make_unique<WorldRenderer>();
+        worldRenderer_->globeEnabled = true;
 
         cityRenderer_ = std::make_unique<CityRenderer>();
 

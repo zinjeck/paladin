@@ -17,6 +17,10 @@ namespace Paladin
     {
         BiomeType classifyLandBiome(float temperature, float rainfall) noexcept
         {
+            if (temperature <= .16F)
+            {
+                return BiomeType::Polar;
+            }
             if (temperature >= 0.62F)
             {
                 if (rainfall < 0.24F)
@@ -76,7 +80,9 @@ namespace Paladin
                 );
                 // Foothills are usable land, with their own city vegetation
                 // and stone distribution. Height has no movement penalty.
-                if (tile->terrain == TerrainType::Land && landElevation >= .25)
+                if (tile->terrain == TerrainType::Land &&
+                    landElevation >= .25 && tile->biome != BiomeType::Polar &&
+                    tile->biome != BiomeType::Tundra)
                 {
                     tile->biome = BiomeType::Hills;
                 }
@@ -90,7 +96,9 @@ namespace Paladin
             for (int x = 0; x < grid.width(); ++x)
             {
                 auto* tile = grid.tile({x, y});
-                if (tile->terrain != TerrainType::Land)
+                if (tile->terrain != TerrainType::Land ||
+                    tile->biome == BiomeType::Polar ||
+                    tile->biome == BiomeType::Tundra)
                 {
                     continue;
                 }

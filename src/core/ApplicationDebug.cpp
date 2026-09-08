@@ -256,17 +256,12 @@ namespace Paladin
             {
                 constexpr const char* terrains[] =
                     {"Land", "Water", "Mountain"};
-                constexpr const char* biomes[] = {
-                    "Plain",
-                    "Forest",
-                    "Jungle",
-                    "Desert",
-                    "Tundra",
-                    "Taiga",
-                    "Ocean"
-                };
-                s << "\nTerrain: " << terrains[int(tile->terrain)]
-                  << " | Biome: " << biomes[int(tile->biome)]
+                const auto terrainIndex = std::size_t(tile->terrain);
+                s << "\nTerrain: "
+                  << (terrainIndex < std::size(terrains)
+                          ? terrains[terrainIndex]
+                          : "Unknown")
+                  << " | Biome: " << biomeName(tile->biome)
                   << "\nElevation: " << tile->elevation.value()
                   << " | Temperature: " << tile->temperature.value()
                   << "\nPrecipitation: " << tile->rainfall.value();

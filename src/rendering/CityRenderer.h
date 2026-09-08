@@ -33,6 +33,8 @@ namespace Paladin
         double animationTimeOverride =
             -1; // Fixed clock for reproducible art previews/tests.
         double animationSeconds = 0;
+        // Terrain, grass, natural features, objects/entities, lighting (ms).
+        mutable std::array<double, 5> renderTimings{};
         std::size_t submittedItems() const
         {
             return raised_.size();

@@ -2,6 +2,7 @@
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "simulation/Simulation.h"
@@ -223,6 +224,23 @@ namespace Paladin
         double screenY
     )
     {
+        if (screen_ == Screen::World)
+        {
+            const auto& grid = simulation_->world().grid();
+            auto hit = GlobeView::from(
+                           *camera_,
+                           grid,
+                           renderer_->outputWidth(),
+                           renderer_->outputHeight()
+            )
+                           .pick(screenX, screenY);
+            settlementPlacementController_->setHoveredPosition(
+                hit ? std::optional<
+                          WorldTilePosition>{{std::clamp(int(hit->u * grid.width()), 0, grid.width() - 1), std::clamp(int(hit->v * grid.height()), 0, grid.height() - 1)}}
+                    : std::nullopt
+            );
+            return;
+        }
         const double tilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
 
@@ -285,6 +303,13 @@ namespace Paladin
             return;
         }
 
+        if (screen_ == Screen::World)
+        {
+            camera_->setZoom(
+                std::clamp(camera_->zoom() * multiplier, .65, 24.)
+            );
+            return;
+        }
         const double screenOffsetX = screenX - viewportWidth * 0.5;
 
         const double screenOffsetY = screenY - viewportHeight * 0.5;
@@ -323,6 +348,20 @@ namespace Paladin
             return;
         }
 
+        if (screen_ == Screen::World)
+        {
+            const auto& grid = simulation_->world().grid();
+            double x = std::fmod(camera_->tileX(), double(grid.width()));
+            if (x < 0)
+            {
+                x += grid.width();
+            }
+            camera_->setPosition(
+                x,
+                std::clamp(camera_->tileY(), .001, grid.height() - .001)
+            );
+            return;
+        }
         const double tilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
 

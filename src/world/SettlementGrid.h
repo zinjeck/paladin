@@ -119,7 +119,8 @@ namespace Paladin
                     const bool beach =
                         !rocky && slope < .08 && t.elevation.value() < .58 &&
                         t.biome != BiomeType::Taiga &&
-                        t.biome != BiomeType::Tundra && (patch % 5 < 3);
+                        t.biome != BiomeType::Tundra &&
+                        t.biome != BiomeType::Polar && (patch % 5 < 3);
                     surfaces_[std::size_t(y) * width() + x] =
                         beach ? CityTileType::Beach : CityTileType::Coast;
                 }

@@ -186,6 +186,8 @@ namespace Paladin
         std::unique_ptr<Camera2D> savedWorldCamera_;
         SettlementId activeCitySettlementId_;
         bool cityHudCapturedPointer_ = false;
+        bool globePointerDown_ = false, globeDragging_ = false;
+        float globePressX_ = 0, globePressY_ = 0;
         bool simulationControlsUnlocked_ = false;
         bool simulationControlsCapturedPointer_ = false;
     };

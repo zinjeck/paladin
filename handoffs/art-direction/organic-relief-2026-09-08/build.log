@@ -1,0 +1,22 @@
+[1/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/22] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[5/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[6/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+[7/22] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+[9/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+[10/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+[11/22] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[12/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+[13/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SceneSpriteLibrary.cpp.obj
+[14/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+[15/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+[16/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[17/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+[18/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+[19/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+[20/22] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldGridRenderer.cpp.obj
+[21/22] Building CXX object CMakeFiles\Paladin.dir\src\ui\CityHud.cpp.obj
+[22/22] Linking CXX executable Paladin.exe

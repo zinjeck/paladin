@@ -119,8 +119,16 @@ namespace Paladin
             animationTimeOverride >= 0 ? animationTimeOverride
                                        : animationSeconds
         );
+        auto timing = SDL_GetTicksNS();
+        const auto stage = [&](int index)
+        {
+            const auto now = SDL_GetTicksNS();
+            renderTimings[index] = (now - timing) / 1e6;
+            timing = now;
+        };
         gridRenderer_
             .render(renderer, settlementMap.grid(), camera, metrics, &sprites_);
+        stage(0);
         raised_.clear();
         const SceneProjection projection{
             camera.tileX(),
@@ -142,6 +150,7 @@ namespace Paladin
             grassStart,
             detailBlend(projection.tilePixels, 20, 36)
         );
+        stage(1);
         naturalFeatureRenderer_.render(
             renderer,
             settlementMap,
@@ -152,6 +161,7 @@ namespace Paladin
             &presentation
         );
 
+        stage(2);
         objectRenderer_.render(
             renderer,
             settlementMap,
@@ -225,6 +235,7 @@ namespace Paladin
             &sprites_
         );
         raised_.render(renderer, 0);
+        stage(3);
         lighting_.render(
             renderer,
             projection,
@@ -233,6 +244,7 @@ namespace Paladin
             presentation,
             hour
         );
+        stage(4);
         objectRenderer_.renderOverlay(
             renderer,
             settlementMap,

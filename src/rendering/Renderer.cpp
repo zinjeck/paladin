@@ -7,9 +7,56 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
 namespace Paladin
 {
+    void Renderer::drawMesh(
+        const Texture& texture,
+        std::span<const MeshVertex> vertices,
+        std::span<const int> indices
+    )
+    {
+        thread_local std::vector<SDL_Vertex> native;
+        native.clear();
+        native.reserve(vertices.size());
+        for (const auto& v : vertices)
+        {
+            native.push_back(
+                {{v.x, v.y},
+                 {v.color.red / 255.F,
+                  v.color.green / 255.F,
+                  v.color.blue / 255.F,
+                  v.color.alpha / 255.F},
+                 {v.u, v.v}}
+            );
+        }
+        SDL_RenderGeometry(
+            renderer_,
+            texture.texture_,
+            native.data(),
+            int(native.size()),
+            indices.data(),
+            int(indices.size())
+        );
+    }
+    std::unique_ptr<Texture> Renderer::createEmptyTexture(int width, int height)
+    {
+        auto* texture = SDL_CreateTexture(
+            renderer_,
+            SDL_PIXELFORMAT_RGBA32,
+            SDL_TEXTUREACCESS_STREAMING,
+            width,
+            height
+        );
+        if (!texture)
+        {
+            return {};
+        }
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+        return std::unique_ptr<Texture>(new Texture(texture, width, height));
+    }
     Renderer::Renderer(SDL_Window* window)
     {
         renderer_ = SDL_CreateRenderer(window, nullptr);

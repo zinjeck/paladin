@@ -7,3 +7,6 @@
 - Inspect each exported atlas object independently. Never assume equal atlas cells isolate the intended object: neighboring foliage previously leaked into the meat icon.
 - Keep source art, generated material and review images under `handoffs/art-direction/`; runtime PNGs belong in `assets/sprites/`. Do not put art sources in `out/` or change the user's Krita originals. Build-packaged copies of assets are expected beside the executable.
 - Preserve distance caching, bounded work and pause-controlled animation. Do not allocate new textures on every zoom step.
+- Terrain tiles are storage units, not visible square boundaries. City and world coasts and material transitions must use shared natural contours at every zoom. Reduce detail when zooming out; never introduce square tile corners or blur remaining features.
+- Grass remains textured everywhere. Vary cluster shapes, spacing and shadows continuously across tile boundaries; do not create featureless green areas as a substitute for variation.
+- Build local C++ executables after changes. Work directly in the PC checkout; do not create GitHub PRs unless explicitly requested.

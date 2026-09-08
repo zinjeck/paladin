@@ -1,0 +1,15 @@
+{
+  "exports": 30,
+  "palette_and_binary_alpha": "pass",
+  "canonical_final_2x2_blocks": "pass",
+  "founding_only_changes_canopy_near_city": [
+    634,
+    322,
+    706,
+    416
+  ],
+  "city_detail_coverage_range": [
+    0.0,
+    0.623046875
+  ]
+}

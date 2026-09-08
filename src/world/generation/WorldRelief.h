@@ -64,68 +64,68 @@ namespace Paladin
                 }
             }
         }
-        struct Plate
+        // Godot Paladin: broad four-octave mountain noise plus an elevation
+        // bonus, then supported peak centers surrounded by foothills.
+        std::vector<double> scores(std::size_t(w) * h);
+        for (int y = 0; y < h; ++y)
         {
-            double x, y;
-        };
-        std::array<Plate, 18> plates;
-        for (unsigned i = 0; i < plates.size(); ++i)
-        {
-            auto a = GenerationNoise::mix(seed + i * 137),
-                 b = GenerationNoise::mix(a);
-            plates[i] = {
-                double(a % 100000) / 100000,
-                double(b % 100000) / 100000
-            };
+            for (int x = 0; x < w; ++x)
+            {
+                const auto elevation = grid.tile({x, y})->elevation.value();
+                scores[y * w + x] = std::abs(
+                                        GenerationNoise::simplexFractal(
+                                            x * .018,
+                                            y * .018,
+                                            seed + 73517,
+                                            4,
+                                            .58,
+                                            2.25
+                                        )
+                                    ) +
+                                    elevation * .55;
+            }
         }
         for (int y = 0; y < h; ++y)
         {
             for (int x = 0; x < w; ++x)
             {
-                auto* t = grid.tile({x, y});
-                if (t->elevation.value() <= sea)
+                auto& tile = *grid.tile({x, y});
+                if (tile.elevation.value() <= sea)
                 {
                     continue;
                 }
-                const double sourceU = double(x) / w;
-                const double sourceV = double(y) / h;
-                // Both offset fields sample the same unwarped coordinate.
-                // Do not let the horizontal offset feed the vertical sample.
-                const double u = sourceU + .035 * GenerationNoise::simplexFractal(
-                    sourceU * 5, sourceV * 5, seed + 51, 2, .5, 2
-                );
-                const double v = sourceV + .035 * GenerationNoise::simplexFractal(
-                    sourceU * 5, sourceV * 5, seed + 89, 2, .5, 2
-                );
-                double first = 10, second = 10;
-                unsigned a = 0, b = 0;
-                for (unsigned i = 0; i < plates.size(); ++i)
+                const double score = scores[y * w + x];
+                int support = 0;
+                for (int j = -2; j <= 2; ++j)
                 {
-                    double d = std::hypot(u - plates[i].x, v - plates[i].y);
-                    if (d < first)
+                    for (int i = -2; i <= 2; ++i)
                     {
-                        second = first;
-                        b = a;
-                        first = d;
-                        a = i;
-                    }
-                    else if (d < second)
-                    {
-                        second = d;
-                        b = i;
+                        if (!i && !j)
+                        {
+                            continue;
+                        }
+                        const int nx = x + i, ny = y + j;
+                        if (nx >= 0 && ny >= 0 && nx < w && ny < h &&
+                            grid.tile({nx, ny})->elevation.value() > sea &&
+                            scores[ny * w + nx] > .62)
+                        {
+                            ++support;
+                        }
                     }
                 }
-                const auto pair = std::min(a, b) * 31 + std::max(a, b);
-                const bool convergent =
-                    GenerationNoise::mix(seed + pair) % 3 != 0;
-                double ridge =
-                    convergent ? std::exp(-std::pow((second - first) / .018, 2))
-                               : 0;
-                const double base = (t->elevation.value() - sea) / (1 - sea);
-                const double inland = std::clamp(base * 9., 0., 1.);
-                const double relief =
-                    std::clamp(base * .30 + ridge * .66 * inland, 0., 1.);
-                t->elevation = Elevation{float(sea + (1 - sea) * relief)};
+                const bool peak = score >= .76 && support >= 12;
+                // Preserve smooth height within each band, not quantized
+                // terraces.
+                double height =
+                    score > .62
+                        ? .25 + std::clamp((score - .62) / .14, 0., 1.) * .26
+                        : .02 + std::clamp(score / .62, 0., 1.) * .22;
+                if (peak)
+                {
+                    height =
+                        .52 + std::clamp((score - .76) / .40, 0., 1.) * .46;
+                }
+                tile.elevation = Elevation{float(sea + (1 - sea) * height)};
             }
         }
     }

@@ -3,6 +3,7 @@
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/TileRenderMetrics.h"
@@ -100,7 +101,7 @@ namespace Paladin
         const bool hudCapturedPointer =
             worldHud_->pointerPressed(event.button.x, event.button.y);
 
-        if (!hudCapturedPointer &&
+        if (!hudCapturedPointer && event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
             settlementPlacementController_->isSelecting())
         {
             updateSettlementPlacementHover(
@@ -207,6 +208,56 @@ namespace Paladin
 
     void Application::handleWorldEvent(const SDL_Event& event)
     {
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+            event.button.button == SDL_BUTTON_LEFT &&
+            !foundingPanel_->isOpen() &&
+            !activeHudContainsPoint(event.button.x, event.button.y))
+        {
+            globePointerDown_ = true;
+            globeDragging_ = false;
+            globePressX_ = event.button.x;
+            globePressY_ = event.button.y;
+        }
+        if (event.type == SDL_EVENT_MOUSE_MOTION && globePointerDown_)
+        {
+            globeDragging_ |= std::hypot(
+                                  event.motion.x - globePressX_,
+                                  event.motion.y - globePressY_
+                              ) > 3;
+            if (globeDragging_)
+            {
+                const auto& grid = simulation_->world().grid();
+                const auto view = GlobeView::from(
+                    *camera_,
+                    grid,
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+                camera_->move(
+                    -event.motion.xrel * grid.width() /
+                        (view.radius * 6.283185307 *
+                         std::max(.15, std::cos(view.pitch))),
+                    -event.motion.yrel * grid.height() /
+                        (view.radius * 3.141592654)
+                );
+                clampCameraToWorld();
+                return;
+            }
+        }
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+            event.button.button == SDL_BUTTON_LEFT && globePointerDown_)
+        {
+            globePointerDown_ = false;
+            if (globeDragging_)
+            {
+                globeDragging_ = false;
+                return;
+            }
+            if (settlementPlacementController_->isSelecting())
+            {
+                handleWorldPointerPressed(event);
+            }
+        }
         if (handleWorldManagement(event))
         {
             return;
@@ -365,14 +416,21 @@ namespace Paladin
             // double-click enters it.
             if (!activeHudContainsPoint(event.button.x, event.button.y))
             {
-                const double pixels =
-                    tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-                const double x =
-                    camera_->tileX() +
-                    (event.button.x - renderer_->outputWidth() * .5) / pixels;
-                const double y =
-                    camera_->tileY() +
-                    (event.button.y - renderer_->outputHeight() * .5) / pixels;
+                const auto& grid = simulation_->world().grid();
+                const auto view = GlobeView::from(
+                    *camera_,
+                    grid,
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+                const auto hit = view.pick(event.button.x, event.button.y);
+                if (!hit)
+                {
+                    return false;
+                }
+                const double pixels = view.radius * 6.283185307 / grid.width();
+                const double x = hit->u * grid.width(),
+                             y = hit->v * grid.height();
                 SettlementId nearest;
                 double best = std::max(1.5, 8 / pixels);
                 for (const auto& city : simulation_->world().settlements())

@@ -1,3 +1,4 @@
+#include "CityZoomPerformanceChecks.h"
 #include "EnvironmentTerrainSmokeChecks.h"
 #include "RenderingRevisionChecks.h"
 #include "TestFramework.h"
@@ -1639,6 +1640,29 @@ namespace Paladin
                 clock.beginFrame();
                 PALADIN_CHECK(clock.presentationSeconds() == time);
             }
+            if (SDL_getenv("PALADIN_CITY_ZOOM_REVIEW"))
+            {
+                SDL_HideWindow(app.window_->nativeHandle());
+                cityZoomPerformanceChecks(*app.renderer_,SDL_GetRenderer(app.window_->nativeHandle()));
+                return;
+            }
+            if (SDL_getenv("PALADIN_GLOBE_REVIEW_ONLY"))
+            {
+                SDL_HideWindow(app.window_->nativeHandle());
+                SceneSpriteLibrary art;
+                art.load(
+                    *app.renderer_,
+                    (std::filesystem::path(SDL_GetBasePath()) /
+                     "assets/sprites")
+                        .string()
+                );
+                globeRevisionChecks(
+                    *app.renderer_,
+                    SDL_GetRenderer(app.window_->nativeHandle()),
+                    art
+                );
+                return;
+            }
             if (SDL_getenv("PALADIN_ART_REVIEW"))
             {
                 SettlementGrid grid(64, 64);
@@ -2215,6 +2239,40 @@ namespace Paladin
             }
             app.camera_->setPosition(32, 32);
             frame(app);
+            // A drag rotates the globe and never opens the founding modal;
+            // space picking rejects the area outside the sphere.
+            SDL_Event globeEvent{};
+            globeEvent.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            globeEvent.button.button = SDL_BUTTON_LEFT;
+            globeEvent.button.x = width * .5F;
+            globeEvent.button.y = height * .5F;
+            app.handleWorldEvent(globeEvent);
+            globeEvent.type = SDL_EVENT_MOUSE_MOTION;
+            globeEvent.motion.x = width * .5F + 70;
+            globeEvent.motion.y = height * .5F + 30;
+            globeEvent.motion.xrel = 70;
+            globeEvent.motion.yrel = 30;
+            app.handleWorldEvent(globeEvent);
+            PALADIN_CHECK(
+                app.camera_->tileX() != 32 && app.camera_->tileY() != 32
+            );
+            globeEvent.type = SDL_EVENT_MOUSE_BUTTON_UP;
+            globeEvent.button.button = SDL_BUTTON_LEFT;
+            globeEvent.button.x = width * .5F + 70;
+            globeEvent.button.y = height * .5F + 30;
+            app.handleWorldEvent(globeEvent);
+            PALADIN_CHECK(
+                !app.foundingPanel_->isOpen() && !app.globePointerDown_
+            );
+            app.updateSettlementPlacementHover(0, 0);
+            PALADIN_CHECK(
+                !app.settlementPlacementController_->hoveredPosition()
+            );
+            const auto globeZoom = app.camera_->zoom();
+            app.applyCameraZoom(1.2, width * .5F, height * .5F);
+            PALADIN_CHECK(app.camera_->zoom() > globeZoom);
+            app.camera_->setZoom(globeZoom);
+            app.camera_->setPosition(32, 32);
             PALADIN_CHECK(click(app, width - 70, height - 22));
             PALADIN_CHECK(app.screen_ == Application::Screen::World);
             PALADIN_CHECK(click(app, width / 2, 38)); // Select Region.
@@ -2650,3 +2708,4 @@ int main()
         return 1;
     }
 }
+

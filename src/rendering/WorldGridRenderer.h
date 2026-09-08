@@ -1,7 +1,10 @@
 #pragma once
 
 #include "rendering/Renderer.h"
+#include <atomic>
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -22,6 +25,15 @@ namespace Paladin
     public:
         WorldGridRenderer();
         ~WorldGridRenderer();
+        void reset() const;
+        void renderGlobeTerrain(
+            Renderer&,
+            const WorldGrid&,
+            const Camera2D&,
+            const TileRenderMetrics&,
+            const SceneSpriteLibrary&,
+            const std::function<void(const Texture&, int, int)>&
+        ) const;
 
         WorldGridRenderer(const WorldGridRenderer&) = delete;
         WorldGridRenderer& operator=(const WorldGridRenderer&) = delete;
@@ -75,7 +87,8 @@ namespace Paladin
             const Grid& grid,
             const Camera2D& camera,
             const TileRenderMetrics& metrics,
-            const SceneSpriteLibrary& sprites
+            const SceneSpriteLibrary& sprites,
+            const std::function<void(const Texture&, int, int)>& project = {}
         ) const;
 
         struct TerrainChunk
@@ -97,5 +110,15 @@ namespace Paladin
         mutable const void* cachedGrid_ = nullptr;
         mutable std::unique_ptr<Texture> cachedTerrainTexture_;
         mutable bool cacheBuildAttempted_ = false;
+        struct OverviewData
+        {
+            int width = 0, height = 0;
+            std::vector<RenderColor> pixels;
+        };
+        mutable std::future<OverviewData> overviewPending_;
+        mutable std::shared_ptr<std::atomic_bool> overviewCancelled_;
+        mutable OverviewData overviewReady_;
+        mutable std::unique_ptr<Texture> overviewUpload_;
+        mutable int overviewUploadRow_ = 0;
     };
 } // namespace Paladin

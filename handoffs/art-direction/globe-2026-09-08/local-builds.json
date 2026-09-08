@@ -1,0 +1,18 @@
+{
+  "x64-Debug": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Debug\\Paladin.exe",
+    "sha256": "076d306d7b668f182567a43497c82756b61f5074362068eae4218e221cf3ac80",
+    "matching_packaged_assets": 31
+  },
+  "x64-Release": {
+    "executable": "C:\\Paladin\\out\\build\\x64-Release\\Paladin.exe",
+    "sha256": "1a09863d4f4c54dc12772fcabca259a13ca8f260695f36efa30e8cb06f0293a8",
+    "matching_packaged_assets": 31
+  },
+  "grass": {
+    "minimum_non_dominant_fraction_per_64px_patch": 0.185546875,
+    "maximum": 0.2626953125,
+    "patches_checked": 180,
+    "distinct_32px_regions": 648
+  }
+}

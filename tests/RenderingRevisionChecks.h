@@ -1,7 +1,9 @@
 #pragma once
+#include "GlobeRevisionChecks.h"
 #include "TestFramework.h"
 #include "rendering/BuildingView.h"
 #include "rendering/SettlementGroundCache.h"
+#include "rendering/WorldFoliage.h"
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldSurface.h"
 #include "world/WorldGrid.h"
@@ -59,6 +61,159 @@ namespace Paladin
             biomes.insert(terrain->texture.get());
         }
         PALADIN_CHECK(biomes.size() == 9);
+        globeRevisionChecks(renderer, native, art);
+
+        // Actual exported relief has climate-specific vegetation, shared
+        // footprints and independent cutouts, including forest silhouettes.
+        for (const auto* kind : {"hill", "ridge"})
+        {
+            for (int variant : {1, 2})
+            {
+                const auto stem = std::string("world.relief.") + kind + "." +
+                                  std::to_string(variant);
+                const auto* base = art.find(stem);
+                PALADIN_CHECK(base && base->texture);
+                for (const auto* climate :
+                     {"plain", "forest", "jungle", "desert", "tundra", "taiga"})
+                {
+                    const auto* sprite = art.find(stem + "." + climate);
+                    PALADIN_CHECK(
+                        sprite && sprite->width == base->width &&
+                        sprite->height == base->height
+                    );
+                }
+            }
+        }
+        PALADIN_CHECK(art.find("world.canopy.1") && art.find("world.canopy.2"));
+
+        const auto saveReview = [&](const char* name)
+        {
+            if (const auto* directory = SDL_getenv("PALADIN_SMOKE_SCREENSHOTS"))
+            {
+                auto* image = SDL_RenderReadPixels(native, nullptr);
+                PALADIN_CHECK(image);
+                PALADIN_CHECK(SDL_SaveBMP(
+                    image,
+                    (std::string(directory) + "/" + name + ".bmp").c_str()
+                ));
+                SDL_DestroySurface(image);
+            }
+        };
+        WorldGenerationSettings settings;
+        settings.width = 80;
+        settings.height = 64;
+        World landscape(settings);
+        for (int y = 0; y < 64; ++y)
+        {
+            for (int x = 0; x < 80; ++x)
+            {
+                auto& t = *landscape.grid().tile({x, y});
+                const double edge = x + 3 * std::sin(y * .17);
+                t.terrain = edge > 39 && edge < 55 ? TerrainType::Mountain
+                                                   : TerrainType::Land;
+                t.biome = edge < 22   ? BiomeType::Forest
+                          : edge < 32 ? BiomeType::Plain
+                          : edge < 62 ? BiomeType::Hills
+                                      : BiomeType::Desert;
+                t.temperature = Temperature{.65F};
+                t.rainfall = Rainfall{x < 48 ? .55F : .15F};
+            }
+        }
+        WorldGridRenderer relief;
+        Camera2D reliefCamera(38, 30);
+        TileRenderMetrics reliefMetrics{16};
+        const auto drawLandscape = [&](bool foliage)
+        {
+            renderer.beginFrame();
+            WorldPixelScene pixels(
+                renderer,
+                reliefMetrics.scaledTilePixels(reliefCamera.zoom())
+            );
+            relief.render(
+                renderer,
+                landscape.grid(),
+                reliefCamera,
+                reliefMetrics,
+                &art
+            );
+            if (foliage)
+            {
+                worldFoliage(
+                    renderer,
+                    landscape,
+                    {reliefCamera.tileX(),
+                     reliefCamera.tileY(),
+                     reliefMetrics.scaledTilePixels(reliefCamera.zoom()),
+                     renderer.outputWidth(),
+                     renderer.outputHeight()},
+                    art
+                );
+            }
+        };
+        for (int i = 0; i < 32; ++i)
+        {
+            drawLandscape(true);
+        }
+        saveReview("organic-world-normal");
+        reliefCamera.setZoom(2);
+        reliefCamera.setPosition(36, 30);
+        for (int i = 0; i < 20; ++i)
+        {
+            drawLandscape(true);
+        }
+        saveReview("organic-world-close");
+        reliefCamera.setPosition(14, 30);
+        for (int i = 0; i < 20; ++i)
+        {
+            drawLandscape(true);
+        }
+        saveReview("organic-forest-before");
+        PALADIN_CHECK(!canopyCleared(landscape, 14, 30));
+        const auto city = landscape.createSettlement({14, 30});
+        PALADIN_CHECK(city.isValid() && canopyCleared(landscape, 14, 30));
+        PALADIN_CHECK(
+            canopyCleared(landscape, 13, 29) &&
+            !canopyCleared(landscape, 12, 30)
+        );
+        PALADIN_CHECK(
+            landscape.grid().tile({14, 30})->biome == BiomeType::Forest
+        );
+        drawLandscape(true);
+        saveReview("organic-forest-founded");
+
+        SettlementGrid meadow(80, 64);
+        for (int y = 0; y < 64; ++y)
+        {
+            for (int x = 0; x < 80; ++x)
+            {
+                meadow.tile({x, y})->terrain = TerrainType::Land;
+                meadow.tile({x, y})->biome = BiomeType::Plain;
+            }
+        }
+        WorldGridRenderer meadowRenderer;
+        reliefCamera.setPosition(38, 30);
+        for (double zoom : {.5, 1., 2.})
+        {
+            reliefCamera.setZoom(zoom);
+            for (int i = 0; i < 80; ++i)
+            {
+                SDL_Delay(1);
+                renderer.beginFrame();
+                WorldPixelScene pixels(renderer, 16 * zoom);
+                meadowRenderer.render(
+                    renderer,
+                    meadow,
+                    reliefCamera,
+                    reliefMetrics,
+                    &art
+                );
+            }
+            saveReview(
+                zoom == .5  ? "organic-city-far"
+                : zoom == 1 ? "organic-city-normal"
+                            : "organic-city-close"
+            );
+        }
 
         // Fitted keep roofs must have no background cracks at animated strip
         // joins. Use the real opaque roof center and the final pixel scene.

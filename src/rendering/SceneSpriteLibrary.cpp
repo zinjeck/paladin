@@ -158,6 +158,11 @@ namespace Paladin
         std::unordered_map<std::string, std::shared_ptr<Texture>> textures;
         std::unordered_map<std::string, std::shared_ptr<Texture>> shadows;
         std::unordered_map<std::string, RenderColor> overviewColors;
+        std::unordered_map<
+            std::string,
+            std::shared_ptr<const std::vector<RenderColor>>>
+            materials;
+        std::unordered_map<std::string, RenderColor> materialBases;
         std::string line;
         int number = 0;
         while (std::getline(input, line))
@@ -229,12 +234,11 @@ namespace Paladin
                 );
                 continue;
             }
-            const auto key =
-                file + (smooth ? ":linear:" : ":nearest:") +
-                (id.starts_with("world.terrain.") ? "atlas:" : "scene:") +
-                std::to_string(sprite.frames) + ":" +
-                std::to_string(sprite.width) + ":" +
-                std::to_string(sprite.height);
+            const auto key = file + (smooth ? ":linear:" : ":nearest:") +
+                             (id.starts_with("world.") ? "atlas:" : "scene:") +
+                             std::to_string(sprite.frames) + ":" +
+                             std::to_string(sprite.width) + ":" +
+                             std::to_string(sprite.height);
             auto& texture = textures[key];
             if (!texture)
             {
@@ -295,7 +299,7 @@ namespace Paladin
                             sprite.width,
                             sprite.height,
                             sprite.frames,
-                            !id.starts_with("world.terrain.") &&
+                            !id.starts_with("world.") &&
                                 palette.contains(0xA6CD59) &&
                                 palette.contains(0x79B56D) &&
                                 palette.contains(0x49975B) &&
@@ -329,6 +333,36 @@ namespace Paladin
                         SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
                     if (rgba)
                     {
+                        if (id.starts_with("world.") ||
+                            id.find("terrain.") != std::string::npos ||
+                            id.find(".floor") != std::string::npos)
+                        {
+                            auto paint =
+                                std::make_shared<std::vector<RenderColor>>();
+                            std::unordered_map<unsigned, int> counts;
+                            int best = 0;
+                            for (int y = 0; y < rgba->h; ++y)
+                            {
+                                for (int x = 0; x < rgba->w; ++x)
+                                {
+                                    const auto* c = static_cast<const Uint8*>(
+                                                        rgba->pixels
+                                                    ) +
+                                                    y * rgba->pitch + x * 4;
+                                    RenderColor color{c[0], c[1], c[2], c[3]};
+                                    paint->push_back(color);
+                                    const auto rgb = (unsigned(c[0]) << 16) |
+                                                     (unsigned(c[1]) << 8) |
+                                                     c[2];
+                                    if (c[3] && ++counts[rgb] > best)
+                                    {
+                                        best = counts[rgb];
+                                        materialBases[key] = color;
+                                    }
+                                }
+                            }
+                            materials[key] = paint;
+                        }
                         const int sw = std::min(64, rgba->w / sprite.frames);
                         const int sh = std::min(128, rgba->h);
                         std::vector<RenderColor> mask(std::size_t(sw) * sh);
@@ -411,6 +445,10 @@ namespace Paladin
             sprite.texture = texture;
             sprite.shadow = shadows[key];
             sprite.overviewColor = overviewColors[key];
+            sprite.materialPixels = materials[key];
+            sprite.materialBase = materialBases[key];
+            sprite.materialWidth = texture->width();
+            sprite.materialHeight = texture->height();
             sprites_[id] = std::move(sprite);
         }
     }
@@ -453,16 +491,7 @@ namespace Paladin
         {
             // Loose thatch moves over an intact roof. Independent band
             // rasterization can otherwise expose background at fitted joins.
-            queue.submit(
-                {b,
-                 {},
-                 depth,
-                 id,
-                 0,
-                 part,
-                 sprite.texture.get(),
-                 f}
-            );
+            queue.submit({b, {}, depth, id, 0, part, sprite.texture.get(), f});
         }
         for (float row = start; row < f.height; row += 2)
         {

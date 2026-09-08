@@ -38,6 +38,9 @@ namespace Paladin
         std::shared_ptr<Texture> texture;
         std::shared_ptr<Texture> shadow;
         RenderColor overviewColor{0, 0, 0, 0};
+        std::shared_ptr<const std::vector<RenderColor>> materialPixels;
+        RenderColor materialBase{};
+        int materialWidth = 0, materialHeight = 0;
         double width = 1, height = 1, pivotX = .5, pivotY = 1, elevation = 0;
         int frames = 1;
         double fps = 0;

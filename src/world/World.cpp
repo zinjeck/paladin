@@ -151,7 +151,8 @@ namespace Paladin
     {
         const WorldTile* tile = grid_.tile({position.x, position.y});
 
-        if (!tile || tile->terrain != TerrainType::Land)
+        if (!tile || tile->terrain != TerrainType::Land ||
+            tile->biome == BiomeType::Tundra || tile->biome == BiomeType::Polar)
         {
             return false;
         }

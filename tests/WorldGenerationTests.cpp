@@ -1,5 +1,6 @@
 #include "TestFramework.h"
 
+#include "rendering/GlobeLighting.h"
 #include "rendering/WorldReliefPlacement.h"
 #include "rendering/WorldSurface.h"
 #include "world/BiomeType.h"
@@ -131,6 +132,7 @@ namespace
             for (int x = 0; x < 24; ++x)
             {
                 grid.tile({x, y})->elevation = Elevation{.50F};
+                grid.tile({x, y})->temperature = Temperature{.5F};
             }
         }
         grid.tile({12, 12})->elevation = Elevation{.90F};
@@ -356,6 +358,47 @@ namespace
 
 void runWorldGenerationTests()
 {
+    PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Hills) == "Hills");
+    PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Polar) == "Polar");
+    PALADIN_CHECK(Paladin::biomeName(static_cast<Paladin::BiomeType>(255)) == "Unknown");
+    // Sun position is geographic, periodic, and independent of camera yaw.
+    PALADIN_CHECK(Paladin::globeSunDot(.5, .5, 43200) > .999);
+    PALADIN_CHECK(Paladin::globeSunDot(0, .5, 43200) < -.999);
+    PALADIN_CHECK(std::abs(Paladin::globeSunDot(.5, .5, 21600)) < 1e-8);
+    PALADIN_CHECK(
+        std::abs(
+            Paladin::globeSunDot(.23, .35, 0) -
+            Paladin::globeSunDot(.23, .35, 86400)
+        ) < 1e-8
+    );
+    const auto night = Paladin::globeLight(0, .5, 43200, 1);
+    PALADIN_CHECK(night.red >= 120 && night.blue > night.red);
+    for (auto seed : {73517ULL, 84391ULL, 992ULL})
+    {
+        Paladin::WorldGenerationSettings s;
+        s.width = 180;
+        s.height = 132;
+        s.seed = seed;
+        Paladin::World w(s);
+        int polar = 0, tundra = 0;
+        for (int y = 0; y < s.height; ++y)
+        {
+            for (int x = 0; x < s.width; ++x)
+            {
+                const auto& t = *w.grid().tile({x, y});
+                if (t.biome == Paladin::BiomeType::Polar ||
+                    t.biome == Paladin::BiomeType::Tundra)
+                {
+                    PALADIN_CHECK(!w.canFoundSettlementAt({x, y}));
+                    PALADIN_CHECK(!w.foundSettlement({x, y}, {}).isValid());
+                    polar += t.biome == Paladin::BiomeType::Polar;
+                    tundra += t.biome == Paladin::BiomeType::Tundra;
+                }
+            }
+        }
+        PALADIN_CHECK(polar > 100);
+        PALADIN_CHECK(tundra > 0);
+    }
     const Paladin::WorldGenerationSettings firstRandomSettings =
         Paladin::withRandomWorldSeed();
 

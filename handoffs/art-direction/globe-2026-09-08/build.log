@@ -1,0 +1,32 @@
+[1/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/art-palette.hex C:/Paladin/out/build/x64-Release/assets/sprites/art-palette.hex && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/pieces.catalog C:/Paladin/out/build/x64-Release/assets/sprites/pieces.catalog && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/lights.catalog C:/Paladin/out/build/x64-Release/assets/sprites/lights.catalog"
+[2/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_directory C:/Paladin/assets/sprites C:/Paladin/out/build/x64-Release/assets/sprites"
+[3/17] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Release/assets/sprites && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/config/city-objects.catalog C:/Paladin/out/build/x64-Release/assets/sprites/objects.catalog"
+[4/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[5/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[6/17] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[7/17] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[8/17] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[9/17] Linking CXX executable Paladin.exe
+[10/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+[11/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[12/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[13/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[14/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[15/17] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[16/17] Linking CXX executable PaladinApplicationSmokeTests.exe
+[17/17] Verify final world pixel grid, daylight/night rendering and sprite integration
+world pan/zoom mean_ms=5.56089 worst_ms=10.7187
+globe renderer=software
+globe generation land=23013 hills=6312 mountains=4976 supported=4976
+city coast zoom mean_ms=7.82346 worst_ms=19.6726
+globe warm zoom/rotation mean_ms=15.5735 worst_ms=19.7756 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Invalid object presentation recipe; using flat fallback
+Rejected off-palette or partial-alpha artwork: alpha.png
+Rejected off-palette or partial-alpha artwork: alpha.png
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Application routing smoke test passed.
