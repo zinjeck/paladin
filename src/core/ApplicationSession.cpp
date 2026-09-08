@@ -7,9 +7,11 @@
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
+#include "rendering/PlanetRotation.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
+#include "rendering/WorldSurface.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -24,10 +26,50 @@
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
 #include <memory>
 
 namespace Paladin
 {
+    namespace
+    {
+        PlanetRotation settlementViewRotation(
+            const World& world,
+            WorldTilePosition position,
+            int cityQuarterTurns
+        )
+        {
+            constexpr double pi = 3.14159265358979323846;
+            const auto& grid = world.grid();
+            const double u = (position.x + .5) / grid.width();
+            const double v = (position.y + .5) / grid.height();
+            const double longitude = (u - .5) * 2 * pi;
+            const double latitude = (.5 - v) * pi;
+            const auto normal = WorldSurface::sphere(u, v);
+            const WorldSurface::Point3 north{
+                -std::sin(latitude) * std::sin(longitude),
+                std::cos(latitude),
+                -std::sin(latitude) * std::cos(longitude)
+            };
+            const WorldSurface::Point3 east{
+                std::cos(longitude),
+                0,
+                -std::sin(longitude)
+            };
+            const double heading = cityQuarterTurns * pi * .5;
+            const WorldSurface::Point3 cityUp{
+                north.x * std::cos(heading) + east.x * std::sin(heading),
+                north.y * std::cos(heading) + east.y * std::sin(heading),
+                north.z * std::cos(heading) + east.z * std::sin(heading)
+            };
+            const auto centered =
+                PlanetRotation::between(normal, {0, 0, 1}).normalized();
+            const auto viewUp = centered.apply(cityUp);
+            const double roll = std::atan2(viewUp.x, viewUp.y);
+            return (PlanetRotation::axis(0, 0, 1, roll) * centered).normalized();
+        }
+    } // namespace
+
     void Application::startWorldSession()
     {
         ledgerPanel_->close();
@@ -216,6 +258,14 @@ namespace Paladin
             return;
         }
 
+        const Settlement* leavingSettlement =
+            simulation_->world().settlement(activeCitySettlementId_);
+        const std::optional<WorldTilePosition> leavingPosition =
+            leavingSettlement
+                ? std::optional<WorldTilePosition>(leavingSettlement->position())
+                : std::nullopt;
+        const int leavingQuarterTurns = camera_->cityQuarterTurns();
+
         settlementObjectPlacementController_->cancelPlacement();
         settlementCommandController_->cancel();
         settlementInspectionController_->clear();
@@ -253,6 +303,20 @@ namespace Paladin
             camera_ = std::make_unique<Camera2D>(
                 static_cast<double>(simulation_->world().grid().width()) * 0.5,
                 static_cast<double>(simulation_->world().grid().height()) * 0.5
+            );
+        }
+
+        if (leavingPosition)
+        {
+            const auto& grid = simulation_->world().grid();
+            camera_->setPlanetRotation(
+                settlementViewRotation(
+                    simulation_->world(),
+                    *leavingPosition,
+                    leavingQuarterTurns
+                ),
+                grid.width(),
+                grid.height()
             );
         }
 
