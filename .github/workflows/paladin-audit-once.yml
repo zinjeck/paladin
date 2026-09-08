@@ -6,6 +6,7 @@ on:
       - .github/workflows/paladin-audit-once.yml
       - .github/paladin-audit-apply.py
       - .github/paladin-audit-regressions.txt
+      - .github/paladin-audit-followup.py
 permissions:
   contents: write
 concurrency:
@@ -20,7 +21,9 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Apply only verified baseline replacements
-        run: python3 .github/paladin-audit-apply.py
+        run: |
+          python3 .github/paladin-audit-apply.py
+          python3 .github/paladin-audit-followup.py
       - name: Configure the existing simulation test source set without private art
         shell: bash
         run: |
