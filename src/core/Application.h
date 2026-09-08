@@ -80,7 +80,8 @@ namespace Paladin
         bool handleMainMenuEvent(const SDL_Event& event);
         void renderMainMenu();
 
-        // City screen and its modal/input layers.
+        // Local settlement screen. "City" remains a presentation synonym;
+        // the domain entity is always Settlement.
         void layoutCityScreen();
         void updateCityScreen();
         void synchronizeCityStatus();
@@ -112,12 +113,12 @@ namespace Paladin
         // Session lifecycle and existing presentation helpers.
         void startWorldSession();
         void endWorldSession();
-        void enterPlayerCapitalCity();
+        void enterPresentedSettlement();
         void executeConsoleCommand(std::string_view text);
         void renderDebug();
         void renderCityTooltip();
         UiTooltip tooltip_;
-        void returnToWorldFromCity();
+        void returnToWorldFromSettlement();
 
         void cancelFoundingFlow();
         void confirmFoundingFlow();
@@ -154,7 +155,7 @@ namespace Paladin
         std::unique_ptr<EmploymentPanel> employmentPanel_;
         std::unique_ptr<DebugConsole> debugConsole_;
         std::vector<std::pair<SettlementId, std::unique_ptr<Camera2D>>>
-            cityCameras_;
+            settlementCameras_;
         std::string cachedStats_;
         std::uint64_t nextStatsRefresh_ = 0;
         bool employmentCapturedPointer_ = false;
@@ -184,7 +185,7 @@ namespace Paladin
         bool handleWorldManagement(const SDL_Event& event);
         void renderWorldManagement();
         std::unique_ptr<Camera2D> savedWorldCamera_;
-        SettlementId activeCitySettlementId_;
+        SettlementId activeSettlementId_;
         bool cityHudCapturedPointer_ = false;
         bool globePointerDown_ = false, globeDragging_ = false;
         int worldNavigatorPress_ = 0;
