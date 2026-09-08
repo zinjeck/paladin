@@ -71,7 +71,8 @@ namespace Paladin
     bool SettlementCommandController::pointerReleased(
         std::optional<SettlementTilePosition> position,
         SettlementMap& settlementMap,
-        SettlementCitizenState& citizens
+        SettlementCitizenState& citizens,
+        double minute
     )
     {
         if (!isActive() || !dragStart_)
@@ -98,7 +99,8 @@ namespace Paladin
             return settlementMap.commandState().cancelIntersecting(
                        settlementMap,
                        *footprint,
-                       citizens
+                       citizens,
+                       minute
                    ) > 0;
         }
 

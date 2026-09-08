@@ -114,6 +114,9 @@ namespace Paladin
             bool& successful;
             double progress;
             double duration;
+            const SettlementMap& map;
+            const SettlementNavigation& navigation;
+            const CitizenMovementPolicy& movementPolicy;
             ~RestorePosition()
             {
                 citizen.tilePosition = original;
@@ -127,9 +130,21 @@ namespace Paladin
                     {
                         citizen.stepDuration = duration;
                     }
+                    else
+                    {
+                        // A prepended house exit changes the first edge even
+                        // when the outdoor leg needs no path search.
+                        citizen.stepDuration = navigation.stepCost(
+                            map,
+                            original,
+                            citizen.path.front(),
+                            movementPolicy
+                        );
+                    }
                 }
             }
-        } restore{c, original, exitPath, successful, progress, duration};
+        } restore{c, original, exitPath, successful, progress, duration,
+                  map, citizens.navigation_, citizens.movementPolicy};
         // Finish the current physical step before changing direction. Planning
         // from its endpoint preserves interpolation instead of snapping
         // backward.

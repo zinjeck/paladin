@@ -1242,10 +1242,6 @@ namespace Paladin
                 }
             }
 
-            if (found == terrainChunks_.end())
-            {
-                continue;
-            }
             found->second.lastUsed = terrainFrame_;
             // Retained textures at different resolutions share one byte cap.
             while (terrainBytes_ > cacheBytes && terrainChunks_.size() > 1)

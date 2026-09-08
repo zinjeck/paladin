@@ -202,7 +202,11 @@ namespace Paladin
         void planMeal(SettlementCitizen&, const SettlementMap&);
         bool shouldSleep(const SettlementCitizen&, double minute) const;
         void planSleep(SettlementMap&, SettlementCitizen&, double minute);
-        bool enterHome(SettlementMap&, SettlementCitizen&);
+        bool enterHome(
+            SettlementMap&,
+            const SettlementCitizenState&,
+            SettlementCitizen&
+        );
         SettlementTilePosition sleepingPosition(
             const SettlementMap&,
             const SettlementCitizenState&,

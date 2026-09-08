@@ -287,7 +287,7 @@ void runSettlementActivityTests()
         citizens
     ));
     PALADIN_CHECK(
-        commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens) == 1
+        commands.cancelIntersecting(commandsMap, {{1, 1}, 1, 1}, citizens, 0) == 1
     );
     PALADIN_CHECK(!commandsMap.naturalFeatures().at({1, 1}).marked);
     PALADIN_CHECK(!commands.contains(commandsMap, commandId, {1, 1}, {}, {}));

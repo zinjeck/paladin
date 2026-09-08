@@ -47,7 +47,8 @@ namespace Paladin
         std::size_t cancelIntersecting(
             SettlementMap& map,
             const SettlementObjectFootprint& footprint,
-            SettlementCitizenState& citizens
+            SettlementCitizenState& citizens,
+            double minute
         );
 
         [[nodiscard]]

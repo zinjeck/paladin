@@ -37,7 +37,8 @@ namespace Paladin
         bool pointerReleased(
             std::optional<SettlementTilePosition> position,
             SettlementMap& settlementMap,
-            SettlementCitizenState& citizens
+            SettlementCitizenState& citizens,
+            double minute
         );
 
         [[nodiscard]]

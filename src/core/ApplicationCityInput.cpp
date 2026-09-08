@@ -360,7 +360,10 @@ namespace Paladin
                         settlementCommandController_->pointerReleased(
                             tile,
                             *settlementMap,
-                            settlement->simulationState().citizens()
+                            settlement->simulationState().citizens(),
+                            static_cast<double>(
+                                simulation_->world().time().totalGameMinutes()
+                            )
                         )
                     );
                 }
