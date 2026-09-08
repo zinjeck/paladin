@@ -1,0 +1,134 @@
+name: Verify Paladin art tracking and numeric regressions
+on:
+  push:
+    branches: [verify/art-inputs-relief-2026-09-07]
+    paths:
+      - .github/workflows/paladin-art-relief-once.yml
+      - .github/paladin-art-relief-apply.py
+      - tests/EntityAttributeTests.cpp
+      - tests/WorldReliefTests.cpp
+      - tests/GitIgnoreTests.cmake
+      - .gitignore
+permissions:
+  contents: read
+concurrency:
+  group: paladin-art-inputs-relief-verification
+  cancel-in-progress: false
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: python3
+          - os: windows-2022
+            python: python
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Apply guarded changes to the merged baseline
+        run: ${{ matrix.python }} .github/paladin-art-relief-apply.py
+      - name: Prove the warp regression rejects the original implementation
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "$RUNNER_TEMP/old-relief/world/generation"
+          git show HEAD:src/world/generation/WorldRelief.h > "$RUNNER_TEMP/old-relief/world/generation/WorldRelief.h"
+          cat > "$RUNNER_TEMP/relief-test-main.cpp" <<'CPP'
+          #include <exception>
+          #include <iostream>
+          void runWorldReliefTests();
+          int main() {
+              try { runWorldReliefTests(); }
+              catch (const std::exception& error) { std::cerr << error.what(); return 1; }
+              return 0;
+          }
+          CPP
+          c++ -std=c++23 -O1 -I"$RUNNER_TEMP/old-relief" -Isrc -Itests \
+            tests/WorldReliefTests.cpp src/world/generation/GenerationNoise.cpp \
+            "$RUNNER_TEMP/relief-test-main.cpp" -o "$RUNNER_TEMP/old-relief-test"
+          python3 - <<'PY'
+          import os, subprocess
+          result = subprocess.run([os.path.join(os.environ['RUNNER_TEMP'], 'old-relief-test')], capture_output=True, text=True)
+          print('Baseline regression result:', result.returncode, result.stdout, result.stderr)
+          assert result.returncode == 1
+          assert 'Relief must sample both warp offsets from the unwarped coordinate.' in result.stderr
+          print('Confirmed: the original sequential warp fails the new independent-coordinate regression.')
+          PY
+      - name: Configure the complete simulation test source set without local art
+        run: |
+          ${{ matrix.python }} - <<'PY'
+          from pathlib import Path
+          import os, re
+          root = Path.cwd()
+          text = (root / 'CMakeLists.txt').read_text()
+          block = re.search(r'add_executable\(PaladinTests\s*\n(.*?)\n\)', text, re.S)
+          assert block, 'PaladinTests source list not found'
+          sources = [line.strip() for line in block.group(1).splitlines()
+                     if line.strip() and not line.lstrip().startswith('#')]
+          assert all(s.endswith('.cpp') and (root / s).is_file() for s in sources)
+          assert 'tests/EntityAttributeTests.cpp' in sources
+          assert 'tests/WorldReliefTests.cpp' in sources
+          project = Path(os.environ['RUNNER_TEMP']) / 'paladin-art-review-project'
+          project.mkdir(exist_ok=True)
+          cmake = ['cmake_minimum_required(VERSION 3.24)',
+                   'project(PaladinArtReview LANGUAGES CXX)',
+                   'set(CMAKE_CXX_STANDARD 23)', 'set(CMAKE_CXX_STANDARD_REQUIRED ON)',
+                   'set(CMAKE_CXX_EXTENSIONS OFF)', 'add_executable(PaladinTests']
+          cmake += ['  "' + (root / s).as_posix() + '"' for s in sources]
+          cmake += [')', 'target_include_directories(PaladinTests PRIVATE "' + (root / 'src').as_posix() + '" "' + (root / 'tests').as_posix() + '")',
+                    'enable_testing()', 'add_test(NAME PaladinTests COMMAND PaladinTests)']
+          # Exercise the exact new CTest registration as well as the C++ list.
+          ignore = text.split('# Keep source/art inputs trackable without publishing local build output.\n', 1)[1].split('# Opt-in SDL integration', 1)[0]
+          cmake += [ignore.replace('${CMAKE_CURRENT_SOURCE_DIR}', root.as_posix())]
+          (project / 'CMakeLists.txt').write_text('\n'.join(cmake) + '\n')
+          print('Using all', len(sources), 'sources from the repository PaladinTests target.')
+          PY
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            cmake -S "$RUNNER_TEMP/paladin-art-review-project" -B "$RUNNER_TEMP/paladin-art-review-build" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_CXX_FLAGS="-O1 -fsanitize=address,undefined -fno-omit-frame-pointer"
+          else
+            cmake -S "$RUNNER_TEMP/paladin-art-review-project" -B "$RUNNER_TEMP/paladin-art-review-build" -A x64
+          fi
+      - name: Build all simulation tests
+        run: cmake --build "$RUNNER_TEMP/paladin-art-review-build" --config Debug --parallel 2
+      - name: Run all simulation, numeric and ignore-policy checks
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir "$RUNNER_TEMP/paladin-art-review-build" -C Debug --verbose --no-tests=error
+      - name: Check whitespace and scope
+        run: |
+          git diff --check
+          git diff --stat
+  publish-verified-source:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Commit only the verified replacements on the isolated branch
+        shell: bash
+        run: |
+          test "$GITHUB_REF" = "refs/heads/verify/art-inputs-relief-2026-09-07"
+          python3 .github/paladin-art-relief-apply.py
+          git diff --check
+          git add -- CMakeLists.txt tests/TestMain.cpp src/world/generation/WorldRelief.h
+          git diff --cached --check
+          git diff --cached --stat
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Verify art tracking and independent relief warp with numeric regression suites'
+          git push origin HEAD:refs/heads/verify/art-inputs-relief-2026-09-07

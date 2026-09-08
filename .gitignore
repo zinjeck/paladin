@@ -1,4 +1,5 @@
-# Default-deny: publish code, not local notes, assets, or generated files.
+# Default-deny: publish source and explicitly approved game/art inputs.
+# Local notes, arbitrary screenshots, and generated files stay private.
 *
 !*/
 
@@ -25,15 +26,37 @@
 !*.S
 !*.inc
 
-# Build definitions and the policy needed to enforce this allowlist.
+# Build definitions and repository instructions.
 !*.csproj
 !CMakeLists.txt
 !*.cmake
 !*.cmake.in
 !/.gitignore
-!/config/city-objects.catalog
+!/AGENTS.md
 
-# Never publish generated/vendor source from local build and tool folders.
+# Authored runtime configuration, sprite recipes, lighting, and palettes.
+!/config/*.catalog
+!/config/*.hex
+!/config/*.gpl
+!/config/*.pal
+
+# Runtime assets, including sprites, atlases, and the game's font assets.
+# Keep their redistribution/attribution notices with them.
+!/assets/
+!/assets/**
+!/licenses/
+!/licenses/**
+
+# Other local references remain private. Only the agreed art-direction area
+# includes masters (Krita/Aseprite/etc.), exports, tools, notes, and previews.
+/docs/
+/sources/
+/handoffs/*
+!/handoffs/art-direction/
+!/handoffs/art-direction/**
+
+# These exclusions must follow the art allowlist: generated/vendor source and
+# build output must stay ignored even when nested in an approved art folder.
 .git/
 .vs/
 .vscode/
@@ -52,10 +75,17 @@ coverage-*/
 node_modules/
 .venv/
 venv/
+__pycache__/
+renderer-test-fixture/
 
-# Private reference folders stay local, even if they contain code examples.
-/docs/
-/handoffs/
-/sources/
-/assets/
-/licenses/
+# Editor/OS debris is not an art master or a review image.
+*.tmp
+*.bak
+*.kra~
+*.ora~
+*.ase~
+*.aseprite~
+*.psd~
+.DS_Store
+Thumbs.db
+desktop.ini
