@@ -41,7 +41,7 @@ namespace Paladin
         ledgerPanel_->toggle(
             action == CityHudAction::Events,
             screen_ == Screen::World,
-            activeSettlementId_
+            activeCitySettlementId_
         );
         updateReports();
         return true;
