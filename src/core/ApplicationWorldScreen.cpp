@@ -66,14 +66,14 @@ namespace Paladin
                 }
                 if (rollDirection != 0.0)
                 {
-                    constexpr double pi = 3.14159265358979323846;
-                    constexpr double rollRadiansPerSecond = pi * 0.5;
                     GlobeCameraNavigation::roll(
                         *camera_,
                         simulation_->world().grid(),
                         renderer_->outputWidth(),
                         renderer_->outputHeight(),
-                        rollDirection * rollRadiansPerSecond * frameDeltaSeconds
+                        rollDirection *
+                            cameraNavigationPolicy_.globeRollRadiansPerSecond *
+                            frameDeltaSeconds
                     );
                 }
             }
@@ -151,16 +151,16 @@ namespace Paladin
                 static_cast<double>(territoryPolicy.settlementRegionHeight / 2);
 
             const RenderColor previewColor =
-                validPlacement ? RenderColor{72, 220, 112, 220}
-                               : RenderColor{232, 70, 70, 230};
+                validPlacement ? RenderColor{121, 181, 109, 220}
+                               : RenderColor{215, 80, 86, 230};
 
             overlays[0] = {
                 regionX,
                 regionY,
                 static_cast<double>(territoryPolicy.settlementRegionWidth),
                 static_cast<double>(territoryPolicy.settlementRegionHeight),
-                validPlacement ? RenderColor{72, 220, 112, 34}
-                               : RenderColor{232, 70, 70, 42}
+                validPlacement ? RenderColor{121, 181, 109, 34}
+                               : RenderColor{215, 80, 86, 42}
             };
 
             outlines[0] = {
@@ -179,7 +179,7 @@ namespace Paladin
         {
             const MapColor selectedColor = foundingPanel_->isOpen()
                                                ? foundingPanel_->selectedColor()
-                                               : MapColor{238, 190, 64};
+                                               : MapColor{255, 215, 131};
 
             const TerritoryFoundationPolicy& territoryPolicy =
                 simulation_->world().territoryFoundationPolicy();
@@ -278,13 +278,12 @@ namespace Paladin
         const auto* realm = world.realm(simulation_->playerRealmId());
         const auto* active =
             world.settlement(simulation_->presentedSettlementId());
-        std::size_t population = 0;
-        for (const auto& city : world.settlements())
+        std::uint64_t population = 0;
+        for (const auto& settlement : world.settlements())
         {
-            if (city.ownerRealmId() == simulation_->playerRealmId())
+            if (settlement.ownerRealmId() == simulation_->playerRealmId())
             {
-                population +=
-                    city.simulationState().citizens().citizens().size();
+                population += settlement.population();
             }
         }
         cityHud_->setSettlementStatus(true, population);
