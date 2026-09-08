@@ -8,6 +8,7 @@
 #include "rendering/WorldPixelGrid.h"
 #include <SDL3/SDL.h>
 
+#include <chrono>
 #include <utility>
 
 namespace Paladin
@@ -36,7 +37,30 @@ namespace Paladin
         artRoot = PALADIN_ART_ROOT;
 #endif
         artwork_.load(renderer, artRoot);
-        globe_.updateAtlas(renderer, world, artwork_);
+
+        // This path is shown only while world interaction is blocked. Spend a
+        // larger but still responsive slice advancing completed GPU uploads so
+        // the old one-slice-per-present cadence does not stretch preparation
+        // across dozens of otherwise-empty loading frames. Atlas generation is
+        // still asynchronous and the exact same pixels/textures are produced.
+        constexpr auto preparationSlice = std::chrono::milliseconds(12);
+        const auto deadline = std::chrono::steady_clock::now() + preparationSlice;
+        do
+        {
+            const float before = globe_.preparationProgress();
+            globe_.updateAtlas(renderer, world, artwork_);
+            if (globe_.detailReady())
+            {
+                return true;
+            }
+            const float after = globe_.preparationProgress();
+            // CPU generation is still running if no upload/progress work was
+            // available. Return to the event loop instead of busy-spinning.
+            if (after <= before)
+            {
+                break;
+            }
+        } while (std::chrono::steady_clock::now() < deadline);
         return globe_.detailReady();
     }
 
