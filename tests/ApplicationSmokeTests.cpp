@@ -301,12 +301,14 @@ namespace Paladin
                                      "presentation-fixture";
             std::filesystem::create_directories(fixtureRoot);
             std::filesystem::copy_file(
-                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "config/city-objects.catalog",
+                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                    "config/city-objects.catalog",
                 fixtureRoot / "objects.catalog",
                 std::filesystem::copy_options::overwrite_existing
             );
             std::filesystem::copy_file(
-                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "config/lights.catalog",
+                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                    "config/lights.catalog",
                 fixtureRoot / "lights.catalog",
                 std::filesystem::copy_options::overwrite_existing
             );
@@ -624,7 +626,8 @@ namespace Paladin
             // Real artist assets: no assumptions about their exact paint
             // colors.
             city.artRootOverride =
-                (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
+                (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                 "assets/sprites")
                     .string();
             SceneSpriteLibrary installed;
             installed.load(renderer, city.artRootOverride);
@@ -1623,13 +1626,18 @@ namespace Paladin
                 PALADIN_CHECK(found);
                 camera.setPosition(hill.x + .5, hill.y + .5);
                 camera.setZoom(8);
-                const auto terrainDeadline=SDL_GetTicks()+15000;
-                do {
+                const auto terrainDeadline = SDL_GetTicks() + 15000;
+                do
+                {
                     app.renderer_->beginFrame();
                     map.render(*app.renderer_, review, camera, metrics);
                     SDL_Delay(1);
-                } while ((!map.terrainDetailReady() || !map.terrainLocalDetailReady()) && SDL_GetTicks()<terrainDeadline);
-                PALADIN_CHECK(map.terrainDetailReady() && map.terrainLocalDetailReady());
+                } while ((!map.terrainDetailReady() ||
+                          !map.terrainLocalDetailReady()) &&
+                         SDL_GetTicks() < terrainDeadline);
+                PALADIN_CHECK(
+                    map.terrainDetailReady() && map.terrainLocalDetailReady()
+                );
                 capture(app, "world-foothills.bmp");
                 camera.setZoom(16);
                 app.renderer_->beginFrame();
@@ -1710,7 +1718,8 @@ namespace Paladin
                 SceneSpriteLibrary art;
                 art.load(
                     *app.renderer_,
-                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                     "assets/sprites")
                         .string()
                 );
                 globeRevisionChecks(
@@ -1785,7 +1794,8 @@ namespace Paladin
                 SceneSpriteLibrary art;
                 art.load(
                     *app.renderer_,
-                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                     "assets/sprites")
                         .string()
                 );
                 SceneDrawQueue goods;
@@ -2143,7 +2153,8 @@ namespace Paladin
                     PALADIN_CHECK(
                         tp >= StaticDetailPixels || city.submittedItems() < 2000
                     );
-                    if (tp < StaticDetailPixels)
+                    if (tp < StaticDetailPixels &&
+                        !SDL_getenv("PALADIN_CAMERA_PROFILE"))
                     {
                         // Terrain LOD stays static. Weather intentionally moves
                         // at these zooms and has separate pause/motion checks.
@@ -2173,6 +2184,7 @@ namespace Paladin
                 {
                     camera.setPosition(focus, focus == 72 ? 72 : 128);
                     double zoomWorst = 0, zoomTotal = 0;
+                    std::array<double, 5> stageWorst{};
                     for (int i = 0; i < 40; ++i)
                     {
                         const double tp = 2 + (i < 20 ? i : 39 - i) * 1.6;
@@ -2193,17 +2205,64 @@ namespace Paladin
                         );
                         app.renderer_->endFrame();
                         const double ms = (SDL_GetTicksNS() - start) / 1e6;
+                        for (int k = 0; k < 5; ++k)
+                        {
+                            stageWorst[k] =
+                                std::max(stageWorst[k], city.renderTimings[k]);
+                        }
                         zoomWorst = std::max(zoomWorst, ms);
                         zoomTotal += ms;
                     }
                     std::cout << "continuous_zoom focus_x=" << focus
                               << " mean_ms=" << zoomTotal / 40
                               << " worst_ms=" << zoomWorst << std::endl;
+                    for (int k = 0; k < 5; ++k)
+                    {
+                        std::cout << "stage " << k
+                                  << " worst_ms=" << stageWorst[k] << std::endl;
+                    }
+                }
+                if (SDL_getenv("PALADIN_CAMERA_PROFILE"))
+                {
+                    for (double hour : {12., 23.})
+                    {
+                        double total = 0, worst = 0;
+                        for (int i = 0; i < 60; ++i)
+                        {
+                            camera.setPosition(
+                                40 + i * 3,
+                                128 + 30 * std::sin(i * .17)
+                            );
+                            camera.setZoom((24 + 8 * std::sin(i * .11)) / 4);
+                            const auto start = SDL_GetTicksNS();
+                            app.renderer_->beginFrame();
+                            city.render(
+                                *app.renderer_,
+                                map,
+                                camera,
+                                metrics,
+                                placement,
+                                commands,
+                                people,
+                                inspection,
+                                1,
+                                hour
+                            );
+                            app.renderer_->endFrame();
+                            const double ms = (SDL_GetTicksNS() - start) / 1e6;
+                            total += ms;
+                            worst = std::max(worst, ms);
+                        }
+                        std::cout << "fast_scroll hour=" << hour
+                                  << " mean_ms=" << total / 60
+                                  << " worst_ms=" << worst << std::endl;
+                    }
                 }
                 SceneSpriteLibrary cacheArt;
                 cacheArt.load(
                     *app.renderer_,
-                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                     "assets/sprites")
                         .string()
                 );
                 SettlementGroundCache groundCache;
@@ -2341,11 +2400,21 @@ namespace Paladin
             PALADIN_CHECK(
                 std::abs(app.camera_->tileX() / grid.width() - .25) < 1e-5
             );
-            const auto switcher =
-                WorldMapNavigation::buttonBounds(int(width), int(height));
-            PALADIN_CHECK(click(app, switcher.x + 20, switcher.y + 15));
+            app.worldRenderer_->toggleProjection(
+                *app.camera_,
+                grid,
+                int(width),
+                int(height),
+                *app.tileRenderMetrics_
+            );
             PALADIN_CHECK(!app.worldRenderer_->globeEnabled);
-            PALADIN_CHECK(click(app, switcher.x + 20, switcher.y + 15));
+            app.worldRenderer_->toggleProjection(
+                *app.camera_,
+                grid,
+                int(width),
+                int(height),
+                *app.tileRenderMetrics_
+            );
             PALADIN_CHECK(app.worldRenderer_->globeEnabled);
             const auto globeZoom = app.camera_->zoom();
             app.applyCameraZoom(1.2, width * .5F, height * .5F);

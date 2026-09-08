@@ -210,11 +210,20 @@ namespace Paladin
 
     void Application::handleWorldEvent(const SDL_Event& event)
     {
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
+            event.key.scancode == SDL_SCANCODE_M && !foundingPanel_->isOpen())
+        {
+            worldRenderer_->toggleProjection(
+                *camera_,
+                simulation_->world().grid(),
+                renderer_->outputWidth(),
+                renderer_->outputHeight(),
+                *tileRenderMetrics_
+            );
+            clampCameraToWorld();
+            return;
+        }
         const auto mapBounds = WorldMapNavigation::mapBounds(
-            renderer_->outputWidth(),
-            renderer_->outputHeight()
-        );
-        const auto toggleBounds = WorldMapNavigation::buttonBounds(
             renderer_->outputWidth(),
             renderer_->outputHeight()
         );
@@ -233,11 +242,9 @@ namespace Paladin
         {
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
                 event.button.button == SDL_BUTTON_LEFT &&
-                (mapBounds.contains(event.button.x, event.button.y) ||
-                 toggleBounds.contains(event.button.x, event.button.y)))
+                mapBounds.contains(event.button.x, event.button.y))
             {
-                worldNavigatorPress_ =
-                    mapBounds.contains(event.button.x, event.button.y) ? 1 : 2;
+                worldNavigatorPress_ = 1;
                 if (worldNavigatorPress_ == 1)
                 {
                     focusMap(event.button.x, event.button.y);
@@ -255,24 +262,11 @@ namespace Paladin
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
                 event.button.button == SDL_BUTTON_LEFT && worldNavigatorPress_)
             {
-                if (worldNavigatorPress_ == 2 &&
-                    toggleBounds.contains(event.button.x, event.button.y))
-                {
-                    worldRenderer_->toggleProjection(
-                        *camera_,
-                        simulation_->world().grid(),
-                        renderer_->outputWidth(),
-                        renderer_->outputHeight(),
-                        *tileRenderMetrics_
-                    );
-                }
                 worldNavigatorPress_ = 0;
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_WHEEL &&
-                (mapBounds.contains(event.wheel.mouse_x, event.wheel.mouse_y) ||
-                 toggleBounds
-                     .contains(event.wheel.mouse_x, event.wheel.mouse_y)))
+                mapBounds.contains(event.wheel.mouse_x, event.wheel.mouse_y))
             {
                 return;
             }

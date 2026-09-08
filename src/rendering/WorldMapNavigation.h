@@ -41,11 +41,10 @@ namespace Paladin
             }
             double u = (c.tileX() + (x - w * .5) / pixels) / g.width();
             double v = (c.tileY() + (y - h * .5) / pixels) / g.height();
-            if (v < 0 || v >= 1)
+            if (u < 0 || u >= 1 || v < 0 || v >= 1)
             {
                 return std::nullopt;
             }
-            u -= std::floor(u);
             return WorldSurface::UV{u, v};
         }
         static void focus(

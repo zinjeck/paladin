@@ -142,22 +142,10 @@ namespace Paladin
             );
         }
         presentation.cartographicBase = politicalViewActive_;
-        // The longitude seam repeats content through the same tile-based
-        // inputs.
-        const double halfWidth = renderer.outputWidth() / (2 * tilePixels);
-        const int first = int(
-            std::floor((camera.tileX() - halfWidth) / world.grid().width())
-        );
-        const int last = int(
-            std::floor((camera.tileX() + halfWidth) / world.grid().width())
-        );
-        for (int wrap = first; wrap <= last; ++wrap)
+        // Both projections share canonical map coordinates. The flat view
+        // draws one bounded copy; only the globe joins the longitude seam.
         {
-            Camera2D flat = camera;
-            flat.setPosition(
-                camera.tileX() - wrap * world.grid().width(),
-                camera.tileY()
-            );
+            const Camera2D& flat = camera;
             territoryRenderer_.render(
                 renderer,
                 world,
@@ -225,18 +213,7 @@ namespace Paladin
     {
         const auto b =
             WorldMapNavigation::mapBounds(r.outputWidth(), r.outputHeight());
-        const auto button =
-            WorldMapNavigation::buttonBounds(r.outputWidth(), r.outputHeight());
         ui.drawPanel(r, {b.x - 3, b.y - 3, b.width + 6, b.height + 6});
-        ui.drawButton(
-            r,
-            button,
-            globeEnabled ? "Flat map" : "Globe",
-            false,
-            false,
-            false,
-            true
-        );
         if (const auto* t = globe_.mapTexture(0))
         {
             r.drawTexture(

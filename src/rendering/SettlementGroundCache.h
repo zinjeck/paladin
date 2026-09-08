@@ -10,11 +10,17 @@ namespace Paladin
     {
         struct Entry
         {
-            std::unique_ptr<Texture> texture;
+            std::shared_ptr<Texture> texture;
             std::uint64_t used = 0, version = 0, signature = 0;
         };
         std::unordered_map<SettlementObjectId, Entry, StrongIdHash> entries_;
-        std::shared_ptr<Texture> source_;
+        std::unordered_map<
+            SettlementObjectId,
+            std::vector<SceneDrawItem>,
+            StrongIdHash>
+            pendingCommands_;
+        std::shared_ptr<Texture> source_, atlas_;
+        int atlasX_ = 0, atlasY_ = 0, atlasRow_ = 0;
         std::uint64_t instance_ = 0, version_ = 0, frame_ = 0;
         std::size_t bytes_ = 0;
         std::size_t builds_ = 0;
@@ -63,9 +69,16 @@ namespace Paladin
             if (instance_ != map.instanceId() || source_ != source)
             {
                 entries_.clear();
+                atlas_.reset();
+                atlasX_ = atlasY_ = atlasRow_ = 0;
+                pendingCommands_.clear();
                 bytes_ = 0;
                 instance_ = map.instanceId();
                 source_ = source;
+            }
+            if (version_ != map.objectState().navigationVersion())
+            {
+                pendingCommands_.clear();
             }
             version_ = map.objectState().navigationVersion();
             ++frame_;
@@ -89,6 +102,56 @@ namespace Paladin
                 );
             }
         }
+        void prewarm(
+            Renderer& renderer,
+            const SceneProjection& p,
+            const SettlementMap& map,
+            const SceneSpriteLibrary& sprites
+        )
+        {
+            begin(map, sprites);
+            const auto deadline = SDL_GetTicksNS() + 2000000;
+            SceneDrawQueue scratch;
+            for (const auto& object : map.objectState().completedObjects())
+            {
+                if (remaining_ <= 0 || SDL_GetTicksNS() >= deadline)
+                {
+                    break;
+                }
+                if (entries_.contains(object.id))
+                {
+                    continue;
+                }
+                const auto& f = object.footprint;
+                if (!p.visible(p.bounds(
+                        {double(f.topLeft.x),
+                         double(f.topLeft.y),
+                         0,
+                         double(f.width),
+                         double(f.height),
+                         0,
+                         0}
+                    )))
+                {
+                    continue;
+                }
+                if (object.objectTypeId != SettlementObjectTypes::Road &&
+                    sprites.objectStyle(object.objectTypeId).mode != "enclosed")
+                {
+                    continue;
+                }
+                scratch.clear();
+                submit(
+                    &renderer,
+                    scratch,
+                    p,
+                    map,
+                    sprites,
+                    object,
+                    (object.id.value() << 3) | 2
+                );
+            }
+        }
         bool submit(
             Renderer* renderer,
             SceneDrawQueue& queue,
@@ -99,7 +162,7 @@ namespace Paladin
             std::uint64_t id
         )
         {
-            if (!renderer || !source_ || p.tilePixels < StaticDetailPixels)
+            if (!renderer || !source_)
             {
                 return false;
             }
@@ -134,29 +197,59 @@ namespace Paladin
             if (it == entries_.end())
             {
                 const auto size = std::size_t(tw) * th * 4;
+                auto pending = pendingCommands_.find(object.id);
+                if (pending == pendingCommands_.end())
+                {
+                    SceneDrawQueue patches;
+                    SceneProjection local{
+                        f.topLeft.x + f.width * .5,
+                        f.topLeft.y + f.height * .5,
+                        double(pixels),
+                        tw,
+                        th
+                    };
+                    if (road)
+                    {
+                        naturalRoad(patches, local, map, sprites, object, id);
+                    }
+                    else
+                    {
+                        buildingGround(patches, local, sprites, map, f, id);
+                    }
+                    pending =
+                        pendingCommands_.emplace(object.id, patches.items())
+                            .first;
+                }
                 if (remaining_ <= 0 || bytes_ + size > 33 * 1024 * 1024)
                 {
-                    return false;
+                    const float scale = float(p.tilePixels / pixels);
+                    const auto bounds = p.bounds(
+                        {f.topLeft.x - pad,
+                         f.topLeft.y - pad,
+                         0,
+                         width,
+                         height,
+                         0,
+                         0}
+                    );
+                    for (auto item : pending->second)
+                    {
+                        item.bounds = {
+                            bounds.x + item.bounds.x * scale,
+                            bounds.y + item.bounds.y * scale,
+                            item.bounds.width * scale,
+                            item.bounds.height * scale
+                        };
+                        if (p.visible(item.bounds))
+                        {
+                            queue.submit(item);
+                        }
+                    }
+                    return true;
                 }
                 --remaining_;
-                SceneDrawQueue patches;
-                SceneProjection local{
-                    f.topLeft.x + f.width * .5,
-                    f.topLeft.y + f.height * .5,
-                    double(pixels),
-                    tw,
-                    th
-                };
-                if (road)
-                {
-                    naturalRoad(patches, local, map, sprites, object, id);
-                }
-                else
-                {
-                    buildingGround(patches, local, sprites, map, f, id);
-                }
                 std::vector<TextureDrawItem> draws;
-                for (const auto& item : patches.items())
+                for (const auto& item : pending->second)
                 {
                     draws.push_back(
                         {item.texture,
@@ -172,13 +265,20 @@ namespace Paladin
                 {
                     return false;
                 }
+                pendingCommands_.erase(pending);
                 bytes_ += size;
                 ++builds_;
                 it = entries_
                          .emplace(
                              object.id,
                              Entry{
-                                 std::move(texture),
+                                 renderer->cacheTextureInAtlas(
+                                     atlas_,
+                                     atlasX_,
+                                     atlasY_,
+                                     atlasRow_,
+                                     std::move(texture)
+                                 ),
                                  frame_,
                                  version_,
                                  signature(map, object)

@@ -1,0 +1,23 @@
+world pan/zoom mean_ms=1.4442 worst_ms=3.6995
+render tile_px=1 cold_ms=11.7146 warm_ms=3.9589 items=0
+render tile_px=4 cold_ms=7.8943 warm_ms=7.0914 items=0
+render tile_px=8 cold_ms=6.452 warm_ms=7.1914 items=0
+render tile_px=16 cold_ms=3.7827 warm_ms=3.4283 items=0
+structure submit_ms=10.17 items=6718
+render tile_px=32 cold_ms=15.6345 warm_ms=8.7981 items=5195
+render tile_px=64 cold_ms=4.059 warm_ms=1.13275 items=855
+continuous_zoom focus_x=72 mean_ms=5.56271 worst_ms=17.5236
+stage 0 worst_ms=6.3064
+stage 1 worst_ms=0.1839
+stage 2 worst_ms=4.373
+stage 3 worst_ms=10.3647
+stage 4 worst_ms=0.0087
+continuous_zoom focus_x=175 mean_ms=5.63601 worst_ms=13.3917
+stage 0 worst_ms=11.4633
+stage 1 worst_ms=0.2423
+stage 2 worst_ms=3.2654
+stage 3 worst_ms=0.7839
+stage 4 worst_ms=0.0064
+fast_scroll hour=12 mean_ms=3.8105 worst_ms=7.2711
+fast_scroll hour=23 mean_ms=3.7886 worst_ms=7.6165
+Application routing smoke test passed.

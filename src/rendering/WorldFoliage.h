@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/GlobeLighting.h"
 #include "rendering/GlobeView.h"
+#include "rendering/SceneDetail.h"
 #include "rendering/TerrainMaterialField.h"
 #include "world/Settlement.h"
 #include "world/World.h"
@@ -168,7 +169,7 @@ namespace Paladin
                 else
                 {
                     double dx = u * g.width() - camera.tileX();
-                    dx -= std::round(dx / g.width()) * g.width();
+
                     p = {
                         r.outputWidth() * .5 + dx * pixels,
                         r.outputHeight() * .5 +
@@ -191,8 +192,10 @@ namespace Paladin
                     continue;
                 }
                 const auto f = art.frame(*sprite, false);
-                const auto tint =
+                auto tint =
                     globeLight(u, v, world.time().secondsIntoDay(), p.z);
+                tint.alpha =
+                    std::uint8_t(tint.alpha * detailBlend(pixels, 24, 36));
                 const float x0 = float(p.x - pixels * .5),
                             y0 = float(p.y - pixels * .4),
                             x1 = float(x0 + pixels),

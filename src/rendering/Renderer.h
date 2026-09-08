@@ -102,8 +102,18 @@ namespace Paladin
             PreparedQuadMesh&,
             float x,
             float y,
-            float scale
+            float scale,
+            float opacity = 1
         );
+
+        std::shared_ptr<Texture> cacheTextureInAtlas(
+            std::shared_ptr<Texture>& page,
+            int& x,
+            int& y,
+            int& row,
+            std::unique_ptr<Texture> source
+        );
+        void drawTextureItems(std::span<const TextureDrawItem> items);
 
         void fillRectangles(
             std::span<const RenderRectangle> rectangles,

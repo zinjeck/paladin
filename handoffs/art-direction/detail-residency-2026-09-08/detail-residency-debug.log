@@ -1,0 +1,15 @@
+[0/2] Re-checking globbed directories...
+[1/10] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=225 cache_hits=229 rebuilt=0 atlas_pages=7 output_bytes=14377699 errors=0 warnings=0
+[2/10] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(254): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[3/10] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\core\ApplicationWorldInput.cpp(448): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[4/10] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[5/10] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[6/10] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[7/10] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[8/10] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[9/10] Linking CXX executable Paladin.exe

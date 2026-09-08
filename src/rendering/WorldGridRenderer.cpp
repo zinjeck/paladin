@@ -558,6 +558,8 @@ namespace Paladin
         overviewUpload_.reset();
         overviewUploadRow_ = 0;
         terrainChunks_.clear();
+        coastPaint_.clear();
+        coastFields_.clear();
         terrainSources_.clear();
         terrainDimensions_.clear();
         terrainBytes_ = 0;
@@ -575,6 +577,8 @@ namespace Paladin
         {
             cachedGrid_ = &grid;
             terrainChunks_.clear();
+            coastPaint_.clear();
+            coastFields_.clear();
             terrainBytes_ = 0;
         }
         renderSpriteTerrain(renderer, grid, camera, metrics, art, project);
@@ -623,11 +627,38 @@ namespace Paladin
     ) const
     {
         const double tp = metrics.scaledTilePixels(camera.zoom());
-        if (tp < 10 || !sprites.find("terrain.shallow") ||
+        if (tp <= 8 || !sprites.find("terrain.shallow") ||
             !sprites.find("terrain.beach"))
         {
             return;
         }
+        std::vector<TextureDrawItem> draws;
+        double coastTileOpacity = 1;
+        const auto drawTexture = [&](const Texture& t,
+                                     float sx,
+                                     float sy,
+                                     float sw,
+                                     float sh,
+                                     float x,
+                                     float y,
+                                     float w,
+                                     float h,
+                                     std::uint8_t opacity)
+        {
+            draws.push_back(
+                {&t,
+                 {sx, sy, sw, sh},
+                 {x, y, w, h},
+                 {},
+                 std::uint8_t(opacity * coastTileOpacity)}
+            );
+        };
+        const auto fillRectangle =
+            [&](float x, float y, float w, float h, RenderColor c)
+        {
+            c.alpha = std::uint8_t(c.alpha * coastTileOpacity);
+            draws.push_back({nullptr, {}, {x, y, w, h}, c, 255});
+        };
         const double ox = renderer.outputWidth() * .5 - camera.tileX() * tp;
         const double oy = renderer.outputHeight() * .5 - camera.tileY() * tp;
         const int x0 = std::max(0, int(std::floor(-ox / tp))),
@@ -680,6 +711,27 @@ namespace Paladin
                 s != sprites.find("terrain.water") &&
                 s != sprites.find("terrain.shallow"))
             {
+                auto& variants = coastPaint_
+                    [(std::uint64_t(std::uint32_t(x)) << 32) |
+                     std::uint32_t(y)];
+                auto found = variants.find(s);
+                if (found == variants.end())
+                {
+                    std::array<RenderColor, 256> colors;
+                    for (int cy = 0; cy < 16; ++cy)
+                    {
+                        for (int cx = 0; cx < 16; ++cx)
+                        {
+                            colors[cy * 16 + cx] = landscapePaint(
+                                *s,
+                                x + (cx + .5) / 16.,
+                                y + (cy + .5) / 16.,
+                                false
+                            );
+                        }
+                    }
+                    found = variants.emplace(s, std::move(colors)).first;
+                }
                 const int x0 = int(std::round(u * 16)),
                           x1 = int(std::round((u + w) * 16));
                 const int y0 = int(std::round(v * 16)),
@@ -688,14 +740,9 @@ namespace Paladin
                 {
                     for (int px = x0; px < x1; ++px)
                     {
-                        auto color = landscapePaint(
-                            *s,
-                            x + (px + .5) / 16.,
-                            y + (py + .5) / 16.,
-                            false
-                        );
+                        auto color = found->second[py * 16 + px];
                         color.alpha = std::uint8_t(alpha);
-                        renderer.fillRectangle(
+                        fillRectangle(
                             float(ox + (x + px / 16.) * tp),
                             float(oy + (y + py / 16.) * tp),
                             float(tp / 16),
@@ -718,7 +765,7 @@ namespace Paladin
                       ) *
                       f.width;
             }
-            renderer.drawTexture(
+            drawTexture(
                 *s->texture,
                 f.x + float((x % mw + u) * f.width / mw),
                 f.y + float((y % mh + v) * f.height / mh),
@@ -731,6 +778,7 @@ namespace Paladin
                 std::uint8_t(alpha)
             );
         };
+        const auto coastDeadline = SDL_GetTicksNS() + 2000000;
         for (int y = y0; y < y1; ++y)
         {
             for (int x = x0; x < x1; ++x)
@@ -742,6 +790,24 @@ namespace Paladin
                         continue;
                     }
                 }
+                const auto coastKey =
+                    (std::uint64_t(std::uint32_t(x)) << 32) | std::uint32_t(y);
+                auto cachedCoast = coastFields_.find(coastKey);
+                if (cachedCoast == coastFields_.end())
+                {
+                    if (SDL_GetTicksNS() >= coastDeadline)
+                    {
+                        continue;
+                    }
+                    cachedCoast = coastFields_.try_emplace(coastKey).first;
+                    cachedCoast->second.readyAt = SDL_GetTicksNS() / 1e9;
+                }
+                coastTileOpacity = std::clamp(
+                    (SDL_GetTicksNS() / 1e9 - cachedCoast->second.readyAt) /
+                        .18,
+                    0.,
+                    1.
+                );
                 const bool isLand = land(x, y);
                 const auto* water = sprites.find(
                     kind(x, y) == CityTileType::DeepWater ? "terrain.water"
@@ -796,7 +862,7 @@ namespace Paladin
                     : grassTile
                         ? sprites.find(terrainArtId(*grassTile, sprites))
                         : landArt;
-                const int n = tp >= 12 ? 16 : 8;
+                const int n = 16;
                 for (int row = 0; row < n; ++row)
                 {
                     for (int col = 0; col < n;)
@@ -805,9 +871,31 @@ namespace Paladin
                         {
                             const double xx = x + (c + .5) / n,
                                          yy = y + (row + .5) / n;
-                            const auto sample = coastSample(xx, yy, false);
-                            const double landField =
-                                surfaceField(sample.x, sample.y, land);
+                            const auto key =
+                                (std::uint64_t(std::uint32_t(x)) << 32) |
+                                std::uint32_t(y);
+                            auto& fields = coastFields_[key];
+                            const auto pixel = (n == 16 ? 64 : 0) + row * n + c;
+                            if (!fields.ready[pixel])
+                            {
+                                const auto sample = coastSample(xx, yy, false);
+                                fields.values[pixel] = {
+                                    surfaceField(sample.x, sample.y, land),
+                                    surfaceField(sample.x, sample.y, sand),
+                                    surfaceField(
+                                        xx,
+                                        yy,
+                                        [&](int a, int b)
+                                        {
+                                            return kind(a, b) ==
+                                                   CityTileType::ShallowWater;
+                                        }
+                                    )
+                                };
+                                fields.ready.set(pixel);
+                            }
+                            const auto& field = fields.values[pixel];
+                            const double landField = field[0];
                             if (coast && landField < .5)
                             {
                                 if (landField > .46)
@@ -833,20 +921,10 @@ namespace Paladin
                             }
                             if (!isLand && !coast)
                             {
-                                const double shallow = surfaceField(
-                                    xx,
-                                    yy,
-                                    [&](int a, int b)
-                                    {
-                                        return kind(a, b) ==
-                                               CityTileType::ShallowWater;
-                                    }
-                                );
+                                const double shallow = field[2];
                                 return shallow > .16 ? 5 : 0;
                             }
-                            return surfaceField(sample.x, sample.y, sand) > .47
-                                       ? 3
-                                       : 4;
+                            return field[1] > .47 ? 3 : 4;
                         };
                         const int m = material(col), first = col++;
                         while (col < n && material(col) == m)
@@ -883,7 +961,7 @@ namespace Paladin
                         }
                         else
                         {
-                            renderer.fillRectangle(
+                            fillRectangle(
                                 float(ox + (x + u) * tp),
                                 float(oy + (y + v) * tp),
                                 float(w * tp),
@@ -897,6 +975,13 @@ namespace Paladin
                 }
             }
         }
+        const double coastOpacity = detailBlend(tp, 8, 16);
+        for (auto& draw : draws)
+        {
+            draw.opacity = std::uint8_t(draw.opacity * coastOpacity);
+            draw.fill.alpha = std::uint8_t(draw.fill.alpha * coastOpacity);
+        }
+        renderer.drawTextureItems(draws);
     }
     void WorldGridRenderer::renderOverview(
         Renderer& renderer,
@@ -983,6 +1068,8 @@ namespace Paladin
             cachedTerrainTexture_.reset();
             cacheBuildAttempted_ = false;
             terrainChunks_.clear();
+            coastPaint_.clear();
+            coastFields_.clear();
             terrainBytes_ = 0;
             terrainSources_ = std::move(sources);
             terrainDimensions_ = std::move(dimensions);
@@ -1321,7 +1408,7 @@ namespace Paladin
     {
         const double displayTilePixels =
             metrics.scaledTilePixels(camera.zoom());
-        const bool drawDetail = displayTilePixels >= 10 || bool(project);
+        const bool drawDetail = displayTilePixels > 8 || bool(project);
         // Prepare canonical ground while zoomed out, within the same per-frame
         // budget. Entering normal city zoom should not discover every ground
         // chunk cold and expose a central patch of detail over the overview.
@@ -1725,6 +1812,7 @@ namespace Paladin
                 if (found->second.texture)
                 {
                     terrainBytes_ += std::size_t(textureSide) * textureSide * 4;
+                    found->second.readyAt = SDL_GetTicksNS() / 1e9;
                     found->second.commands.clear();
                     found->second.commands.shrink_to_fit();
                 }
@@ -1783,7 +1871,15 @@ namespace Paladin
                     float(originY + cell.y * chunkSide * tilePixels),
                     float(chunkSide * tilePixels),
                     float(chunkSide * tilePixels),
-                    std::uint8_t(255)
+                    std::uint8_t(
+                        255 * detailBlend(displayTilePixels, 8, 16) *
+                        std::clamp(
+                            (SDL_GetTicksNS() / 1e9 - found->second.readyAt) /
+                                .22,
+                            0.,
+                            1.
+                        )
+                    )
                 );
             }
             else

@@ -15,7 +15,9 @@ namespace Paladin
             const SceneProjection& p,
             double seconds,
             double day,
-            bool sky
+            bool sky,
+            int mapWidth,
+            int mapHeight
         ) const
         {
             const double visibility =
@@ -26,35 +28,30 @@ namespace Paladin
             }
             if (!body_)
             {
-                constexpr int w = 128, h = 64;
+                constexpr int w = 64, h = 32;
                 std::vector<RenderColor> body(w * h), shadow(w * h);
                 for (int y = 0; y < h; ++y)
                 {
                     for (int x = 0; x < w; ++x)
                     {
-                        double cover = 0;
-                        for (auto lobe : std::array<std::array<double, 4>, 5>{
-                                 {{{.25, .57, .22, .26}},
-                                  {{.43, .40, .24, .33}},
-                                  {{.62, .53, .28, .30}},
-                                  {{.78, .58, .17, .23}},
-                                  {{.48, .64, .30, .23}}}
-                             })
-                        {
-                            double dx = (x / double(w) - lobe[0]) / lobe[2],
-                                   dy = (y / double(h) - lobe[1]) / lobe[3];
-                            cover = std::max(
-                                cover,
-                                std::clamp(
-                                    (1 - dx * dx - dy * dy) * 1.5,
-                                    0.,
-                                    1.
-                                )
-                            );
-                        }
-                        cover = cover * cover * (3 - 2 * cover);
-                        cover *=
-                            .80 + .20 * landscapeField(x * .12, y * .12, 922);
+                        // Stepped wind-shaped clusters, sampled on a coarse
+                        // art grid instead of smooth ellipse lobes.
+                        const double nx = x / double(w), ny = y / double(h);
+                        const double center =
+                            .5 + .12 * (landscapeField(x * .13, 0, 361) - .5);
+                        const double taper =
+                            std::clamp(std::min(nx, 1 - nx) * 5, 0., 1.);
+                        const double halfHeight =
+                            (.14 + .20 * landscapeField(x * .18, 0, 731)) *
+                            taper;
+                        const double coverField =
+                            landscapeField(x * .16, y * .23, 922) * .65 +
+                            landscapeField(x * .4, y * .4, 179) * .35;
+                        const double edge = halfHeight - std::abs(ny - center);
+                        const double cover =
+                            edge <= .02 || coverField < .34
+                                ? 0
+                                : (edge > .10 && coverField > .65 ? 1. : .65);
                         auto alpha = std::uint8_t(255 * cover);
                         body[y * w + x] = {215, 224, 227, alpha};
                         shadow[y * w + x] = {25, 62, 66, alpha};
@@ -67,13 +64,20 @@ namespace Paladin
             {
                 return;
             }
-            const double driftX = seconds * .35, driftY = seconds * .07;
+            const double driftX =
+                             std::fmod(seconds * .35, double(mapWidth) + 240),
+                         driftY =
+                             std::fmod(seconds * .07, double(mapHeight) + 170);
             const double halfW = p.screenWidth * .5 / p.tilePixels,
                          halfH = p.screenHeight * .5 / p.tilePixels;
             int x0 = int(std::floor((p.cameraX - halfW - driftX - 110) / 120)),
                 x1 = int(std::ceil((p.cameraX + halfW - driftX + 110) / 120));
             int y0 = int(std::floor((p.cameraY - halfH - driftY - 60) / 85)),
                 y1 = int(std::ceil((p.cameraY + halfH - driftY + 60) / 85));
+            x0 = std::max(x0, int(std::floor((-driftX - 130) / 120)));
+            x1 = std::min(x1, int(std::ceil((mapWidth - driftX + 130) / 120)));
+            y0 = std::max(y0, int(std::floor((-driftY - 90) / 85)));
+            y1 = std::min(y1, int(std::ceil((mapHeight - driftY + 90) / 85)));
             for (int y = y0; y <= y1; ++y)
             {
                 for (int x = x0; x <= x1; ++x)
@@ -89,8 +93,8 @@ namespace Paladin
                     const double cx = x * 120 + ((hash >> 12) % 50) + driftX,
                                  cy = y * 85 + ((hash >> 18) % 35) + driftY;
                     const auto b = p.bounds(
-                        {cx + (sky ? 0 : 5),
-                         cy + (sky ? 0 : 3),
+                        {cx + (sky ? 0 : 22),
+                         cy + (sky ? 0 : 14),
                          0,
                          width,
                          height,
@@ -105,16 +109,40 @@ namespace Paladin
                         (sky ? 24 : 24) * visibility *
                         (sky ? (.3 + .7 * day) : (.4 + .6 * day))
                     );
+                    const float mx = float(
+                                    p.screenWidth * .5 -
+                                    p.cameraX * p.tilePixels
+                                ),
+                                my = float(
+                                    p.screenHeight * .5 -
+                                    p.cameraY * p.tilePixels
+                                );
+                    const float x0 = std::max({0.F, b.x, mx}),
+                                y0 = std::max({0.F, b.y, my});
+                    const float x1 = std::min(
+                                    {float(p.screenWidth),
+                                     b.x + b.width,
+                                     mx + float(mapWidth * p.tilePixels)}
+                                ),
+                                y1 = std::min(
+                                    {float(p.screenHeight),
+                                     b.y + b.height,
+                                     my + float(mapHeight * p.tilePixels)}
+                                );
+                    if (x1 <= x0 || y1 <= y0)
+                    {
+                        continue;
+                    }
                     r.drawTexture(
                         sky ? *body_ : *shadow_,
-                        0,
-                        0,
-                        128,
-                        64,
-                        b.x,
-                        b.y,
-                        b.width,
-                        b.height,
+                        (x0 - b.x) / b.width * 64,
+                        (y0 - b.y) / b.height * 32,
+                        (x1 - x0) / b.width * 64,
+                        (y1 - y0) / b.height * 32,
+                        x0,
+                        y0,
+                        x1 - x0,
+                        y1 - y0,
                         alpha
                     );
                 }

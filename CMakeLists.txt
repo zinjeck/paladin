@@ -57,6 +57,9 @@ endforeach()
 target_compile_definitions(PaladinAssetImport PRIVATE PALADIN_IMPORT_SIGNATURE="${PALADIN_IMPORT_SIGNATURE}")
 add_executable(PaladinAssetCompiler tools/asset_compiler/main.cpp)
 target_link_libraries(PaladinAssetCompiler PRIVATE PaladinAssetImport)
+# The compiler owns SDL_image deployment. Debug Paladin also uses this DLL
+# for F6 import; Release Paladin does not depend on it. The tools currently
+# share the build output directory with the game.
 add_custom_command(TARGET PaladinAssetCompiler POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:PaladinAssetCompiler>
  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3_image::SDL3_image> $<TARGET_FILE_DIR:PaladinAssetCompiler>)
@@ -84,6 +87,10 @@ add_executable(Paladin
     src/interaction/SettlementObjectPlacementController.cpp
     src/interaction/SettlementPlacementController.cpp
     src/platform/Window.cpp
+    src/rendering/BuildingView.cpp
+    src/rendering/ScenePresentation.cpp
+    src/rendering/SettlementEnvironmentDetails.cpp
+    src/rendering/TerrainMaterialField.cpp
     src/rendering/Renderer.cpp
     src/rendering/CityRenderer.cpp
     src/rendering/SceneSpriteLibrary.cpp
@@ -184,9 +191,6 @@ add_custom_command(
         $<TARGET_FILE_DIR:Paladin>
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:SDL3_ttf::SDL3_ttf>
-        $<TARGET_FILE_DIR:Paladin>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:SDL3_image::SDL3_image>
         $<TARGET_FILE_DIR:Paladin>
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:Paladin>/assets/fonts
@@ -326,6 +330,10 @@ target_compile_definitions(Paladin PRIVATE $<$<CONFIG:Debug>:PALADIN_ART_ROOT="$
 # These files generate the identical pixels; /Od's per-pixel STL overhead made
 # moving into cold terrain/forest chunks exceed the frame budget.
 if(MSVC)
+    # Rendering and simulation exchange STL containers: use one ABI consistently.
+    # Debug iterator proxy bookkeeping serializes the large per-frame geometry
+    # batches. Keep symbols and simulation /RTC1, without that container tax.
+    add_compile_definitions($<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>)
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
     file(GLOB_RECURSE PALADIN_DEBUG_SOURCES CONFIGURE_DEPENDS "src/*.cpp" "tests/*.cpp")
     foreach(PALADIN_DEBUG_SOURCE IN LISTS PALADIN_DEBUG_SOURCES)

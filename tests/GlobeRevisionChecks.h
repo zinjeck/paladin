@@ -60,6 +60,21 @@ namespace Paladin
                   << " mountains=" << mountains << " supported=" << supported
                   << std::endl;
         PALADIN_CHECK(mountains > 20 && hills > 20 && supported == mountains);
+        // A deterministic ice-and-ridge cap exercises the actual polar
+        // surface, even when this seed generates ocean at the geographic pole.
+        for (int y = 0; y < 16; ++y)
+        {
+            for (int x = 0; x < settings.width; ++x)
+            {
+                auto& tile = *world.grid().tile({x, y});
+                tile.terrain = TerrainType::Mountain;
+                tile.biome = BiomeType::Polar;
+                tile.relief = ReliefType::Mountain;
+                tile.elevation = Elevation{.95F};
+                tile.temperature = Temperature{.02F};
+            }
+        }
+        world.grid().terrainChanged();
         Camera2D camera(settings.width * .5, settings.height * .5);
         // Screen-relative motion remains continuous through both poles.
         const int vw = renderer.outputWidth(), vh = renderer.outputHeight();
@@ -192,7 +207,7 @@ namespace Paladin
             vw * .5,
             vh * .5
         );
-        PALADIN_CHECK(seam && seam->u > .99);
+        PALADIN_CHECK(!seam);
         GlobeRenderer globe;
         const auto draw = [&]()
         {
@@ -239,6 +254,16 @@ namespace Paladin
         world.time().advanceMinutes(360);
         draw();
         save("globe-noon");
+        const auto savedCamera = camera;
+        camera.setPlanetRotation(
+            PlanetRotation::between(WorldSurface::sphere(.5, 0), {0, 0, 1}),
+            world.grid().width(),
+            world.grid().height()
+        );
+        camera.setZoom(3);
+        draw();
+        save("globe-polar");
+        camera = savedCamera;
         world.time().advanceMinutes(720);
         draw();
         save("globe-midnight");
@@ -303,6 +328,7 @@ namespace Paladin
         }
         save("globe-regional");
         camera.setZoom(7);
+        draw();
         const auto detailDeadline = SDL_GetTicks() + 60000;
         while (!globe.fullDetailReady() && SDL_GetTicks() < detailDeadline)
         {
@@ -310,11 +336,51 @@ namespace Paladin
             SDL_Delay(1);
         }
         PALADIN_CHECK(globe.fullDetailReady());
+        SDL_Delay(320);
         draw();
         save("globe-close");
         camera.setZoom(16);
         draw();
         save("globe-relief-near");
+        // Pole coverage must include every visible longitude, and returning
+        // to resident terrain must not restart detail builds or fades.
+        const auto reliefCamera = camera;
+        camera.setPlanetRotation(
+            PlanetRotation::between(WorldSurface::sphere(.5, 0), {0, 0, 1}),
+            settings.width,
+            settings.height
+        );
+        camera.setZoom(10);
+        draw();
+        const auto polarDeadline = SDL_GetTicks() + 60000;
+        while (!globe.fullDetailReady() && SDL_GetTicks() < polarDeadline)
+        {
+            draw();
+            SDL_Delay(1);
+        }
+        PALADIN_CHECK(globe.fullDetailReady());
+        SDL_Delay(320);
+        draw();
+        save("globe-polar-detail-resident");
+        const auto residentBuilds = globe.detailBuilds();
+        for (int i = 0; i < 12; ++i)
+        {
+            GlobeCameraNavigation::pan(camera, world.grid(), vw, vh, 1, 0, 1);
+            draw();
+        }
+        PALADIN_CHECK(globe.fullDetailReady());
+        PALADIN_CHECK(globe.detailBuilds() == residentBuilds);
+        camera.setZoom(.3);
+        for (int i = 0; i < 4; ++i)
+        {
+            draw();
+        }
+        PALADIN_CHECK(globe.detailBuilds() == residentBuilds);
+        camera.setZoom(10);
+        draw();
+        PALADIN_CHECK(globe.fullDetailReady());
+        PALADIN_CHECK(globe.detailBuilds() == residentBuilds);
+        camera = reliefCamera;
         double total = 0, worst = 0;
         for (int i = 0; i < 90; ++i)
         {

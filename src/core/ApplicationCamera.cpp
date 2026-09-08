@@ -364,7 +364,14 @@ namespace Paladin
         }
         else
         {
-            camera_->multiplyZoom(multiplier);
+            const auto* map =
+                simulation_->settlementMap(activeCitySettlementId_);
+            const double fit = map ? std::min(
+                                         viewportWidth / map->grid().width(),
+                                         viewportHeight / map->grid().height()
+                                     ) / (tileRenderMetrics_->tilePixels * 1.12)
+                                   : .1;
+            camera_->setZoom(std::max(fit, camera_->zoom() * multiplier));
         }
 
         const double newTilePixels =
@@ -393,11 +400,7 @@ namespace Paladin
         if (screen_ == Screen::World)
         {
             const auto& g = simulation_->world().grid();
-            double x = std::fmod(camera_->tileX(), double(g.width()));
-            if (x < 0)
-            {
-                x += g.width();
-            }
+            double x = std::clamp(camera_->tileX(), 0., double(g.width()));
             camera_->setPosition(
                 x,
                 std::clamp(
@@ -407,6 +410,20 @@ namespace Paladin
                 )
             );
             return;
+        }
+        if (screen_ == Screen::City)
+        {
+            if (const auto* map =
+                    simulation_->settlementMap(activeCitySettlementId_))
+            {
+                const double fit =
+                    std::min(
+                        double(renderer_->outputWidth()) / map->grid().width(),
+                        double(renderer_->outputHeight()) / map->grid().height()
+                    ) /
+                    (tileRenderMetrics_->tilePixels * 1.12);
+                camera_->setZoom(std::max(camera_->zoom(), fit));
+            }
         }
         const double tilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
@@ -487,11 +504,6 @@ namespace Paladin
         }
 
         return WorldMapNavigation::mapBounds(
-                   renderer_->outputWidth(),
-                   renderer_->outputHeight()
-               )
-                   .contains(x, y) ||
-               WorldMapNavigation::buttonBounds(
                    renderer_->outputWidth(),
                    renderer_->outputHeight()
                )

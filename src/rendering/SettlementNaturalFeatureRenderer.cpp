@@ -220,7 +220,8 @@ namespace Paladin
                 }
             }
         }
-        if (tp < 4)
+        const double baseBlend = detailBlend(tp, 3, 6);
+        if (tp < 6)
         {
             // One density image at strategic zoom. Refresh a bounded number of
             // dirty blocks.
@@ -263,9 +264,13 @@ namespace Paladin
                 float(ox),
                 float(oy),
                 float(overviewW * block * tp),
-                float(overviewH * block * tp)
+                float(overviewH * block * tp),
+                std::uint8_t(255 * (1 - baseBlend))
             );
-            return;
+            if (tp <= 3)
+            {
+                return;
+            }
         }
         struct Visible
         {
@@ -352,7 +357,7 @@ namespace Paladin
         fallbackIndices_.clear();
         const auto deadline = SDL_GetTicksNS() + 3000000;
         int built = 0;
-        const double detail = tp >= 40 ? 1.0 : 0.0;
+        const double detail = detailBlend(tp, 32, 48);
         for (std::size_t cellIndex = 0; cellIndex < visible.size(); ++cellIndex)
         {
             if (cellIndex >= visibleCount &&
@@ -428,6 +433,11 @@ namespace Paladin
                 // Only animation is omitted; no replacement circles or fade-in.
                 textures -= bool(chunk.texture);
                 chunk.texture.reset();
+                if (built >= 8 || (built > 0 && SDL_GetTicksNS() >= deadline))
+                {
+                    continue;
+                }
+                chunk.readyAt = SDL_GetTicksNS() / 1e9;
                 SceneDrawQueue snapshot;
                 submitDetailed(
                     renderer,
@@ -602,10 +612,7 @@ namespace Paladin
                     navigationKeys_[std::size_t(cell.y) * columns + cell.x];
                 if (image)
                 {
-                    if (!chunk.texture)
-                    {
-                        chunk.readyAt = SDL_GetTicksNS() / 1e9;
-                    }
+
                     textures += !chunk.texture;
                     chunk.texture = std::move(image);
                     chunk.empty = false;
@@ -649,6 +656,45 @@ namespace Paladin
             {
                 continue;
             }
+            if (!chunk.texture && chunk.commands.empty() && !chunk.empty)
+            {
+                renderer.drawTexture(
+                    *overviewTexture_,
+                    float(cell.x * side / block),
+                    float(cell.y * side / block),
+                    float(side / block),
+                    float(side / block),
+                    float(ox + cell.x * side * tp),
+                    float(oy + cell.y * side * tp),
+                    float(side * tp),
+                    float(side * tp),
+                    std::uint8_t(255 * baseBlend)
+                );
+                continue;
+            }
+            const double ready =
+                chunk.readyAt == 0
+                    ? 1
+                    : std::clamp(
+                          (SDL_GetTicksNS() / 1e9 - chunk.readyAt) / .2,
+                          0.,
+                          1.
+                      );
+            if (detail < 1 && ready < 1)
+            {
+                renderer.drawTexture(
+                    *overviewTexture_,
+                    float(cell.x * side / block),
+                    float(cell.y * side / block),
+                    float(side / block),
+                    float(side / block),
+                    float(ox + cell.x * side * tp),
+                    float(oy + cell.y * side * tp),
+                    float(side * tp),
+                    float(side * tp),
+                    std::uint8_t(255 * (1 - ready) * baseBlend)
+                );
+            }
             const auto draw = [&](const Texture& texture,
                                   float sx,
                                   float sy,
@@ -672,11 +718,18 @@ namespace Paladin
                     );
                 }
             };
-            if (detail == 0)
+            if (detail < 1)
             {
                 if (chunk.texture)
                 {
-                    draw(*chunk.texture, 0, 0, textureSide, textureSide, 1);
+                    draw(
+                        *chunk.texture,
+                        0,
+                        0,
+                        textureSide,
+                        textureSide,
+                        (1 - detail) * baseBlend * ready
+                    );
                 }
                 else
                 {
@@ -687,7 +740,8 @@ namespace Paladin
                             *chunk.mesh,
                             float(ox + cell.x * side * tp),
                             float(oy + cell.y * side * tp),
-                            float(tp / density)
+                            float(tp / density),
+                            float((1 - detail) * baseBlend * ready)
                         );
                         continue;
                     }

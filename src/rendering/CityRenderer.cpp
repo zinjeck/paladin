@@ -182,9 +182,15 @@ namespace Paladin
             presentation.roofsVisible,
             1 - objectDetail
         );
+        if (objectDetail == 0)
+        {
+            structures_
+                .prewarmGround(renderer, projection, settlementMap, sprites_);
+        }
         if (objectDetail > 0)
         {
             const auto start = raised_.size();
+            const auto structureStart = SDL_GetTicksNS();
             structures_.submit(
                 raised_,
                 projection,
@@ -194,6 +200,15 @@ namespace Paladin
                 &citizens,
                 &renderer
             );
+            if (SDL_getenv("PALADIN_CAMERA_PROFILE") &&
+                SDL_GetTicksNS() - structureStart > 10000000)
+            {
+                SDL_Log(
+                    "structure submit_ms=%.2f items=%zu",
+                    (SDL_GetTicksNS() - structureStart) / 1e6,
+                    raised_.size() - start
+                );
+            }
             raised_.setOpacityFrom(start, objectDetail);
         }
         if (const auto* definition = placementController.activeDefinition())
@@ -225,6 +240,7 @@ namespace Paladin
             &sprites_,
             &presentation
         );
+        const auto drawStart = SDL_GetTicksNS();
         raised_.render(renderer, -3, -1);
         logisticsRenderer_.render(
             renderer,
@@ -237,6 +253,11 @@ namespace Paladin
             &sprites_
         );
         raised_.render(renderer, 0);
+        if (SDL_getenv("PALADIN_CAMERA_PROFILE") &&
+            SDL_GetTicksNS() - drawStart > 10000000)
+        {
+            SDL_Log("queue draw_ms=%.2f", (SDL_GetTicksNS() - drawStart) / 1e6);
+        }
         const double weatherTime = animationTimeOverride >= 0
                                        ? animationTimeOverride
                                        : animationSeconds;
@@ -246,8 +267,15 @@ namespace Paladin
         );
         if (presentation.cloudsEnabled)
         {
-            clouds_
-                .render(renderer, projection, weatherTime, weatherDay, false);
+            clouds_.render(
+                renderer,
+                projection,
+                weatherTime,
+                weatherDay,
+                false,
+                settlementMap.grid().width(),
+                settlementMap.grid().height()
+            );
         }
         stage(3);
         lighting_.render(
@@ -261,7 +289,15 @@ namespace Paladin
         );
         if (presentation.cloudsEnabled)
         {
-            clouds_.render(renderer, projection, weatherTime, weatherDay, true);
+            clouds_.render(
+                renderer,
+                projection,
+                weatherTime,
+                weatherDay,
+                true,
+                settlementMap.grid().width(),
+                settlementMap.grid().height()
+            );
         }
         stage(4);
         objectRenderer_.renderOverlay(

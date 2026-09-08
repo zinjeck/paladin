@@ -23,6 +23,7 @@ namespace Paladin
     ) const
     {
         const auto& state = map.objectState();
+        ++commandFrame_;
         std::unordered_map<SettlementObjectId, unsigned, StrongIdHash>
             doubleRows;
         if (citizens && !policy.roofsVisible)
@@ -52,6 +53,7 @@ namespace Paladin
         if (instance_ != map.instanceId())
         {
             doors_.clear();
+            buildingCommands_.clear();
         }
         std::unordered_set<std::uint64_t> doorTraffic;
         if (citizens && animate)
@@ -154,6 +156,7 @@ namespace Paladin
             const auto& object = *pointer;
             const auto& footprint = object.footprint;
             const auto& recipe = sprites.objectStyle(object.objectTypeId);
+            bool animatedArt = false;
             double marginX = 1, marginY = std::max(1., recipe.height);
             for (const auto& name :
                  {object.objectTypeId + ".roof.full",
@@ -164,6 +167,7 @@ namespace Paladin
             {
                 if (const auto* s = sprites.find(name))
                 {
+                    animatedArt |= s->frames > 1;
                     marginX = std::max(marginX, s->width);
                     marginY = std::max(marginY, s->height + s->elevation);
                 }
@@ -175,6 +179,7 @@ namespace Paladin
                 {
                     if (const auto* s = sprites.find(piece.sprite))
                     {
+                        animatedArt |= s->frames > 1;
                         marginX =
                             std::max(marginX, std::abs(piece.x) + s->width);
                         marginY = std::max(
@@ -496,19 +501,113 @@ namespace Paladin
                 id,
                 doubleRows[object.id]
             );
-            if (style.mode == "enclosed" && tribalBuilding(
-                                                queue,
-                                                projection,
-                                                sprites,
-                                                policy,
-                                                object.objectTypeId,
-                                                f,
-                                                object.door,
-                                                id,
-                                                doorOpen
-                                            ))
+            if (style.mode == "enclosed")
             {
-                continue;
+                bool handled = false;
+                const auto* wallArt = sprites.find(style.wall + ".front");
+                if (renderer && wallArt && !animatedArt && doorOpen == 0 &&
+                    w + 2 * marginX + 4 <= 128 && h + 2 * marginY + 4 <= 128)
+                {
+                    const std::array<double, 9> cacheKey{
+                        double(policy.roofsVisible),
+                        double(policy.shadowsVisible),
+                        policy.viewAzimuthDegrees,
+                        x,
+                        y,
+                        w,
+                        h,
+                        object.door ? double(object.door->x) : -1,
+                        object.door ? double(object.door->y) : -1
+                    };
+                    auto& cached = buildingCommands_[id];
+                    if (cached.key != cacheKey ||
+                        cached.art != wallArt->texture || !cached.valid)
+                    {
+                        cached.key = cacheKey;
+                        cached.art = wallArt->texture;
+                        cached.projection = {
+                            x + w * .5,
+                            y + h * .5,
+                            16,
+                            int(std::ceil((w + 2 * marginX + 4) * 16)),
+                            int(std::ceil((h + 2 * marginY + 4) * 16))
+                        };
+                        SceneDrawQueue local;
+                        cached.valid = tribalBuilding(
+                            local,
+                            cached.projection,
+                            sprites,
+                            policy,
+                            object.objectTypeId,
+                            f,
+                            object.door,
+                            id,
+                            0
+                        );
+                        cached.items = local.items();
+                    }
+                    cached.used = commandFrame_;
+                    handled = cached.valid;
+                    const float scale = float(projection.tilePixels / 16);
+                    const float dx = float(
+                        projection.screenWidth * .5 +
+                        (cached.projection.cameraX - projection.cameraX) *
+                            projection.tilePixels -
+                        cached.projection.screenWidth * .5 * scale
+                    );
+                    const float dy = float(
+                        projection.screenHeight * .5 +
+                        (cached.projection.cameraY - projection.cameraY) *
+                            projection.tilePixels -
+                        cached.projection.screenHeight * .5 * scale
+                    );
+                    for (auto item : cached.items)
+                    {
+                        item.bounds = {
+                            dx + item.bounds.x * scale,
+                            dy + item.bounds.y * scale,
+                            item.bounds.width * scale,
+                            item.bounds.height * scale
+                        };
+                        item.thatchPixelPitch *= scale;
+                        item.windSeconds = animate ? sprites.time() : 0;
+                        if (projection.visible(item.bounds))
+                        {
+                            queue.submit(item);
+                        }
+                    }
+                    if (buildingCommands_.size() > 128)
+                    {
+                        auto oldest = std::min_element(
+                            buildingCommands_.begin(),
+                            buildingCommands_.end(),
+                            [](const auto& a, const auto& b)
+                            { return a.second.used < b.second.used; }
+                        );
+                        if (oldest->first != id)
+                        {
+                            buildingCommands_.erase(oldest);
+                        }
+                    }
+                }
+                else
+                {
+                    handled = tribalBuilding(
+                        queue,
+                        projection,
+                        sprites,
+                        policy,
+                        object.objectTypeId,
+                        f,
+                        object.door,
+                        id,
+                        doorOpen
+                    );
+                }
+                if (handled)
+                {
+                    continue;
+                }
             }
             const auto floorStart = queue.size();
             if (!policy.roofsVisible ||

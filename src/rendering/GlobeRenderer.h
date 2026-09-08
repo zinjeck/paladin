@@ -3,9 +3,11 @@
 #include "rendering/GlobeView.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/OverlayRenderer.h"
+#include "rendering/SceneDetail.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldFoliage.h"
 #include "rendering/WorldGridRenderer.h"
+#include <SDL3/SDL.h>
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -29,11 +31,21 @@ namespace Paladin
         std::shared_ptr<Source> terrainSource_;
         std::future<Atlas> patchPending_;
         std::shared_ptr<Source> patchSource_;
-        Atlas patchReady_, patchActive_;
-        std::unique_ptr<Texture> patchTexture_, patchUpload_, patchWater_,
-            patchWaterUpload_;
+        Atlas patchReady_;
+        std::unique_ptr<Texture> patchUpload_, patchWaterUpload_;
+        struct DetailRegion
+        {
+            Atlas area;
+            std::unique_ptr<Texture> texture, water;
+            double readyAt = 0;
+            std::uint64_t used = 0;
+        };
+        std::vector<DetailRegion> detailRegions_;
+        std::vector<std::pair<int, int>> wantedRegions_;
+        std::uint64_t detailFrame_ = 0;
+        static constexpr int RegionSide = 48;
         int patchUploadRow_ = 0;
-        int requestedX_ = -99999, requestedY_ = -99999;
+        double detailReadyAt_ = 0;
         std::uint64_t patchBuilds_ = 0;
         const WorldTile* source_ = nullptr;
         std::uint64_t sourceRevision_ = 0;
@@ -196,6 +208,22 @@ namespace Paladin
                 {
                     const double xx = left + (px + .5) / density,
                                  yy = top + (py + .5) / density;
+                    const double longitude = xx / w * 6.283185307179586,
+                                 polarDistance = std::min(yy, double(h) - yy);
+                    const double polarBlend =
+                        1 - detailBlend(polarDistance / double(h), .12, .24);
+                    const double radius = std::sin(yy / h * 3.141592653589793) *
+                                          h / 3.141592653589793;
+                    const double polarX = w * .5 + std::cos(longitude) * radius,
+                                 polarY = h * .5 + std::sin(longitude) * radius;
+                    // Mix material samples, never interpolate coordinate
+                    // systems: interpolating UVs stretches noise into streaks
+                    // in the blend band.
+                    const bool polarSample =
+                        landscapeField(polarX * 3, polarY * 3, 1409) <
+                        polarBlend;
+                    const double gx = polarSample ? polarX : xx,
+                                 gy = polarSample ? polarY : yy;
                     const auto sample = coastSample(xx, yy, true);
                     const auto occupied = [&](int x, int y)
                     {
@@ -214,7 +242,7 @@ namespace Paladin
                     u = u * u * (3 - 2 * u);
                     v = v * v * (3 - 2 * v);
                     const double choose =
-                        landscapeField(xx * 2.1, yy * 2.1, 193) *
+                        landscapeField(gx * 2.1, gy * 2.1, 193) *
                         (dry ? land : 1 - land);
                     double cumulative = 0, exposure = 0, rock = 0, ice = 0;
                     bool chosen = false;
@@ -257,14 +285,14 @@ namespace Paladin
                     if (dry && materials[y * w + x])
                     {
                         color =
-                            landscapePaint(*materials[y * w + x], xx, yy, true);
+                            landscapePaint(*materials[y * w + x], gx, gy, true);
                     }
                     const double patch =
-                        .55 * landscapeField(xx * .38, yy * .38, 931) +
-                        .45 * landscapeField(xx * 5, yy * 5, 981);
+                        .55 * landscapeField(gx * .38, gy * .38, 931) +
+                        .45 * landscapeField(gx * 5, gy * 5, 981);
                     if (dry && patch < exposure)
                     {
-                        double grain = landscapeField(xx * 4, yy * 4, 713);
+                        double grain = landscapeField(gx * 4, gy * 4, 713);
                         color = grain < .24   ? RenderColor{116, 81, 63, 255}
                                 : grain > .79 ? RenderColor{113, 109, 112, 255}
                                               : RenderColor{78, 59, 57, 255};
@@ -272,7 +300,7 @@ namespace Paladin
                     if (dry && patch < rock * .92)
                     {
                         const double grain =
-                            landscapeField(xx * 3, yy * 3, 811);
+                            landscapeField(gx * 3, gy * 3, 811);
                         color = grain < .25   ? RenderColor{57, 70, 88, 255}
                                 : grain > .76 ? RenderColor{154, 167, 175, 255}
                                               : RenderColor{108, 116, 122, 255};
@@ -280,15 +308,15 @@ namespace Paladin
                     // Sparse low moss and lichen retain tundra's exposed soil;
                     // this is a small palette shift, not a grassland carpet.
                     if (dry && t.biome == BiomeType::Tundra && rock < .3 &&
-                        landscapeField(xx * .45, yy * .45, 824) > .60 &&
-                        landscapeField(xx * 3, yy * 3, 831) > .56)
+                        landscapeField(gx * .45, gy * .45, 824) > .60 &&
+                        landscapeField(gx * 3, gy * 3, 831) > .56)
                     {
                         color = {79, 140, 122, 255};
                     }
                     if (dry && patch < ice)
                     {
                         const double drift =
-                            landscapeField(xx * .8, yy * 1.5, 519);
+                            landscapeField(gx * .8, gy * 1.5, 519);
                         color = drift < .26   ? RenderColor{126, 156, 170, 255}
                                 : drift > .72 ? RenderColor{244, 243, 232, 255}
                                               : RenderColor{215, 224, 227, 255};
@@ -358,40 +386,75 @@ namespace Paladin
                     return;
                 }
                 const auto& s = it->second;
-                for (int py = std::max(0, int((y - top) * density));
+                constexpr double pi = 3.141592653589793;
+                const double cx = x + width * .5, cy = y + height * .5,
+                             theta = cy / h * pi, longitude = cx / w * 2 * pi;
+                const bool polar = cy < h * .24 || cy > h * .76;
+                const double span =
+                    polar ? width / std::max(.015, std::sin(theta)) : width;
+                const double localCenter =
+                    cx + std::round((left + tileWidth * .5 - cx) / w) * w;
+                const bool spansPole = polar && std::min(cy, h - cy) < height;
+                const double center = polar ? localCenter : cx;
+                const int startX =
+                    spansPole
+                        ? 0
+                        : std::max(0, int((center - span - left) * density));
+                const int endX =
+                    spansPole
+                        ? a.w
+                        : std::min(
+                              a.w,
+                              int(std::ceil((center + span - left) * density))
+                          );
+                for (int py =
+                         std::max(0, int((y - height * .5 - top) * density));
                      py < std::min(
                               a.h,
-                              int(std::ceil((y + height - top) * density))
+                              int(std::ceil((y + height * 1.5 - top) * density))
                           );
                      ++py)
                 {
-                    for (int px = std::max(0, int((x - left) * density));
-                         px < std::min(
-                                  a.w,
-                                  int(std::ceil((x + width - left) * density))
-                              );
-                         ++px)
+                    const double t = (top + (py + .5) / density) / h * pi;
+                    for (int px = startX; px < endX; ++px)
                     {
-                        if (grid.tile(
-                                    {(left + px / density + w) % w,
-                                     std::clamp(top + py / density, 0, h - 1)}
-                            )
+                        const double xx = left + (px + .5) / density,
+                                     yy = top + (py + .5) / density;
+                        if (grid.tile({(int(xx) % w + w) % w,
+                                       std::clamp(int(yy), 0, h - 1)})
                                 ->terrain == TerrainType::Water)
                         {
                             continue;
                         }
+                        const double delta = xx / w * 2 * pi - longitude;
+                        const double dx =
+                            std::sin(t) * std::sin(delta) * w / (2 * pi);
+                        const double dy =
+                            (std::sin(t) * std::cos(delta) * std::cos(theta) -
+                             std::cos(t) * std::sin(theta)) *
+                            h / pi;
+                        const double u =
+                            polar ? .5 + dx / width : (xx - x) / width;
+                        const double v =
+                            polar ? .5 + dy / height : (yy - y) / height;
+                        if (u < 0 || u >= 1 || v < 0 || v >= 1 ||
+                            (polar &&
+                             std::sin(t) * std::sin(theta) * std::cos(delta) +
+                                     std::cos(t) * std::cos(theta) <
+                                 0))
+                        {
+                            continue;
+                        }
                         const int sx = std::clamp(
-                            int((left + (px + .5) / density - x) / width *
-                                s.materialWidth),
-                            0,
-                            s.materialWidth - 1
-                        );
-                        const int sy = std::clamp(
-                            int((top + (py + .5) / density - y) / height *
-                                s.materialHeight),
-                            0,
-                            s.materialHeight - 1
-                        );
+                                      int(u * s.materialWidth),
+                                      0,
+                                      s.materialWidth - 1
+                                  ),
+                                  sy = std::clamp(
+                                      int(v * s.materialHeight),
+                                      0,
+                                      s.materialHeight - 1
+                                  );
                         auto color = (*s.materialPixels)
                             [std::size_t(sy) * s.materialWidth + sx];
                         if (color.alpha &&
@@ -435,9 +498,7 @@ namespace Paladin
                  row <= std::min(h / 3, (top + tileHeight + 8) / 3);
                  ++row)
             {
-                for (int col = int(std::floor((left - 8) / 4.));
-                     col <= (left + tileWidth + 8) / 4;
-                     ++col)
+                for (int col = -2; col <= (w + 8) / 4; ++col)
                 {
                     const auto hash = landscapeHash(
                         (col % std::max(1, w / 4) + std::max(1, w / 4)) %
@@ -449,6 +510,14 @@ namespace Paladin
                               y = row * 3 + int((hash >> 4) % 3);
                     const auto* t = grid.tile({(x % w + w) % w, y});
                     if (!t || t->terrain != TerrainType::Mountain)
+                    {
+                        continue;
+                    }
+                    const double latitudeArea =
+                        std::sin((y + .5) / h * 3.141592653589793);
+                    if ((y < h * .24 || y > h * .76) &&
+                        (hash >> 20) % 1024 >=
+                            std::max(.02, latitudeArea) * 1024)
                     {
                         continue;
                     }
@@ -481,7 +550,7 @@ namespace Paladin
                      y < std::min(h, top + tileHeight + 4);
                      ++y)
                 {
-                    for (int x = left - 4; x < left + tileWidth + 4; ++x)
+                    for (int x = -4; x < w + 4; ++x)
                     {
                         const auto& t = *grid.tile({(x % w + w) % w, y});
                         const auto hash =
@@ -523,8 +592,27 @@ namespace Paladin
         }
         bool fullDetailReady() const
         {
-            return bool(patchTexture_) && !patchPending_.valid() &&
-                   !patchReady_.w;
+            if (patchPending_.valid() || patchReady_.w)
+            {
+                return false;
+            }
+            return !wantedRegions_.empty() &&
+                   std::all_of(
+                       wantedRegions_.begin(),
+                       wantedRegions_.end(),
+                       [&](auto key)
+                       {
+                           return std::any_of(
+                               detailRegions_.begin(),
+                               detailRegions_.end(),
+                               [&](const auto& region)
+                               {
+                                   return region.area.left == key.first &&
+                                          region.area.top == key.second;
+                               }
+                           );
+                       }
+                   );
         }
         std::uint64_t detailBuilds() const
         {
@@ -532,8 +620,9 @@ namespace Paladin
         }
         void reset()
         {
-            patchTexture_.reset();
-            patchActive_ = {};
+            detailRegions_.clear();
+            wantedRegions_.clear();
+            detailReadyAt_ = 0;
             if (cancelled_)
             {
                 cancelled_->store(true);
@@ -615,12 +704,11 @@ namespace Paladin
             }
             terrainSource_ =
                 std::make_shared<Source>(Source{g, std::move(art)});
-            requestedX_ = requestedY_ = -99999;
-            patchTexture_.reset();
+            detailRegions_.clear();
+            wantedRegions_.clear();
             patchUpload_.reset();
-            patchWater_.reset();
             patchWaterUpload_.reset();
-            patchActive_ = {};
+            detailReadyAt_ = 0;
             patchReady_ = {};
             pending_ = std::async(
                 std::launch::async,
@@ -705,10 +793,16 @@ namespace Paladin
                 {
                     patchReady_.pixels[1] = {};
                     patchReady_.pixels[2] = {};
-                    patchActive_ = std::move(patchReady_);
+                    // Completed regions remain resident. A camera move cannot
+                    // replace the detail underneath already visible terrain.
+                    detailRegions_.push_back(
+                        {std::move(patchReady_),
+                         std::move(patchUpload_),
+                         std::move(patchWaterUpload_),
+                         SDL_GetTicksNS() / 1e9,
+                         detailFrame_}
+                    );
                     patchReady_ = {};
-                    patchTexture_ = std::move(patchUpload_);
-                    patchWater_ = std::move(patchWaterUpload_);
                 }
             }
             if (pending_.valid() &&
@@ -746,45 +840,166 @@ namespace Paladin
                 }
             }
         }
-        void requestDetail(const World& world, const Camera2D& camera)
+        void requestDetail(
+            const World& world,
+            const Camera2D& camera,
+            int screenWidth,
+            int screenHeight,
+            double pixels,
+            bool flat = false
+        )
         {
-            const int pw = std::min(128, world.grid().width()),
-                      ph = std::min(96, world.grid().height());
-            const int wantedX = int(camera.tileX()) - pw / 2,
-                      wantedY = std::clamp(
-                          int(camera.tileY()) - ph / 2,
-                          0,
-                          world.grid().height() - ph
-                      );
-            if (!patchPending_.valid() && !patchReady_.w &&
-                (std::abs(wantedX - requestedX_) > pw / 5 ||
-                 std::abs(wantedY - requestedY_) > ph / 5))
+            ++detailFrame_;
+            wantedRegions_.clear();
+            if (pixels <= 8)
             {
-                requestedX_ = wantedX;
-                requestedY_ = wantedY;
+                return;
+            }
+            const auto& grid = world.grid();
+            const auto view =
+                GlobeView::from(camera, grid, screenWidth, screenHeight);
+            struct Candidate
+            {
+                int x, y;
+                double distance;
+            };
+            std::vector<Candidate> candidates;
+            for (int y = 0; y < grid.height(); y += RegionSide)
+            {
+                for (int x = 0; x < grid.width(); x += RegionSide)
+                {
+                    const int w = std::min(RegionSide, grid.width() - x),
+                              h = std::min(RegionSide, grid.height() - y);
+                    double minX = 1e30, minY = 1e30, maxX = -1e30, maxY = -1e30,
+                           maxZ = -1;
+                    if (flat)
+                    {
+                        minX = screenWidth * .5 + (x - camera.tileX()) * pixels;
+                        maxX = minX + w * pixels;
+                        minY =
+                            screenHeight * .5 + (y - camera.tileY()) * pixels;
+                        maxY = minY + h * pixels;
+                        maxZ = 1;
+                    }
+                    else
+                    {
+                        // Sample curved region bounds, including the shared
+                        // pole.
+                        for (int j = 0; j <= 4; ++j)
+                        {
+                            for (int i = 0; i <= 4; ++i)
+                            {
+                                const auto point = view.project(
+                                    (x + w * i / 4.) / grid.width(),
+                                    (y + h * j / 4.) / grid.height()
+                                );
+                                minX = std::min(minX, point.x);
+                                maxX = std::max(maxX, point.x);
+                                minY = std::min(minY, point.y);
+                                maxY = std::max(maxY, point.y);
+                                maxZ = std::max(maxZ, point.z);
+                            }
+                        }
+                    }
+                    constexpr double margin = 24;
+                    if (maxZ < 0 || maxX < -margin || maxY < -margin ||
+                        minX > screenWidth + margin ||
+                        minY > screenHeight + margin)
+                    {
+                        continue;
+                    }
+                    const double dx = std::max(
+                                     {minX - screenWidth * .5,
+                                      screenWidth * .5 - maxX,
+                                      0.}
+                                 ),
+                                 dy = std::max(
+                                     {minY - screenHeight * .5,
+                                      screenHeight * .5 - maxY,
+                                      0.}
+                                 );
+                    candidates.push_back({x, y, dx * dx + dy * dy});
+                }
+            }
+            std::stable_sort(
+                candidates.begin(),
+                candidates.end(),
+                [](auto a, auto b) { return a.distance < b.distance; }
+            );
+            for (auto c : candidates)
+            {
+                wantedRegions_.emplace_back(c.x, c.y);
+            }
+            for (auto& region : detailRegions_)
+            {
+                if (std::find(
+                        wantedRegions_.begin(),
+                        wantedRegions_.end(),
+                        std::pair{region.area.left, region.area.top}
+                    ) != wantedRegions_.end())
+                {
+                    region.used = detailFrame_;
+                }
+            }
+            // Evict only offscreen regions. Active detail never falls back to
+            // the overview because a neighboring region finished preparing.
+            while (detailRegions_.size() > 64)
+            {
+                auto oldest = std::min_element(
+                    detailRegions_.begin(),
+                    detailRegions_.end(),
+                    [](const auto& a, const auto& b) { return a.used < b.used; }
+                );
+                if (oldest->used == detailFrame_)
+                {
+                    break;
+                }
+                detailRegions_.erase(oldest);
+            }
+            if (patchPending_.valid() || patchReady_.w)
+            {
+                return;
+            }
+            for (auto [x, y] : wantedRegions_)
+            {
+                if (std::any_of(
+                        detailRegions_.begin(),
+                        detailRegions_.end(),
+                        [&](const auto& region)
+                        {
+                            return region.area.left == x &&
+                                   region.area.top == y;
+                        }
+                    ))
+                {
+                    continue;
+                }
                 patchSource_ = terrainSource_;
                 ++patchBuilds_;
+                const int w = std::min(RegionSide, grid.width() - x),
+                          h = std::min(RegionSide, grid.height() - y);
                 patchPending_ = std::async(
                     std::launch::async,
                     [source = terrainSource_,
                      cancelled = cancelled_,
-                     wantedX,
-                     wantedY,
-                     pw,
-                     ph]()
+                     x,
+                     y,
+                     w,
+                     h]
                     {
                         return buildAtlas(
                             source->grid,
                             source->art,
                             cancelled,
                             16,
-                            wantedX,
-                            wantedY,
-                            pw,
-                            ph
+                            x,
+                            y,
+                            w,
+                            h
                         );
                     }
                 );
+                break;
             }
         }
         const Texture* mapTexture(double tilePixels) const
@@ -802,15 +1017,22 @@ namespace Paladin
         )
         {
             updateAtlas(r, world, art);
-            requestDetail(world, camera);
+            requestDetail(
+                world,
+                camera,
+                r.outputWidth(),
+                r.outputHeight(),
+                pixels,
+                true
+            );
             r.fillRectangle(
                 0,
                 0,
                 float(r.outputWidth()),
                 float(r.outputHeight()),
-                {8, 15, 27, 255}
+                {0, 0, 0, 255}
             );
-            const auto* texture = mapTexture(pixels);
+            const auto* texture = mapTexture(0);
             if (!texture)
             {
                 return;
@@ -822,12 +1044,17 @@ namespace Paladin
                                   double tx,
                                   double ty,
                                   double tw,
-                                  double th)
+                                  double th,
+                                  double opacity = 1)
             {
-                const double x0 = std::max(left, tx), y0 = std::max(top, ty);
-                const double
-                    x1 = std::min(left + r.outputWidth() / pixels, tx + tw),
-                    y1 = std::min(top + r.outputHeight() / pixels, ty + th);
+                const double x0 = std::max({left, tx, 0.}),
+                             y0 = std::max({top, ty, 0.});
+                const double x1 = std::min(
+                                 {left + r.outputWidth() / pixels, tx + tw, gw}
+                             ),
+                             y1 = std::min(
+                                 {top + r.outputHeight() / pixels, ty + th, gh}
+                             );
                 if (x1 <= x0 || y1 <= y0)
                 {
                     return;
@@ -843,8 +1070,8 @@ namespace Paladin
                         const double x = std::lerp(x0, x1, double(i) / nx),
                                      y = std::lerp(y0, y1, double(j) / ny);
                         verts.push_back(
-                            {float((x - left) * pixels),
-                             float((y - top) * pixels),
+                            {float(std::round((x - left) * pixels)),
+                             float(std::round((y - top) * pixels)),
                              float((x - tx) / tw),
                              float((y - ty) / th),
                              globeLight(
@@ -854,6 +1081,7 @@ namespace Paladin
                                  1
                              )}
                         );
+                        verts.back().color.alpha = std::uint8_t(255 * opacity);
                     }
                 }
                 for (int j = 0; j < ny; ++j)
@@ -869,26 +1097,51 @@ namespace Paladin
                 }
                 r.drawMesh(tex, verts, ids);
             };
-            for (int wrap = int(std::floor(left / gw));
-                 wrap <=
-                 int(std::floor((left + r.outputWidth() / pixels) / gw));
-                 ++wrap)
+            for (int wrap = 0; wrap <= 0; ++wrap)
             {
-                draw(*texture, wrap * gw, 0, gw, gh);
-                if (pixels >= 8 && patchTexture_)
+                draw(*texture, 0, 0, gw, gh);
+                if (uploadLayer_ >= 2 && textures_[1])
                 {
-                    const double pw = double(patchActive_.w) /
-                                      patchActive_.density,
-                                 ph = double(patchActive_.h) /
-                                      patchActive_.density;
-                    for (int offset = -1; offset <= 1; ++offset)
+                    if (!detailReadyAt_)
                     {
+                        detailReadyAt_ = SDL_GetTicksNS() / 1e9;
+                    }
+                    draw(
+                        *textures_[1],
+                        0,
+                        0,
+                        gw,
+                        gh,
+                        detailBlend(pixels, 2, 4) *
+                            std::clamp(
+                                (SDL_GetTicksNS() / 1e9 - detailReadyAt_) / .3,
+                                0.,
+                                1.
+                            )
+                    );
+                }
+                if (pixels > 8)
+                {
+                    for (const auto& region : detailRegions_)
+                    {
+                        if (region.used != detailFrame_)
+                        {
+                            continue;
+                        }
+                        const auto& a = region.area;
                         draw(
-                            *patchTexture_,
-                            patchActive_.left + (wrap + offset) * gw,
-                            patchActive_.top,
-                            pw,
-                            ph
+                            *region.texture,
+                            a.left,
+                            a.top,
+                            double(a.w) / a.density,
+                            double(a.h) / a.density,
+                            detailBlend(pixels, 8, 16) *
+                                std::clamp(
+                                    (SDL_GetTicksNS() / 1e9 - region.readyAt) /
+                                        .3,
+                                    0.,
+                                    1.
+                                )
                         );
                     }
                 }
@@ -1102,10 +1355,16 @@ namespace Paladin
             // A fixed-resolution local atlas is prepared off-thread. One
             // coherent patch is promoted only after its upload is complete;
             // terrain and relief share the same canonical 16-pixel samples.
-            requestDetail(world, camera);
+            requestDetail(
+                world,
+                camera,
+                r.outputWidth(),
+                r.outputHeight(),
+                tilePixels
+            );
             // Zoom changes only which prebuilt illustration is sampled.
             // Small foliage and foothill stamps are absent at regional scale.
-            int level = tilePixels >= 3 ? 1 : 0;
+            int level = 0;
             level = std::min(level, uploadLayer_ - 1);
             const auto* texture =
                 level >= 0 ? textures_[level].get() : overview_.get();
@@ -1168,60 +1427,107 @@ namespace Paladin
             };
             if (texture)
             {
-                r.drawMesh(*texture, vertices_, indices_);
+                const double detailAlpha =
+                    uploadLayer_ >= 2 && textures_[1]
+                        ? detailBlend(tilePixels, 2, 4) *
+                              std::clamp(
+                                  (SDL_GetTicksNS() / 1e9 - detailReadyAt_) /
+                                      .3,
+                                  0.,
+                                  1.
+                              )
+                        : 0.;
+                if (detailAlpha < 1 || detailReadyAt_ == 0)
+                {
+                    r.drawMesh(*texture, vertices_, indices_);
+                }
+                if (uploadLayer_ >= 2 && textures_[1])
+                {
+                    if (detailReadyAt_ == 0)
+                    {
+                        detailReadyAt_ = SDL_GetTicksNS() / 1e9;
+                    }
+                    const double fade =
+                        detailBlend(tilePixels, 2, 4) *
+                        std::clamp(
+                            (SDL_GetTicksNS() / 1e9 - detailReadyAt_) / .3,
+                            0.,
+                            1.
+                        );
+                    for (auto& v : vertices_)
+                    {
+                        v.color.alpha = std::uint8_t(255 * fade);
+                    }
+                    if (fade > 0)
+                    {
+                        r.drawMesh(*textures_[1], vertices_, indices_);
+                    }
+                    for (auto& v : vertices_)
+                    {
+                        v.color.alpha = 255;
+                    }
+                }
+
                 if (uploadLayer_ >= 3)
                 {
                     glint(*textures_[2], nullptr);
                 }
             }
-            if (patchTexture_ && tilePixels > 12)
+            if (tilePixels > 12)
             {
-                vertices_.clear();
-                indices_.clear();
-                const auto& a = patchActive_;
-                const int width = a.w / a.density, height = a.h / a.density;
-                for (int y = 0; y < height; y += 2)
+                for (const auto& region : detailRegions_)
                 {
-                    for (int x = 0; x < width; x += 2)
+                    if (region.used != detailFrame_)
                     {
-                        const double
-                            u0 = double(a.left + x) / world.grid().width(),
-                            u1 = double(a.left + std::min(x + 2, width)) /
-                                 world.grid().width(),
-                            v0 = double(a.top + y) / world.grid().height(),
-                            v1 = double(a.top + std::min(y + 2, height)) /
-                                 world.grid().height();
-                        triangle(
-                            vertex(u0, v0),
-                            vertex(u1, v0),
-                            vertex(u1, v1)
-                        );
-                        triangle(
-                            vertex(u0, v0),
-                            vertex(u1, v1),
-                            vertex(u0, v1)
-                        );
+                        continue;
                     }
-                }
-                for (auto& v : vertices_)
-                {
-                    const double x = v.u * world.grid().width() - a.left,
-                                 y = v.v * world.grid().height() - a.top;
-                    const double edge = std::clamp(
-                        std::min({x, y, width - x, height - y}) / 8.,
-                        0.,
-                        1.
-                    );
-                    v.color.alpha = std::uint8_t(
-                        255 * edge * std::clamp((tilePixels - 12) / 12., 0., 1.)
-                    );
-                    v.u = float(x / width);
-                    v.v = float(y / height);
-                }
-                r.drawMesh(*patchTexture_, vertices_, indices_);
-                if (patchWater_)
-                {
-                    glint(*patchWater_, &patchActive_);
+                    vertices_.clear();
+                    indices_.clear();
+                    const auto& a = region.area;
+                    const int width = a.w / a.density, height = a.h / a.density;
+                    for (int y = 0; y < height; y += 2)
+                    {
+                        for (int x = 0; x < width; x += 2)
+                        {
+                            const double
+                                u0 = double(a.left + x) / world.grid().width(),
+                                u1 = double(a.left + std::min(x + 2, width)) /
+                                     world.grid().width(),
+                                v0 = double(a.top + y) / world.grid().height(),
+                                v1 = double(a.top + std::min(y + 2, height)) /
+                                     world.grid().height();
+                            triangle(
+                                vertex(u0, v0),
+                                vertex(u1, v0),
+                                vertex(u1, v1)
+                            );
+                            triangle(
+                                vertex(u0, v0),
+                                vertex(u1, v1),
+                                vertex(u0, v1)
+                            );
+                        }
+                    }
+                    for (auto& v : vertices_)
+                    {
+                        const double x = v.u * world.grid().width() - a.left,
+                                     y = v.v * world.grid().height() - a.top;
+                        v.color.alpha = std::uint8_t(
+                            255 * detailBlend(tilePixels, 12, 24) *
+                            std::clamp(
+                                (SDL_GetTicksNS() / 1e9 - region.readyAt) / .3,
+                                0.,
+                                1.
+                            )
+                        );
+                        v.u = float(std::clamp(x / width, 0., 1.));
+                        v.v = float(std::clamp(y / height, 0., 1.));
+                    }
+                    r.drawMesh(*region.texture, vertices_, indices_);
+                    if (region.water)
+                    {
+                        glint(*region.water, &region.area);
+                    }
                 }
             }
             worldFoliageProjected(r, world, camera, tilePixels, true, art);

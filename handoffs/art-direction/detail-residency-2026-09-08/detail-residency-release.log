@@ -1,0 +1,37 @@
+[0/2] Re-checking globbed directories...
+[1/20] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Release && C:\Paladin\out\build\x64-Release\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Release/assets/packages"
+sources=225 cache_hits=229 rebuilt=0 atlas_pages=7 output_bytes=14377699 errors=0 warnings=0
+[2/20] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+[3/20] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+[4/20] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+[5/20] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+[6/20] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+[7/20] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+[8/20] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+[9/20] Linking CXX executable Paladin.exe
+[10/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldScreen.cpp.obj
+[11/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationFrame.cpp.obj
+[12/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\Application.cpp.obj
+[13/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationWorldInput.cpp.obj
+[14/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationCamera.cpp.obj
+[15/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\core\ApplicationSession.cpp.obj
+[16/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+[17/20] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\src\rendering\WorldRenderer.cpp.obj
+[18/20] Linking CXX executable PaladinApplicationSmokeTests.exe
+[19/20] Verify final world pixel grid, daylight/night rendering and sprite integration
+world pan/zoom mean_ms=11.9928 worst_ms=27.7169
+globe renderer=software
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=40.0849 worst=65.0226
+city coast zoom mean_ms=12.4818 worst_ms=32.2387
+globe warm zoom/rotation mean_ms=40.0849 worst_ms=65.0226 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Invalid object presentation recipe; using flat fallback
+Rejected off-palette or partial-alpha artwork: alpha.png
+Rejected off-palette or partial-alpha artwork: alpha.png
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Release\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Application routing smoke test passed.

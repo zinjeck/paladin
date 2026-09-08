@@ -78,6 +78,7 @@ namespace Paladin
     {
         std::vector<SDL_Vertex> vertices;
         std::vector<SDL_FPoint> positions, coordinates;
+        std::vector<SDL_FColor> colors;
         std::vector<int> indices;
     };
     PreparedQuadMesh::PreparedQuadMesh(std::span<const MeshVertex> input)
@@ -97,6 +98,7 @@ namespace Paladin
             );
             data_->positions.push_back({v.x, v.y});
             data_->coordinates.push_back({v.u, v.v});
+            data_->colors.push_back(data_->vertices.back().color);
         }
         for (int n = 0; n < int(input.size()); n += 4)
         {
@@ -112,7 +114,8 @@ namespace Paladin
         PreparedQuadMesh& mesh,
         float x,
         float y,
-        float scale
+        float scale,
+        float opacity
     )
     {
         auto& data = *mesh.data_;
@@ -122,6 +125,9 @@ namespace Paladin
         for (std::size_t i = 0; i < count; ++i, ++out, ++in)
         {
             out->position = {x + in->x * scale, y + in->y * scale};
+            const auto c = data.colors[i];
+            out->color =
+                {c.r * opacity, c.g * opacity, c.b * opacity, c.a * opacity};
             out->tex_coord = {
                 texture.uvX(data.coordinates[i].x),
                 texture.uvY(data.coordinates[i].y)
@@ -135,6 +141,160 @@ namespace Paladin
             data.indices.data(),
             int(data.indices.size())
         );
+    }
+    std::shared_ptr<Texture> Renderer::cacheTextureInAtlas(
+        std::shared_ptr<Texture>& page,
+        int& x,
+        int& y,
+        int& row,
+        std::unique_ptr<Texture> source
+    )
+    {
+        if (!source)
+        {
+            return {};
+        }
+        constexpr int side = 2048;
+        const int w = source->width(), h = source->height();
+        if (w > side || h > side)
+        {
+            return std::shared_ptr<Texture>(std::move(source));
+        }
+        if (x + w > side)
+        {
+            x = 0;
+            y += row;
+            row = 0;
+        }
+        bool fresh = !page || y + h > side;
+        if (fresh)
+        {
+            auto* t = SDL_CreateTexture(
+                renderer_,
+                SDL_PIXELFORMAT_RGBA32,
+                SDL_TEXTUREACCESS_TARGET,
+                side,
+                side
+            );
+            if (!t)
+            {
+                return std::shared_ptr<Texture>(std::move(source));
+            }
+            page = std::shared_ptr<Texture>(new Texture(t, side, side));
+            page->premultiplied_ = true;
+            SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND_PREMULTIPLIED);
+            SDL_SetTextureScaleMode(t, SDL_SCALEMODE_NEAREST);
+            x = y = row = 0;
+        }
+        auto* previous = SDL_GetRenderTarget(renderer_);
+        float sx = 1, sy = 1;
+        SDL_GetRenderScale(renderer_, &sx, &sy);
+        SDL_Rect viewport{}, clip{};
+        SDL_GetRenderViewport(renderer_, &viewport);
+        SDL_GetRenderClipRect(renderer_, &clip);
+        const bool clipped = SDL_RenderClipEnabled(renderer_);
+        Uint8 oldR, oldG, oldB, oldA;
+        SDL_GetRenderDrawColor(renderer_, &oldR, &oldG, &oldB, &oldA);
+        if (!SDL_SetRenderTarget(renderer_, page->texture_))
+        {
+            return std::shared_ptr<Texture>(std::move(source));
+        }
+        SDL_SetRenderScale(renderer_, 1, 1);
+        SDL_SetRenderViewport(renderer_, nullptr);
+        SDL_SetRenderClipRect(renderer_, nullptr);
+        if (fresh)
+        {
+            SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 0);
+            SDL_RenderClear(renderer_);
+        }
+        SDL_BlendMode blend;
+        SDL_GetTextureBlendMode(source->texture_, &blend);
+        SDL_SetTextureBlendMode(source->texture_, SDL_BLENDMODE_NONE);
+        SDL_FRect dest{float(x), float(y), float(w), float(h)};
+        SDL_RenderTexture(renderer_, source->texture_, nullptr, &dest);
+        SDL_SetTextureBlendMode(source->texture_, blend);
+        SDL_SetRenderTarget(renderer_, previous);
+        SDL_SetRenderScale(renderer_, sx, sy);
+        SDL_SetRenderViewport(renderer_, &viewport);
+        SDL_SetRenderClipRect(renderer_, clipped ? &clip : nullptr);
+        SDL_SetRenderDrawColor(renderer_, oldR, oldG, oldB, oldA);
+        auto result = createTextureView(page, x, y, w, h);
+        x += w;
+        row = std::max(row, h);
+        return result;
+    }
+    void Renderer::drawTextureItems(std::span<const TextureDrawItem> items)
+    {
+        // Preserve painter order while batching neighboring quads sharing an
+        // atlas. Per-sprite alpha belongs in vertices, not mutable texture
+        // state.
+        thread_local std::vector<SDL_Vertex> vertices;
+        thread_local std::vector<int> indices;
+        vertices.clear();
+        indices.clear();
+        SDL_Texture* page = nullptr;
+        const auto flush = [&]
+        {
+            if (!indices.empty())
+            {
+                SDL_RenderGeometry(
+                    renderer_,
+                    page,
+                    vertices.data(),
+                    int(vertices.size()),
+                    indices.data(),
+                    int(indices.size())
+                );
+            }
+            vertices.clear();
+            indices.clear();
+        };
+        for (const auto& item : items)
+        {
+            SDL_Texture* next = item.texture ? item.texture->texture_ : nullptr;
+            if (next != page || vertices.size() >= 65532)
+            {
+                flush();
+                page = next;
+            }
+            auto d = item.destination;
+            if (d.width <= 0 || d.height <= 0)
+            {
+                continue;
+            }
+            SDL_FColor color = item.texture
+                                   ? SDL_FColor{1, 1, 1, item.opacity / 255.F}
+                                   : SDL_FColor{
+                                         item.fill.red / 255.F,
+                                         item.fill.green / 255.F,
+                                         item.fill.blue / 255.F,
+                                         item.fill.alpha / 255.F
+                                     };
+            if (item.texture && item.texture->premultiplied_)
+            {
+                color.r = color.g = color.b = color.a;
+            }
+            float u0 = 0, v0 = 0, u1 = 0, v1 = 0;
+            if (item.texture)
+            {
+                auto& t = *item.texture;
+                const auto& f = item.source;
+                u0 = t.uvX(f.x / t.width());
+                v0 = t.uvY(f.y / t.height());
+                u1 = t.uvX((f.x + f.width) / t.width());
+                v1 = t.uvY((f.y + f.height) / t.height());
+            }
+            const int n = int(vertices.size());
+            vertices.insert(
+                vertices.end(),
+                {{{d.x, d.y}, color, {u0, v0}},
+                 {{d.x + d.width, d.y}, color, {u1, v0}},
+                 {{d.x + d.width, d.y + d.height}, color, {u1, v1}},
+                 {{d.x, d.y + d.height}, color, {u0, v1}}}
+            );
+            indices.insert(indices.end(), {n, n + 1, n + 2, n, n + 2, n + 3});
+        }
+        flush();
     }
     void Renderer::drawMesh(
         const Texture& texture,
@@ -179,6 +339,7 @@ namespace Paladin
             throw std::runtime_error("Compiled sprite outside atlas");
         }
         auto view = std::shared_ptr<Texture>(new Texture(page->texture_, w, h));
+        view->premultiplied_ = page->premultiplied_;
         view->parent_ = std::move(page);
         view->atlasX_ = x;
         view->atlasY_ = y;
@@ -490,6 +651,45 @@ namespace Paladin
         {
             return nullptr;
         }
+        // Opaque integer spans already describe final pixels. Rasterize them
+        // directly: thousands of SDL commands/target flushes add no value here.
+        if (!batch && std::all_of(
+                          items.begin(),
+                          items.end(),
+                          [](const auto& i)
+                          {
+                              const auto& d = i.destination;
+                              return !i.texture && i.fill.alpha == 255 &&
+                                     i.opacity == 255 &&
+                                     d.x == std::floor(d.x) &&
+                                     d.y == std::floor(d.y) &&
+                                     d.width == std::floor(d.width) &&
+                                     d.height == std::floor(d.height);
+                          }
+                      ))
+        {
+            std::vector<RenderColor> pixels(
+                std::size_t(width) * height,
+                {0, 0, 0, 0}
+            );
+            for (const auto& i : items)
+            {
+                const auto& d = i.destination;
+                const int x0 = std::clamp(int(d.x), 0, width),
+                          x1 = std::clamp(int(d.x + d.width), 0, width);
+                for (int y = std::clamp(int(d.y), 0, height);
+                     y < std::clamp(int(d.y + d.height), 0, height);
+                     ++y)
+                {
+                    std::fill(
+                        pixels.begin() + std::size_t(y) * width + x0,
+                        pixels.begin() + std::size_t(y) * width + x1,
+                        i.fill
+                    );
+                }
+            }
+            return createTextureFromPixels(width, height, pixels);
+        }
         SDL_Texture* texture = SDL_CreateTexture(
             renderer_,
             SDL_PIXELFORMAT_RGBA32,
@@ -527,30 +727,7 @@ namespace Paladin
         }
         else
         {
-            for (const auto& item : items)
-            {
-                const auto& d = item.destination;
-                if (item.texture)
-                {
-                    const auto& s = item.source;
-                    drawTexture(
-                        *item.texture,
-                        s.x,
-                        s.y,
-                        s.width,
-                        s.height,
-                        d.x,
-                        d.y,
-                        d.width,
-                        d.height,
-                        item.opacity
-                    );
-                }
-                else
-                {
-                    fillRectangle(d.x, d.y, d.width, d.height, item.fill);
-                }
-            }
+            drawTextureItems(items);
         }
         const bool restored = SDL_SetRenderTarget(renderer_, previousTarget);
         SDL_SetRenderScale(renderer_, previousScaleX, previousScaleY);

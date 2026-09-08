@@ -1,7 +1,9 @@
 #pragma once
 
 #include "rendering/Renderer.h"
+#include <array>
 #include <atomic>
+#include <bitset>
 #include <cstdint>
 #include <functional>
 #include <future>
@@ -13,6 +15,7 @@ namespace Paladin
 {
     class Renderer;
     class Texture;
+    struct SceneSprite;
     class WorldGrid;
     class SettlementGrid;
     class Camera2D;
@@ -95,6 +98,7 @@ namespace Paladin
         {
             std::unique_ptr<Texture> texture;
             std::uint64_t lastUsed = 0;
+            double readyAt = 0;
             int resolution = 0;
             std::vector<TextureDrawItem> commands;
         };
@@ -106,6 +110,19 @@ namespace Paladin
         mutable int terrainPixelsPerTile_ = 0;
         mutable std::uint64_t terrainFrame_ = 0;
         mutable std::size_t terrainBytes_ = 0;
+        mutable std::unordered_map<
+            std::uint64_t,
+            std::
+                unordered_map<const SceneSprite*, std::array<RenderColor, 256>>>
+            coastPaint_;
+        struct CoastFields
+        {
+            std::array<std::array<double, 3>, 320> values{};
+            std::bitset<320> ready;
+            double readyAt = 0;
+        };
+        mutable std::unordered_map<std::uint64_t, CoastFields> coastFields_;
+
 
         mutable const void* cachedGrid_ = nullptr;
         mutable std::unique_ptr<Texture> cachedTerrainTexture_;

@@ -21,7 +21,7 @@ namespace Paladin
             );
             if (enabled)
             {
-                clouds.render(r, p, t, 1, sky);
+                clouds.render(r, p, t, 1, sky, 256, 256);
             }
             auto* surface = SDL_RenderReadPixels(native, nullptr);
             PALADIN_CHECK(surface);
