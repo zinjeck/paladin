@@ -6,7 +6,9 @@
 
 namespace Paladin
 {
-    enum class CityTileType : std::uint8_t
+    // This describes terrain/surface inside a settlement map. It is not a
+    // settlement class or settlement type.
+    enum class SettlementSurfaceType : std::uint8_t
     {
         Inland,
         Beach,
@@ -14,6 +16,11 @@ namespace Paladin
         ShallowWater,
         DeepWater
     };
+
+    // Transitional source-compatibility name for older renderer code. New code
+    // should use SettlementSurfaceType/settlementSurfaceType().
+    using CityTileType = SettlementSurfaceType;
+
     class SettlementGrid final : public TileGrid<SettlementTilePosition>
     {
     public:
@@ -24,18 +31,24 @@ namespace Paladin
                    coastRegions_
                        [std::size_t(y / 32) * ((width() + 31) / 32) + x / 32];
         }
-        CityTileType cityTileType(SettlementTilePosition p) const noexcept
+        SettlementSurfaceType settlementSurfaceType(
+            SettlementTilePosition p
+        ) const noexcept
         {
             if (!isValidPosition(p) || surfaces_.empty())
             {
-                return CityTileType::Inland;
+                return SettlementSurfaceType::Inland;
             }
             return surfaces_[std::size_t(p.y) * width() + p.x];
         }
-        // City surfaces preserve walkable land and strategic-world terrain.
+        CityTileType cityTileType(SettlementTilePosition p) const noexcept
+        {
+            return settlementSurfaceType(p);
+        }
+        // Settlement surfaces preserve walkable land and strategic-world terrain.
         void classifyCoast(std::uint64_t seed)
         {
-            surfaces_.assign(tileCount(), CityTileType::Inland);
+            surfaces_.assign(tileCount(), SettlementSurfaceType::Inland);
             coastRegions_.assign(
                 std::size_t((width() + 31) / 32) * ((height() + 31) / 32),
                 0
@@ -70,7 +83,7 @@ namespace Paladin
                             }
                         }
                         surfaces_[std::size_t(y) * width() + x] =
-                            CityTileType::DeepWater;
+                            SettlementSurfaceType::DeepWater;
                     }
                 }
             }
@@ -95,7 +108,7 @@ namespace Paladin
                         next = std::uint8_t(d + 1);
                         frontier.push_back(q);
                         surfaces_[std::size_t(q.y) * width() + q.x] =
-                            CityTileType::ShallowWater;
+                            SettlementSurfaceType::ShallowWater;
                     }
                 }
             }
@@ -145,13 +158,14 @@ namespace Paladin
                         t.biome != BiomeType::Tundra &&
                         t.biome != BiomeType::Polar && (patch % 5 < 3);
                     surfaces_[std::size_t(y) * width() + x] =
-                        beach ? CityTileType::Beach : CityTileType::Coast;
+                        beach ? SettlementSurfaceType::Beach
+                              : SettlementSurfaceType::Coast;
                 }
             }
         }
 
     private:
-        std::vector<CityTileType> surfaces_;
+        std::vector<SettlementSurfaceType> surfaces_;
         std::vector<std::uint8_t> coastRegions_;
     };
 } // namespace Paladin
