@@ -180,6 +180,15 @@ namespace Paladin
             );
             return;
         }
+
+        if (screen_ == Screen::City)
+        {
+            const auto worldDirection =
+                camera_->cityViewToWorldOffset(directionX, directionY);
+            directionX = worldDirection.first;
+            directionY = worldDirection.second;
+        }
+
         const double panSpeedTilesPerSecond =
             panSpeedTilesPerSecondAtZoomOne / camera_->zoom();
 
@@ -258,8 +267,7 @@ namespace Paladin
                 hit.reset();
             }
             settlementPlacementController_->setHoveredPosition(
-                hit ? std::optional<
-                          WorldTilePosition>{{std::clamp(int(hit->u * g.width()), 0, g.width() - 1), std::clamp(int(hit->v * g.height()), 0, g.height() - 1)}}
+                hit ? std::optional<WorldTilePosition>{{std::clamp(int(hit->u * g.width()), 0, g.width() - 1), std::clamp(int(hit->v * g.height()), 0, g.height() - 1)}}
                     : std::nullopt
             );
             return;
@@ -277,15 +285,15 @@ namespace Paladin
             screenX >= viewportWidth || screenY >= viewportHeight)
         {
             settlementPlacementController_->setHoveredPosition(std::nullopt);
-
             return;
         }
 
-        const double worldTileX =
-            camera_->tileX() + (screenX - viewportWidth * 0.5) / tilePixels;
-
-        const double worldTileY =
-            camera_->tileY() + (screenY - viewportHeight * 0.5) / tilePixels;
+        const auto worldOffset = camera_->cityViewToWorldOffset(
+            (screenX - viewportWidth * 0.5) / tilePixels,
+            (screenY - viewportHeight * 0.5) / tilePixels
+        );
+        const double worldTileX = camera_->tileX() + worldOffset.first;
+        const double worldTileY = camera_->tileY() + worldOffset.second;
 
         const WorldTilePosition position{
             static_cast<std::int32_t>(std::floor(worldTileX)),
@@ -297,7 +305,6 @@ namespace Paladin
             ))
         {
             settlementPlacementController_->setHoveredPosition(std::nullopt);
-
             return;
         }
 
@@ -317,7 +324,6 @@ namespace Paladin
 
         const double viewportWidth =
             static_cast<double>(renderer_->outputWidth());
-
         const double viewportHeight =
             static_cast<double>(renderer_->outputHeight());
 
@@ -334,7 +340,6 @@ namespace Paladin
             return;
         }
         const double screenOffsetX = screenX - viewportWidth * 0.5;
-
         const double screenOffsetY = screenY - viewportHeight * 0.5;
 
         const double oldTilePixels =
@@ -345,11 +350,21 @@ namespace Paladin
             return;
         }
 
+        auto oldWorldOffset = std::pair{
+            screenOffsetX / oldTilePixels,
+            screenOffsetY / oldTilePixels
+        };
+        if (screen_ == Screen::City)
+        {
+            oldWorldOffset = camera_->cityViewToWorldOffset(
+                oldWorldOffset.first,
+                oldWorldOffset.second
+            );
+        }
         const double worldTileXUnderCursor =
-            camera_->tileX() + screenOffsetX / oldTilePixels;
-
+            camera_->tileX() + oldWorldOffset.first;
         const double worldTileYUnderCursor =
-            camera_->tileY() + screenOffsetY / oldTilePixels;
+            camera_->tileY() + oldWorldOffset.second;
 
         if (screen_ == Screen::World)
         {
@@ -366,20 +381,37 @@ namespace Paladin
         {
             const auto* map =
                 simulation_->settlementMap(activeCitySettlementId_);
-            const double fit = map ? std::min(
-                                         viewportWidth / map->grid().width(),
-                                         viewportHeight / map->grid().height()
-                                     ) / (tileRenderMetrics_->tilePixels * 1.12)
-                                   : .1;
+            const bool sideways = (camera_->cityQuarterTurns() & 1) != 0;
+            const double mapWidth =
+                map ? double(sideways ? map->grid().height() : map->grid().width())
+                    : 1.;
+            const double mapHeight =
+                map ? double(sideways ? map->grid().width() : map->grid().height())
+                    : 1.;
+            const double fit =
+                map ? std::min(viewportWidth / mapWidth, viewportHeight / mapHeight) /
+                          (tileRenderMetrics_->tilePixels * 1.12)
+                    : .1;
             camera_->setZoom(std::max(fit, camera_->zoom() * multiplier));
         }
 
         const double newTilePixels =
             tileRenderMetrics_->scaledTilePixels(camera_->zoom());
+        auto newWorldOffset = std::pair{
+            screenOffsetX / newTilePixels,
+            screenOffsetY / newTilePixels
+        };
+        if (screen_ == Screen::City)
+        {
+            newWorldOffset = camera_->cityViewToWorldOffset(
+                newWorldOffset.first,
+                newWorldOffset.second
+            );
+        }
 
         camera_->setPosition(
-            worldTileXUnderCursor - screenOffsetX / newTilePixels,
-            worldTileYUnderCursor - screenOffsetY / newTilePixels
+            worldTileXUnderCursor - newWorldOffset.first,
+            worldTileYUnderCursor - newWorldOffset.second
         );
 
         clampCameraToWorld();
@@ -416,10 +448,15 @@ namespace Paladin
             if (const auto* map =
                     simulation_->settlementMap(activeCitySettlementId_))
             {
+                const bool sideways = (camera_->cityQuarterTurns() & 1) != 0;
+                const double mapWidth =
+                    sideways ? map->grid().height() : map->grid().width();
+                const double mapHeight =
+                    sideways ? map->grid().width() : map->grid().height();
                 const double fit =
                     std::min(
-                        double(renderer_->outputWidth()) / map->grid().width(),
-                        double(renderer_->outputHeight()) / map->grid().height()
+                        double(renderer_->outputWidth()) / mapWidth,
+                        double(renderer_->outputHeight()) / mapHeight
                     ) /
                     (tileRenderMetrics_->tilePixels * 1.12);
                 camera_->setZoom(std::max(camera_->zoom(), fit));
@@ -450,12 +487,20 @@ namespace Paladin
 
         const double worldWidth = static_cast<double>(gridWidth);
         const double worldHeight = static_cast<double>(gridHeight);
+        const bool sideways =
+            screen_ == Screen::City && (camera_->cityQuarterTurns() & 1) != 0;
 
         const double halfVisibleWidth =
-            static_cast<double>(renderer_->outputWidth()) / (2.0 * tilePixels);
+            static_cast<double>(
+                sideways ? renderer_->outputHeight() : renderer_->outputWidth()
+            ) /
+            (2.0 * tilePixels);
 
         const double halfVisibleHeight =
-            static_cast<double>(renderer_->outputHeight()) / (2.0 * tilePixels);
+            static_cast<double>(
+                sideways ? renderer_->outputWidth() : renderer_->outputHeight()
+            ) /
+            (2.0 * tilePixels);
 
         const auto clampAxis = [](double position,
                                   double worldSize,
@@ -542,15 +587,14 @@ namespace Paladin
             return std::nullopt;
         }
 
-        const double tileX =
-            camera_->tileX() +
+        const auto worldOffset = camera_->cityViewToWorldOffset(
             (screenX - static_cast<double>(renderer_->outputWidth()) * 0.5) /
-                tilePixels;
-
-        const double tileY =
-            camera_->tileY() +
+                tilePixels,
             (screenY - static_cast<double>(renderer_->outputHeight()) * 0.5) /
-                tilePixels;
+                tilePixels
+        );
+        const double tileX = camera_->tileX() + worldOffset.first;
+        const double tileY = camera_->tileY() + worldOffset.second;
 
         const SettlementTilePosition position{
             static_cast<std::int32_t>(std::floor(tileX)),
