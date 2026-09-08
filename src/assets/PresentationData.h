@@ -1,6 +1,7 @@
 #pragma once
 #include "assets/AssetTypes.h"
-namespace Paladin {
+namespace Paladin
+{
     // Artist-facing recipe; object IDs and artwork never select renderer code.
     struct ObjectPresentation
     {
@@ -27,4 +28,4 @@ namespace Paladin {
         double x = 0, y = 0, depth = 0;
         unsigned choices = 1, choice = 0;
     };
-}
+} // namespace Paladin

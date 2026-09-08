@@ -1,19 +1,259 @@
 #include "assets/AssetManager.h"
 #include <algorithm>
 #include <functional>
-namespace Paladin {
-void AssetManager::mount(const std::filesystem::path& path,int priority){auto package=AssetPackage::read(path);auto mounts=mounts_;std::erase_if(mounts,[&](auto& m){return m.package->path==path;});mounts.push_back({package,priority});std::map<AssetId,Resolved> next;for(auto& m:mounts)for(auto& [id,record]:m.package->records()){auto it=next.find(id);if(it!=next.end()){if(it->second.record.name!=record.name)throw std::runtime_error("AssetId hash collision on mount");if(it->second.record.type!=record.type)throw std::runtime_error("Override changes asset type: "+record.name);if(it->second.priority==m.priority)throw std::runtime_error("Conflicting assets at equal package priority: "+record.name);if(it->second.priority>m.priority)continue;}next[id]={m.package,record,m.priority};}mounts_=std::move(mounts);registry_=std::move(next);uploads.clear();residency_.clear();generation_=++nextGeneration_;}
-void AssetManager::mountDirectory(const std::filesystem::path& path,int priority){std::vector<std::filesystem::path> files;if(!std::filesystem::exists(path))throw std::runtime_error("Compiled asset directory missing: "+path.string());for(auto& e:std::filesystem::directory_iterator(path))if(e.path().extension()==".palpak")files.push_back(e.path());std::sort(files.begin(),files.end());if(files.empty())throw std::runtime_error("No compiled asset packages in "+path.string());for(auto& f:files)mount(f,priority);validateDependencies();}
-void AssetManager::validateDependencies()const{std::map<AssetId,int> colors;std::function<void(AssetId)> visit=[&](AssetId id){if(colors[id]==1)throw std::runtime_error("Asset dependency cycle");if(colors[id]==2)return;auto it=registry_.find(id);if(it==registry_.end())throw std::runtime_error("Missing package dependency: "+std::to_string(id));colors[id]=1;for(auto d:it->second.record.dependencies)visit(d);colors[id]=2;};for(auto& [id,r]:registry_)visit(id);}
-const AssetRecord* AssetManager::resolve(AssetId id)const {auto it=registry_.find(id);return it==registry_.end()?nullptr:&it->second.record;}
-std::span<const std::uint8_t> AssetManager::data(AssetId id)const {auto it=registry_.find(id);if(it==registry_.end())throw std::runtime_error("Unknown AssetId");return it->second.package->data(id);}
-std::vector<AssetRecord> AssetManager::records()const {std::vector<AssetRecord> out;for(auto& [id,v]:registry_)out.push_back(v.record);return out;}
-AssetHandle AssetManager::request(AssetId id,AssetType type){auto it=registry_.find(id);if(it==registry_.end()||it->second.record.type!=type)throw std::runtime_error("Missing or wrong typed asset: "+std::to_string(id));auto& s=residency_[id];s.generation=generation_;s.lastUsed=++stamp_;s.priority=it->second.priority;s.package=it->second.package->identity;++s.requests;AssetHandle h{id,generation_,type};if(s.state!=AssetState::Unloaded)return h;s.state=AssetState::Requested;try{s.state=AssetState::Loading;s.cpuBytes=size_t(it->second.record.uncompressedSize);if(type==AssetType::SpriteAtlas)uploads.push({h,decodeAtlas(data(id))});else if(type==AssetType::Sprite||type==AssetType::UiAsset){auto sprite=decodeSprite(data(id));request(sprite.atlas,AssetType::SpriteAtlas);if(sprite.shadowAtlas)request(sprite.shadowAtlas,AssetType::SpriteAtlas);}else s.state=AssetState::Resident;}catch(...){s.state=AssetState::Failed;throw;}return h;}
-bool AssetManager::valid(AssetHandle h)const{return h.generation==generation_ && resolve(h.id) && resolve(h.id)->type==h.type;}
-const AssetResidency* AssetManager::residency(AssetId id)const {auto i=residency_.find(id);return i==residency_.end()?nullptr:&i->second;}
-bool AssetManager::isResident(AssetHandle h)const{auto s=residency(h.id);return valid(h)&&s&&s->state==AssetState::Resident;}
-void AssetManager::completeUpload(AssetHandle h,std::shared_ptr<void> resource,size_t bytes){if(!valid(h))return;auto& s=residency_.at(h.id);s.resource=std::move(resource);s.gpuBytes=bytes;s.state=AssetState::Resident;}
-void AssetManager::failed(AssetHandle h){if(valid(h))residency_[h.id].state=AssetState::Failed;}
-void AssetManager::release(AssetHandle h){if(!valid(h))return;auto i=residency_.find(h.id);if(i==residency_.end())return;auto& s=i->second;if(s.requests)--s.requests;if(!s.requests&&s.resource.use_count()<=1){s.resource.reset();s.state=AssetState::Unloaded;s.cpuBytes=s.gpuBytes=0;}}
-size_t AssetManager::residentGpuBytes()const{size_t n=0;for(auto& [id,s]:residency_)n+=s.gpuBytes;return n;}
-}
+namespace Paladin
+{
+    void AssetManager::mount(const std::filesystem::path& path, int priority)
+    {
+        auto package = AssetPackage::read(path);
+        auto mounts = mounts_;
+        std::erase_if(mounts, [&](auto& m) { return m.package->path == path; });
+        mounts.push_back({package, priority});
+        std::map<AssetId, Resolved> next;
+        for (auto& m : mounts)
+        {
+            for (auto& [id, record] : m.package->records())
+            {
+                auto it = next.find(id);
+                if (it != next.end())
+                {
+                    if (it->second.record.name != record.name)
+                    {
+                        throw std::runtime_error(
+                            "AssetId hash collision on mount"
+                        );
+                    }
+                    if (it->second.record.type != record.type)
+                    {
+                        throw std::runtime_error(
+                            "Override changes asset type: " + record.name
+                        );
+                    }
+                    if (it->second.priority == m.priority)
+                    {
+                        throw std::runtime_error(
+                            "Conflicting assets at equal package priority: " +
+                            record.name
+                        );
+                    }
+                    if (it->second.priority > m.priority)
+                    {
+                        continue;
+                    }
+                }
+                next[id] = {m.package, record, m.priority};
+            }
+        }
+        mounts_ = std::move(mounts);
+        registry_ = std::move(next);
+        uploads.clear();
+        residency_.clear();
+        generation_ = ++nextGeneration_;
+    }
+    void AssetManager::mountDirectory(
+        const std::filesystem::path& path,
+        int priority
+    )
+    {
+        std::vector<std::filesystem::path> files;
+        if (!std::filesystem::exists(path))
+        {
+            throw std::runtime_error(
+                "Compiled asset directory missing: " + path.string()
+            );
+        }
+        for (auto& e : std::filesystem::directory_iterator(path))
+        {
+            if (e.path().extension() == ".palpak")
+            {
+                files.push_back(e.path());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        if (files.empty())
+        {
+            throw std::runtime_error(
+                "No compiled asset packages in " + path.string()
+            );
+        }
+        for (auto& f : files)
+        {
+            mount(f, priority);
+        }
+        validateDependencies();
+    }
+    void AssetManager::validateDependencies() const
+    {
+        std::map<AssetId, int> colors;
+        std::function<void(AssetId)> visit = [&](AssetId id)
+        {
+            if (colors[id] == 1)
+            {
+                throw std::runtime_error("Asset dependency cycle");
+            }
+            if (colors[id] == 2)
+            {
+                return;
+            }
+            auto it = registry_.find(id);
+            if (it == registry_.end())
+            {
+                throw std::runtime_error(
+                    "Missing package dependency: " + std::to_string(id)
+                );
+            }
+            colors[id] = 1;
+            for (auto d : it->second.record.dependencies)
+            {
+                visit(d);
+            }
+            colors[id] = 2;
+        };
+        for (auto& [id, r] : registry_)
+        {
+            visit(id);
+        }
+    }
+    const AssetRecord* AssetManager::resolve(AssetId id) const
+    {
+        auto it = registry_.find(id);
+        return it == registry_.end() ? nullptr : &it->second.record;
+    }
+    std::span<const std::uint8_t> AssetManager::data(AssetId id) const
+    {
+        auto it = registry_.find(id);
+        if (it == registry_.end())
+        {
+            throw std::runtime_error("Unknown AssetId");
+        }
+        return it->second.package->data(id);
+    }
+    std::vector<AssetRecord> AssetManager::records() const
+    {
+        std::vector<AssetRecord> out;
+        for (auto& [id, v] : registry_)
+        {
+            out.push_back(v.record);
+        }
+        return out;
+    }
+    AssetHandle AssetManager::request(AssetId id, AssetType type)
+    {
+        auto it = registry_.find(id);
+        if (it == registry_.end() || it->second.record.type != type)
+        {
+            throw std::runtime_error(
+                "Missing or wrong typed asset: " + std::to_string(id)
+            );
+        }
+        auto& s = residency_[id];
+        s.generation = generation_;
+        s.lastUsed = ++stamp_;
+        s.priority = it->second.priority;
+        s.package = it->second.package->identity;
+        ++s.requests;
+        AssetHandle h{id, generation_, type};
+        if (s.state != AssetState::Unloaded)
+        {
+            return h;
+        }
+        s.state = AssetState::Requested;
+        try
+        {
+            s.state = AssetState::Loading;
+            s.cpuBytes = size_t(it->second.record.uncompressedSize);
+            if (type == AssetType::SpriteAtlas)
+            {
+                uploads.push({h, decodeAtlas(data(id))});
+            }
+            else if (type == AssetType::Sprite || type == AssetType::UiAsset)
+            {
+                auto sprite = decodeSprite(data(id));
+                request(sprite.atlas, AssetType::SpriteAtlas);
+                if (sprite.shadowAtlas)
+                {
+                    request(sprite.shadowAtlas, AssetType::SpriteAtlas);
+                }
+            }
+            else
+            {
+                s.state = AssetState::Resident;
+            }
+        }
+        catch (...)
+        {
+            s.state = AssetState::Failed;
+            throw;
+        }
+        return h;
+    }
+    bool AssetManager::valid(AssetHandle h) const
+    {
+        return h.generation == generation_ && resolve(h.id) &&
+               resolve(h.id)->type == h.type;
+    }
+    const AssetResidency* AssetManager::residency(AssetId id) const
+    {
+        auto i = residency_.find(id);
+        return i == residency_.end() ? nullptr : &i->second;
+    }
+    bool AssetManager::isResident(AssetHandle h) const
+    {
+        auto s = residency(h.id);
+        return valid(h) && s && s->state == AssetState::Resident;
+    }
+    void AssetManager::completeUpload(
+        AssetHandle h,
+        std::shared_ptr<void> resource,
+        size_t bytes
+    )
+    {
+        if (!valid(h))
+        {
+            return;
+        }
+        auto& s = residency_.at(h.id);
+        s.resource = std::move(resource);
+        s.gpuBytes = bytes;
+        s.state = AssetState::Resident;
+    }
+    void AssetManager::failed(AssetHandle h)
+    {
+        if (valid(h))
+        {
+            residency_[h.id].state = AssetState::Failed;
+        }
+    }
+    void AssetManager::release(AssetHandle h)
+    {
+        if (!valid(h))
+        {
+            return;
+        }
+        auto i = residency_.find(h.id);
+        if (i == residency_.end())
+        {
+            return;
+        }
+        auto& s = i->second;
+        if (s.requests)
+        {
+            --s.requests;
+        }
+        if (!s.requests && s.resource.use_count() <= 1)
+        {
+            s.resource.reset();
+            s.state = AssetState::Unloaded;
+            s.cpuBytes = s.gpuBytes = 0;
+        }
+    }
+    size_t AssetManager::residentGpuBytes() const
+    {
+        size_t n = 0;
+        for (auto& [id, s] : residency_)
+        {
+            n += s.gpuBytes;
+        }
+        return n;
+    }
+} // namespace Paladin

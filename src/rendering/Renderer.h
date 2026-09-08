@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
 #include "assets/AssetTypes.h"
+#include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
 
 struct SDL_Renderer;
 struct SDL_Surface;
@@ -124,8 +124,14 @@ namespace Paladin
             std::span<const RenderColor> pixels
         );
         std::unique_ptr<Texture> createEmptyTexture(int width, int height);
-        std::shared_ptr<Texture> createTextureView(std::shared_ptr<Texture>,int x,int y,int width,int height);
-        void setTextureFiltering(Texture&,bool linear);
+        std::shared_ptr<Texture> createTextureView(
+            std::shared_ptr<Texture>,
+            int x,
+            int y,
+            int width,
+            int height
+        );
+        void setTextureFiltering(Texture&, bool linear);
 
         [[nodiscard]]
         std::unique_ptr<Texture> createTextureFromSurface(

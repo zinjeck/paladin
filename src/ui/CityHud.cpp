@@ -865,10 +865,24 @@ namespace Paladin
         if (!goodsIconsLoaded_)
         {
             goodsIconsLoaded_ = true;
-            SceneSpriteLibrary icons;icons.load(renderer,std::string(SDL_GetBasePath())+"assets/sprites");
-            const char* names[]={"ui.goods.stone","ui.goods.lumber","ui.goods.fish","ui.goods.meat"};
-            for(int i=0;i<4;++i)if(auto* sprite=icons.find(names[i]))goodsIcons_[i]=sprite->texture;
-
+            SceneSpriteLibrary icons;
+            icons.load(
+                renderer,
+                std::string(SDL_GetBasePath()) + "assets/sprites"
+            );
+            const char* names[] = {
+                "ui.goods.stone",
+                "ui.goods.lumber",
+                "ui.goods.fish",
+                "ui.goods.meat"
+            };
+            for (int i = 0; i < 4; ++i)
+            {
+                if (auto* sprite = icons.find(names[i]))
+                {
+                    goodsIcons_[i] = sprite->texture;
+                }
+            }
         }
 
         if (goodsOpen_)

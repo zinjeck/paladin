@@ -25,14 +25,9 @@ namespace Paladin
             return nullptr;
         }
         const int fw = rgba->w / frames;
-        const int tw = std::min(
-            fw,
-            std::max(1, int(std::round(width * 16)))
-        );
-        const int th = std::min(
-            rgba->h,
-            std::max(1, int(std::round(height * 16)))
-        );
+        const int tw = std::min(fw, std::max(1, int(std::round(width * 16))));
+        const int th =
+            std::min(rgba->h, std::max(1, int(std::round(height * 16))));
         auto* output =
             SDL_CreateSurface(tw * frames, th, SDL_PIXELFORMAT_RGBA32);
         if (!output)

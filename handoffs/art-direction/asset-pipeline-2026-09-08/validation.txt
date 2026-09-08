@@ -1,0 +1,10 @@
+PASS: PaladinAssetCompiler Release and Debug builds.
+PASS: Paladin Release and Debug builds.
+PASS: official source compilation: 225 catalog sprites, 229 imported/cacheable inputs, 7 atlas pages, 4 packages, 490 records, 14,377,699 package bytes.
+PASS: PaladinAssetTests (round-trip metadata/pixels, SHA-256 known vector, byte determinism, content cache hit, layered override, stale handle, version rejection and off-palette rejection).
+PASS: PaladinArtCheck / existing application routing smoke test using compiled official packages with normal runtime assets/sprites directories absent.
+PASS: Release executable dependency inspection: SDL3 and SDL3_ttf; no SDL3_image dependency.
+PASS: inspected captured close day/night, normal city grass, nighttime contact lighting and fixture output. Canonical pixel grid, sprite appearance and warm local nighttime lighting retained.
+PASS: git diff --check. Final diff/status reviewed; no source art modified or unrelated source reset/deleted. No commits/PRs created by this task; remaining edits are local.
+The smoke test intentionally logs missing/off-palette fixture rejections. These are expected negative checks, not missing official assets.
+Review captures are in review/. Build logs remain locally at asset-final-release.log and asset-final-debug.log.

@@ -31,8 +31,14 @@ namespace Paladin
         int height_ = 0;
         bool premultiplied_ = false;
         std::shared_ptr<Texture> parent_;
-        int atlasX_=0,atlasY_=0;
-        float uvX(float u)const { return parent_ ? (atlasX_+u*width_)/parent_->width_ : u; }
-        float uvY(float v)const { return parent_ ? (atlasY_+v*height_)/parent_->height_ : v; }
+        int atlasX_ = 0, atlasY_ = 0;
+        float uvX(float u) const
+        {
+            return parent_ ? (atlasX_ + u * width_) / parent_->width_ : u;
+        }
+        float uvY(float v) const
+        {
+            return parent_ ? (atlasY_ + v * height_) / parent_->height_ : v;
+        }
     };
 } // namespace Paladin

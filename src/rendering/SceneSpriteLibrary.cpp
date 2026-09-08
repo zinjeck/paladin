@@ -1,13 +1,13 @@
 #include "rendering/SceneSpriteLibrary.h"
-#include "rendering/SceneDetail.h"
-#include "rendering/AssetUpload.h"
 #include "assets/PresentationCodec.h"
+#include "rendering/AssetUpload.h"
+#include "rendering/SceneDetail.h"
 #ifdef PALADIN_SOURCE_ART
-#include "tools/asset_compiler/SourceImporter.h"
 #include "tools/asset_compiler/AssetCompiler.h"
+#include "tools/asset_compiler/SourceImporter.h"
 #endif
-#include <mutex>
 #include <SDL3/SDL.h>
+#include <mutex>
 
 #include <cmath>
 #include <filesystem>
@@ -17,40 +17,161 @@
 
 namespace Paladin
 {
-    void SceneSpriteLibrary::load(Renderer& renderer,const std::string& root) {
-        if(loaded_)return;
-        try {
+    void SceneSpriteLibrary::load(Renderer& renderer, const std::string& root)
+    {
+        if (loaded_)
+        {
+            return;
+        }
+        try
+        {
 #ifdef PALADIN_SOURCE_ART
-            // Tiny authoring fixtures / development overrides use the same importer.
-            if(std::filesystem::exists(std::filesystem::path(root)) && std::filesystem::weakly_canonical(root)!=std::filesystem::weakly_canonical(std::filesystem::path(SDL_GetBasePath())/"assets/sprites")
+            // Tiny authoring fixtures / development overrides use the same
+            // importer.
+            if (
+                std::filesystem::exists(std::filesystem::path(root)) &&
+                std::filesystem::weakly_canonical(root) !=
+                    std::filesystem::weakly_canonical(
+                        std::filesystem::path(SDL_GetBasePath()) /
+                        "assets/sprites"
+                    )
 #ifdef PALADIN_ART_ROOT
-               && std::filesystem::weakly_canonical(root)!=std::filesystem::weakly_canonical(PALADIN_ART_ROOT)
+                && std::filesystem::weakly_canonical(root) !=
+                       std::filesystem::weakly_canonical(PALADIN_ART_ROOT)
 #endif
 #ifdef PALADIN_TEST_SOURCE_ROOT
-               && std::filesystem::weakly_canonical(root)!=std::filesystem::weakly_canonical(std::filesystem::path(PALADIN_TEST_SOURCE_ROOT)/"assets/sprites")
+                && std::filesystem::weakly_canonical(root) !=
+                       std::filesystem::weakly_canonical(
+                           std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) /
+                           "assets/sprites"
+                       )
 #endif
-            ) {
-                SourceImporter source(false);ImportImages cpu;source.load(cpu,root);sprites_.clear();
-                for(auto& [id,in]:source.sprites_) {SceneSprite out;static_cast<SpriteAsset&>(out)=in;out.texture=renderer.createTextureFromPixels(in.texture->width(),in.texture->height(),in.texture->atlas.pixels);renderer.setTextureFiltering(*out.texture,in.texture->atlas.linear);if(in.shadow)out.shadow=renderer.createTextureFromPixels(in.shadow->width(),in.shadow->height(),in.shadow->atlas.pixels);sprites_[id]=std::move(out);}
-                objects_=std::move(source.objects_);pieces_=std::move(source.pieces_);lights_=std::move(source.lights_);loaded_=true;return;
+            )
+            {
+                SourceImporter source(false);
+                ImportImages cpu;
+                source.load(cpu, root);
+                sprites_.clear();
+                for (auto& [id, in] : source.sprites_)
+                {
+                    SceneSprite out;
+                    static_cast<SpriteAsset&>(out) = in;
+                    out.texture = renderer.createTextureFromPixels(
+                        in.texture->width(),
+                        in.texture->height(),
+                        in.texture->atlas.pixels
+                    );
+                    renderer.setTextureFiltering(
+                        *out.texture,
+                        in.texture->atlas.linear
+                    );
+                    if (in.shadow)
+                    {
+                        out.shadow = renderer.createTextureFromPixels(
+                            in.shadow->width(),
+                            in.shadow->height(),
+                            in.shadow->atlas.pixels
+                        );
+                    }
+                    sprites_[id] = std::move(out);
+                }
+                objects_ = std::move(source.objects_);
+                pieces_ = std::move(source.pieces_);
+                lights_ = std::move(source.lights_);
+                loaded_ = true;
+                return;
             }
 #ifdef PALADIN_ART_ROOT
             // F6 resets this facade; incremental import is content-keyed.
-            static std::mutex compileMutex;std::lock_guard lock(compileMutex);
-            ensureDevelopmentAssets(PALADIN_ART_ROOT,std::filesystem::path(SDL_GetBasePath())/"assets/packages",std::filesystem::path(PALADIN_ART_ROOT)/"../../.cache/assets");
+            static std::mutex compileMutex;
+            std::lock_guard lock(compileMutex);
+            ensureDevelopmentAssets(
+                PALADIN_ART_ROOT,
+                std::filesystem::path(SDL_GetBasePath()) / "assets/packages",
+                std::filesystem::path(PALADIN_ART_ROOT) / "../../.cache/assets"
+            );
 #endif
 #endif
-            auto manager=renderer.compiledAssets();
-            std::unordered_map<std::string,SceneSprite> sprites;std::unordered_map<std::string,ObjectPresentation> objects;std::vector<BuildingPiece> pieces;std::vector<BlueprintLight> lights;
-            for(auto& record:manager->records()) {
-                auto name=record.name.starts_with("paladin:")?record.name.substr(8):record.name;
-                if(record.type==AssetType::Sprite||record.type==AssetType::UiAsset){SceneSprite sprite;static_cast<SpriteAsset&>(sprite)=decodeSprite(manager->data(record.id));sprite.texture=assetTextureView(renderer,*manager,sprite.atlas,sprite.x,sprite.y,sprite.pixelWidth,sprite.pixelHeight);if(sprite.shadowAtlas)sprite.shadow=assetTextureView(renderer,*manager,sprite.shadowAtlas,sprite.shadowX,sprite.shadowY,sprite.shadowWidth,sprite.shadowHeight);AssetHandle h{record.id,manager->residency(record.id)->generation,record.type};manager->completeUpload(h,{},0);sprites[name]=std::move(sprite);}
-                else if(record.type==AssetType::ObjectPresentation){auto key=name;auto start=key.find(':');start=start==std::string::npos?0:start+1;if(key.compare(start,13,"presentation.")!=0)throw std::runtime_error("Invalid presentation asset name: "+name);key.erase(start,13);objects[key]=decodePresentation(manager->data(record.id));}
-                else if(name=="recipe.pieces")pieces=decodePieces(manager->data(record.id));
-                else if(name=="recipe.lights")lights=decodeLights(manager->data(record.id));
+            auto manager = renderer.compiledAssets();
+            std::unordered_map<std::string, SceneSprite> sprites;
+            std::unordered_map<std::string, ObjectPresentation> objects;
+            std::vector<BuildingPiece> pieces;
+            std::vector<BlueprintLight> lights;
+            for (auto& record : manager->records())
+            {
+                auto name = record.name.starts_with("paladin:")
+                                ? record.name.substr(8)
+                                : record.name;
+                if (record.type == AssetType::Sprite ||
+                    record.type == AssetType::UiAsset)
+                {
+                    SceneSprite sprite;
+                    static_cast<SpriteAsset&>(sprite) =
+                        decodeSprite(manager->data(record.id));
+                    sprite.texture = assetTextureView(
+                        renderer,
+                        *manager,
+                        sprite.atlas,
+                        sprite.x,
+                        sprite.y,
+                        sprite.pixelWidth,
+                        sprite.pixelHeight
+                    );
+                    if (sprite.shadowAtlas)
+                    {
+                        sprite.shadow = assetTextureView(
+                            renderer,
+                            *manager,
+                            sprite.shadowAtlas,
+                            sprite.shadowX,
+                            sprite.shadowY,
+                            sprite.shadowWidth,
+                            sprite.shadowHeight
+                        );
+                    }
+                    AssetHandle h{
+                        record.id,
+                        manager->residency(record.id)->generation,
+                        record.type
+                    };
+                    manager->completeUpload(h, {}, 0);
+                    sprites[name] = std::move(sprite);
+                }
+                else if (record.type == AssetType::ObjectPresentation)
+                {
+                    auto key = name;
+                    auto start = key.find(':');
+                    start = start == std::string::npos ? 0 : start + 1;
+                    if (key.compare(start, 13, "presentation.") != 0)
+                    {
+                        throw std::runtime_error(
+                            "Invalid presentation asset name: " + name
+                        );
+                    }
+                    key.erase(start, 13);
+                    objects[key] = decodePresentation(manager->data(record.id));
+                }
+                else if (name == "recipe.pieces")
+                {
+                    pieces = decodePieces(manager->data(record.id));
+                }
+                else if (name == "recipe.lights")
+                {
+                    lights = decodeLights(manager->data(record.id));
+                }
             }
-            assets_=std::move(manager);sprites_=std::move(sprites);objects_=std::move(objects);pieces_=std::move(pieces);lights_=std::move(lights);loaded_=true;
-        } catch(const std::exception& e){SDL_Log("Asset load rejected: %s",e.what());loaded_=true;}
+            assets_ = std::move(manager);
+            sprites_ = std::move(sprites);
+            objects_ = std::move(objects);
+            pieces_ = std::move(pieces);
+            lights_ = std::move(lights);
+            loaded_ = true;
+        }
+        catch (const std::exception& e)
+        {
+            SDL_Log("Asset load rejected: %s", e.what());
+            loaded_ = true;
+        }
     }
     RenderRectangle SceneSpriteLibrary::frame(
         const SceneSprite& sprite,

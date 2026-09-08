@@ -1,7 +1,7 @@
 #include "rendering/Renderer.h"
-#include "rendering/Texture.h"
 #include "assets/AssetManager.h"
 #include "rendering/AssetUpload.h"
+#include "rendering/Texture.h"
 
 #include <SDL3/SDL.h>
 #ifdef PALADIN_SOURCE_ART
@@ -15,20 +15,69 @@
 
 namespace Paladin
 {
-    std::shared_ptr<AssetManager> Renderer::compiledAssets() {
-        const auto base=std::filesystem::path(SDL_GetBasePath())/"assets";
-        std::string signature=assetDigest(readAssetFile(base/"packages/assets.manifest"));
+    std::shared_ptr<AssetManager> Renderer::compiledAssets()
+    {
+        const auto base = std::filesystem::path(SDL_GetBasePath()) / "assets";
+        std::string signature =
+            assetDigest(readAssetFile(base / "packages/assets.manifest"));
         std::vector<std::filesystem::path> layers;
-        if(std::filesystem::exists(base/"overrides")){for(auto& e:std::filesystem::directory_iterator(base/"overrides"))if(e.is_directory())layers.push_back(e.path());std::sort(layers.begin(),layers.end());for(auto& dir:layers){std::vector<std::filesystem::path> files;for(auto& e:std::filesystem::directory_iterator(dir))if(e.path().extension()==".palpak")files.push_back(e.path());std::sort(files.begin(),files.end());for(auto& f:files)signature+=f.generic_string()+assetDigest(readAssetFile(f));}}
-        if(assetManager_&&signature==assetPackageSignature_)return assetManager_;
-        auto manager=std::make_shared<AssetManager>();manager->mountDirectory(base/"packages");int priority=1;for(auto& dir:layers)manager->mountDirectory(dir,priority++);
-        for(auto& record:manager->records())if(record.type==AssetType::Sprite||record.type==AssetType::UiAsset)manager->request(record.id,record.type);
-        uploadAssets(*this,*manager);assetManager_=manager;assetPackageSignature_=signature;return manager;
+        if (std::filesystem::exists(base / "overrides"))
+        {
+            for (auto& e :
+                 std::filesystem::directory_iterator(base / "overrides"))
+            {
+                if (e.is_directory())
+                {
+                    layers.push_back(e.path());
+                }
+            }
+            std::sort(layers.begin(), layers.end());
+            for (auto& dir : layers)
+            {
+                std::vector<std::filesystem::path> files;
+                for (auto& e : std::filesystem::directory_iterator(dir))
+                {
+                    if (e.path().extension() == ".palpak")
+                    {
+                        files.push_back(e.path());
+                    }
+                }
+                std::sort(files.begin(), files.end());
+                for (auto& f : files)
+                {
+                    signature +=
+                        f.generic_string() + assetDigest(readAssetFile(f));
+                }
+            }
+        }
+        if (assetManager_ && signature == assetPackageSignature_)
+        {
+            return assetManager_;
+        }
+        auto manager = std::make_shared<AssetManager>();
+        manager->mountDirectory(base / "packages");
+        int priority = 1;
+        for (auto& dir : layers)
+        {
+            manager->mountDirectory(dir, priority++);
+        }
+        for (auto& record : manager->records())
+        {
+            if (record.type == AssetType::Sprite ||
+                record.type == AssetType::UiAsset)
+            {
+                manager->request(record.id, record.type);
+            }
+        }
+        uploadAssets(*this, *manager);
+        assetManager_ = manager;
+        assetPackageSignature_ = signature;
+        return manager;
     }
     struct PreparedQuadMesh::Data
     {
         std::vector<SDL_Vertex> vertices;
-        std::vector<SDL_FPoint> positions,coordinates;
+        std::vector<SDL_FPoint> positions, coordinates;
         std::vector<int> indices;
     };
     PreparedQuadMesh::PreparedQuadMesh(std::span<const MeshVertex> input)
@@ -47,7 +96,7 @@ namespace Paladin
                  {v.u, v.v}}
             );
             data_->positions.push_back({v.x, v.y});
-            data_->coordinates.push_back({v.u,v.v});
+            data_->coordinates.push_back({v.u, v.v});
         }
         for (int n = 0; n < int(input.size()); n += 4)
         {
@@ -73,7 +122,10 @@ namespace Paladin
         for (std::size_t i = 0; i < count; ++i, ++out, ++in)
         {
             out->position = {x + in->x * scale, y + in->y * scale};
-            out->tex_coord={texture.uvX(data.coordinates[i].x),texture.uvY(data.coordinates[i].y)};
+            out->tex_coord = {
+                texture.uvX(data.coordinates[i].x),
+                texture.uvY(data.coordinates[i].y)
+            };
         }
         SDL_RenderGeometry(
             renderer_,
@@ -113,11 +165,32 @@ namespace Paladin
             int(indices.size())
         );
     }
-    std::shared_ptr<Texture> Renderer::createTextureView(std::shared_ptr<Texture> page,int x,int y,int w,int h) {
-        if(!page || x<0 || y<0 || w<=0 || h<=0 || x>page->width()-w || y>page->height()-h) throw std::runtime_error("Compiled sprite outside atlas");
-        auto view=std::shared_ptr<Texture>(new Texture(page->texture_,w,h));view->parent_=std::move(page);view->atlasX_=x;view->atlasY_=y;return view;
+    std::shared_ptr<Texture> Renderer::createTextureView(
+        std::shared_ptr<Texture> page,
+        int x,
+        int y,
+        int w,
+        int h
+    )
+    {
+        if (!page || x < 0 || y < 0 || w <= 0 || h <= 0 ||
+            x > page->width() - w || y > page->height() - h)
+        {
+            throw std::runtime_error("Compiled sprite outside atlas");
+        }
+        auto view = std::shared_ptr<Texture>(new Texture(page->texture_, w, h));
+        view->parent_ = std::move(page);
+        view->atlasX_ = x;
+        view->atlasY_ = y;
+        return view;
     }
-    void Renderer::setTextureFiltering(Texture& t,bool linear){SDL_SetTextureScaleMode(t.texture_,linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);}
+    void Renderer::setTextureFiltering(Texture& t, bool linear)
+    {
+        SDL_SetTextureScaleMode(
+            t.texture_,
+            linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST
+        );
+    }
     std::unique_ptr<Texture> Renderer::createEmptyTexture(int width, int height)
     {
         auto* texture = SDL_CreateTexture(
@@ -277,7 +350,9 @@ namespace Paladin
         SDL_DestroySurface(surface);
         return result;
 #else
-        (void)filePath;(void)smooth;return nullptr;
+        (void)filePath;
+        (void)smooth;
+        return nullptr;
 #endif
     }
 

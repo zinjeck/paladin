@@ -4,8 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
-namespace Paladin {
-using RenderColor=AssetPixel;
+namespace Paladin
+{
+    using RenderColor = AssetPixel;
     void SourceImporter::load(ImportImages& renderer, const std::string& root)
     {
         if (loaded_)
@@ -52,6 +53,10 @@ using RenderColor=AssetPixel;
                 palette.contains(from) && palette.contains(to))
             {
                 materialColors[file][from] = to;
+            }
+            else if (rule.find_first_not_of(" \t\r") != std::string::npos)
+            {
+                diagnostic("Invalid material color rule: %s", rule.c_str());
             }
         }
         std::ifstream lights(settings / "lights.catalog");
@@ -169,7 +174,8 @@ using RenderColor=AssetPixel;
             objects_[id] = std::move(style);
         }
         std::ifstream input(base / "sprites.catalog");
-        std::unordered_map<std::string, std::shared_ptr<ImportedImage>> textures;
+        std::unordered_map<std::string, std::shared_ptr<ImportedImage>>
+            textures;
         std::unordered_map<std::string, std::shared_ptr<ImportedImage>> shadows;
         std::unordered_map<std::string, RenderColor> overviewColors;
         std::unordered_map<
@@ -219,7 +225,8 @@ using RenderColor=AssetPixel;
                     !std::isfinite(sprite.fps) || sprite.fps < 0 ||
                     sprite.fps > 120)
                 {
-                    diagnostic("Invalid animation metadata in %s", id.c_str()); continue;
+                    diagnostic("Invalid animation metadata in %s", id.c_str());
+                    continue;
                 }
             }
             row >> std::ws;
@@ -234,7 +241,8 @@ using RenderColor=AssetPixel;
                     d.width <= 0 || d.height <= 0 || d.x + d.width > 1 ||
                     d.y + d.height > 1)
                 {
-                    diagnostic("Invalid door region in %s",id.c_str()); continue;
+                    diagnostic("Invalid door region in %s", id.c_str());
+                    continue;
                 }
             }
             const auto relative = std::filesystem::path(file);
@@ -248,8 +256,23 @@ using RenderColor=AssetPixel;
                 );
                 continue;
             }
-            const auto cacheKey = cacheName(base,settings,line,file);
-            if(auto cached=readCached(cacheKey)) { sprites_[id]=std::move(*cached); ++cacheHits; continue; }
+            const auto resolvedRelative =
+                std::filesystem::weakly_canonical(base / relative)
+                    .lexically_relative(
+                        std::filesystem::weakly_canonical(base)
+                    );
+            if (resolvedRelative.empty() || *resolvedRelative.begin() == "..")
+            {
+                diagnostic("Sprite path escapes source root: %s", file.c_str());
+                continue;
+            }
+            const auto cacheKey = cacheName(base, settings, line, file);
+            if (auto cached = readCached(cacheKey))
+            {
+                sprites_[id] = std::move(*cached);
+                ++cacheHits;
+                continue;
+            }
             const auto key = file + (smooth ? ":linear:" : ":nearest:") +
                              (id.starts_with("world.") ? "atlas:" : "scene:") +
                              std::to_string(sprite.frames) + ":" +
@@ -315,7 +338,8 @@ using RenderColor=AssetPixel;
                             sprite.width,
                             sprite.height,
                             sprite.frames,
-                            !id.starts_with("world.") && !id.starts_with("ui.") &&
+                            !id.starts_with("world.") &&
+                                !id.starts_with("ui.") &&
                                 palette.contains(0xA6CD59) &&
                                 palette.contains(0x79B56D) &&
                                 palette.contains(0x49975B) &&
@@ -500,7 +524,8 @@ using RenderColor=AssetPixel;
             sprite.materialBase = materialBases[key];
             sprite.materialWidth = texture->width();
             sprite.materialHeight = texture->height();
-            writeCached(cacheKey,sprite); ++rebuilt;
+            writeCached(cacheKey, sprite);
+            ++rebuilt;
             sprites_[id] = std::move(sprite);
         }
         // New birch bark is generated once on the canonical grid and packed
@@ -620,11 +645,109 @@ using RenderColor=AssetPixel;
         }
     }
 
-std::string SourceImporter::cacheName(const std::filesystem::path& base,const std::filesystem::path& settings,const std::string& row,const std::string& file){if(cacheRoot.empty())return {};AssetWriter w;w.u32(AssetCompilerVersion);w.u32(AssetSchemaVersion);
+    std::string SourceImporter::cacheName(
+        const std::filesystem::path& base,
+        const std::filesystem::path& settings,
+        const std::string& row,
+        const std::string& file
+    )
+    {
+        if (cacheRoot.empty())
+        {
+            return {};
+        }
+        AssetWriter w;
+        w.u32(AssetCompilerVersion);
+        w.u32(AssetSchemaVersion);
 #ifdef PALADIN_IMPORT_SIGNATURE
-w.text(PALADIN_IMPORT_SIGNATURE);
+        w.text(PALADIN_IMPORT_SIGNATURE);
 #endif
-w.text(row);for(auto p:{base/file,settings/"art-palette.hex",base/"material-colors.catalog"}){if(std::filesystem::exists(p))w.text(assetDigest(readAssetFile(p)));else w.text("absent");}return assetDigest(w.bytes);}
-std::optional<ImportedSprite> SourceImporter::readCached(const std::string& key){if(key.empty())return {};auto p=cacheRoot/(key+".ddc");if(!std::filesystem::exists(p))return {};try{auto bytes=readAssetFile(p);AssetReader r{bytes};auto hash=r.text();auto blob=r.bytes.subspan(r.pos);if(assetDigest(blob)!=hash)throw std::runtime_error("Bad cache checksum");AssetReader b{blob};auto n=b.u32();ImportedSprite s;static_cast<SpriteAsset&>(s)=decodeSprite(b.take(n));n=b.u32();s.texture=std::make_shared<ImportedImage>();s.texture->atlas=decodeAtlas(b.take(n));n=b.u32();if(n){s.shadow=std::make_shared<ImportedImage>();s.shadow->atlas=decodeAtlas(b.take(n));}b.end();return s;}catch(...){return {};}}
-void SourceImporter::writeCached(const std::string& key,const ImportedSprite& in){if(key.empty())return;auto s=in;s.pixelWidth=s.texture->width();s.pixelHeight=s.texture->height();s.linear=s.texture->atlas.linear;AssetWriter w;for(auto bytes:{encodeSprite(s),encodeAtlas(s.texture->atlas),s.shadow?encodeAtlas(s.shadow->atlas):AssetBytes{}}){w.u32(unsigned(bytes.size()));w.raw(bytes);}AssetWriter file;file.text(assetDigest(w.bytes));file.raw(w.bytes);writeAssetFile(cacheRoot/(key+".ddc"),file.bytes);}
-}
+        w.text(row);
+        for (auto p :
+             {base / file,
+              settings / "art-palette.hex",
+              base / "material-colors.catalog"})
+        {
+            if (std::filesystem::exists(p))
+            {
+                w.text(assetDigest(readAssetFile(p)));
+            }
+            else
+            {
+                w.text("absent");
+            }
+        }
+        return assetDigest(w.bytes);
+    }
+    std::optional<ImportedSprite> SourceImporter::readCached(
+        const std::string& key
+    )
+    {
+        if (key.empty())
+        {
+            return {};
+        }
+        auto p = cacheRoot / (key + ".ddc");
+        if (!std::filesystem::exists(p))
+        {
+            return {};
+        }
+        try
+        {
+            auto bytes = readAssetFile(p);
+            AssetReader r{bytes};
+            auto hash = r.text();
+            auto blob = r.bytes.subspan(r.pos);
+            if (assetDigest(blob) != hash)
+            {
+                throw std::runtime_error("Bad cache checksum");
+            }
+            AssetReader b{blob};
+            auto n = b.u32();
+            ImportedSprite s;
+            static_cast<SpriteAsset&>(s) = decodeSprite(b.take(n));
+            n = b.u32();
+            s.texture = std::make_shared<ImportedImage>();
+            s.texture->atlas = decodeAtlas(b.take(n));
+            n = b.u32();
+            if (n)
+            {
+                s.shadow = std::make_shared<ImportedImage>();
+                s.shadow->atlas = decodeAtlas(b.take(n));
+            }
+            b.end();
+            return s;
+        }
+        catch (...)
+        {
+            return {};
+        }
+    }
+    void SourceImporter::writeCached(
+        const std::string& key,
+        const ImportedSprite& in
+    )
+    {
+        if (key.empty())
+        {
+            return;
+        }
+        auto s = in;
+        s.pixelWidth = s.texture->width();
+        s.pixelHeight = s.texture->height();
+        s.linear = s.texture->atlas.linear;
+        AssetWriter w;
+        for (auto bytes :
+             {encodeSprite(s),
+              encodeAtlas(s.texture->atlas),
+              s.shadow ? encodeAtlas(s.shadow->atlas) : AssetBytes{}})
+        {
+            w.u32(unsigned(bytes.size()));
+            w.raw(bytes);
+        }
+        AssetWriter file;
+        file.text(assetDigest(w.bytes));
+        file.raw(w.bytes);
+        writeAssetFile(cacheRoot / (key + ".ddc"), file.bytes);
+    }
+} // namespace Paladin
