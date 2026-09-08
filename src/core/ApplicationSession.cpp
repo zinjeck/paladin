@@ -35,8 +35,7 @@ namespace Paladin
     {
         PlanetRotation settlementViewRotation(
             const World& world,
-            WorldTilePosition position,
-            int cityQuarterTurns
+            WorldTilePosition position
         )
         {
             constexpr double pi = 3.14159265358979323846;
@@ -51,20 +50,9 @@ namespace Paladin
                 std::cos(latitude),
                 -std::sin(latitude) * std::cos(longitude)
             };
-            const WorldSurface::Point3 east{
-                std::cos(longitude),
-                0,
-                -std::sin(longitude)
-            };
-            const double heading = cityQuarterTurns * pi * .5;
-            const WorldSurface::Point3 cityUp{
-                north.x * std::cos(heading) + east.x * std::sin(heading),
-                north.y * std::cos(heading) + east.y * std::sin(heading),
-                north.z * std::cos(heading) + east.z * std::sin(heading)
-            };
             const auto centered =
                 PlanetRotation::between(normal, {0, 0, 1}).normalized();
-            const auto viewUp = centered.apply(cityUp);
+            const auto viewUp = centered.apply(north);
             const double roll = std::atan2(viewUp.x, viewUp.y);
             return (PlanetRotation::axis(0, 0, 1, roll) * centered).normalized();
         }
@@ -264,7 +252,6 @@ namespace Paladin
             leavingSettlement
                 ? std::optional<WorldTilePosition>(leavingSettlement->position())
                 : std::nullopt;
-        const int leavingQuarterTurns = camera_->cityQuarterTurns();
 
         settlementObjectPlacementController_->cancelPlacement();
         settlementCommandController_->cancel();
@@ -310,11 +297,7 @@ namespace Paladin
         {
             const auto& grid = simulation_->world().grid();
             camera_->setPlanetRotation(
-                settlementViewRotation(
-                    simulation_->world(),
-                    *leavingPosition,
-                    leavingQuarterTurns
-                ),
+                settlementViewRotation(simulation_->world(), *leavingPosition),
                 grid.width(),
                 grid.height()
             );
