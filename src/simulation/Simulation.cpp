@@ -391,11 +391,13 @@ namespace Paladin
         std::string name
     )
     {
-        if (!isValidFoundingName(name) ||
+        const Realm* playerRealm = world_->realm(playerRealmId_);
+        if (!playerRealm || !isValidFoundingName(name) ||
             !world_->canFoundAdditionalSettlementAt(position, playerRealmId_))
         {
             return {};
         }
+
         const auto& policy = world_->territoryFoundationPolicy();
         auto map = settlementMapGenerator_.generate(
             world_->grid(),
@@ -409,10 +411,8 @@ namespace Paladin
         {
             return {};
         }
-        map->activities.policy.setWorkDayHours(
-            world_->realm(playerRealmId_)->workDayHours()
-        );
-        map->commerce.treasury = world_->realm(playerRealmId_)->treasury;
+        map->activities.policy.setWorkDayHours(playerRealm->workDayHours());
+        map->commerce.treasury = playerRealm->treasury;
         auto profile = playerSettlementFoundationProfile(
             world_->generationSeed() ^ (std::uint64_t(position.x) << 32) ^
             std::uint32_t(position.y)
@@ -557,13 +557,13 @@ namespace Paladin
             }
             const int hours = std::clamp(realm->workDayHours() + delta, 0, 14);
             realm->setWorkDayHours(hours);
-            // A realm enactment applies to every controlled city, including
-            // future maps through the realm's persistent default.
-            for (const auto& city : world_->settlements())
+            // A realm enactment applies to every controlled settlement,
+            // including future maps through the realm's persistent default.
+            for (const auto& controlledSettlement : world_->settlements())
             {
-                if (city.ownerRealmId() == playerRealmId_)
+                if (controlledSettlement.ownerRealmId() == playerRealmId_)
                 {
-                    if (auto* map = settlementMap(city.id()))
+                    if (auto* map = settlementMap(controlledSettlement.id()))
                     {
                         map->activities.policy.setWorkDayHours(hours);
                     }
