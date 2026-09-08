@@ -22,7 +22,7 @@ namespace Paladin
         SceneSpriteLibrary art;
         art.load(
             renderer,
-            (std::filesystem::path(SDL_GetBasePath()) / "assets/sprites")
+            (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
                 .string()
         );
         int birches = 0, temperate = 0, northern = 0, coldTrees = 0;

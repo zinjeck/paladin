@@ -865,22 +865,10 @@ namespace Paladin
         if (!goodsIconsLoaded_)
         {
             goodsIconsLoaded_ = true;
-            std::string root =
-                std::string(SDL_GetBasePath()) + "assets/sprites";
-#ifdef PALADIN_ART_ROOT
-            root = PALADIN_ART_ROOT;
-#endif
-            constexpr const char* paths[] = {
-                "environment-v4/props/resource-stone.png",
-                "environment-v4/props/resource-lumber.png",
-                "tribal-v14/fish.png",
-                "tribal-v14/meat.png"
-            };
-            for (int i = 0; i < 4; ++i)
-            {
-                goodsIcons_[i] =
-                    renderer.loadImageTexture((root + "/" + paths[i]).c_str());
-            }
+            SceneSpriteLibrary icons;icons.load(renderer,std::string(SDL_GetBasePath())+"assets/sprites");
+            const char* names[]={"ui.goods.stone","ui.goods.lumber","ui.goods.fish","ui.goods.meat"};
+            for(int i=0;i<4;++i)if(auto* sprite=icons.find(names[i]))goodsIcons_[i]=sprite->texture;
+
         }
 
         if (goodsOpen_)

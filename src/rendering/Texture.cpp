@@ -11,7 +11,7 @@ namespace Paladin
 
     Texture::~Texture()
     {
-        if (texture_)
+        if (texture_ && !parent_)
         {
             SDL_DestroyTexture(texture_);
         }

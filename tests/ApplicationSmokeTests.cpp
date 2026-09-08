@@ -301,14 +301,12 @@ namespace Paladin
                                      "presentation-fixture";
             std::filesystem::create_directories(fixtureRoot);
             std::filesystem::copy_file(
-                std::filesystem::path(SDL_GetBasePath()) /
-                    "assets/sprites/objects.catalog",
+                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "config/city-objects.catalog",
                 fixtureRoot / "objects.catalog",
                 std::filesystem::copy_options::overwrite_existing
             );
             std::filesystem::copy_file(
-                std::filesystem::path(SDL_GetBasePath()) /
-                    "assets/sprites/lights.catalog",
+                std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "config/lights.catalog",
                 fixtureRoot / "lights.catalog",
                 std::filesystem::copy_options::overwrite_existing
             );
@@ -626,7 +624,7 @@ namespace Paladin
             // Real artist assets: no assumptions about their exact paint
             // colors.
             city.artRootOverride =
-                (std::filesystem::path(SDL_GetBasePath()) / "assets/sprites")
+                (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
                     .string();
             SceneSpriteLibrary installed;
             installed.load(renderer, city.artRootOverride);
@@ -1712,8 +1710,7 @@ namespace Paladin
                 SceneSpriteLibrary art;
                 art.load(
                     *app.renderer_,
-                    (std::filesystem::path(SDL_GetBasePath()) /
-                     "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
                         .string()
                 );
                 globeRevisionChecks(
@@ -1788,8 +1785,7 @@ namespace Paladin
                 SceneSpriteLibrary art;
                 art.load(
                     *app.renderer_,
-                    (std::filesystem::path(SDL_GetBasePath()) /
-                     "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
                         .string()
                 );
                 SceneDrawQueue goods;
@@ -2207,8 +2203,7 @@ namespace Paladin
                 SceneSpriteLibrary cacheArt;
                 cacheArt.load(
                     *app.renderer_,
-                    (std::filesystem::path(SDL_GetBasePath()) /
-                     "assets/sprites")
+                    (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT) / "assets/sprites")
                         .string()
                 );
                 SettlementGroundCache groundCache;

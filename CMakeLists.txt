@@ -42,6 +42,28 @@ FetchContent_Declare(SDL3_image
 )
 FetchContent_MakeAvailable(SDL3_image)
 
+# Asset compiler and runtime package core have no dependency on the game.
+add_library(PaladinAssetCore STATIC src/assets/AssetBinary.cpp src/assets/AssetPackage.cpp src/assets/AssetManager.cpp)
+target_include_directories(PaladinAssetCore PUBLIC src)
+add_library(PaladinAssetImport STATIC tools/asset_compiler/SourceImporter.cpp tools/asset_compiler/AssetCompiler.cpp)
+target_include_directories(PaladinAssetImport PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(PaladinAssetImport PUBLIC PaladinAssetCore SDL3::SDL3 SDL3_image::SDL3_image)
+set(PALADIN_IMPORT_SIGNATURE "")
+foreach(file tools/asset_compiler/SourceImporter.cpp tools/asset_compiler/SpriteProcessor.h src/rendering/SunlitMaterials.h src/assets/AssetBinary.cpp)
+ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+ file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/${file}" part)
+ string(APPEND PALADIN_IMPORT_SIGNATURE "${part}")
+endforeach()
+target_compile_definitions(PaladinAssetImport PRIVATE PALADIN_IMPORT_SIGNATURE="${PALADIN_IMPORT_SIGNATURE}")
+add_executable(PaladinAssetCompiler tools/asset_compiler/main.cpp)
+target_link_libraries(PaladinAssetCompiler PRIVATE PaladinAssetImport)
+add_custom_command(TARGET PaladinAssetCompiler POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:PaladinAssetCompiler>
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3_image::SDL3_image> $<TARGET_FILE_DIR:PaladinAssetCompiler>)
+add_custom_target(PaladinCompileAssets
+ COMMAND $<TARGET_FILE:PaladinAssetCompiler> compile ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/assets/packages
+ DEPENDS PaladinAssetCompiler VERBATIM)
+
 add_executable(Paladin
     src/main.cpp
     src/core/Application.cpp
@@ -150,7 +172,10 @@ target_include_directories(Paladin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(Paladin PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf SDL3_image::SDL3_image)
+target_link_libraries(Paladin PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf PaladinAssetCore $<$<CONFIG:Debug>:PaladinAssetImport>)
+target_compile_definitions(Paladin PRIVATE $<$<CONFIG:Debug>:PALADIN_SOURCE_ART>)
+target_include_directories(Paladin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(Paladin PaladinCompileAssets)
 
 add_custom_command(
     TARGET Paladin POST_BUILD
@@ -170,28 +195,7 @@ add_custom_command(
         $<TARGET_FILE_DIR:Paladin>/assets/fonts/Arimo-Regular.ttf
 )
 
-# Copies only runtime exports. Source art and review material stay out of the build.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites")
-    add_custom_target(PaladinSpriteAssets ALL
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites $<TARGET_FILE_DIR:Paladin>/assets/sprites)
-    add_dependencies(Paladin PaladinSpriteAssets)
-endif()
-
-# ============================================================
-# Tests
-# Presentation recipes and runtime artwork are source-controlled inputs.
-add_custom_target(PaladinObjectPresentation ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Paladin>/assets/sprites
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/config/city-objects.catalog
-        $<TARGET_FILE_DIR:Paladin>/assets/sprites/objects.catalog)
-if(TARGET PaladinSpriteAssets)
-    add_dependencies(PaladinObjectPresentation PaladinSpriteAssets)
-endif()
-add_dependencies(Paladin PaladinObjectPresentation)
-# ============================================================
-
+# Authoring PNGs/catalogs remain in the source tree; only packages are runtime inputs.
 enable_testing()
 
 add_executable(PaladinTests
@@ -291,7 +295,9 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
         ${PALADIN_APPLICATION_SOURCES}
     )
     target_include_directories(PaladinApplicationSmokeTests PRIVATE src tests)
-    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf SDL3_image::SDL3_image)
+    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf PaladinAssetImport)
+    target_include_directories(PaladinApplicationSmokeTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(PaladinApplicationSmokeTests PRIVATE PALADIN_SOURCE_ART PALADIN_TEST_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
     # Reuse the game's runtime DLL/font packaging even when building only this target.
     add_dependencies(PaladinApplicationSmokeTests Paladin)
     add_test(NAME PaladinApplicationSmokeTests COMMAND PaladinApplicationSmokeTests)
@@ -315,13 +321,6 @@ endif()
 
 # Artist exports can be reloaded with F6 without recompiling in Debug builds.
 target_compile_definitions(Paladin PRIVATE $<$<CONFIG:Debug>:PALADIN_ART_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets/sprites">)
-add_custom_target(PaladinArtSettings ALL
- COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Paladin>/assets/sprites
- COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/art-palette.hex $<TARGET_FILE_DIR:Paladin>/assets/sprites/art-palette.hex
- COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/pieces.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/pieces.catalog
- COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/config/lights.catalog $<TARGET_FILE_DIR:Paladin>/assets/sprites/lights.catalog)
-add_dependencies(Paladin PaladinArtSettings)
-
 # Keep the interactive raster/mesh path optimized in the Visual Studio Debug
 # executable too. Simulation and application code remain fully debuggable.
 # These files generate the identical pixels; /Od's per-pixel STL overhead made
@@ -330,11 +329,20 @@ if(MSVC)
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
     file(GLOB_RECURSE PALADIN_DEBUG_SOURCES CONFIGURE_DEPENDS "src/*.cpp" "tests/*.cpp")
     foreach(PALADIN_DEBUG_SOURCE IN LISTS PALADIN_DEBUG_SOURCES)
-        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/rendering/")
+        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/(rendering|assets)/")
             set_property(SOURCE ${PALADIN_DEBUG_SOURCE} APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:/RTC1>")
         endif()
     endforeach()
-    file(GLOB PALADIN_RENDER_SOURCES CONFIGURE_DEPENDS "src/rendering/*.cpp")
+    file(GLOB PALADIN_RENDER_SOURCES CONFIGURE_DEPENDS "src/rendering/*.cpp" "src/assets/*.cpp")
     set_property(SOURCE ${PALADIN_RENDER_SOURCES} APPEND PROPERTY COMPILE_OPTIONS
         "$<$<CONFIG:Debug>:/O2>" "$<$<CONFIG:Debug>:/Ob2>")
+endif()
+
+add_executable(PaladinAssetTests tests/AssetCompilerTests.cpp)
+target_link_libraries(PaladinAssetTests PRIVATE PaladinAssetImport)
+add_dependencies(PaladinAssetTests PaladinAssetCompiler)
+add_test(NAME PaladinAssetTests COMMAND PaladinAssetTests)
+
+if(MSVC)
+ target_compile_options(PaladinAssetImport PRIVATE /O2 /Ob2)
 endif()
