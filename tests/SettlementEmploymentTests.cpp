@@ -182,7 +182,7 @@ void runSettlementEmploymentTests()
     );
     PALADIN_CHECK(
         map.commandState()
-            .cancelIntersecting(map, {{11, 11}, 1, 1}, citizens) == 1
+            .cancelIntersecting(map, {{11, 11}, 1, 1}, citizens, 0) == 1
     );
     PALADIN_CHECK(map.objectState().constructionSites().empty());
     PALADIN_CHECK(!jobs.workplace(pendingFishId));
@@ -278,7 +278,7 @@ void runSettlementEmploymentTests()
         {{5, 30}, 5, 2}
     ));
     PALADIN_CHECK(
-        map.commandState().cancelIntersecting(map, {{7, 30}, 1, 1}, citizens) ==
+        map.commandState().cancelIntersecting(map, {{7, 30}, 1, 1}, citizens, 0) ==
         1
     );
     PALADIN_CHECK(!map.objectState().constructionSiteAt({7, 30}));

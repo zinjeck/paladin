@@ -140,19 +140,25 @@ namespace Paladin
             std::min(std::size_t(pathCredit_), policy.maximumPathsPerStep);
         const auto initialPaths = pathsRemaining_;
         bool citizenDied = false;
+        // Both pre-existing deaths and deaths caused by needs take the same
+        // cleanup path, before the dense citizen array is compacted.
+        const auto handleDeath = [&](SettlementCitizen& deceased)
+        {
+            citizenDied = true;
+            for (auto& survivor : citizens.citizens_)
+            {
+                survivor.familiarities.erase(deceased.id);
+            }
+            map.commerce.citizenDeparted(deceased.id);
+            map.employment().citizenDeparted(deceased.workplaceId);
+            deceased.workplaceId = {};
+            finish(map, deceased, minute);
+        };
         for (auto& c : citizens.citizens_)
         {
             if (c.health <= 1e-7)
             {
-                citizenDied = true;
-                for (auto& survivor : citizens.citizens_)
-                {
-                    survivor.familiarities.erase(c.id);
-                }
-                map.commerce.citizenDeparted(c.id);
-                map.employment().citizenDeparted(c.workplaceId);
-                c.workplaceId = {};
-                finish(map, c, minute);
+                handleDeath(c);
                 continue;
             }
             if (c.foodSeekHunger < policy.foodSeekThreshold)
@@ -212,11 +218,7 @@ namespace Paladin
             }
             if (c.health <= 1e-7)
             {
-                citizenDied = true;
-                map.commerce.citizenDeparted(c.id);
-                map.employment().citizenDeparted(c.workplaceId);
-                c.workplaceId = {};
-                finish(map, c, minute);
+                handleDeath(c);
                 continue;
             }
             const bool shift = policy.isWorkTime(minute);
@@ -632,7 +634,7 @@ namespace Paladin
             }
             if (parent->insideHome && !c.insideHome)
             {
-                enterHome(map, c);
+                enterHome(map, citizens, c);
                 return;
             }
             const bool together =
@@ -931,7 +933,7 @@ namespace Paladin
         }
         else if (c.task.kind == CitizenTaskKind::Sleep)
         {
-            if (c.task.object && !enterHome(map, c))
+            if (c.task.object && !enterHome(map, citizens, c))
             {
                 if (!map.objectState().completedObject(c.homeId))
                 {
@@ -985,6 +987,12 @@ namespace Paladin
                 }
                 c.pathIndex = 0;
                 c.stepProgress = 0;
+                c.stepDuration = citizens.navigation_.stepCost(
+                    map,
+                    c.tilePosition,
+                    c.path.front(),
+                    citizens.movementPolicy
+                );
                 c.destination = c.task.target;
                 c.explicitMovement = true;
                 c.activity = CitizenActivity::ReturningHome;
@@ -1014,7 +1022,7 @@ namespace Paladin
         }
         else if (c.task.kind == CitizenTaskKind::Care)
         {
-            if (enterHome(map, c))
+            if (enterHome(map, citizens, c))
             {
                 c.activity = CitizenActivity::AtHome;
                 if (!c.child && c.youngDependents > 0 &&
@@ -1041,6 +1049,12 @@ namespace Paladin
                         c.path = {next};
                         c.pathIndex = 0;
                         c.stepProgress = 0;
+                        c.stepDuration = citizens.navigation_.stepCost(
+                            map,
+                            c.tilePosition,
+                            next,
+                            citizens.movementPolicy
+                        );
                         c.destination = next;
                         c.explicitMovement = true;
                         break;
@@ -1068,7 +1082,7 @@ namespace Paladin
                 }
                 return;
             }
-            if (!enterHome(map, c))
+            if (!enterHome(map, citizens, c))
             {
                 // A failed/invalidated return route must retry, not leave a
                 // permanent Home task standing outside with no path.
@@ -1126,6 +1140,12 @@ namespace Paladin
                     c.path = {target};
                     c.pathIndex = 0;
                     c.stepProgress = 0;
+                    c.stepDuration = citizens.navigation_.stepCost(
+                        map,
+                        c.tilePosition,
+                        target,
+                        citizens.movementPolicy
+                    );
                     c.destination = target;
                     c.explicitMovement = true;
                 }

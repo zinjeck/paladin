@@ -6,12 +6,26 @@
 #include <cmath>
 namespace Paladin
 {
+    namespace
+    {
+        double movementFraction(double progress, double duration) noexcept
+        {
+            // Invalid timing must not leak NaN/Inf into captured positions or
+            // rendering. Keep the citizen at the current tile until repaired.
+            if (!std::isfinite(progress) || !std::isfinite(duration) ||
+                duration <= 0)
+            {
+                return 0;
+            }
+            return std::clamp(progress / duration, 0.0, 1.0);
+        }
+    } // namespace
     double SettlementCitizen::visualX() const noexcept
     {
         return tilePosition.x +
                (pathIndex < path.size()
                     ? (path[pathIndex].x - tilePosition.x) *
-                          std::clamp(stepProgress / stepDuration, 0.0, 1.0)
+                          movementFraction(stepProgress, stepDuration)
                     : 0);
     }
     double SettlementCitizen::visualY() const noexcept
@@ -19,7 +33,7 @@ namespace Paladin
         return tilePosition.y +
                (pathIndex < path.size()
                     ? (path[pathIndex].y - tilePosition.y) *
-                          std::clamp(stepProgress / stepDuration, 0.0, 1.0)
+                          movementFraction(stepProgress, stepDuration)
                     : 0);
     }
     void SettlementCitizenState::resetLocalPlacement() noexcept
