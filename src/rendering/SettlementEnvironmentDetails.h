@@ -68,9 +68,27 @@ namespace Paladin
                     neighbor->objectTypeId == SettlementObjectTypes::Bakery);
         };
         const auto& f = object.footprint;
-        for (int ty = f.topLeft.y - 1; ty <= f.topLeft.y + f.height; ++ty)
+        // Direct rendering is also the cache-budget fallback. Clip iteration
+        // itself, not just draw calls, for long player-dragged road footprints.
+        const int firstX = std::max(
+            f.topLeft.x - 1,
+            int(std::floor(p.cameraX - p.screenWidth * .5 / p.tilePixels)) - 1
+        );
+        const int firstY = std::max(
+            f.topLeft.y - 1,
+            int(std::floor(p.cameraY - p.screenHeight * .5 / p.tilePixels)) - 1
+        );
+        const int lastX = std::min(
+            f.topLeft.x + f.width,
+            int(std::ceil(p.cameraX + p.screenWidth * .5 / p.tilePixels)) + 1
+        );
+        const int lastY = std::min(
+            f.topLeft.y + f.height,
+            int(std::ceil(p.cameraY + p.screenHeight * .5 / p.tilePixels)) + 1
+        );
+        for (int ty = firstY; ty <= lastY; ++ty)
         {
-            for (int tx = f.topLeft.x - 1; tx <= f.topLeft.x + f.width; ++tx)
+            for (int tx = firstX; tx <= lastX; ++tx)
             {
                 if (!p.visible(
                         p.bounds({double(tx), double(ty), 0, 1, 1, 0, 0})

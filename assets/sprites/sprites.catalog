@@ -158,14 +158,14 @@ home.detail.woodrack tribal-v13/woodrack.png .60 .60 .5 1 0 0
 home.detail.basket tribal-v13/basket.png .60 .60 .5 1 0 0
 home.detail.hide tribal-v13/hide.png .60 .60 .5 1 0 0
 home.detail.shutters tribal-v13/shutters.png .60 .60 .5 1 0 0
-home.bed.0 tribal-v13/bed-0.png .72 .92 .5 1 0 0
-home.bed.1 tribal-v13/bed-1.png .72 .92 .5 1 0 0
-home.bed.2 tribal-v13/bed-2.png .72 .92 .5 1 0 0
-home.bed.3 tribal-v13/bed-3.png .72 .92 .5 1 0 0
-home.bed.4 tribal-v13/bed-4.png .72 .92 .5 1 0 0
-home.bed.5 tribal-v13/bed-5.png .72 .92 .5 1 0 0
-home.bed.6 tribal-v13/bed-6.png .72 .92 .5 1 0 0
-home.bed.7 tribal-v13/bed-7.png .72 .92 .5 1 0 0
+home.bed.0 modular-v1/bed-0.png .72 .92 .5 1 0 0
+home.bed.1 modular-v1/bed-1.png .72 .92 .5 1 0 0
+home.bed.2 modular-v1/bed-2.png .72 .92 .5 1 0 0
+home.bed.3 modular-v1/bed-3.png .72 .92 .5 1 0 0
+home.bed.4 modular-v1/bed-4.png .72 .92 .5 1 0 0
+home.bed.5 modular-v1/bed-5.png .72 .92 .5 1 0 0
+home.bed.6 modular-v1/bed-6.png .72 .92 .5 1 0 0
+home.bed.7 modular-v1/bed-7.png .72 .92 .5 1 0 0
 mountain.peak.a tribal-v13/mountain-a.png 4 4 .5 1 0 0
 mountain.peak.b tribal-v13/mountain-b.png 4 4 .5 1 0 0
 hill.mound world-relief/hill.png 3 2 .5 1 0 0
@@ -173,3 +173,30 @@ hill.mound.small world-relief/hill.png 1 1 .5 1 0 0
 mountain.peak.small tribal-v13/mountain-a.png 1 1 .5 1 0 0
 mountain.range.a tribal-v13/mountain-a.png 3 2 .5 1 0 0
 mountain.range.b tribal-v13/mountain-b.png 3 2 .5 1 0 0
+
+# Shared material families. Same fitted footprint for every roof variant.
+wall.adobe modular-v1/adobe-front.png 3 .85 0 1 0 0
+wall.adobe.front modular-v1/adobe-front.png 3 .85 0 1 0 0
+wall.adobe.door modular-v1/timber-door.png .55 .75 .5 1 0 0 1 0 door 0 0 1 1
+roof.thatch tribal-v12/roof.png 3.44 3.08 0 0 0 0
+roof.thatch.full tribal-v12/roof.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.side tribal-v12/roof-side.png 3.44 3.08 0 0 .85 0
+city_keep.floor.full modular-v1/hall-floor.png 3 7 0 0 0 0
+furniture.communal-table modular-v1/communal-table.png 2 1 .5 1 0 0
+roof.thatch.full.1 modular-v1/roof-bound.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.2 modular-v1/roof-dormer.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.3 modular-v1/roof-bound.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.4 modular-v1/roof-dormer.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.side.1 modular-v1/roof-bound-side.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.side.2 modular-v1/roof-dormer-side.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.side.3 modular-v1/roof-bound-side.png 3.44 3.08 0 0 .85 0
+roof.thatch.full.side.4 modular-v1/roof-dormer-side.png 3.44 3.08 0 0 .85 0
+world.terrain.plain world-biomes/plain.png 2 2 0 0 0 0
+world.terrain.forest world-biomes/forest.png 2 2 0 0 0 0
+world.terrain.jungle world-biomes/jungle.png 2 2 0 0 0 0
+world.terrain.desert world-biomes/desert.png 2 2 0 0 0 0
+world.terrain.tundra world-biomes/tundra.png 2 2 0 0 0 0
+world.terrain.taiga world-biomes/taiga.png 2 2 0 0 0 0
+world.terrain.water world-biomes/water.png 2 2 0 0 0 0
+world.terrain.shallow world-biomes/shallow.png 2 2 0 0 0 0
+world.terrain.beach world-biomes/beach.png 2 2 0 0 0 0

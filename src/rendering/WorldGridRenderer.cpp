@@ -109,10 +109,18 @@ namespace Paladin
         }
         std::string terrainArtId(
             const WorldTile& tile,
-            const SceneSpriteLibrary& sprites
+            const SceneSpriteLibrary& sprites,
+            bool worldScale = false
         )
         {
             std::string id = terrainIds[terrainIndex(tile)];
+            if (worldScale && tile.terrain != TerrainType::Mountain &&
+                tile.biome != BiomeType::Hills)
+            {
+                // Strategic art has its own biome identity, never city climate
+                // variants.
+                return "world." + id;
+            }
             if (tile.terrain == TerrainType::Land &&
                 (tile.biome == BiomeType::Plain ||
                  tile.biome == BiomeType::Forest ||
@@ -296,34 +304,31 @@ namespace Paladin
                             }
                         }
                     }
-                    if (current->terrain == TerrainType::Water && !coast)
-                    {
-                        renderer.fillRectangle(
-                            float(ox + x * tp),
-                            float(oy + y * tp),
-                            float(tp),
-                            float(tp),
-                            {0x20, 0x2C, 0x43, 255}
-                        );
-                        continue;
-                    }
                     if (!coast && !ridge)
                     {
                         continue;
                     }
                     const auto* green =
-                        sprites.find(terrainArtId(*grass, sprites));
+                        sprites.find(terrainArtId(*grass, sprites, true));
                     const auto* rock = sprites.find("terrain.mountain");
                     const auto material = [&](int col, int row)
                     {
                         const double xx = x + (col + .5) / 16,
                                      yy = y + (row + .5) / 16;
-                        const double l = surfaceField(xx, yy, land);
+                        const auto sample = coastSample(xx, yy, true);
+                        const double l = surfaceField(sample.x, sample.y, land);
                         if (l < .5)
                         {
                             return l > .40 ? 1 : 0;
                         }
-                        return surfaceField(xx, yy, mountain) > .5 ? 3 : 2;
+                        if (surfaceField(xx, yy, mountain) > .5)
+                        {
+                            return 3;
+                        }
+                        // Sparse sand margin at strategic scale; no city-sized
+                        // foam.
+                        return l < .55 && std::sin(xx * .9 + yy * .7) > .2 ? 4
+                                                                           : 2;
                     };
                     for (int row = 0; row < 16; ++row)
                     {
@@ -347,7 +352,13 @@ namespace Paladin
                                            : RenderColor{0x30, 0x45, 0x5D, 255}
                                 );
                             }
-                            else if (const auto* art = m == 3 ? rock : green)
+                            else if (
+                                const auto* art =
+                                    m == 3 ? rock
+                                    : m == 4
+                                        ? sprites.find("world.terrain.beach")
+                                        : green
+                            )
                             {
                                 auto frame = sprites.frame(*art, false);
                                 const int mw = std::max(1, int(art->width)),
@@ -679,20 +690,26 @@ namespace Paladin
                         {
                             const double xx = x + (c + .5) / n,
                                          yy = y + (row + .5) / n;
-                            const double grain =
-                                .016 * std::sin(xx * 13 + yy * 7);
+                            const auto sample = coastSample(xx, yy, false);
                             const double landField =
-                                surfaceField(xx, yy, land) + grain;
+                                surfaceField(sample.x, sample.y, land);
                             if (coast && landField < .5)
                             {
-                                if (landField > .40)
+                                if (landField > .46)
                                 {
                                     return 1; // narrow wet shoreline
                                 }
-                                if (landField > .31 &&
-                                    ((int(xx * 8 + yy * 5) +
-                                      int(sprites.time() * 2)) %
-                                     9) < 3)
+                                if (std::abs(
+                                        landField -
+                                        (.29 + .075 * std::sin(
+                                                          sprites.time() * 1.4 +
+                                                          xx * .8 + yy * .7
+                                                      ))
+                                    ) < .035 &&
+                                    std::sin(
+                                        xx * 3.1 - yy * 2.3 +
+                                        sprites.time() * .3
+                                    ) > -.25)
                                 {
                                     return 2;
                                 }
@@ -711,8 +728,9 @@ namespace Paladin
                                 );
                                 return shallow > .16 ? 5 : 0;
                             }
-                            return surfaceField(xx, yy, sand) + grain > .47 ? 3
-                                                                            : 4;
+                            return surfaceField(sample.x, sample.y, sand) > .47
+                                       ? 3
+                                       : 4;
                         };
                         const int m = material(col), first = col++;
                         while (col < n && material(col) == m)
@@ -756,7 +774,7 @@ namespace Paladin
                                 float(h * tp),
                                 m == 2      ? RenderColor{175, 201, 214, 255}
                                 : coastSand ? RenderColor{169, 148, 120, 255}
-                                            : RenderColor{25, 62, 66, 255}
+                                            : RenderColor{79, 140, 122, 255}
                             );
                         }
                     }
@@ -808,8 +826,13 @@ namespace Paladin
         std::vector<std::shared_ptr<Texture>> sources;
         std::vector<double> dimensions;
         bool hasTerrainArt = false;
-        for (const char* id : terrainIds)
+        for (const char* baseId : terrainIds)
         {
+            const std::string id =
+                std::is_same_v<Grid, WorldGrid> &&
+                        std::string(baseId) != "terrain.mountain"
+                    ? "world." + std::string(baseId)
+                    : std::string(baseId);
             for (int variant = 0; variant <= 4; ++variant)
             {
                 const auto* sprite =
@@ -868,7 +891,11 @@ namespace Paladin
                             }
                         }
                         if (const auto* art = sprites->find(
-                                index < 8 ? terrainArtId(tile, *sprites)
+                                index < 8 ? terrainArtId(
+                                                tile,
+                                                *sprites,
+                                                std::is_same_v<Grid, WorldGrid>
+                                            )
                                           : std::string(terrainIds[index])
                             );
                             art && art->overviewColor.alpha == 255)
@@ -906,8 +933,12 @@ namespace Paladin
             {
                 for (int px = 0; px < w * density; ++px)
                 {
-                    const double xx = (px + .5) / density - .5,
-                                 yy = (py + .5) / density - .5;
+                    const auto sample = coastSample(
+                        (px + .5) / density,
+                        (py + .5) / density,
+                        std::is_same_v<Grid, WorldGrid>
+                    );
+                    const double xx = sample.x - .5, yy = sample.y - .5;
                     const int ix = int(std::floor(xx)),
                               iy = int(std::floor(yy));
                     double u = xx - ix, v = yy - iy;
@@ -1123,7 +1154,11 @@ namespace Paladin
                             break;
                         }
                         const auto& tile = *grid.tile({x, y});
-                        std::string id = terrainArtId(tile, sprites);
+                        std::string id = terrainArtId(
+                            tile,
+                            sprites,
+                            std::is_same_v<Grid, WorldGrid>
+                        );
                         if constexpr (std::is_same_v<Grid, SettlementGrid>)
                         {
                             if (grid.cityTileType({x, y}) ==
@@ -1141,7 +1176,9 @@ namespace Paladin
                         }
                         if (shoreWater(grid, x, y))
                         {
-                            id = "terrain.shallow";
+                            id = std::is_same_v<Grid, WorldGrid>
+                                     ? "world.terrain.shallow"
+                                     : "terrain.shallow";
                         }
                         const auto* sprite = sprites.find(id);
                         // A variant belongs to a whole module, so changing

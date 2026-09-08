@@ -1,6 +1,8 @@
 # Presentation only. No collision, production, capacity or placement rules.
 # Restart the game after editing. This file is packaged as assets/sprites/objects.catalog.
 # Columns:
+# Optional final column: independent shared decor profile (or -).
+# Enclosed wall/roof columns select generic material families, shared across work objects.
 # object-id mode floor-id wall-id roof-id sprite-id module-width module-depth height wall-thickness front-shade side-shade edge-light shadow-alpha outline
 # Modes: ground (flat), enclosed (walls/optional roof), modules (repeated props),
 # single (one centered prop). "-" means no sprite; primitive fallback remains.
@@ -13,9 +15,9 @@
 # Proxy lighting/shadows also disappear: transparent sprite pixels stay clear.
 # Define all desired sprite layers explicitly; '-' layers stay absent with art.
 # Open-area modules are clipped to the viewport and omitted at overview zoom.
-city_keep enclosed city_keep.floor city_keep.wall city_keep.roof - 3 7 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45
-house enclosed house.floor house.wall house.roof - 3 3 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45
-bakery enclosed bakery.floor bakery.wall bakery.roof - 3 3 .75 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45
+city_keep enclosed city_keep.floor wall.adobe roof.thatch - 3 7 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+house enclosed house.floor wall.adobe roof.thatch - 3 3 .85 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+bakery enclosed bakery.floor wall.adobe roof.thatch - 3 3 .75 .12 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
 market modules market.floor - - market.stall 3 4 .65 .12 30 65 32 65 1 ca7e48 683724 .6 .45
 stockpile ground stockpile.floor - - - 2 2 .35 .12 30 65 32 50 1 d1a352 754d1f .6 .45
 fishing_grounds modules fishing_grounds.floor - - fishing_grounds.station 4 4 .3 .12 30 65 32 45 1 bd864c 633e4b .6 .45

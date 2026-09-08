@@ -83,6 +83,16 @@ namespace Paladin
             std::istringstream row(partLine);
             if (row >> p.object >> p.sprite >> p.state >> p.x >> p.y >> p.depth)
             {
+                // Optional deterministic variant selector; old rows always
+                // draw.
+                if (row >> p.choices)
+                {
+                    if (!(row >> p.choice) || p.choices == 0 ||
+                        p.choices > 64 || p.choice >= p.choices)
+                    {
+                        continue;
+                    }
+                }
                 if ((p.state == "always" || p.state == "roofed" ||
                      p.state == "cutaway") &&
                     std::isfinite(p.x) && std::isfinite(p.y) &&
@@ -141,6 +151,7 @@ namespace Paladin
                 continue;
             }
             style.outline = outline != 0;
+            row >> style.decor;
             objects_[id] = std::move(style);
         }
         std::ifstream input(base / "sprites.catalog");
@@ -218,10 +229,12 @@ namespace Paladin
                 );
                 continue;
             }
-            const auto key = file + (smooth ? ":linear:" : ":nearest:") +
-                             std::to_string(sprite.frames) + ":" +
-                             std::to_string(sprite.width) + ":" +
-                             std::to_string(sprite.height);
+            const auto key =
+                file + (smooth ? ":linear:" : ":nearest:") +
+                (id.starts_with("world.terrain.") ? "atlas:" : "scene:") +
+                std::to_string(sprite.frames) + ":" +
+                std::to_string(sprite.width) + ":" +
+                std::to_string(sprite.height);
             auto& texture = textures[key];
             if (!texture)
             {
@@ -282,7 +295,8 @@ namespace Paladin
                             sprite.width,
                             sprite.height,
                             sprite.frames,
-                            palette.contains(0xA6CD59) &&
+                            !id.starts_with("world.terrain.") &&
+                                palette.contains(0xA6CD59) &&
                                 palette.contains(0x79B56D) &&
                                 palette.contains(0x49975B) &&
                                 palette.contains(0x337A58) &&
@@ -430,19 +444,24 @@ namespace Paladin
         }
         // Only the loose eave fringe moves on a roof; its structure stays
         // fixed. Grass bends more at the tips and stays rooted at the bottom.
-        const float moving = roof ? std::min(8.F, f.height * .12F) : f.height;
+        // Slice on whole source rows so nearest sampling stays stable.
+        const float moving =
+            roof ? std::max(1.F, std::floor(std::min(8.F, f.height * .12F)))
+                 : f.height;
         const float start = f.height - moving;
-        if (start > 0)
+        if (roof)
         {
+            // Loose thatch moves over an intact roof. Independent band
+            // rasterization can otherwise expose background at fitted joins.
             queue.submit(
-                {{b.x, b.y, b.width, b.height * start / f.height},
+                {b,
                  {},
                  depth,
                  id,
                  0,
                  part,
                  sprite.texture.get(),
-                 {f.x, f.y, f.width, start}}
+                 f}
             );
         }
         for (float row = start; row < f.height; row += 2)
@@ -509,7 +528,9 @@ namespace Paladin
         );
         if (p.visible(b))
         {
-            if (name.find(".roof.full") != std::string::npos &&
+            if ((name.find(".roof.full") != std::string::npos ||
+                 (name.starts_with("roof.") &&
+                  name.find(".full") != std::string::npos)) &&
                 p.tilePixels >= AnimationDetailPixels)
             {
                 submitWind(q, *sprite, b, depth, id, part, true);
