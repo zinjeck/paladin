@@ -89,7 +89,7 @@ namespace Paladin
         }
 
         tileRenderMetrics_.reset();
-        settlementCameras_.clear();
+        cityCameras_.clear();
         cityRenderer_.reset();
         worldRenderer_.reset();
         settlementPlacementController_.reset();
