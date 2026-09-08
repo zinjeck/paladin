@@ -438,25 +438,18 @@ namespace Paladin
                     continue;
                 }
                 SceneDrawQueue snapshot;
-                {
-                    // Chunk textures are reusable map-space data. The live
-                    // camera turn must not become part of their anchor
-                    // positions or depth order, otherwise a chunk composed
-                    // while rotated is later rotated a second time at draw.
-                    SceneQuarterTurnScope cacheSceneTurn(0);
-                    submitDetailed(
-                        renderer,
-                        map,
-                        {(cell.x + .5) * side,
-                         (cell.y + .5) * side,
-                         double(density),
-                         textureSide,
-                         textureSide},
-                        snapshot,
-                        *sprites,
-                        *policy
-                    );
-                }
+                submitDetailed(
+                    renderer,
+                    map,
+                    {(cell.x + .5) * side,
+                     (cell.y + .5) * side,
+                     double(density),
+                     textureSide,
+                     textureSide},
+                    snapshot,
+                    *sprites,
+                    *policy
+                );
                 auto ordered = snapshot.items();
                 if (!foliageAtlas_ && sprites->find("tree.trunk.1"))
                 {

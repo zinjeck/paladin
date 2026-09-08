@@ -5,57 +5,10 @@
 #include <cmath>
 #include <limits>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 namespace Paladin
 {
-    inline thread_local int activeSceneQuarterTurns = 0;
-
-    inline int normalizedSceneQuarterTurns(int turns) noexcept
-    {
-        turns %= 4;
-        return turns < 0 ? turns + 4 : turns;
-    }
-
-    class SceneQuarterTurnScope
-    {
-    public:
-        explicit SceneQuarterTurnScope(int turns) noexcept
-            : previous_(activeSceneQuarterTurns)
-        {
-            activeSceneQuarterTurns = normalizedSceneQuarterTurns(turns);
-        }
-        ~SceneQuarterTurnScope()
-        {
-            activeSceneQuarterTurns = previous_;
-        }
-        SceneQuarterTurnScope(const SceneQuarterTurnScope&) = delete;
-        SceneQuarterTurnScope& operator=(const SceneQuarterTurnScope&) = delete;
-
-    private:
-        int previous_ = 0;
-    };
-
-    inline std::pair<double, double> rotateSceneOffset(
-        double x,
-        double y,
-        int quarterTurns = activeSceneQuarterTurns
-    ) noexcept
-    {
-        switch (normalizedSceneQuarterTurns(quarterTurns))
-        {
-        case 1:
-            return {y, -x};
-        case 2:
-            return {-x, -y};
-        case 3:
-            return {-y, x};
-        default:
-            return {x, y};
-        }
-    }
-
     // Simulation coordinates stay flat. Presentation alone owns sprite height,
     // ground anchor, pivot and atlas frame. Tall art can overhang its
     // footprint.
@@ -69,54 +22,18 @@ namespace Paladin
     {
         double cameraX = 0, cameraY = 0, tilePixels = 1;
         int screenWidth = 0, screenHeight = 0;
-        int quarterTurns = activeSceneQuarterTurns;
-
-        [[nodiscard]]
-        std::pair<double, double> viewOffset(double x, double y) const noexcept
-        {
-            return rotateSceneOffset(x, y, quarterTurns);
-        }
-
-        [[nodiscard]]
-        RenderRectangle groundBounds(
-            double x,
-            double y,
-            double width,
-            double height
-        ) const
-        {
-            const auto a = viewOffset(x - cameraX, y - cameraY);
-            const auto b = viewOffset(x + width - cameraX, y - cameraY);
-            const auto c = viewOffset(
-                x + width - cameraX,
-                y + height - cameraY
-            );
-            const auto d = viewOffset(x - cameraX, y + height - cameraY);
-            const double minX = std::min({a.first, b.first, c.first, d.first});
-            const double maxX = std::max({a.first, b.first, c.first, d.first});
-            const double minY = std::min({a.second, b.second, c.second, d.second});
-            const double maxY = std::max({a.second, b.second, c.second, d.second});
-            return {
-                float(screenWidth * .5 + minX * tilePixels),
-                float(screenHeight * .5 + minY * tilePixels),
-                float((maxX - minX) * tilePixels),
-                float((maxY - minY) * tilePixels)
-            };
-        }
-
         RenderRectangle bounds(const SceneVisual& visual) const
         {
-            const auto offset = viewOffset(
-                visual.groundX - cameraX,
-                visual.groundY - cameraY
-            );
-            const double anchorX = screenWidth * .5 + offset.first * tilePixels;
-            const double anchorY = screenHeight * .5 + offset.second * tilePixels;
             return {
-                float(anchorX - visual.width * visual.pivotX * tilePixels),
                 float(
-                    anchorY -
-                    (visual.elevation + visual.height * visual.pivotY) *
+                    screenWidth * .5 +
+                    (visual.groundX - cameraX - visual.width * visual.pivotX) *
+                        tilePixels
+                ),
+                float(
+                    screenHeight * .5 +
+                    (visual.groundY - cameraY - visual.elevation -
+                     visual.height * visual.pivotY) *
                         tilePixels
                 ),
                 float(visual.width * tilePixels),
@@ -166,10 +83,6 @@ namespace Paladin
                 b.x += float(dx);
                 b.y = float(groundY + (b.y - groundY) * scaleY);
                 b.height *= float(scaleY);
-                if (activeSceneQuarterTurns)
-                {
-                    items_[i].groundDepth = b.y + b.height;
-                }
             }
         }
         const std::vector<SceneDrawItem>& items() const
@@ -207,13 +120,7 @@ namespace Paladin
         }
         void submit(const SceneDrawItem& item)
         {
-            auto submitted = item;
-            if (activeSceneQuarterTurns)
-            {
-                submitted.groundDepth =
-                    submitted.bounds.y + submitted.bounds.height;
-            }
-            items_.push_back(std::move(submitted));
+            items_.push_back(item);
             sorted_ = false;
         }
         static bool before(const SceneDrawItem& a, const SceneDrawItem& b)
