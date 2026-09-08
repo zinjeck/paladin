@@ -1,6 +1,8 @@
 #include <exception>
 #include <iostream>
 
+void runEntityAttributeTests();
+void runWorldReliefTests();
 void runSettlementSimulationLoopTests();
 void runSettlementEmploymentTests();
 void runSettlementActivityTests();
@@ -12,6 +14,8 @@ int main()
 {
     try
     {
+        runEntityAttributeTests();
+        runWorldReliefTests();
         runSettlementSimulationLoopTests();
         runSettlementEmploymentTests();
         runSettlementActivityTests();

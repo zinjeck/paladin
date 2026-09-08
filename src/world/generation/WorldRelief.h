@@ -87,23 +87,16 @@ namespace Paladin
                 {
                     continue;
                 }
-                double u = double(x) / w, v = double(y) / h;
-                u += .035 * GenerationNoise::simplexFractal(
-                                u * 5,
-                                v * 5,
-                                seed + 51,
-                                2,
-                                .5,
-                                2
-                            );
-                v += .035 * GenerationNoise::simplexFractal(
-                                u * 5,
-                                v * 5,
-                                seed + 89,
-                                2,
-                                .5,
-                                2
-                            );
+                const double sourceU = double(x) / w;
+                const double sourceV = double(y) / h;
+                // Both offset fields sample the same unwarped coordinate.
+                // Do not let the horizontal offset feed the vertical sample.
+                const double u = sourceU + .035 * GenerationNoise::simplexFractal(
+                    sourceU * 5, sourceV * 5, seed + 51, 2, .5, 2
+                );
+                const double v = sourceV + .035 * GenerationNoise::simplexFractal(
+                    sourceU * 5, sourceV * 5, seed + 89, 2, .5, 2
+                );
                 double first = 10, second = 10;
                 unsigned a = 0, b = 0;
                 for (unsigned i = 0; i < plates.size(); ++i)
