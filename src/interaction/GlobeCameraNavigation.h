@@ -33,6 +33,25 @@ namespace Paladin
                 grid.height()
             );
         }
+        static void roll(
+            Camera2D& camera,
+            const WorldGrid& grid,
+            int width,
+            int height,
+            double radians
+        )
+        {
+            if (radians == 0)
+            {
+                return;
+            }
+            const auto view = GlobeView::from(camera, grid, width, height);
+            camera.setPlanetRotation(
+                PlanetRotation::axis(0, 0, 1, radians) * view.orientation(),
+                grid.width(),
+                grid.height()
+            );
+        }
         static void drag(
             Camera2D& camera,
             const WorldGrid& grid,

@@ -1,11 +1,13 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
+#include "ui/DebugConsole.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
 #include "ui/SimulationSpeedControls.h"
@@ -46,9 +48,35 @@ namespace Paladin
 
         if (!foundingPanel_->isOpen())
         {
-            updateCameraMovement(simulationClock_->frameDeltaSeconds());
+            const double frameDeltaSeconds = simulationClock_->frameDeltaSeconds();
+            updateCameraMovement(frameDeltaSeconds);
+            updateCameraZoom(frameDeltaSeconds);
 
-            updateCameraZoom(simulationClock_->frameDeltaSeconds());
+            if (!debugConsole_->wantsKeyboard() && worldRenderer_->globeEnabled)
+            {
+                const bool* keyboardState = SDL_GetKeyboardState(nullptr);
+                double rollDirection = 0.0;
+                if (keyboardState[SDL_SCANCODE_Q])
+                {
+                    rollDirection += 1.0;
+                }
+                if (keyboardState[SDL_SCANCODE_E])
+                {
+                    rollDirection -= 1.0;
+                }
+                if (rollDirection != 0.0)
+                {
+                    constexpr double pi = 3.14159265358979323846;
+                    constexpr double rollRadiansPerSecond = pi * 0.5;
+                    GlobeCameraNavigation::roll(
+                        *camera_,
+                        simulation_->world().grid(),
+                        renderer_->outputWidth(),
+                        renderer_->outputHeight(),
+                        rollDirection * rollRadiansPerSecond * frameDeltaSeconds
+                    );
+                }
+            }
         }
 
         if (settlementPlacementController_->isSelecting())

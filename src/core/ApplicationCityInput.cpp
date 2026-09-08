@@ -404,16 +404,6 @@ namespace Paladin
             }
         }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
-            (event.key.scancode == SDL_SCANCODE_Q ||
-             event.key.scancode == SDL_SCANCODE_E))
-        {
-            camera_->rotateCityQuarterTurns(
-                event.key.scancode == SDL_SCANCODE_Q ? -1 : 1
-            );
-            clampCameraToWorld();
-            return;
-        }
-        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             event.key.scancode == SDL_SCANCODE_F7)
         {
             camera_->setZoom(
@@ -441,6 +431,7 @@ namespace Paladin
             handleCityPointerMotion(event);
         }
 
+
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             settlementObjectPlacementController_->isActive() &&
             event.key.scancode == SDL_SCANCODE_F)
@@ -450,10 +441,12 @@ namespace Paladin
         }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat &&
             settlementObjectPlacementController_->isActive() &&
-            event.key.scancode == SDL_SCANCODE_R)
+            (event.key.scancode == SDL_SCANCODE_E ||
+             event.key.scancode == SDL_SCANCODE_R))
         {
-            const bool reverse = (event.key.mod & SDL_KMOD_SHIFT) != 0;
-            settlementObjectPlacementController_->rotateDoor(reverse ? -1 : 1);
+            settlementObjectPlacementController_->rotateDoor(
+                event.key.scancode == SDL_SCANCODE_E ? -1 : 1
+            );
             return;
         }
 
@@ -475,6 +468,7 @@ namespace Paladin
             }
             return;
         }
+
 
         handleCameraZoomEvent(event);
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&

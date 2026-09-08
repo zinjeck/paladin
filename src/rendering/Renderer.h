@@ -5,7 +5,6 @@
 #include <memory>
 #include <span>
 #include <string>
-#include <utility>
 
 struct SDL_Renderer;
 struct SDL_Surface;
@@ -71,15 +70,6 @@ namespace Paladin
         void compositeLighting(Texture& light, Texture& glow);
 
         void endFrame();
-
-        // Rotates only immediate world-space drawing. Cached/offscreen texture
-        // composition is intentionally left untouched. Positive turns are a
-        // clockwise camera turn, so the rendered world rotates counterclockwise.
-        void setQuarterTurnTransform(int turns) noexcept;
-        [[nodiscard]] int quarterTurnTransform() const noexcept
-        {
-            return quarterTurns_;
-        }
 
         void fillRectangle(
 
@@ -179,8 +169,7 @@ namespace Paladin
             int y,
             int width,
             int height,
-            std::span<const RenderColor>,
-            std::size_t sourcePitchPixels = 0
+            std::span<const RenderColor>
         );
 
         void drawTexture(
@@ -207,21 +196,11 @@ namespace Paladin
         void endPixelScene();
 
     private:
-        [[nodiscard]] bool quarterTurnActive() const noexcept;
-        [[nodiscard]] std::pair<float, float> quarterPoint(
-            float x,
-            float y
-        ) const noexcept;
-        [[nodiscard]] RenderRectangle quarterRectangle(
-            const RenderRectangle& rectangle
-        ) const noexcept;
-
         std::shared_ptr<AssetManager> assetManager_;
         std::string assetPackageSignature_;
         SDL_Renderer* renderer_ = nullptr;
         std::unique_ptr<Texture> pixelScene_;
         double pixelPitch_ = 1;
-        int quarterTurns_ = 0;
     };
 
 } // namespace Paladin

@@ -8,10 +8,8 @@
 #include <SDL3_image/SDL_image.h>
 #endif
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <filesystem>
 #include <stdexcept>
 #include <vector>
 
@@ -76,7 +74,6 @@ namespace Paladin
         assetPackageSignature_ = signature;
         return manager;
     }
-
     struct PreparedQuadMesh::Data
     {
         std::vector<SDL_Vertex> vertices;
@@ -84,7 +81,6 @@ namespace Paladin
         std::vector<SDL_FColor> colors;
         std::vector<int> indices;
     };
-
     PreparedQuadMesh::PreparedQuadMesh(std::span<const MeshVertex> input)
         : data_(std::make_unique<Data>())
     {
@@ -112,72 +108,7 @@ namespace Paladin
             }
         }
     }
-
     PreparedQuadMesh::~PreparedQuadMesh() = default;
-
-    void Renderer::setQuarterTurnTransform(int turns) noexcept
-    {
-        turns %= 4;
-        quarterTurns_ = turns < 0 ? turns + 4 : turns;
-    }
-
-    bool Renderer::quarterTurnActive() const noexcept
-    {
-        if (quarterTurns_ == 0 || !renderer_)
-        {
-            return false;
-        }
-        SDL_Texture* target = SDL_GetRenderTarget(renderer_);
-        return !target || (pixelScene_ && target == pixelScene_->texture_);
-    }
-
-    std::pair<float, float> Renderer::quarterPoint(float x, float y) const noexcept
-    {
-        if (!quarterTurnActive())
-        {
-            return {x, y};
-        }
-        int width = 0, height = 0;
-        SDL_GetRenderOutputSize(renderer_, &width, &height);
-        const float cx = width * .5F, cy = height * .5F;
-        const float dx = x - cx, dy = y - cy;
-        switch (quarterTurns_)
-        {
-        case 1:
-            return {cx + dy, cy - dx};
-        case 2:
-            return {cx - dx, cy - dy};
-        case 3:
-            return {cx - dy, cy + dx};
-        default:
-            return {x, y};
-        }
-    }
-
-    RenderRectangle Renderer::quarterRectangle(
-        const RenderRectangle& rectangle
-    ) const noexcept
-    {
-        if (!quarterTurnActive())
-        {
-            return rectangle;
-        }
-        const auto a = quarterPoint(rectangle.x, rectangle.y);
-        const auto b =
-            quarterPoint(rectangle.x + rectangle.width, rectangle.y);
-        const auto c = quarterPoint(
-            rectangle.x + rectangle.width,
-            rectangle.y + rectangle.height
-        );
-        const auto d =
-            quarterPoint(rectangle.x, rectangle.y + rectangle.height);
-        const float minX = std::min({a.first, b.first, c.first, d.first});
-        const float maxX = std::max({a.first, b.first, c.first, d.first});
-        const float minY = std::min({a.second, b.second, c.second, d.second});
-        const float maxY = std::max({a.second, b.second, c.second, d.second});
-        return {minX, minY, maxX - minX, maxY - minY};
-    }
-
     void Renderer::drawTranslatedQuads(
         const Texture& texture,
         PreparedQuadMesh& mesh,
@@ -193,11 +124,7 @@ namespace Paladin
         const auto count = data.vertices.size();
         for (std::size_t i = 0; i < count; ++i, ++out, ++in)
         {
-            const auto position = quarterPoint(
-                x + in->x * scale,
-                y + in->y * scale
-            );
-            out->position = {position.first, position.second};
+            out->position = {x + in->x * scale, y + in->y * scale};
             const auto c = data.colors[i];
             out->color =
                 {c.r * opacity, c.g * opacity, c.b * opacity, c.a * opacity};
@@ -215,7 +142,6 @@ namespace Paladin
             int(data.indices.size())
         );
     }
-
     std::shared_ptr<Texture> Renderer::cacheTextureInAtlas(
         std::shared_ptr<Texture>& page,
         int& x,
@@ -297,7 +223,6 @@ namespace Paladin
         row = std::max(row, h);
         return result;
     }
-
     void Renderer::drawTextureItems(std::span<const TextureDrawItem> items)
     {
         // Preserve painter order while batching neighboring quads sharing an
@@ -332,7 +257,7 @@ namespace Paladin
                 flush();
                 page = next;
             }
-            const auto& d = item.destination;
+            auto d = item.destination;
             if (d.width <= 0 || d.height <= 0)
             {
                 continue;
@@ -359,24 +284,18 @@ namespace Paladin
                 u1 = t.uvX((f.x + f.width) / t.width());
                 v1 = t.uvY((f.y + f.height) / t.height());
             }
-            const auto p0 = quarterPoint(d.x, d.y);
-            const auto p1 = quarterPoint(d.x + d.width, d.y);
-            const auto p2 =
-                quarterPoint(d.x + d.width, d.y + d.height);
-            const auto p3 = quarterPoint(d.x, d.y + d.height);
             const int n = int(vertices.size());
             vertices.insert(
                 vertices.end(),
-                {{{p0.first, p0.second}, color, {u0, v0}},
-                 {{p1.first, p1.second}, color, {u1, v0}},
-                 {{p2.first, p2.second}, color, {u1, v1}},
-                 {{p3.first, p3.second}, color, {u0, v1}}}
+                {{{d.x, d.y}, color, {u0, v0}},
+                 {{d.x + d.width, d.y}, color, {u1, v0}},
+                 {{d.x + d.width, d.y + d.height}, color, {u1, v1}},
+                 {{d.x, d.y + d.height}, color, {u0, v1}}}
             );
             indices.insert(indices.end(), {n, n + 1, n + 2, n, n + 2, n + 3});
         }
         flush();
     }
-
     void Renderer::drawMesh(
         const Texture& texture,
         std::span<const MeshVertex> vertices,
@@ -388,9 +307,8 @@ namespace Paladin
         native.reserve(vertices.size());
         for (const auto& v : vertices)
         {
-            const auto point = quarterPoint(v.x, v.y);
             native.push_back(
-                {{point.first, point.second},
+                {{v.x, v.y},
                  {v.color.red / 255.F,
                   v.color.green / 255.F,
                   v.color.blue / 255.F,
@@ -407,7 +325,6 @@ namespace Paladin
             int(indices.size())
         );
     }
-
     std::shared_ptr<Texture> Renderer::createTextureView(
         std::shared_ptr<Texture> page,
         int x,
@@ -428,7 +345,6 @@ namespace Paladin
         view->atlasY_ = y;
         return view;
     }
-
     void Renderer::setTextureFiltering(Texture& t, bool linear)
     {
         SDL_SetTextureScaleMode(
@@ -436,7 +352,6 @@ namespace Paladin
             linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST
         );
     }
-
     std::unique_ptr<Texture> Renderer::createEmptyTexture(int width, int height)
     {
         auto* texture = SDL_CreateTexture(
@@ -454,7 +369,6 @@ namespace Paladin
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
         return std::unique_ptr<Texture>(new Texture(texture, width, height));
     }
-
     Renderer::Renderer(SDL_Window* window)
     {
         renderer_ = SDL_CreateRenderer(window, nullptr);
@@ -462,6 +376,7 @@ namespace Paladin
         if (!renderer_)
         {
             SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
+
             return;
         }
 
@@ -480,7 +395,6 @@ namespace Paladin
         SDL_SetTextureBlendMode(light.texture_, SDL_BLENDMODE_BLEND);
         SDL_SetTextureBlendMode(glow.texture_, SDL_BLENDMODE_BLEND);
     }
-
     Renderer::~Renderer()
     {
         assetManager_.reset();
@@ -499,6 +413,7 @@ namespace Paladin
     void Renderer::beginFrame()
     {
         SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
+
         SDL_RenderClear(renderer_);
     }
 
@@ -522,16 +437,12 @@ namespace Paladin
             color.blue,
             color.alpha
         );
-        const auto rectangle =
-            quarterRectangle({x, y, width, height});
-        const SDL_FRect native{
-            rectangle.x,
-            rectangle.y,
-            rectangle.width,
-            rectangle.height
-        };
-        SDL_RenderFillRect(renderer_, &native);
+
+        const SDL_FRect rectangle{x, y, width, height};
+
+        SDL_RenderFillRect(renderer_, &rectangle);
     }
+
 
     void Renderer::drawLine(
         float x1,
@@ -548,8 +459,7 @@ namespace Paladin
             color.blue,
             color.alpha
         );
-        const auto a = quarterPoint(x1, y1), b = quarterPoint(x2, y2);
-        SDL_RenderLine(renderer_, a.first, a.second, b.first, b.second);
+        SDL_RenderLine(renderer_, x1, y1, x2, y2);
     }
 
     void Renderer::fillRectangles(
@@ -557,10 +467,14 @@ namespace Paladin
         RenderColor color
     )
     {
+        static_assert(sizeof(RenderRectangle) == sizeof(SDL_FRect));
+        static_assert(alignof(RenderRectangle) == alignof(SDL_FRect));
+
         if (rectangles.empty())
         {
             return;
         }
+
         SDL_SetRenderDrawColor(
             renderer_,
             color.red,
@@ -568,31 +482,14 @@ namespace Paladin
             color.blue,
             color.alpha
         );
-        if (!quarterTurnActive())
-        {
-            static_assert(sizeof(RenderRectangle) == sizeof(SDL_FRect));
-            static_assert(alignof(RenderRectangle) == alignof(SDL_FRect));
-            SDL_RenderFillRects(
-                renderer_,
-                reinterpret_cast<const SDL_FRect*>(rectangles.data()),
-                static_cast<int>(rectangles.size())
-            );
-            return;
-        }
-        thread_local std::vector<SDL_FRect> transformed;
-        transformed.clear();
-        transformed.reserve(rectangles.size());
-        for (const auto& rectangle : rectangles)
-        {
-            const auto r = quarterRectangle(rectangle);
-            transformed.push_back({r.x, r.y, r.width, r.height});
-        }
+
         SDL_RenderFillRects(
             renderer_,
-            transformed.data(),
-            static_cast<int>(transformed.size())
+            reinterpret_cast<const SDL_FRect*>(rectangles.data()),
+            static_cast<int>(rectangles.size())
         );
     }
+
 
     std::unique_ptr<Texture> Renderer::loadImageTexture(
         const char* filePath,
@@ -631,12 +528,15 @@ namespace Paladin
                 filePath,
                 SDL_GetError()
             );
+
             return nullptr;
         }
 
         const int width = surface->w;
         const int height = surface->h;
+
         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
+
         SDL_DestroySurface(surface);
 
         if (!texture)
@@ -646,12 +546,15 @@ namespace Paladin
                 filePath,
                 SDL_GetError()
             );
+
             return nullptr;
         }
 
         SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
         return std::unique_ptr<Texture>(new Texture(texture, width, height));
     }
+
 
     std::unique_ptr<Texture> Renderer::createTextureFromPixels(
         int width,
@@ -679,6 +582,7 @@ namespace Paladin
         if (!texture)
         {
             SDL_Log("SDL_CreateTexture failed: %s", SDL_GetError());
+
             return nullptr;
         }
 
@@ -690,14 +594,18 @@ namespace Paladin
             ))
         {
             SDL_Log("SDL_UpdateTexture failed: %s", SDL_GetError());
+
             SDL_DestroyTexture(texture);
             return nullptr;
         }
 
         SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
         return std::unique_ptr<Texture>(new Texture(texture, width, height));
     }
+
 
     std::unique_ptr<Texture> Renderer::createTextureFromSurface(
         SDL_Surface* surface,
@@ -710,6 +618,7 @@ namespace Paladin
         }
 
         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer_, surface);
+
         if (!texture)
         {
             SDL_Log("SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
@@ -720,11 +629,14 @@ namespace Paladin
             texture,
             smoothScaling ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST
         );
+
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+
         return std::unique_ptr<Texture>(
             new Texture(texture, surface->w, surface->h)
         );
     }
+
 
     std::unique_ptr<Texture> Renderer::createTextureFromDrawItems(
         int width,
@@ -778,7 +690,6 @@ namespace Paladin
             }
             return createTextureFromPixels(width, height, pixels);
         }
-
         SDL_Texture* texture = SDL_CreateTexture(
             renderer_,
             SDL_PIXELFORMAT_RGBA32,
@@ -843,25 +754,18 @@ namespace Paladin
         return result;
     }
 
+
     bool Renderer::updateTextureRegion(
         Texture& texture,
         int x,
         int y,
         int width,
         int height,
-        std::span<const RenderColor> pixels,
-        std::size_t sourcePitchPixels
+        std::span<const RenderColor> pixels
     )
     {
-        if (sourcePitchPixels == 0)
-        {
-            sourcePitchPixels = std::size_t(width);
-        }
         if (width <= 0 || height <= 0 ||
-            sourcePitchPixels < std::size_t(width) ||
-            pixels.size() <
-                (std::size_t(height) - 1) * sourcePitchPixels +
-                    std::size_t(width))
+            pixels.size() != std::size_t(width) * height)
         {
             return false;
         }
@@ -870,7 +774,7 @@ namespace Paladin
             texture.texture_,
             &rect,
             pixels.data(),
-            int(sourcePitchPixels * sizeof(RenderColor))
+            width * int(sizeof(RenderColor))
         );
     }
 
@@ -911,7 +815,6 @@ namespace Paladin
         SDL_RenderClear(renderer_);
         return true;
     }
-
     void Renderer::endPixelScene()
     {
         SDL_SetRenderTarget(renderer_, nullptr);
@@ -923,7 +826,6 @@ namespace Paladin
         SDL_RenderTexture(renderer_, pixelScene_->texture_, &source, &dest);
         pixelPitch_ = 1;
     }
-
     bool Renderer::updateTexturePixels(
         Texture& texture,
         std::span<const RenderColor> pixels
@@ -943,6 +845,7 @@ namespace Paladin
         );
     }
 
+
     void Renderer::drawTexture(
         const Texture& texture,
         float sourceX,
@@ -961,49 +864,6 @@ namespace Paladin
         {
             return;
         }
-
-        if (quarterTurnActive())
-        {
-            const float u0 = texture.uvX(sourceX / texture.width()),
-                        v0 = texture.uvY(sourceY / texture.height()),
-                        u1 = texture.uvX(
-                            (sourceX + sourceWidth) / texture.width()
-                        ),
-                        v1 = texture.uvY(
-                            (sourceY + sourceHeight) / texture.height()
-                        );
-            SDL_FColor color{1, 1, 1, opacity / 255.F};
-            if (texture.premultiplied_)
-            {
-                color.r = color.g = color.b = color.a;
-            }
-            const auto p0 = quarterPoint(destinationX, destinationY);
-            const auto p1 =
-                quarterPoint(destinationX + destinationWidth, destinationY);
-            const auto p2 = quarterPoint(
-                destinationX + destinationWidth,
-                destinationY + destinationHeight
-            );
-            const auto p3 =
-                quarterPoint(destinationX, destinationY + destinationHeight);
-            const SDL_Vertex vertices[] = {
-                {{p0.first, p0.second}, color, {u0, v0}},
-                {{p1.first, p1.second}, color, {u1, v0}},
-                {{p2.first, p2.second}, color, {u1, v1}},
-                {{p3.first, p3.second}, color, {u0, v1}}
-            };
-            const int indices[] = {0, 1, 2, 0, 2, 3};
-            SDL_RenderGeometry(
-                renderer_,
-                texture.texture_,
-                vertices,
-                4,
-                indices,
-                6
-            );
-            return;
-        }
-
         // Crop before handing the scale operation to SDL. Its software path
         // can otherwise scale a whole map into a huge temporary surface and
         // only then clip the result to the window.
@@ -1056,19 +916,25 @@ namespace Paladin
         }
     }
 
+
     int Renderer::outputWidth() const noexcept
     {
         int width = 0;
         int height = 0;
+
         SDL_GetRenderOutputSize(renderer_, &width, &height);
+
         return width;
     }
+
 
     int Renderer::outputHeight() const noexcept
     {
         int width = 0;
         int height = 0;
+
         SDL_GetRenderOutputSize(renderer_, &width, &height);
+
         return height;
     }
 } // namespace Paladin

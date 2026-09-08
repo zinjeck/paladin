@@ -3,8 +3,10 @@
 #include "core/EntityRegistry.h"
 #include "core/StrongId.h"
 #include "debug/ConsoleCommand.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "rendering/Camera2D.h"
-#include "rendering/ScenePresentation.h"
+#include "rendering/GlobeView.h"
+#include "world/WorldGrid.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <cmath>
@@ -103,64 +105,33 @@ namespace
         PALADIN_CHECK(camera.zoom() == 80.0);
     }
 
-    void testCameraQuarterTurns()
+    void testGlobeRollNavigation()
     {
-        Paladin::Camera2D camera;
-        PALADIN_CHECK(camera.cityQuarterTurns() == 0);
+        constexpr double pi = 3.14159265358979323846;
+        Paladin::WorldGrid grid(360, 180);
+        Paladin::Camera2D camera(180.0, 90.0);
 
-        camera.rotateCityQuarterTurns(1);
-        PALADIN_CHECK(camera.cityQuarterTurns() == 1);
-        PALADIN_CHECK(camera.cityHeadingDegrees() == 90.0);
-        auto view = camera.cityWorldToViewOffset(3.0, 2.0);
-        PALADIN_CHECK(view.first == 2.0 && view.second == -3.0);
-        auto world = camera.cityViewToWorldOffset(view.first, view.second);
-        PALADIN_CHECK(world.first == 3.0 && world.second == 2.0);
+        const auto before = Paladin::GlobeView::from(camera, grid, 1000, 800);
+        const auto worldRight = before.orientation().inverse().apply({1, 0, 0});
+        const double centerX = camera.tileX();
+        const double centerY = camera.tileY();
 
-        camera.rotateCityQuarterTurns(-2);
-        PALADIN_CHECK(camera.cityQuarterTurns() == 3);
-        view = camera.cityWorldToViewOffset(3.0, 2.0);
-        PALADIN_CHECK(view.first == -2.0 && view.second == 3.0);
-        world = camera.cityViewToWorldOffset(view.first, view.second);
-        PALADIN_CHECK(world.first == 3.0 && world.second == 2.0);
+        Paladin::GlobeCameraNavigation::roll(
+            camera,
+            grid,
+            1000,
+            800,
+            pi * 0.5
+        );
 
-        camera.setCityQuarterTurns(10);
-        PALADIN_CHECK(camera.cityQuarterTurns() == 2);
-        camera.setCityQuarterTurns(-1);
-        PALADIN_CHECK(camera.cityQuarterTurns() == 3);
-    }
+        PALADIN_CHECK(std::abs(camera.tileX() - centerX) < 1e-9);
+        PALADIN_CHECK(std::abs(camera.tileY() - centerY) < 1e-9);
 
-    void testNeutralSceneOrientationScope()
-    {
-        using Paladin::SceneProjection;
-        using Paladin::SceneQuarterTurnScope;
-        using Paladin::activeSceneQuarterTurns;
-
-        PALADIN_CHECK(activeSceneQuarterTurns == 0);
-        {
-            SceneQuarterTurnScope cityTurn(1);
-            PALADIN_CHECK(activeSceneQuarterTurns == 1);
-
-            const SceneProjection live{10, 10, 16, 256, 256};
-            PALADIN_CHECK(live.quarterTurns == 1);
-            const auto liveOffset = live.viewOffset(3, 2);
-            PALADIN_CHECK(liveOffset.first == 2 && liveOffset.second == -3);
-
-            {
-                // Offscreen reusable caches must be composable in canonical
-                // orientation even while the live city camera is rotated.
-                SceneQuarterTurnScope cacheTurn(0);
-                PALADIN_CHECK(activeSceneQuarterTurns == 0);
-                const SceneProjection cache{10, 10, 16, 256, 256};
-                PALADIN_CHECK(cache.quarterTurns == 0);
-                const auto cacheOffset = cache.viewOffset(3, 2);
-                PALADIN_CHECK(
-                    cacheOffset.first == 3 && cacheOffset.second == 2
-                );
-            }
-
-            PALADIN_CHECK(activeSceneQuarterTurns == 1);
-        }
-        PALADIN_CHECK(activeSceneQuarterTurns == 0);
+        const auto after = Paladin::GlobeView::from(camera, grid, 1000, 800);
+        const auto rotatedRight = after.orientation().apply(worldRight);
+        PALADIN_CHECK(std::abs(rotatedRight.x) < 1e-9);
+        PALADIN_CHECK(rotatedRight.y > 0.999999999);
+        PALADIN_CHECK(std::abs(rotatedRight.z) < 1e-9);
     }
 } // namespace
 
@@ -192,6 +163,5 @@ void runCoreTests()
     testStrongIds();
     testEntityRegistry();
     testCameraZoomLimits();
-    testCameraQuarterTurns();
-    testNeutralSceneOrientationScope();
+    testGlobeRollNavigation();
 }
