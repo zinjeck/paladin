@@ -166,9 +166,15 @@ namespace Paladin
         Renderer& renderer,
         const World& world,
         const Camera2D& camera,
-        const TileRenderMetrics& metrics
+        const TileRenderMetrics& metrics,
+        float visibility
     ) const
     {
+        if (visibility <= 0.0F)
+        {
+            return;
+        }
+
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
         if (!std::isfinite(tilePixels) || tilePixels <= 0.0)
         {
@@ -203,17 +209,26 @@ namespace Paladin
                 continue;
             }
 
-            drawMarker(renderer, world, settlement, centerX, centerY);
+            drawMarker(
+                renderer,
+                world,
+                settlement,
+                centerX,
+                centerY,
+                visibility
+            );
         }
     }
 
     void SettlementMarkerRenderer::renderGlobe(
         Renderer& renderer,
         const World& world,
-        const Camera2D& camera
+        const Camera2D& camera,
+        float visibility
     ) const
     {
-        if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0)
+        if (visibility <= 0.0F || renderer.outputWidth() <= 0 ||
+            renderer.outputHeight() <= 0)
         {
             return;
         }
@@ -250,11 +265,13 @@ namespace Paladin
                 continue;
             }
 
+            const float limbVisibility =
+                std::clamp(static_cast<float>(projected.z * 4.0), 0.0F, 1.0F);
             visibleSettlements.push_back(
                 {&settlement,
                  static_cast<float>(projected.x),
                  static_cast<float>(projected.y),
-                 std::clamp(static_cast<float>(projected.z * 4.0), 0.0F, 1.0F),
+                 std::clamp(visibility * limbVisibility, 0.0F, 1.0F),
                  projected.z}
             );
         }
