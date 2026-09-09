@@ -7,6 +7,7 @@
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/WorldGridRenderer.h"
+#include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
 #include "rendering/WorldTerritoryPresentationRenderer.h"
 
@@ -61,6 +62,7 @@ namespace Paladin
             artwork_.reset();
             globe_.reset();
             territoryPresentationRenderer_.reset();
+            pixelStabilityActive_ = false;
         }
 
         void render(
@@ -115,5 +117,7 @@ namespace Paladin
         OverlayRenderer overlayRenderer_;
         mutable WorldTerritoryPresentationRenderer territoryPresentationRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
+        WorldPixelStabilityPolicy pixelStabilityPolicy_;
+        mutable bool pixelStabilityActive_ = false;
     };
 } // namespace Paladin
