@@ -28,13 +28,15 @@ namespace Paladin
             Renderer& renderer,
             const World& world,
             const Camera2D& camera,
-            const TileRenderMetrics& metrics
+            const TileRenderMetrics& metrics,
+            float visibility = 1.0F
         ) const;
 
         void renderGlobe(
             Renderer& renderer,
             const World& world,
-            const Camera2D& camera
+            const Camera2D& camera,
+            float visibility = 1.0F
         ) const;
 
     private:
