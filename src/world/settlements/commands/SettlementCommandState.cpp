@@ -134,8 +134,16 @@ namespace Paladin
             return false;
         }
         command.id = commandIds_.generate();
-        // Natural-resource designation visuals are rendered from the command
-        // itself. Do not mutate feature art state merely to draw a marker.
+        for (const auto& target : command.targets)
+        {
+            if (!target.objectId && !target.constructionId)
+            {
+                // Preserve the stable command-state bit used by simulation and
+                // tests. Presentation no longer derives the yellow strip from
+                // this flag; SettlementCommandRenderer owns the visible outline.
+                map.naturalFeatures().mark(target.footprint.topLeft, true);
+            }
+        }
         commands_.push_back(std::move(command));
         ++version_;
         ++selectionVersion_;
@@ -168,6 +176,13 @@ namespace Paladin
                     if (!intersects(area, target.footprint))
                     {
                         return false;
+                    }
+                    if (!target.objectId && !target.constructionId)
+                    {
+                        map.naturalFeatures().mark(
+                            target.footprint.topLeft,
+                            false
+                        );
                     }
                     ++removed;
                     return true;
