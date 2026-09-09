@@ -138,11 +138,12 @@ namespace Paladin
         {
             if (!target.objectId && !target.constructionId)
             {
+                // Preserve the stable command-state bit used by simulation and
+                // tests. Presentation no longer derives the yellow strip from
+                // this flag; SettlementCommandRenderer owns the visible outline.
                 map.naturalFeatures().mark(target.footprint.topLeft, true);
             }
         }
-        // Designations do not reserve citizens until a work executor can claim
-        // them.
         commands_.push_back(std::move(command));
         ++version_;
         ++selectionVersion_;

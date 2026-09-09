@@ -8,6 +8,7 @@
 #include "interaction/SettlementInspectionController.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
 
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementObjectPlacementController.h"
@@ -42,6 +43,24 @@ namespace Paladin
         const float x = bounds.x + (bounds.width - width) * 0.5F;
         const float y = bounds.y + (bounds.height - height) * 0.5F;
         gridRenderer_.renderOverview(renderer, x, y, width, height);
+
+        // The minimap is the same settlement under the same sky. Reuse the
+        // live city's solar illumination instead of leaving the overview stuck
+        // at noon while the main scene darkens around it.
+        const double night = std::clamp(1.0 - minimapDaylight_, 0.0, 1.0);
+        if (night > 0.0)
+        {
+            renderer.fillRectangle(
+                x,
+                y,
+                width,
+                height,
+                {13,
+                 20,
+                 58,
+                 static_cast<std::uint8_t>(std::round(178.0 * night))}
+            );
+        }
 
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
         if (tilePixels <= 0.0)
@@ -85,8 +104,13 @@ namespace Paladin
             outline
         );
         renderer.fillRectangle(left, top, stroke, bottom - top, outline);
-        renderer
-            .fillRectangle(right - stroke, top, stroke, bottom - top, outline);
+        renderer.fillRectangle(
+            right - stroke,
+            top,
+            stroke,
+            bottom - top,
+            outline
+        );
     }
 
     void CityRenderer::render(
@@ -128,8 +152,13 @@ namespace Paladin
             renderTimings[index] = (now - timing) / 1e6;
             timing = now;
         };
-        gridRenderer_
-            .render(renderer, settlementMap.grid(), camera, metrics, &sprites_);
+        gridRenderer_.render(
+            renderer,
+            settlementMap.grid(),
+            camera,
+            metrics,
+            &sprites_
+        );
         stage(0);
         raised_.clear();
         const SceneProjection projection{
@@ -150,7 +179,7 @@ namespace Paladin
         );
         raised_.setOpacityFrom(
             grassStart,
-            detailBlend(projection.tilePixels, 20, 36)
+            detailBlend(projection.tilePixels, 12, 22)
         );
         stage(1);
         naturalFeatureRenderer_.render(
@@ -173,7 +202,10 @@ namespace Paladin
             sprites_
         );
 
-        const double objectDetail = detailBlend(projection.tilePixels, 16, 28);
+        // Keep authored close-city presentation alive much farther out. The
+        // distant layer still crossfades smoothly, but players can frame a
+        // large district without dropping immediately to strategic blobs.
+        const double objectDetail = detailBlend(projection.tilePixels, 9, 16);
         distantObjects_.render(
             renderer,
             projection,
@@ -184,8 +216,12 @@ namespace Paladin
         );
         if (objectDetail == 0)
         {
-            structures_
-                .prewarmGround(renderer, projection, settlementMap, sprites_);
+            structures_.prewarmGround(
+                renderer,
+                projection,
+                settlementMap,
+                sprites_
+            );
         }
         if (objectDetail > 0)
         {
@@ -256,7 +292,10 @@ namespace Paladin
         if (SDL_getenv("PALADIN_CAMERA_PROFILE") &&
             SDL_GetTicksNS() - drawStart > 10000000)
         {
-            SDL_Log("queue draw_ms=%.2f", (SDL_GetTicksNS() - drawStart) / 1e6);
+            SDL_Log(
+                "queue draw_ms=%.2f",
+                (SDL_GetTicksNS() - drawStart) / 1e6
+            );
         }
         const double weatherTime = animationTimeOverride >= 0
                                        ? animationTimeOverride
@@ -265,6 +304,7 @@ namespace Paladin
             std::isfinite(sunIncidence) ? sunIncidence
                                         : globeSunDot(.5, .5, hour * 3600.)
         );
+        minimapDaylight_ = weatherDay;
         if (presentation.cloudsEnabled)
         {
             clouds_.render(
@@ -318,23 +358,38 @@ namespace Paladin
             renderer,
             metrics.scaledTilePixels(camera.zoom())
         );
+        const float selectionStroke =
+            static_cast<float>(worldPixelPitch(projection.tilePixels));
         const auto highlight = [&](const RenderRectangle& b)
         {
             const RenderColor selected{0xFF, 0xD7, 0x83, 255};
-            renderer.drawLine(b.x, b.y, b.x + b.width, b.y, selected);
-            renderer.drawLine(
-                b.x,
-                b.y + b.height,
-                b.x + b.width,
-                b.y + b.height,
+            const float stroke = std::max(1.0F, selectionStroke);
+            renderer.fillRectangle(
+                b.x - stroke,
+                b.y - stroke,
+                b.width + stroke * 2,
+                stroke,
                 selected
             );
-            renderer.drawLine(b.x, b.y, b.x, b.y + b.height, selected);
-            renderer.drawLine(
+            renderer.fillRectangle(
+                b.x - stroke,
+                b.y + b.height,
+                b.width + stroke * 2,
+                stroke,
+                selected
+            );
+            renderer.fillRectangle(
+                b.x - stroke,
+                b.y,
+                stroke,
+                b.height,
+                selected
+            );
+            renderer.fillRectangle(
                 b.x + b.width,
                 b.y,
-                b.x + b.width,
-                b.y + b.height,
+                stroke,
+                b.height,
                 selected
             );
         };

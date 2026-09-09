@@ -22,6 +22,22 @@ namespace Paladin
         assignHomeBeds(map, citizens.citizens_);
     }
 
+    bool SettlementActivitySystem::pastureWorkerAvailableForGeneralLabor(
+        const SettlementMap& map,
+        const SettlementCitizen& citizen
+    ) const noexcept
+    {
+        if (!citizen.workplaceId)
+        {
+            return false;
+        }
+        const auto* workplace =
+            map.employment().workplace(citizen.workplaceId);
+        return workplace && workplace->operational &&
+               workplace->objectTypeId == SettlementObjectTypes::Pastureland &&
+               map.animals.containedCount(workplace->objectId) == 0;
+    }
+
     void SettlementActivitySystem::finish(
         SettlementMap& map,
         SettlementCitizen& c,
@@ -223,11 +239,15 @@ namespace Paladin
             }
             const bool shift = policy.isWorkTime(minute);
             const auto* w = map.employment().workplace(c.workplaceId);
+            const bool dormantPasture =
+                pastureWorkerAvailableForGeneralLabor(map, c);
+            const bool generalLabor = !c.workplaceId || dormantPasture;
+            const bool activeWorkplace = c.workplaceId && !dormantPasture;
             bool valid = true;
             if (c.task.kind == CitizenTaskKind::AnimalWork)
             {
                 const auto* animal = map.animals.find(c.task.animal);
-                valid = !c.child && !c.workplaceId && !c.youngDependents &&
+                valid = !c.child && generalLabor && !c.youngDependents &&
                         animal && animal->health > 0 &&
                         animal->handler == c.id &&
                         animal->order != AnimalOrder::None &&
@@ -250,7 +270,7 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Work)
             {
-                valid = c.youngDependents == 0 && shift && w &&
+                valid = c.youngDependents == 0 && shift && activeWorkplace && w &&
                         w->operational && w->objectId == c.task.object;
             }
             if (c.task.kind == CitizenTaskKind::Sleep)
@@ -261,15 +281,16 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Break)
             {
-                valid = c.breakUntil > 0 && c.workplaceId == c.breakEmployer;
+                valid = activeWorkplace && c.breakUntil > 0 &&
+                        c.workplaceId == c.breakEmployer;
             }
             if (c.task.kind == CitizenTaskKind::Talk)
             {
                 const auto* other = citizens.citizen(c.task.partner);
                 valid = other && other->task.kind == CitizenTaskKind::Talk &&
                         other->task.partner == c.id &&
-                        (!c.workplaceId || !shift || c.breakUntil > minute) &&
-                        (c.child || !shift || c.workplaceId ||
+                        (!activeWorkplace || !shift || c.breakUntil > minute) &&
+                        (c.child || !shift || activeWorkplace ||
                          (map.commandState().commands().empty() &&
                           map.objectState().constructionSites().empty()));
             }
@@ -282,7 +303,7 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Home)
             {
-                valid = (!c.workplaceId || !shift) &&
+                valid = (generalLabor || !shift) &&
                         c.homeId == c.task.object &&
                         map.objectState().completedObject(c.homeId);
             }
@@ -290,7 +311,7 @@ namespace Paladin
             {
                 const auto* site =
                     map.objectState().constructionSite(c.task.site);
-                valid = !c.workplaceId && site &&
+                valid = generalLabor && site &&
                         site->footprint.contains(c.task.workTile);
             }
             if (c.task.kind == CitizenTaskKind::Haul)
@@ -308,7 +329,7 @@ namespace Paladin
                         ((destination &&
                           destination->kind == InventoryKind::Home &&
                           !c.child) ||
-                         !c.workplaceId ||
+                         generalLabor ||
                          (shift && w && destination &&
                           (w->objectTypeId ==
                                SettlementObjectTypes::Stockpile ||
@@ -319,7 +340,7 @@ namespace Paladin
             if (c.task.kind == CitizenTaskKind::Gather ||
                 c.task.kind == CitizenTaskKind::Demolish)
             {
-                valid = !c.workplaceId;
+                valid = generalLabor;
                 bool designated =
                     c.task.kind == CitizenTaskKind::Gather && !c.task.command &&
                     c.task.site &&
@@ -476,7 +497,9 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::None ||
                 (c.task.kind == CitizenTaskKind::Home &&
-                 (!c.workplaceId || policy.isWorkTime(minute))))
+                 (!c.workplaceId ||
+                  pastureWorkerAvailableForGeneralLabor(map, c) ||
+                  policy.isWorkTime(minute))))
             {
                 decide(map, citizens, c, minute);
             }
@@ -535,6 +558,8 @@ namespace Paladin
             }
         } retry{c, pathsRemaining_, minute};
         c.nextWorkCheckMinutes = minute + policy.retryMinutes;
+        const bool generalLabor =
+            !c.workplaceId || pastureWorkerAvailableForGeneralLabor(map, c);
         if (!c.child && c.homeId)
         {
             const auto home = map.logistics.forObject(c.homeId);
@@ -545,7 +570,7 @@ namespace Paladin
                 return;
             }
         }
-        if (!c.child && !c.workplaceId)
+        if (!c.child && generalLabor)
         {
             if (!policy.isWorkTime(minute) &&
                 chooseSocial(map, citizens, c, minute))
@@ -597,7 +622,7 @@ namespace Paladin
         {
             return;
         }
-        if (!c.workplaceId || !policy.isWorkTime(minute))
+        if (generalLabor || !policy.isWorkTime(minute))
         {
             if (const auto* home = map.objectState().completedObject(c.homeId))
             {
@@ -1308,16 +1333,16 @@ namespace Paladin
                 if (object &&
                     object->objectTypeId == SettlementObjectTypes::Pastureland)
                 {
-                    const auto* animal = map.animals.find(c.task.animal);
-                    if (!animal || animal->tender != c.id ||
-                        animal->pasture != object->id ||
+                    // The first contained animal activates the pasture. From
+                    // then on every physically present assigned worker counts
+                    // as productive husbandry, whether or not this minute's
+                    // duty is a specific tending interaction.
+                    if (map.animals.containedCount(object->id) == 0 ||
                         !object->footprint.contains(c.tilePosition))
                     {
                         continue;
                     }
                 }
-                // Moving between livestock inside the pasture is productive
-                // husbandry too. Commuting, breaks and unrelated tasks are not.
                 else if (!c.path.empty() || c.tilePosition != c.destination)
                 {
                     continue;

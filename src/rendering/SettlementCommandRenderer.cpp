@@ -28,8 +28,27 @@ namespace Paladin
 
         for (const SettlementCommand& command : state.commands())
         {
-            // Natural-resource highlighting is already cached in terrain
-            // chunks. Never traverse every designated tree each frame.
+            if (command.commandTypeId == SettlementCommandTypes::ChopTree ||
+                command.commandTypeId == SettlementCommandTypes::CollectRock)
+            {
+                const RenderColor border =
+                    command.commandTypeId == SettlementCommandTypes::ChopTree
+                        ? RenderColor{255, 215, 50, 242}
+                        : RenderColor{214, 199, 169, 242};
+                for (const auto& target : command.targets)
+                {
+                    const auto& footprint = target.footprint;
+                    outlines.push_back(
+                        {double(footprint.topLeft.x),
+                         double(footprint.topLeft.y),
+                         double(footprint.width),
+                         double(footprint.height),
+                         1.5F,
+                         border}
+                    );
+                }
+                continue;
+            }
             if (command.commandTypeId != SettlementCommandTypes::Demolish)
             {
                 continue;

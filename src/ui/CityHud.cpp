@@ -42,29 +42,29 @@ namespace Paladin
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
              {1, SettlementObjectTypes::Road, "", "", "Road", ""},
              {2, SettlementObjectTypes::House, "", "", "House", ""},
-             {3, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""},
-             {3, SettlementObjectTypes::Market, "", "", "Market", ""},
              {3,
-              SettlementObjectTypes::LoggingGrounds,
-              "",
-              "",
-              "Logging",
-              "Grounds"},
-             {4,
               SettlementObjectTypes::FishingGrounds,
               "",
               "",
               "Fishing",
               "Grounds"},
-             {4, SettlementObjectTypes::WheatFarm, "", "", "Wheat", "Farm"},
-             {4, SettlementObjectTypes::Pastureland, "", "", "Pastureland", ""},
+             {3, SettlementObjectTypes::WheatFarm, "", "", "Wheat", "Farm"},
+             {3, SettlementObjectTypes::Pastureland, "", "", "Pastureland", ""},
+             {4,
+              SettlementObjectTypes::LoggingGrounds,
+              "",
+              "",
+              "Logging",
+              "Grounds"},
              {4, SettlementObjectTypes::Bakery, "", "", "Bakery", ""},
-             {5, "", SettlementCommandTypes::Cancel, "Cancel Task", "", ""},
-             {5, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
-             {5, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
-             {5, "", SettlementCommandTypes::Gather, "Gather", "", ""},
-             {5, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
-             {5,
+             {5, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""},
+             {5, SettlementObjectTypes::Market, "", "", "Market", ""},
+             {6, "", SettlementCommandTypes::Cancel, "Cancel Task", "", ""},
+             {6, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
+             {6, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
+             {6, "", SettlementCommandTypes::Gather, "Gather", "", ""},
+             {6, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
+             {6,
               "",
               SettlementCommandTypes::CollectRock,
               "Collect Rocks",
@@ -100,8 +100,9 @@ namespace Paladin
               UiButton("Rule"),
               UiButton("Roads"),
               UiButton("Housing"),
+              UiButton("Agriculture"),
+              UiButton("Production"),
               UiButton("Logistics"),
-              UiButton("Food"),
               UiButton("Command")
           }
     {
@@ -972,12 +973,13 @@ namespace Paladin
             }
 
             const UiRectangle& bounds = optionBounds_[index];
-            const bool isFoodWorkplace = definition.category == 4;
+            const bool isWorkplaceCategory =
+                definition.category == 3 || definition.category == 4;
             const bool isRoad = definition.category == 1;
-            const float maximumIconWidth = isFoodWorkplace
+            const float maximumIconWidth = isWorkplaceCategory
                                                ? bounds.width - 14.0F
                                                : (isRoad ? 18.0F : 36.0F);
-            const float maximumIconHeight = isFoodWorkplace
+            const float maximumIconHeight = isWorkplaceCategory
                                                 ? bounds.height - 14.0F
                                                 : (isRoad ? 18.0F : 36.0F);
             const float scale = std::min(

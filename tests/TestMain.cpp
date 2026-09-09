@@ -1,6 +1,8 @@
 #include <exception>
 #include <iostream>
 
+#include "PastureDormancyRegression.h"
+
 void runEntityAttributeTests();
 void runWorldReliefTests();
 void runSettlementSimulationLoopTests();
@@ -19,6 +21,7 @@ int main()
         runSettlementSimulationLoopTests();
         runSettlementEmploymentTests();
         runSettlementActivityTests();
+        runPastureDormancyRegression();
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();

@@ -60,6 +60,15 @@ namespace Paladin
             c.breakEmployer = {};
             c.breakObject = {};
         }
+        if (pastureWorkerAvailableForGeneralLabor(map, c))
+        {
+            // An empty-pasture assignment behaves as unemployed general labor,
+            // so it does not create a workplace shift break.
+            c.breakUntil = 0;
+            c.breakEmployer = {};
+            c.breakObject = {};
+            return;
+        }
         if (c.breakEmployer != c.workplaceId && !c.breakTaken)
         {
             c.breakEmployer = c.workplaceId;
@@ -86,9 +95,11 @@ namespace Paladin
         double minute
     )
     {
-        if (c.breakTaken || !c.workplaceId || minute < c.breakDue ||
-            !policy.isWorkTime(minute) || c.carriedAmount > 0 ||
-            !c.path.empty() || c.task.kind != CitizenTaskKind::Work)
+        if (c.breakTaken || !c.workplaceId ||
+            pastureWorkerAvailableForGeneralLabor(map, c) ||
+            minute < c.breakDue || !policy.isWorkTime(minute) ||
+            c.carriedAmount > 0 || !c.path.empty() ||
+            c.task.kind != CitizenTaskKind::Work)
         {
             return;
         }
@@ -232,13 +243,15 @@ namespace Paladin
             {
                 return false;
             }
-            if (person.workplaceId && policy.isWorkTime(minute) &&
+            const bool generalLabor =
+                !person.workplaceId ||
+                pastureWorkerAvailableForGeneralLabor(map, person);
+            if (!generalLabor && policy.isWorkTime(minute) &&
                 person.breakUntil <= minute)
             {
                 return false;
             }
-            if (!person.child && !person.workplaceId &&
-                policy.isWorkTime(minute) &&
+            if (!person.child && generalLabor && policy.isWorkTime(minute) &&
                 (!map.commandState().commands().empty() ||
                  !map.objectState().constructionSites().empty()))
             {

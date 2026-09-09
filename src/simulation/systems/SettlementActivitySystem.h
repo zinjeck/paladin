@@ -8,8 +8,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <unordered_set>
+#include <vector>
 
 namespace Paladin
 {
@@ -147,6 +149,13 @@ namespace Paladin
             const SettlementCitizen&,
             double minute
         ) const;
+        // A worker assigned to an empty pasture remains employed there, but is
+        // temporarily available for the same civic/general labor as an
+        // unemployed adult. The first contained animal ends that availability.
+        bool pastureWorkerAvailableForGeneralLabor(
+            const SettlementMap&,
+            const SettlementCitizen&
+        ) const noexcept;
         std::size_t housingCapacity() const noexcept
         {
             return families_.housingCapacity();
@@ -167,6 +176,24 @@ namespace Paladin
         }
 
     private:
+        enum class RouteFailureDomain : std::uint8_t
+        {
+            Inventory,
+            Construction,
+            Command,
+            Animal,
+            Workplace
+        };
+        struct RouteFailure
+        {
+            CitizenId citizen;
+            RouteFailureDomain domain = RouteFailureDomain::Inventory;
+            std::uint64_t target = 0;
+            SettlementTilePosition origin;
+            std::uint64_t topologyVersion = 0;
+            double untilMinute = 0;
+        };
+
         friend struct SettlementActivityTestFixture;
         bool choosePastureWork(
             SettlementMap&,
@@ -288,6 +315,22 @@ namespace Paladin
             const SettlementObjectFootprint&,
             bool inside
         );
+        bool routeFailed(
+            const SettlementCitizen&,
+            RouteFailureDomain,
+            std::uint64_t target,
+            SettlementTilePosition origin,
+            const SettlementMap&,
+            double minute
+        );
+        void rememberRouteFailure(
+            const SettlementCitizen&,
+            RouteFailureDomain,
+            std::uint64_t target,
+            SettlementTilePosition origin,
+            const SettlementMap&,
+            double minute
+        );
         bool chooseFood(
             SettlementMap&,
             SettlementCitizenState&,
@@ -339,6 +382,7 @@ namespace Paladin
         SettlementJobBoard jobBoard_;
         friend class SettlementFamilySystem;
         SettlementFamilySystem families_;
+        std::vector<RouteFailure> routeFailures_;
         std::size_t decisionCursor_ = 0;
         std::size_t pathsRemaining_ = 0;
         bool routeBudgetLimited_ = false;
