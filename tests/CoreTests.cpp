@@ -7,6 +7,7 @@
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
 #include "rendering/SettlementWorldPresentation.h"
+#include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
 #include "world/WorldGrid.h"
 #include "world/settlements/SettlementCommerce.h"
@@ -245,6 +246,62 @@ namespace
         PALADIN_CHECK(local.localWorldWeight > 0.999F);
         PALADIN_CHECK(std::abs(local.realmBorderWeight - 0.22F) < 1e-5F);
     }
+
+    void testWorldPixelStability()
+    {
+        using Paladin::pixelStableWorldCamera;
+        using Paladin::snapWorldArtCoordinate;
+        using Paladin::worldPixelStabilityActive;
+
+        PALADIN_CHECK(!worldPixelStabilityActive(false, 27.9));
+        PALADIN_CHECK(worldPixelStabilityActive(false, 28.0));
+        PALADIN_CHECK(worldPixelStabilityActive(true, 24.0));
+        PALADIN_CHECK(!worldPixelStabilityActive(true, 23.9));
+
+        PALADIN_CHECK(
+            std::abs(snapWorldArtCoordinate(12.04) - 12.0625) < 1e-12
+        );
+
+        Paladin::WorldGrid grid(360, 180);
+        Paladin::Camera2D flat(120.041, 70.027);
+        flat.setZoom(5.0);
+        const auto flatStable =
+            pixelStableWorldCamera(flat, grid, 1000, 800, false);
+        PALADIN_CHECK(
+            std::abs(flatStable.tileX() * Paladin::WorldPixelsPerTile -
+                     std::round(flatStable.tileX() *
+                                Paladin::WorldPixelsPerTile)) < 1e-10
+        );
+        PALADIN_CHECK(
+            std::abs(flatStable.tileY() * Paladin::WorldPixelsPerTile -
+                     std::round(flatStable.tileY() *
+                                Paladin::WorldPixelsPerTile)) < 1e-10
+        );
+        PALADIN_CHECK(std::abs(flatStable.zoom() - flat.zoom()) < 1e-12);
+        PALADIN_CHECK(std::abs(flat.tileX() - 120.041) < 1e-12);
+        PALADIN_CHECK(std::abs(flat.tileY() - 70.027) < 1e-12);
+
+        Paladin::Camera2D globe(120.041, 70.027);
+        globe.setZoom(5.0);
+        Paladin::GlobeCameraNavigation::roll(globe, grid, 1000, 800, 0.37);
+        const double realX = globe.tileX();
+        const double realY = globe.tileY();
+        const auto globeStable =
+            pixelStableWorldCamera(globe, grid, 1000, 800, true);
+        PALADIN_CHECK(std::abs(globeStable.zoom() - globe.zoom()) < 1e-12);
+        PALADIN_CHECK(std::abs(globe.tileX() - realX) < 1e-12);
+        PALADIN_CHECK(std::abs(globe.tileY() - realY) < 1e-12);
+
+        const auto stableView =
+            Paladin::GlobeView::from(globeStable, grid, 1000, 800);
+        const auto stableCenter = stableView.project(
+            globeStable.tileX() / grid.width(),
+            globeStable.tileY() / grid.height()
+        );
+        PALADIN_CHECK(std::abs(stableCenter.x - stableView.cx) < 1e-8);
+        PALADIN_CHECK(std::abs(stableCenter.y - stableView.cy) < 1e-8);
+        PALADIN_CHECK(stableCenter.z > 0.999999999);
+    }
 } // namespace
 
 
@@ -279,4 +336,5 @@ void runCoreTests()
     testGlobeNorthUpFocus();
     testSettlementWorldPresentationScale();
     testWorldPresentationLayers();
+    testWorldPixelStability();
 }
