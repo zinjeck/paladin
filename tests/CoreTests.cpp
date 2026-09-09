@@ -7,6 +7,7 @@
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
 #include "rendering/SettlementWorldPresentation.h"
+#include "rendering/WorldPresentation.h"
 #include "world/WorldGrid.h"
 #include "world/settlements/SettlementCommerce.h"
 
@@ -207,6 +208,43 @@ namespace
         PALADIN_CHECK(empty.markerDiameterPixels >= 1.0F);
         PALADIN_CHECK(large.borderPixels > 0.0F);
     }
+
+    void testWorldPresentationLayers()
+    {
+        using Paladin::worldPresentationState;
+
+        const auto realm = worldPresentationState(4.0);
+        const auto firstTransition = worldPresentationState(7.75);
+        const auto regional = worldPresentationState(16.0);
+        const auto secondTransition = worldPresentationState(34.0);
+        const auto local = worldPresentationState(60.0);
+
+        PALADIN_CHECK(realm.realmFillWeight > 0.999F);
+        PALADIN_CHECK(realm.realmLabelWeight > 0.999F);
+        PALADIN_CHECK(realm.settlementMarkerWeight < 0.001F);
+        PALADIN_CHECK(realm.localWorldWeight < 0.001F);
+
+        PALADIN_CHECK(firstTransition.realmFillWeight > 0.0F);
+        PALADIN_CHECK(firstTransition.realmFillWeight < 1.0F);
+        PALADIN_CHECK(firstTransition.settlementMarkerWeight > 0.0F);
+        PALADIN_CHECK(firstTransition.settlementMarkerWeight < 1.0F);
+
+        PALADIN_CHECK(regional.realmFillWeight < 0.001F);
+        PALADIN_CHECK(regional.settlementMarkerWeight > 0.999F);
+        PALADIN_CHECK(regional.localWorldWeight < 0.001F);
+        PALADIN_CHECK(regional.realmBorderWeight > 0.999F);
+
+        PALADIN_CHECK(secondTransition.settlementMarkerWeight > 0.0F);
+        PALADIN_CHECK(secondTransition.settlementMarkerWeight < 1.0F);
+        PALADIN_CHECK(secondTransition.localWorldWeight > 0.0F);
+        PALADIN_CHECK(secondTransition.localWorldWeight < 1.0F);
+        PALADIN_CHECK(secondTransition.realmBorderWeight < 1.0F);
+
+        PALADIN_CHECK(local.realmFillWeight < 0.001F);
+        PALADIN_CHECK(local.settlementMarkerWeight < 0.001F);
+        PALADIN_CHECK(local.localWorldWeight > 0.999F);
+        PALADIN_CHECK(std::abs(local.realmBorderWeight - 0.22F) < 1e-5F);
+    }
 } // namespace
 
 
@@ -240,4 +278,5 @@ void runCoreTests()
     testGlobeRollNavigation();
     testGlobeNorthUpFocus();
     testSettlementWorldPresentationScale();
+    testWorldPresentationLayers();
 }
