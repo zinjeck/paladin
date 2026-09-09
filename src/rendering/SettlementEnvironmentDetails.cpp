@@ -96,17 +96,11 @@ namespace Paladin
                         {
                             const double xx = tx + (c + .5) / n,
                                          yy = ty + (row + .5) / n;
-                            const double noise =
-                                .025 * std::sin(xx * 11 + yy * 7);
-                            return int(std::clamp(
-                                           (surfaceField(xx, yy, occupied) -
-                                            .44 + noise) /
-                                               .14,
-                                           0.,
-                                           1.
-                                       ) * 4 +
-                                       .5) *
-                                   255 / 4;
+                            return roadSurfaceOpacity(
+                                surfaceField(xx, yy, occupied),
+                                xx,
+                                yy
+                            );
                         };
                         const int alpha = opacity(col), first = col++;
                         while (col < n && opacity(col) == alpha)
@@ -146,24 +140,26 @@ namespace Paladin
         {
             return;
         }
-        // Fade continuously across both sides of the foundation, avoiding a
-        // second rectangular edge inside transparent roof overhangs.
+        // Keep the authored wall/foundation nearly against neighboring roads.
+        // The cached dirt skirt is intentionally compact; close-view stones,
+        // weeds and timber ends add breakup without creating a fake front yard.
         const double cell = .125;
+        const double pad = .25;
         const double left = std::max(
-            double(f.topLeft.x) - .5,
+            double(f.topLeft.x) - pad,
             p.cameraX - p.screenWidth * .5 / p.tilePixels - cell
         );
         const double top = std::max(
-            double(f.topLeft.y) - .5,
+            double(f.topLeft.y) - pad,
             p.cameraY - p.screenHeight * .5 / p.tilePixels - cell
         );
         for (double y = std::floor(top / cell) * cell;
-             y < f.topLeft.y + f.height + .5 &&
+             y < f.topLeft.y + f.height + pad &&
              y < p.cameraY + p.screenHeight * .5 / p.tilePixels + cell;
              y += cell)
         {
             for (double x = std::floor(left / cell) * cell;
-                 x < f.topLeft.x + f.width + .5 &&
+                 x < f.topLeft.x + f.width + pad &&
                  x < p.cameraX + p.screenWidth * .5 / p.tilePixels + cell;
                  x += cell)
             {
@@ -184,11 +180,11 @@ namespace Paladin
                 const double distance =
                     std::hypot(std::max(0., dx), std::max(0., dy)) +
                     std::min(std::max(dx, dy), 0.) - .25;
-                const double grain = .06 * std::sin(x * 9 + y * 5) +
-                                     .04 * std::sin(y * 17 - x * 3);
-                const int alpha =
-                    int(72 *
-                        std::clamp((.34 - distance + grain) / .85, 0., 1.));
+                const double grain = .028 * std::sin(x * 9 + y * 5) +
+                                     .018 * std::sin(y * 17 - x * 3);
+                const int alpha = int(
+                    88 * std::clamp((.20 - distance + grain) / .34, 0., 1.)
+                );
                 groundPatch(q, p, sprites, *soil, x, y, cell, cell, id, alpha);
             }
         }

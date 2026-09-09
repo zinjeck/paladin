@@ -57,6 +57,295 @@ namespace Paladin
             return hash;
         }
 
+        static std::uint64_t detailHash(std::uint64_t value)
+        {
+            value ^= value >> 30;
+            value *= 0xbf58476d1ce4e5b9ULL;
+            value ^= value >> 27;
+            value *= 0x94d049bb133111ebULL;
+            return value ^ (value >> 31);
+        }
+
+        static void buildingEdgeDetails(
+            SceneDrawQueue& queue,
+            const SceneProjection& p,
+            const SettlementMap& map,
+            const CompletedSettlementObject& object,
+            std::uint64_t id
+        )
+        {
+            if (p.tilePixels < AnimationDetailPixels)
+            {
+                return;
+            }
+            const auto& f = object.footprint;
+            constexpr double pixel = 1. / WorldPixelsPerTile;
+            const double x = f.topLeft.x, y = f.topLeft.y;
+            const double w = f.width, h = f.height;
+            int part = 70;
+            const auto draw = [&](double px,
+                                  double py,
+                                  double pw,
+                                  double ph,
+                                  RenderColor color,
+                                  double depth)
+            {
+                const auto bounds = p.bounds({px, py, 0, pw, ph, 0, 0});
+                if (p.visible(bounds))
+                {
+                    queue.submit({bounds, color, depth, id, -1, part++});
+                }
+            };
+            const auto outsideObject = [&](double px, double py)
+            {
+                return map.objectState().completedObjectAt(
+                    {int(std::floor(px)), int(std::floor(py))}
+                );
+            };
+            const auto validGround = [&](double px, double py)
+            {
+                const auto* tile = map.grid().tile(
+                    {int(std::floor(px)), int(std::floor(py))}
+                );
+                return tile && tile->terrain == TerrainType::Land;
+            };
+            const auto doorGap = [&](int edge, double along)
+            {
+                if (!object.door)
+                {
+                    return false;
+                }
+                const auto& door = *object.door;
+                if (edge == 0 && door.y == f.topLeft.y)
+                {
+                    return std::abs(x + along - (door.x + .5)) < .68;
+                }
+                if (edge == 2 && door.y == f.topLeft.y + f.height - 1)
+                {
+                    return std::abs(x + along - (door.x + .5)) < .68;
+                }
+                if (edge == 1 && door.x == f.topLeft.x + f.width - 1)
+                {
+                    return std::abs(y + along - (door.y + .5)) < .68;
+                }
+                if (edge == 3 && door.x == f.topLeft.x)
+                {
+                    return std::abs(y + along - (door.y + .5)) < .68;
+                }
+                return false;
+            };
+
+            // A broken one-pixel contact band keeps the front wall grounded.
+            // It is allowed to sit on a road directly outside the door wall;
+            // the doorway itself remains clear.
+            for (int i = 0; i < f.width; ++i)
+            {
+                const auto seed = detailHash(
+                    object.id.value() ^
+                    (std::uint64_t(std::uint32_t(f.topLeft.x + i)) << 32) ^
+                    std::uint32_t(f.topLeft.y + f.height) ^
+                    0x4f1bbcdcULL
+                );
+                if (seed % 5 == 0)
+                {
+                    continue;
+                }
+                const double along = std::clamp(
+                    i + .5 + (int((seed >> 9) % 5) - 2) * pixel,
+                    .25,
+                    w - .25
+                );
+                if (doorGap(2, along))
+                {
+                    continue;
+                }
+                const double ox = x + along;
+                const double oy = y + h + pixel * .5;
+                if (!validGround(ox, oy))
+                {
+                    continue;
+                }
+                const auto* occupant = outsideObject(ox, oy);
+                const bool road = occupant &&
+                                  occupant->objectTypeId ==
+                                      SettlementObjectTypes::Road;
+                if (occupant && !road)
+                {
+                    continue;
+                }
+                const double length = (4 + int((seed >> 15) % 4)) * pixel;
+                draw(
+                    ox - length * .5,
+                    y + h,
+                    length,
+                    pixel,
+                    {57, 43, 60, std::uint8_t(road ? 92 : 72)},
+                    y + h + .001
+                );
+            }
+
+            // Sparse, stable accents break the ruler-straight foundation edge.
+            // They are presentation only. A few pixels may overlap an adjacent
+            // road, but no road tile, collision or navigation state is changed.
+            for (int edge = 0; edge < 4; ++edge)
+            {
+                const int samples = edge % 2 ? f.height : f.width;
+                const double length = edge % 2 ? h : w;
+                for (int i = 0; i < samples; ++i)
+                {
+                    const auto seed = detailHash(
+                        object.id.value() * 0x9e3779b97f4a7c15ULL ^
+                        std::uint64_t(edge * 131 + i * 977) ^
+                        (std::uint64_t(std::uint32_t(f.topLeft.x)) << 32) ^
+                        std::uint32_t(f.topLeft.y)
+                    );
+                    const int chance = edge == 2 ? 68 : 42;
+                    if (int(seed % 100) >= chance)
+                    {
+                        continue;
+                    }
+                    const double along = std::clamp(
+                        i + .5 + (int((seed >> 8) % 5) - 2) * pixel,
+                        .22,
+                        length - .22
+                    );
+                    if (doorGap(edge, along))
+                    {
+                        continue;
+                    }
+                    double ox = 0, oy = 0;
+                    if (edge == 0)
+                    {
+                        ox = x + along;
+                        oy = y - pixel;
+                    }
+                    else if (edge == 1)
+                    {
+                        ox = x + w + pixel;
+                        oy = y + along;
+                    }
+                    else if (edge == 2)
+                    {
+                        ox = x + along;
+                        oy = y + h + pixel;
+                    }
+                    else
+                    {
+                        ox = x - pixel;
+                        oy = y + along;
+                    }
+                    if (!validGround(ox, oy))
+                    {
+                        continue;
+                    }
+                    const auto* occupant = outsideObject(ox, oy);
+                    const bool road = occupant &&
+                                      occupant->objectTypeId ==
+                                          SettlementObjectTypes::Road;
+                    if (occupant && !road)
+                    {
+                        continue;
+                    }
+                    int kind = int((seed >> 17) % 4);
+                    if (road && kind == 2 && (seed >> 23) % 13 != 0)
+                    {
+                        kind = 0;
+                    }
+                    const double depth = edge == 0 ? y : edge == 2 ? y + h
+                                                    : y + along;
+                    if (kind == 0)
+                    {
+                        const double sw = (2 + int((seed >> 25) % 2)) * pixel;
+                        const double sh = (1 + int((seed >> 27) % 2)) * pixel;
+                        const double sx = edge == 1   ? x + w
+                                          : edge == 3 ? x - sw
+                                                      : ox - sw * .5;
+                        const double sy = edge == 0   ? y - sh
+                                          : edge == 2 ? y + h
+                                                      : oy - sh * .5;
+                        draw(sx, sy, sw, sh, {89, 102, 121, 255}, depth);
+                        draw(
+                            sx,
+                            sy,
+                            pixel,
+                            pixel,
+                            {154, 167, 175, 255},
+                            depth + .001
+                        );
+                    }
+                    else if (kind == 1)
+                    {
+                        const double dw = (2 + int((seed >> 25) % 2)) * pixel;
+                        const double dh = pixel;
+                        const double dx = edge == 1   ? x + w
+                                          : edge == 3 ? x - dw
+                                                      : ox - dw * .5;
+                        const double dy = edge == 0   ? y - dh
+                                          : edge == 2 ? y + h
+                                                      : oy - dh * .5;
+                        draw(dx, dy, dw, dh, {122, 80, 56, 255}, depth);
+                        if ((seed >> 29) % 2)
+                        {
+                            draw(
+                                dx + pixel,
+                                dy,
+                                pixel,
+                                pixel,
+                                {183, 131, 80, 255},
+                                depth + .001
+                            );
+                        }
+                    }
+                    else if (kind == 2)
+                    {
+                        const double wx = edge == 1   ? x + w
+                                          : edge == 3 ? x - pixel
+                                                      : ox;
+                        const double wy = edge == 0   ? y - 2 * pixel
+                                          : edge == 2 ? y + h - pixel
+                                                      : oy - pixel;
+                        draw(
+                            wx,
+                            wy,
+                            pixel,
+                            2 * pixel,
+                            {51, 122, 88, 255},
+                            depth
+                        );
+                        draw(
+                            wx + pixel,
+                            wy + pixel,
+                            pixel,
+                            pixel,
+                            {121, 181, 109, 255},
+                            depth + .001
+                        );
+                    }
+                    else
+                    {
+                        const bool horizontal = edge == 0 || edge == 2;
+                        const double tw = horizontal ? 2 * pixel : pixel;
+                        const double th = horizontal ? pixel : 2 * pixel;
+                        const double tx = edge == 1   ? x + w
+                                          : edge == 3 ? x - tw
+                                                      : ox - tw * .5;
+                        const double ty = edge == 0   ? y - th
+                                          : edge == 2 ? y + h
+                                                      : oy - th * .5;
+                        draw(tx, ty, tw, th, {73, 53, 47, 255}, depth);
+                        draw(
+                            tx,
+                            ty,
+                            horizontal ? tw : pixel,
+                            pixel,
+                            {136, 96, 68, 255},
+                            depth + .001
+                        );
+                    }
+                }
+            }
+        }
+
     public:
         std::size_t buildCount() const
         {
@@ -245,6 +534,10 @@ namespace Paladin
                             queue.submit(item);
                         }
                     }
+                    if (!road)
+                    {
+                        buildingEdgeDetails(queue, p, map, object, id);
+                    }
                     return true;
                 }
                 --remaining_;
@@ -309,6 +602,10 @@ namespace Paladin
                  {0, 0, float(tw), float(th)},
                  255}
             );
+            if (!road)
+            {
+                buildingEdgeDetails(queue, p, map, object, id);
+            }
             return true;
         }
     };
