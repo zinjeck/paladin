@@ -308,14 +308,15 @@ namespace Paladin
     )
     {
         const auto* job = map.employment().workplace(c.workplaceId);
-        if (!job || !job->operational)
+        if (!job || !job->operational ||
+            map.animals.containedCount(job->objectId) == 0)
         {
             return false;
         }
 
-        // A pasture is a real workplace. Employees commute there first and
-        // remain physically on duty. Tending is an activity within that shift,
-        // not the condition that decides whether the employee goes to work.
+        // Once the first animal is actually contained, every assigned worker
+        // returns to the pasture. Tending is a duty within that active shift,
+        // while ordinary attendance still contributes husbandry production.
         if (job->footprint.contains(c.tilePosition))
         {
             std::vector<EntityId> candidates;
@@ -529,6 +530,7 @@ namespace Paladin
                 map.objectState().completedObject(c.task.object);
             if (!pasture ||
                 pasture->objectTypeId != SettlementObjectTypes::Pastureland ||
+                map.animals.containedCount(pasture->id) == 0 ||
                 !pasture->footprint.contains(c.tilePosition))
             {
                 finish(map, c, minute);
