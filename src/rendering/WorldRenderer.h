@@ -13,6 +13,8 @@
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
 #include "world/WorldTilePosition.h"
+#include <cstdint>
+#include <optional>
 #include <span>
 
 namespace Paladin
