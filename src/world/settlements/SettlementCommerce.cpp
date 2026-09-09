@@ -96,12 +96,16 @@ namespace Paladin
                                  1440.0;
         for (const auto& c : people.citizens())
         {
+            const bool generalLabor =
+                !c.workplaceId ||
+                map.activities.pastureWorkerAvailableForGeneralLabor(map, c);
             const bool governmentJob =
-                !c.workplaceId && (c.task.kind == CitizenTaskKind::AnimalWork ||
-                                   c.task.kind == CitizenTaskKind::Build ||
-                                   c.task.kind == CitizenTaskKind::Gather ||
-                                   c.task.kind == CitizenTaskKind::Demolish ||
-                                   c.task.kind == CitizenTaskKind::Haul);
+                generalLabor &&
+                (c.task.kind == CitizenTaskKind::AnimalWork ||
+                 c.task.kind == CitizenTaskKind::Build ||
+                 c.task.kind == CitizenTaskKind::Gather ||
+                 c.task.kind == CitizenTaskKind::Demolish ||
+                 c.task.kind == CitizenTaskKind::Haul);
             frozenPayRates_[c.id] = !c.child && (c.workplaceId || governmentJob)
                                         ? policy.dailyWage / 720.0 * workShare
                                         : (!c.child && c.youngDependents > 0
@@ -527,9 +531,16 @@ namespace Paladin
                 c.task.kind == CitizenTaskKind::Gather ||
                 c.task.kind == CitizenTaskKind::Demolish ||
                 c.task.kind == CitizenTaskKind::Haul;
-            // Businesses pay their own staff and retain operating reserves.
-            // Government labor is treasury-paid only while working; only
-            // carers receive continuing support. Children never spend money.
+            const auto* assignedWorkplace =
+                map.employment().workplace(c.workplaceId);
+            const bool pastureCivicLabor =
+                assignedWorkplace &&
+                assignedWorkplace->objectTypeId ==
+                    SettlementObjectTypes::Pastureland &&
+                c.task.kind != CitizenTaskKind::Work;
+            // Businesses pay their own active staff and retain operating
+            // reserves. An empty-pasture employee doing the same civic work as
+            // an unemployed citizen is treasury-paid for that work instead.
             const double rate = !monetary   ? 0
                                 : inactive_ ? frozenPayRates_[c.id]
                                 : !c.child && working
@@ -541,12 +552,12 @@ namespace Paladin
             const Money due = Money(wallet.accrued);
             wallet.accrued -= double(due);
             Money* employer = &treasury->balance;
-            if ((working || inactive_) && c.workplaceId)
+            if ((working || inactive_) && c.workplaceId && !pastureCivicLabor)
             {
-                const auto* w = map.employment().workplace(c.workplaceId);
-                if (w && businessAccounts_.contains(w->objectId))
+                if (assignedWorkplace &&
+                    businessAccounts_.contains(assignedWorkplace->objectId))
                 {
-                    employer = &businessAccounts_.at(w->objectId);
+                    employer = &businessAccounts_.at(assignedWorkplace->objectId);
                 }
             }
             const Money paid = std::min(*employer, due);
