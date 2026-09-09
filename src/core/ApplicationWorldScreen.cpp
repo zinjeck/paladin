@@ -119,8 +119,7 @@ namespace Paladin
             return;
         }
 
-        std::optional<WorldTilePosition> placementMarkerPosition;
-        RenderColor placementMarkerColor{255, 215, 131, 235};
+        std::optional<WorldPlacementMarker> placementMarker;
         const std::optional<WorldTilePosition> hoveredPosition =
             settlementPlacementController_->hoveredPosition();
         const std::optional<WorldTilePosition> lockedPosition =
@@ -128,25 +127,27 @@ namespace Paladin
 
         if (settlementPlacementController_->isSelecting() && hoveredPosition)
         {
-            placementMarkerPosition = hoveredPosition;
-            placementMarkerColor =
+            const RenderColor markerColor =
                 settlementPlacementController_->hasValidPlacement(
                     simulation_->world()
                 )
                     ? RenderColor{121, 181, 109, 235}
                     : RenderColor{215, 80, 86, 235};
+            placementMarker = WorldPlacementMarker{*hoveredPosition, markerColor};
         }
         else if (lockedPosition)
         {
-            placementMarkerPosition = lockedPosition;
             const MapColor selectedColor = foundingPanel_->isOpen()
                                                ? foundingPanel_->selectedColor()
                                                : MapColor{255, 215, 131};
-            placementMarkerColor = {
-                selectedColor.red,
-                selectedColor.green,
-                selectedColor.blue,
-                235
+            placementMarker = WorldPlacementMarker{
+                *lockedPosition,
+                RenderColor{
+                    selectedColor.red,
+                    selectedColor.green,
+                    selectedColor.blue,
+                    235
+                }
             };
         }
 
@@ -156,20 +157,12 @@ namespace Paladin
             *renderer_,
             simulation_->world(),
             *camera_,
-            *tileRenderMetrics_
+            *tileRenderMetrics_,
+            {},
+            {},
+            {},
+            placementMarker
         );
-
-        if (placementMarkerPosition)
-        {
-            worldRenderer_->renderSettlementPlacementMarker(
-                *renderer_,
-                simulation_->world(),
-                *camera_,
-                *tileRenderMetrics_,
-                *placementMarkerPosition,
-                placementMarkerColor
-            );
-        }
 
         renderWorldManagement();
         worldRenderer_->renderNavigator(
