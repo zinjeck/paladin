@@ -2,22 +2,22 @@
 
 #include "rendering/GlobeRenderer.h"
 #include "rendering/OverlayRenderer.h"
+#include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
-#include "rendering/TerritoryPresentationPolicy.h"
-#include "rendering/TerritoryRenderer.h"
-#include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
+#include "rendering/WorldPresentation.h"
+#include "rendering/WorldTerritoryPresentationRenderer.h"
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
+#include "world/WorldTilePosition.h"
 #include <span>
 
 namespace Paladin
 {
     class Camera2D;
-    class Renderer;
     class World;
 
     struct TileRenderMetrics;
@@ -27,12 +27,9 @@ namespace Paladin
     public:
         double animationSeconds = 0;
         bool globeEnabled = false;
-        bool politicalViewRequested = false;
         WorldRenderer();
 
-        explicit WorldRenderer(
-            TerritoryPresentationPolicy territoryPresentationPolicy
-        );
+        explicit WorldRenderer(WorldPresentationPolicy worldPresentationPolicy);
 
         std::uint64_t terrainAtlasBuilds() const
         {
@@ -54,8 +51,8 @@ namespace Paladin
         void reloadArt() const
         {
             artwork_.reset();
-            cartography_.reset();
             globe_.reset();
+            territoryPresentationRenderer_.reset();
         }
 
         void render(
@@ -66,6 +63,17 @@ namespace Paladin
             std::span<const SpriteRenderItem> sprites = {},
             std::span<const TileOverlayRenderItem> overlays = {},
             std::span<const TileOutlineRenderItem> outlines = {}
+        ) const;
+
+        // Temporary founding feedback only. It follows the world surface and
+        // disappears when the placement controller leaves the founding flow.
+        void renderSettlementPlacementMarker(
+            Renderer& renderer,
+            const World& world,
+            const Camera2D& camera,
+            const TileRenderMetrics& metrics,
+            WorldTilePosition position,
+            RenderColor color
         ) const;
 
         void renderNavigator(
@@ -84,17 +92,22 @@ namespace Paladin
         );
 
     private:
+        [[nodiscard]]
+        double effectiveTilePixels(
+            const Renderer&,
+            const World&,
+            const Camera2D&,
+            const TileRenderMetrics&
+        ) const noexcept;
+
         std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
-        mutable WorldCartography cartography_;
         mutable SceneSpriteLibrary artwork_;
         mutable GlobeRenderer globe_;
-        TerritoryRenderer territoryRenderer_;
         SpriteRenderer spriteRenderer_;
         SettlementMarkerRenderer settlementMarkerRenderer_;
         OverlayRenderer overlayRenderer_;
-        TerritoryPresentationPolicy territoryPresentationPolicy_;
-        mutable bool politicalViewActive_ = false;
-        mutable bool politicalViewInitialized_ = false;
+        mutable WorldTerritoryPresentationRenderer territoryPresentationRenderer_;
+        WorldPresentationPolicy worldPresentationPolicy_;
     };
 } // namespace Paladin
