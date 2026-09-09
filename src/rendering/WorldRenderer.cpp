@@ -98,7 +98,8 @@ namespace Paladin
         const TileRenderMetrics& metrics,
         std::span<const SpriteRenderItem> sprites,
         std::span<const TileOverlayRenderItem> overlays,
-        std::span<const TileOutlineRenderItem> outlines
+        std::span<const TileOutlineRenderItem> outlines,
+        std::optional<WorldPlacementMarker> placementMarker
     ) const
     {
         std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
@@ -198,6 +199,16 @@ namespace Paladin
                 camera,
                 presentation.settlementMarkerWeight
             );
+            if (placementMarker)
+            {
+                drawSettlementPlacementMarker(
+                    renderer,
+                    world,
+                    camera,
+                    presentationTilePixels,
+                    *placementMarker
+                );
+            }
             return;
         }
 
@@ -234,32 +245,35 @@ namespace Paladin
         );
         overlayRenderer_.render(renderer, overlays, flat, metrics);
         overlayRenderer_.renderOutlines(renderer, outlines, flat, metrics);
+        if (placementMarker)
+        {
+            drawSettlementPlacementMarker(
+                renderer,
+                world,
+                camera,
+                presentationTilePixels,
+                *placementMarker
+            );
+        }
     }
 
-    void WorldRenderer::renderSettlementPlacementMarker(
+    void WorldRenderer::drawSettlementPlacementMarker(
         Renderer& renderer,
         const World& world,
         const Camera2D& camera,
-        const TileRenderMetrics& metrics,
-        WorldTilePosition position,
-        RenderColor color
+        double tilePixels,
+        const WorldPlacementMarker& marker
     ) const
     {
-        if (!world.grid().isValidPosition(position))
+        if (!world.grid().isValidPosition(marker.position) ||
+            !std::isfinite(tilePixels) || tilePixels <= 0.0)
         {
             return;
         }
 
-        const double tilePixels =
-            effectiveTilePixels(renderer, world, camera, metrics);
-        if (!std::isfinite(tilePixels) || tilePixels <= 0.0)
-        {
-            return;
-        }
-
-        WorldPixelScene pixelScene(renderer, tilePixels);
         float centerX = 0.0F;
         float centerY = 0.0F;
+        RenderColor color = marker.color;
         if (globeEnabled)
         {
             const auto view = GlobeView::from(
@@ -269,8 +283,8 @@ namespace Paladin
                 renderer.outputHeight()
             );
             const auto projected = view.project(
-                (double(position.x) + 0.5) / world.grid().width(),
-                (double(position.y) + 0.5) / world.grid().height()
+                (double(marker.position.x) + 0.5) / world.grid().width(),
+                (double(marker.position.y) + 0.5) / world.grid().height()
             );
             if (!std::isfinite(projected.x) || !std::isfinite(projected.y) ||
                 projected.z <= 0.0)
@@ -290,11 +304,11 @@ namespace Paladin
         {
             centerX = float(
                 renderer.outputWidth() * 0.5 +
-                (double(position.x) + 0.5 - camera.tileX()) * tilePixels
+                (double(marker.position.x) + 0.5 - camera.tileX()) * tilePixels
             );
             centerY = float(
                 renderer.outputHeight() * 0.5 +
-                (double(position.y) + 0.5 - camera.tileY()) * tilePixels
+                (double(marker.position.y) + 0.5 - camera.tileY()) * tilePixels
             );
         }
 
