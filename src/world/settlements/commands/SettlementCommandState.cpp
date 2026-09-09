@@ -134,15 +134,8 @@ namespace Paladin
             return false;
         }
         command.id = commandIds_.generate();
-        for (const auto& target : command.targets)
-        {
-            if (!target.objectId && !target.constructionId)
-            {
-                map.naturalFeatures().mark(target.footprint.topLeft, true);
-            }
-        }
-        // Designations do not reserve citizens until a work executor can claim
-        // them.
+        // Natural-resource designation visuals are rendered from the command
+        // itself. Do not mutate feature art state merely to draw a marker.
         commands_.push_back(std::move(command));
         ++version_;
         ++selectionVersion_;
@@ -175,13 +168,6 @@ namespace Paladin
                     if (!intersects(area, target.footprint))
                     {
                         return false;
-                    }
-                    if (!target.objectId && !target.constructionId)
-                    {
-                        map.naturalFeatures().mark(
-                            target.footprint.topLeft,
-                            false
-                        );
                     }
                     ++removed;
                     return true;
