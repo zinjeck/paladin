@@ -28,6 +28,18 @@ namespace Paladin
                        std::clamp(p.y, f.topLeft.y, f.topLeft.y + f.height - 1)
                    );
         }
+        std::uint64_t jobRouteKey(
+            std::uint64_t id,
+            SettlementTilePosition tile
+        )
+        {
+            std::uint64_t value = id * 0x9E3779B97F4A7C15ULL;
+            value ^= std::uint64_t(std::uint32_t(tile.x)) +
+                     0x9E3779B97F4A7C15ULL + (value << 6) + (value >> 2);
+            value ^= std::uint64_t(std::uint32_t(tile.y)) +
+                     0x9E3779B97F4A7C15ULL + (value << 6) + (value >> 2);
+            return value ? value : 1;
+        }
         bool failedRoute(
             const SettlementCitizen& citizen,
             InventoryId target,
@@ -92,6 +104,58 @@ namespace Paladin
                    inventory.kind == InventoryKind::Stockpile;
         }
     } // namespace
+
+    bool SettlementActivitySystem::routeFailed(
+        const SettlementCitizen& citizen,
+        RouteFailureDomain domain,
+        std::uint64_t target,
+        SettlementTilePosition origin,
+        const SettlementMap& map,
+        double minute
+    )
+    {
+        return std::any_of(
+            routeFailures_.begin(),
+            routeFailures_.end(),
+            [&](const RouteFailure& failure)
+            {
+                return failure.citizen == citizen.id &&
+                       failure.domain == domain && failure.target == target &&
+                       failure.untilMinute > minute &&
+                       failure.topologyVersion ==
+                           map.objectState().navigationVersion() &&
+                       distance(origin, {failure.origin, 1, 1}) <= 8;
+            }
+        );
+    }
+
+    void SettlementActivitySystem::rememberRouteFailure(
+        const SettlementCitizen& citizen,
+        RouteFailureDomain domain,
+        std::uint64_t target,
+        SettlementTilePosition origin,
+        const SettlementMap& map,
+        double minute
+    )
+    {
+        const auto topology = map.objectState().navigationVersion();
+        std::erase_if(
+            routeFailures_,
+            [&](const RouteFailure& failure)
+            {
+                return failure.untilMinute <= minute ||
+                       failure.topologyVersion != topology;
+            }
+        );
+        if (routeFailures_.size() >= 256)
+        {
+            routeFailures_.erase(routeFailures_.begin());
+        }
+        routeFailures_.push_back(
+            {citizen.id, domain, target, origin, topology, minute + 30}
+        );
+    }
+
     bool SettlementActivitySystem::route(
         SettlementMap& map,
         SettlementCitizenState& citizens,
@@ -699,7 +763,7 @@ namespace Paladin
             }
             if (!assignedDestination &&
                 distance(c.tilePosition, source.footprint) >
-                    policy.localSearchRadius)
+                    policy.stockpile.collectionRadius)
             {
                 continue;
             }
@@ -886,8 +950,21 @@ namespace Paladin
         {
             const auto id = choice.id;
             const auto& site = *map.objectState().constructionSite(id);
+            const auto routeKey = jobRouteKey(id.value(), site.footprint.topLeft);
+            if (routeFailed(
+                    c,
+                    RouteFailureDomain::Construction,
+                    routeKey,
+                    c.tilePosition,
+                    map,
+                    minute
+                ))
+            {
+                continue;
+            }
             if (map.naturalFeatures().countIn(site.footprint) > 0)
             {
+                bool routeFailure = false;
                 while (clearingBudget > 0)
                 {
                     const auto next = jobBoard_.nextClearingTarget(
@@ -906,18 +983,42 @@ namespace Paladin
                     clearing.site = id;
                     clearing.workTile = tile;
                     clearing.startedMinute = minute;
-                    if (!jobBoard_.claimed(clearing) &&
-                        route(map, citizens, c, {tile, 1, 1}, true))
+                    if (!jobBoard_.claimed(clearing))
                     {
-                        c.task = clearing;
-                        jobBoard_.claim(c.task);
-                        c.activity = CitizenActivity::AssignedToCommand;
-                        return true;
+                        if (route(map, citizens, c, {tile, 1, 1}, true))
+                        {
+                            c.task = clearing;
+                            jobBoard_.claim(c.task);
+                            c.activity = CitizenActivity::AssignedToCommand;
+                            return true;
+                        }
+                        if (routeBudgetLimited_)
+                        {
+                            return false;
+                        }
+                        rememberRouteFailure(
+                            c,
+                            RouteFailureDomain::Construction,
+                            routeKey,
+                            c.tilePosition,
+                            map,
+                            minute
+                        );
+                        routeFailure = true;
+                        if (!pathsRemaining_)
+                        {
+                            return false;
+                        }
+                        break;
                     }
                     if (!pathsRemaining_)
                     {
                         return false;
                     }
+                }
+                if (routeFailure)
+                {
+                    continue;
                 }
                 continue;
             }
@@ -1029,6 +1130,21 @@ namespace Paladin
             if (!route(map, citizens, planned, {goal, 1, 1}, true) ||
                 !site.footprint.contains(planned.destination))
             {
+                if (!routeBudgetLimited_)
+                {
+                    rememberRouteFailure(
+                        c,
+                        RouteFailureDomain::Construction,
+                        routeKey,
+                        c.tilePosition,
+                        map,
+                        minute
+                    );
+                }
+                if (!pathsRemaining_)
+                {
+                    return false;
+                }
                 continue;
             }
             task.workTile = planned.destination;
@@ -1099,6 +1215,9 @@ namespace Paladin
                 }
             }
         }
+        // The global fallback deliberately has no distance cutoff. Distance is
+        // a preference only; an accessible player command remains eligible
+        // anywhere on the settlement map.
         for (std::size_t i = 0;
              i <
              std::min<std::size_t>(jobBoard_.availableCommands().size(), 64);
@@ -1117,6 +1236,19 @@ namespace Paladin
         for (const auto& choice : choices)
         {
             const auto& job = jobBoard_.command(choice.index);
+            const auto key =
+                jobRouteKey(job.command.value(), job.footprint.topLeft);
+            if (routeFailed(
+                    c,
+                    RouteFailureDomain::Command,
+                    key,
+                    c.tilePosition,
+                    map,
+                    minute
+                ))
+            {
+                continue;
+            }
             if (route(map, citizens, c, job.footprint, true))
             {
                 c.task = job.task();
@@ -1125,6 +1257,17 @@ namespace Paladin
                 c.assignedCommandId = c.task.command;
                 c.activity = CitizenActivity::AssignedToCommand;
                 return true;
+            }
+            if (!routeBudgetLimited_)
+            {
+                rememberRouteFailure(
+                    c,
+                    RouteFailureDomain::Command,
+                    key,
+                    c.tilePosition,
+                    map,
+                    minute
+                );
             }
             if (!pathsRemaining_)
             {
