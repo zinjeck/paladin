@@ -2,7 +2,6 @@
 #include "core/SimulationClock.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
-#include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
@@ -15,8 +14,6 @@
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
-#include <array>
-#include <span>
 
 namespace Paladin
 {
@@ -121,106 +118,36 @@ namespace Paladin
             );
             return;
         }
-        std::array<TileOverlayRenderItem, 1> overlays{};
-        std::array<TileOutlineRenderItem, 1> outlines{};
-        std::size_t overlayCount = 0;
-        std::size_t outlineCount = 0;
 
+        std::optional<WorldTilePosition> placementMarkerPosition;
+        RenderColor placementMarkerColor{255, 215, 131, 235};
         const std::optional<WorldTilePosition> hoveredPosition =
             settlementPlacementController_->hoveredPosition();
-
         const std::optional<WorldTilePosition> lockedPosition =
             settlementPlacementController_->lockedPosition();
 
         if (settlementPlacementController_->isSelecting() && hoveredPosition)
         {
-            const bool validPlacement =
+            placementMarkerPosition = hoveredPosition;
+            placementMarkerColor =
                 settlementPlacementController_->hasValidPlacement(
                     simulation_->world()
-                );
-
-            const TerritoryFoundationPolicy& territoryPolicy =
-                simulation_->world().territoryFoundationPolicy();
-
-            const double regionX =
-                static_cast<double>(hoveredPosition->x) -
-                static_cast<double>(territoryPolicy.settlementRegionWidth / 2);
-
-            const double regionY =
-                static_cast<double>(hoveredPosition->y) -
-                static_cast<double>(territoryPolicy.settlementRegionHeight / 2);
-
-            const RenderColor previewColor =
-                validPlacement ? RenderColor{121, 181, 109, 220}
-                               : RenderColor{215, 80, 86, 230};
-
-            overlays[0] = {
-                regionX,
-                regionY,
-                static_cast<double>(territoryPolicy.settlementRegionWidth),
-                static_cast<double>(territoryPolicy.settlementRegionHeight),
-                validPlacement ? RenderColor{121, 181, 109, 34}
-                               : RenderColor{215, 80, 86, 42}
-            };
-
-            outlines[0] = {
-                regionX,
-                regionY,
-                static_cast<double>(territoryPolicy.settlementRegionWidth),
-                static_cast<double>(territoryPolicy.settlementRegionHeight),
-                2.0F,
-                previewColor
-            };
-
-            overlayCount = 1;
-            outlineCount = 1;
+                )
+                    ? RenderColor{121, 181, 109, 235}
+                    : RenderColor{215, 80, 86, 235};
         }
         else if (lockedPosition)
         {
+            placementMarkerPosition = lockedPosition;
             const MapColor selectedColor = foundingPanel_->isOpen()
                                                ? foundingPanel_->selectedColor()
                                                : MapColor{255, 215, 131};
-
-            const TerritoryFoundationPolicy& territoryPolicy =
-                simulation_->world().territoryFoundationPolicy();
-
-            const double regionX =
-                static_cast<double>(lockedPosition->x) -
-                static_cast<double>(territoryPolicy.settlementRegionWidth / 2);
-
-            const double regionY =
-                static_cast<double>(lockedPosition->y) -
-                static_cast<double>(territoryPolicy.settlementRegionHeight / 2);
-
-            overlays[0] = {
-                regionX,
-                regionY,
-                static_cast<double>(territoryPolicy.settlementRegionWidth),
-                static_cast<double>(territoryPolicy.settlementRegionHeight),
-                RenderColor{
-                    selectedColor.red,
-                    selectedColor.green,
-                    selectedColor.blue,
-                    38
-                }
+            placementMarkerColor = {
+                selectedColor.red,
+                selectedColor.green,
+                selectedColor.blue,
+                235
             };
-
-            outlines[0] = {
-                regionX,
-                regionY,
-                static_cast<double>(territoryPolicy.settlementRegionWidth),
-                static_cast<double>(territoryPolicy.settlementRegionHeight),
-                2.0F,
-                RenderColor{
-                    selectedColor.red,
-                    selectedColor.green,
-                    selectedColor.blue,
-                    235
-                }
-            };
-
-            overlayCount = 1;
-            outlineCount = 1;
         }
 
         worldRenderer_->animationSeconds =
@@ -229,17 +156,20 @@ namespace Paladin
             *renderer_,
             simulation_->world(),
             *camera_,
-            *tileRenderMetrics_,
-            {},
-            std::span<const TileOverlayRenderItem>(
-                overlays.data(),
-                overlayCount
-            ),
-            std::span<const TileOutlineRenderItem>(
-                outlines.data(),
-                outlineCount
-            )
+            *tileRenderMetrics_
         );
+
+        if (placementMarkerPosition)
+        {
+            worldRenderer_->renderSettlementPlacementMarker(
+                *renderer_,
+                simulation_->world(),
+                *camera_,
+                *tileRenderMetrics_,
+                *placementMarkerPosition,
+                placementMarkerColor
+            );
+        }
 
         renderWorldManagement();
         worldRenderer_->renderNavigator(
