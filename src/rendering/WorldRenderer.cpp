@@ -16,16 +16,19 @@
 
 namespace Paladin
 {
+    namespace
+    {
+        constexpr double TwoPi = 6.28318530717958647692;
+    }
+
     WorldRenderer::WorldRenderer()
-        : WorldRenderer(defaultTerritoryPresentationPolicy())
+        : WorldRenderer(WorldPresentationPolicy{})
     {
     }
 
 
-    WorldRenderer::WorldRenderer(
-        TerritoryPresentationPolicy territoryPresentationPolicy
-    )
-        : territoryPresentationPolicy_(std::move(territoryPresentationPolicy))
+    WorldRenderer::WorldRenderer(WorldPresentationPolicy worldPresentationPolicy)
+        : worldPresentationPolicy_(std::move(worldPresentationPolicy))
     {
     }
 
@@ -61,6 +64,33 @@ namespace Paladin
         return globe_.detailReady();
     }
 
+    double WorldRenderer::effectiveTilePixels(
+        const Renderer& renderer,
+        const World& world,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics
+    ) const noexcept
+    {
+        if (!globeEnabled)
+        {
+            return metrics.scaledTilePixels(camera.zoom());
+        }
+
+        if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0 ||
+            world.grid().width() <= 0 || world.grid().height() <= 0)
+        {
+            return 0.0;
+        }
+
+        const auto view = GlobeView::from(
+            camera,
+            world.grid(),
+            renderer.outputWidth(),
+            renderer.outputHeight()
+        );
+        return view.radius * TwoPi / world.grid().width();
+    }
+
     void WorldRenderer::render(
         Renderer& renderer,
         const World& world,
@@ -76,26 +106,40 @@ namespace Paladin
         artRoot = PALADIN_ART_ROOT;
 #endif
         artwork_.load(renderer, artRoot);
-        WorldPixelScene pixelScene(
-            renderer,
-            globeEnabled ? GlobeView::from(
-                               camera,
-                               world.grid(),
-                               renderer.outputWidth(),
-                               renderer.outputHeight()
-                           )
-                                   .radius *
-                               6.283185307 / world.grid().width()
-                         : metrics.scaledTilePixels(camera.zoom())
-        );
-        artwork_.setTime(animationSeconds);
 
-        const double tilePixels = metrics.scaledTilePixels(camera.zoom());
+        const double presentationTilePixels =
+            effectiveTilePixels(renderer, world, camera, metrics);
+        if (!std::isfinite(presentationTilePixels) ||
+            presentationTilePixels <= 0.0)
+        {
+            return;
+        }
+
+        WorldPixelScene pixelScene(renderer, presentationTilePixels);
+        artwork_.setTime(animationSeconds);
+        const WorldPresentationState presentation = worldPresentationState(
+            presentationTilePixels,
+            worldPresentationPolicy_
+        );
+
+        const double flatTilePixels = metrics.scaledTilePixels(camera.zoom());
 
         if (globeEnabled)
         {
             globe_
                 .render(renderer, world, camera, artwork_, overlays, outlines);
+
+            // Realm presentation is now a globe-native layer rather than a
+            // flat political-map special case. Fill and labels fade away as the
+            // terrain becomes regional; borders remain faint in local view.
+            territoryPresentationRenderer_.renderGlobe(
+                renderer,
+                world,
+                camera,
+                presentation,
+                worldPresentationPolicy_
+            );
+
             const auto view = GlobeView::from(
                 camera,
                 world.grid(),
@@ -145,61 +189,181 @@ namespace Paladin
                 );
             }
 
-            // Settlement identity is projection-independent. The same renderer
-            // is used for the globe and flat map, and size comes from settlement
-            // population rather than from a separate settlement-type enum.
-            settlementMarkerRenderer_.renderGlobe(renderer, world, camera);
-            return;
-        }
-
-        politicalViewActive_ = politicalViewRequested;
-        if (!politicalViewActive_)
-        {
-            globe_.renderFlat(renderer, world, camera, artwork_, tilePixels);
-        }
-        if (politicalViewActive_)
-        {
-            cartography_.render(
-                renderer,
-                world,
-                {camera.tileX(),
-                 camera.tileY(),
-                 tilePixels,
-                 renderer.outputWidth(),
-                 renderer.outputHeight()},
-                politicalViewActive_
-            );
-        }
-        auto presentation = territoryPresentationPolicy_;
-        if (!politicalViewActive_)
-        {
-            worldFoliageProjected(
+            // The PR #12 cartographic symbol now belongs only to the regional
+            // layer. It is absent from distant realm view and fades away before
+            // the future physical settlement miniature layer takes over.
+            settlementMarkerRenderer_.renderGlobe(
                 renderer,
                 world,
                 camera,
-                tilePixels,
-                false,
-                artwork_
+                presentation.settlementMarkerWeight
             );
+            return;
         }
-        presentation.cartographicBase = politicalViewActive_;
-        // Both projections share canonical map coordinates. The flat view
-        // draws one bounded copy; only the globe joins the longitude seam.
+
+        // Flat and globe projections share the same semantic zoom policy.
+        // Terrain is always available underneath; distant realm color is a
+        // presentation layer that crossfades away rather than replacing the
+        // world with a separate mode.
+        globe_.renderFlat(renderer, world, camera, artwork_, flatTilePixels);
+        worldFoliageProjected(
+            renderer,
+            world,
+            camera,
+            flatTilePixels,
+            false,
+            artwork_
+        );
+        territoryPresentationRenderer_.renderFlat(
+            renderer,
+            world,
+            camera,
+            metrics,
+            presentation,
+            worldPresentationPolicy_
+        );
+
+        const Camera2D& flat = camera;
+        spriteRenderer_.render(renderer, sprites, flat, metrics);
+        settlementMarkerRenderer_.renderFlat(
+            renderer,
+            world,
+            flat,
+            metrics,
+            presentation.settlementMarkerWeight
+        );
+        overlayRenderer_.render(renderer, overlays, flat, metrics);
+        overlayRenderer_.renderOutlines(renderer, outlines, flat, metrics);
+    }
+
+    void WorldRenderer::renderSettlementPlacementMarker(
+        Renderer& renderer,
+        const World& world,
+        const Camera2D& camera,
+        const TileRenderMetrics& metrics,
+        WorldTilePosition position,
+        RenderColor color
+    ) const
+    {
+        if (!world.grid().isValidPosition(position))
         {
-            const Camera2D& flat = camera;
-            territoryRenderer_.render(
-                renderer,
-                world,
-                flat,
-                metrics,
-                politicalViewActive_,
-                presentation
-            );
-            spriteRenderer_.render(renderer, sprites, flat, metrics);
-            settlementMarkerRenderer_.renderFlat(renderer, world, flat, metrics);
-            overlayRenderer_.render(renderer, overlays, flat, metrics);
-            overlayRenderer_.renderOutlines(renderer, outlines, flat, metrics);
+            return;
         }
+
+        const double tilePixels =
+            effectiveTilePixels(renderer, world, camera, metrics);
+        if (!std::isfinite(tilePixels) || tilePixels <= 0.0)
+        {
+            return;
+        }
+
+        WorldPixelScene pixelScene(renderer, tilePixels);
+        float centerX = 0.0F;
+        float centerY = 0.0F;
+        if (globeEnabled)
+        {
+            const auto view = GlobeView::from(
+                camera,
+                world.grid(),
+                renderer.outputWidth(),
+                renderer.outputHeight()
+            );
+            const auto projected = view.project(
+                (double(position.x) + 0.5) / world.grid().width(),
+                (double(position.y) + 0.5) / world.grid().height()
+            );
+            if (!std::isfinite(projected.x) || !std::isfinite(projected.y) ||
+                projected.z <= 0.0)
+            {
+                return;
+            }
+            centerX = float(projected.x);
+            centerY = float(projected.y);
+            color.alpha = static_cast<std::uint8_t>(std::clamp(
+                std::lround(double(color.alpha) *
+                            std::clamp(projected.z * 4.0, 0.0, 1.0)),
+                0L,
+                255L
+            ));
+        }
+        else
+        {
+            centerX = float(
+                renderer.outputWidth() * 0.5 +
+                (double(position.x) + 0.5 - camera.tileX()) * tilePixels
+            );
+            centerY = float(
+                renderer.outputHeight() * 0.5 +
+                (double(position.y) + 0.5 - camera.tileY()) * tilePixels
+            );
+        }
+
+        const float radius = std::clamp(float(tilePixels * 0.24), 5.0F, 10.0F);
+        RenderColor shadow{8, 15, 27, color.alpha};
+        shadow.alpha = static_cast<std::uint8_t>(
+            std::lround(double(shadow.alpha) * 0.8)
+        );
+
+        // A small surface marker communicates the chosen point without exposing
+        // the rectangular settlement-region implementation on the sphere.
+        renderer.drawLine(
+            centerX,
+            centerY - radius - 1.0F,
+            centerX + radius + 1.0F,
+            centerY,
+            shadow
+        );
+        renderer.drawLine(
+            centerX + radius + 1.0F,
+            centerY,
+            centerX,
+            centerY + radius + 1.0F,
+            shadow
+        );
+        renderer.drawLine(
+            centerX,
+            centerY + radius + 1.0F,
+            centerX - radius - 1.0F,
+            centerY,
+            shadow
+        );
+        renderer.drawLine(
+            centerX - radius - 1.0F,
+            centerY,
+            centerX,
+            centerY - radius - 1.0F,
+            shadow
+        );
+
+        renderer.drawLine(
+            centerX,
+            centerY - radius,
+            centerX + radius,
+            centerY,
+            color
+        );
+        renderer.drawLine(
+            centerX + radius,
+            centerY,
+            centerX,
+            centerY + radius,
+            color
+        );
+        renderer.drawLine(
+            centerX,
+            centerY + radius,
+            centerX - radius,
+            centerY,
+            color
+        );
+        renderer.drawLine(
+            centerX - radius,
+            centerY,
+            centerX,
+            centerY - radius,
+            color
+        );
+        renderer.fillRectangle(centerX - 1.0F, centerY - 1.0F, 3.0F, 3.0F, color);
     }
 
     void WorldRenderer::toggleProjection(
