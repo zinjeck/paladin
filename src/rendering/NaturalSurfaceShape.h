@@ -48,4 +48,30 @@ namespace Paladin
             v
         );
     }
+
+    // Stable settlement-space variation for road shoulders. Multiple spatial
+    // frequencies keep long runs and intersections from reading as ruler-cut
+    // geometry while remaining continuous across object/cache boundaries.
+    inline double roadSurfaceNoise(double x, double y)
+    {
+        return .052 *
+                   std::sin(x * 2.17 + y * .83 + .35 * std::sin(y * .61)) +
+               .026 * std::sin(x * 6.7 - y * 5.1) +
+               .012 * std::sin(x * 13.7 + y * 11.3);
+    }
+
+    inline int roadSurfaceOpacity(double field, double x, double y)
+    {
+        // Never let edge variation punch holes through the readable road core.
+        if (field >= .74)
+        {
+            return 255;
+        }
+        const double coverage = std::clamp(
+            (field - .44 + roadSurfaceNoise(x, y)) / .15,
+            0.,
+            1.
+        );
+        return int(coverage * 4 + .5) * 255 / 4;
+    }
 } // namespace Paladin
