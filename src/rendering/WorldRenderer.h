@@ -24,6 +24,12 @@ namespace Paladin
 
     struct TileRenderMetrics;
 
+    struct WorldPlacementMarker
+    {
+        WorldTilePosition position;
+        RenderColor color{255, 215, 131, 235};
+    };
+
     class WorldRenderer
     {
     public:
@@ -64,18 +70,8 @@ namespace Paladin
             const TileRenderMetrics& metrics,
             std::span<const SpriteRenderItem> sprites = {},
             std::span<const TileOverlayRenderItem> overlays = {},
-            std::span<const TileOutlineRenderItem> outlines = {}
-        ) const;
-
-        // Temporary founding feedback only. It follows the world surface and
-        // disappears when the placement controller leaves the founding flow.
-        void renderSettlementPlacementMarker(
-            Renderer& renderer,
-            const World& world,
-            const Camera2D& camera,
-            const TileRenderMetrics& metrics,
-            WorldTilePosition position,
-            RenderColor color
+            std::span<const TileOutlineRenderItem> outlines = {},
+            std::optional<WorldPlacementMarker> placementMarker = std::nullopt
         ) const;
 
         void renderNavigator(
@@ -101,6 +97,14 @@ namespace Paladin
             const Camera2D&,
             const TileRenderMetrics&
         ) const noexcept;
+
+        void drawSettlementPlacementMarker(
+            Renderer&,
+            const World&,
+            const Camera2D&,
+            double effectiveTilePixels,
+            const WorldPlacementMarker&
+        ) const;
 
         std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
