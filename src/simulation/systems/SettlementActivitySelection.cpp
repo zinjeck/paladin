@@ -763,7 +763,7 @@ namespace Paladin
             }
             if (!assignedDestination &&
                 distance(c.tilePosition, source.footprint) >
-                    policy.stockpile.collectionRadius)
+                    policy.localSearchRadius)
             {
                 continue;
             }
