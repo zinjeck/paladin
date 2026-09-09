@@ -55,8 +55,23 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DPALADIN_BUILD_APPLICATION_SMOKE_TESTS=ON
 
-      - name: Build and run PaladinArtCheck
+      - name: Prepare art review output
+        run: New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\art-review"
+
+      - name: Build and run software-rendered art review
+        env:
+          PALADIN_ART_REVIEW: "1"
+          PALADIN_SMOKE_SCREENSHOTS: ${{ github.workspace }}\art-review
         run: >-
           cmake --build art-build
           --target PaladinArtCheck
           --parallel
+
+      - name: Upload software-rendered review images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paladin-software-art-review
+          path: art-review
+          if-no-files-found: warn
+          retention-days: 14
