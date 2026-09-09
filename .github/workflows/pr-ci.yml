@@ -38,3 +38,26 @@ jobs:
 
       - name: Run automated tests
         run: ctest --test-dir build -C Debug --output-on-failure
+
+  software-art-validation:
+    name: Software-rendered art validation
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure art validation
+        run: >-
+          cmake -S . -B art-build
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DPALADIN_BUILD_APPLICATION_SMOKE_TESTS=ON
+
+      - name: Build and run PaladinArtCheck
+        run: >-
+          cmake --build art-build
+          --config Release
+          --target PaladinArtCheck
+          --parallel
