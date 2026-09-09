@@ -149,6 +149,13 @@ namespace Paladin
             const SettlementCitizen&,
             double minute
         ) const;
+        // A worker assigned to an empty pasture remains employed there, but is
+        // temporarily available for the same civic/general labor as an
+        // unemployed adult. The first contained animal ends that availability.
+        bool pastureWorkerAvailableForGeneralLabor(
+            const SettlementMap&,
+            const SettlementCitizen&
+        ) const noexcept;
         std::size_t housingCapacity() const noexcept
         {
             return families_.housingCapacity();
