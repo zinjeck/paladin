@@ -116,19 +116,51 @@ namespace Paladin
             return;
         }
 
-        WorldPixelScene pixelScene(renderer, presentationTilePixels);
-        artwork_.setTime(animationSeconds);
         const WorldPresentationState presentation = worldPresentationState(
             presentationTilePixels,
             worldPresentationPolicy_
         );
 
-        const double flatTilePixels = metrics.scaledTilePixels(camera.zoom());
+        // The authoritative camera remains perfectly continuous. Once the
+        // close/local world band is reached, only the camera used for drawing is
+        // snapped to one sixteenth of a tile. With WorldPixelScene that means a
+        // pan advances the prepared terrain by whole art pixels rather than
+        // continuously changing the nearest-neighbour sampling phase. The
+        // enter/exit gap prevents a zoom hovering on the threshold from toggling
+        // the stabilization every frame.
+        pixelStabilityActive_ = worldPixelStabilityActive(
+            pixelStabilityActive_,
+            presentationTilePixels,
+            pixelStabilityPolicy_
+        );
+        Camera2D renderCamera = camera;
+        if (pixelStabilityActive_)
+        {
+            renderCamera = pixelStableWorldCamera(
+                camera,
+                world.grid(),
+                renderer.outputWidth(),
+                renderer.outputHeight(),
+                globeEnabled
+            );
+        }
+
+        WorldPixelScene pixelScene(renderer, presentationTilePixels);
+        artwork_.setTime(animationSeconds);
+
+        const double flatTilePixels =
+            metrics.scaledTilePixels(renderCamera.zoom());
 
         if (globeEnabled)
         {
-            globe_
-                .render(renderer, world, camera, artwork_, overlays, outlines);
+            globe_.render(
+                renderer,
+                world,
+                renderCamera,
+                artwork_,
+                overlays,
+                outlines
+            );
 
             // Realm presentation is now a globe-native layer rather than a
             // flat political-map special case. Fill and labels fade away as the
@@ -136,13 +168,13 @@ namespace Paladin
             territoryPresentationRenderer_.renderGlobe(
                 renderer,
                 world,
-                camera,
+                renderCamera,
                 presentation,
                 worldPresentationPolicy_
             );
 
             const auto view = GlobeView::from(
-                camera,
+                renderCamera,
                 world.grid(),
                 renderer.outputWidth(),
                 renderer.outputHeight()
@@ -170,12 +202,12 @@ namespace Paladin
                 const float width = float(
                     (item.displayWidthPixels > 0 ? item.displayWidthPixels
                                                  : sw) *
-                    camera.zoom()
+                    renderCamera.zoom()
                 );
                 const float height = float(
                     (item.displayHeightPixels > 0 ? item.displayHeightPixels
                                                   : sh) *
-                    camera.zoom()
+                    renderCamera.zoom()
                 );
                 renderer.drawTexture(
                     *item.texture,
@@ -196,7 +228,7 @@ namespace Paladin
             settlementMarkerRenderer_.renderGlobe(
                 renderer,
                 world,
-                camera,
+                renderCamera,
                 presentation.settlementMarkerWeight
             );
             if (placementMarker)
@@ -204,7 +236,7 @@ namespace Paladin
                 drawSettlementPlacementMarker(
                     renderer,
                     world,
-                    camera,
+                    renderCamera,
                     presentationTilePixels,
                     *placementMarker
                 );
@@ -212,15 +244,21 @@ namespace Paladin
             return;
         }
 
-        // Flat and globe projections share the same semantic zoom policy.
-        // Terrain is always available underneath; distant realm color is a
-        // presentation layer that crossfades away rather than replacing the
-        // world with a separate mode.
-        globe_.renderFlat(renderer, world, camera, artwork_, flatTilePixels);
+        // Flat and globe projections share the same semantic zoom policy and
+        // the same close-view pixel phase. Terrain is always available
+        // underneath; distant realm color is a presentation layer that
+        // crossfades away rather than replacing the world with a separate mode.
+        globe_.renderFlat(
+            renderer,
+            world,
+            renderCamera,
+            artwork_,
+            flatTilePixels
+        );
         worldFoliageProjected(
             renderer,
             world,
-            camera,
+            renderCamera,
             flatTilePixels,
             false,
             artwork_
@@ -228,13 +266,13 @@ namespace Paladin
         territoryPresentationRenderer_.renderFlat(
             renderer,
             world,
-            camera,
+            renderCamera,
             metrics,
             presentation,
             worldPresentationPolicy_
         );
 
-        const Camera2D& flat = camera;
+        const Camera2D& flat = renderCamera;
         spriteRenderer_.render(renderer, sprites, flat, metrics);
         settlementMarkerRenderer_.renderFlat(
             renderer,
@@ -250,7 +288,7 @@ namespace Paladin
             drawSettlementPlacementMarker(
                 renderer,
                 world,
-                camera,
+                renderCamera,
                 presentationTilePixels,
                 *placementMarker
             );
@@ -430,6 +468,7 @@ namespace Paladin
             camera.setZoom(std::clamp(zoom, .65, 24.));
         }
         globeEnabled = !globeEnabled;
+        pixelStabilityActive_ = false;
     }
 
     void WorldRenderer::renderNavigator(
