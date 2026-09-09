@@ -9,6 +9,7 @@ namespace Paladin
         float edgeActivationWidthPixels = 42.0F;
         double edgeActivationDelaySeconds = 0.10;
         double edgeResponseExponent = 1.65;
+        double globeRollRadiansPerSecond = 1.5707963267948966;
     };
 
     [[nodiscard]]

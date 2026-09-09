@@ -80,7 +80,8 @@ namespace Paladin
         bool handleMainMenuEvent(const SDL_Event& event);
         void renderMainMenu();
 
-        // City screen and its modal/input layers.
+        // Local settlement screen. "City" remains a presentation synonym;
+        // the domain entity is always Settlement.
         void layoutCityScreen();
         void updateCityScreen();
         void synchronizeCityStatus();
@@ -109,15 +110,24 @@ namespace Paladin
         void handleWorldPointerPressed(const SDL_Event& event);
         void handleWorldPointerReleased(const SDL_Event& event);
 
-        // Session lifecycle and existing presentation helpers.
+        // Canonical settlement lifecycle. Legacy city/capital-named wrappers
+        // remain temporarily so presentation code can migrate incrementally.
         void startWorldSession();
         void endWorldSession();
-        void enterPlayerCapitalCity();
+        void enterPresentedSettlement();
+        void enterPlayerCapitalCity()
+        {
+            enterPresentedSettlement();
+        }
         void executeConsoleCommand(std::string_view text);
         void renderDebug();
         void renderCityTooltip();
         UiTooltip tooltip_;
-        void returnToWorldFromCity();
+        void returnToWorldFromSettlement();
+        void returnToWorldFromCity()
+        {
+            returnToWorldFromSettlement();
+        }
 
         void cancelFoundingFlow();
         void confirmFoundingFlow();

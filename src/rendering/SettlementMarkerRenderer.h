@@ -1,28 +1,53 @@
 #pragma once
 
+#include "rendering/SettlementWorldPresentation.h"
 #include "ui/BitmapFontRenderer.h"
 
 namespace Paladin
 {
     class Camera2D;
     class Renderer;
+    class Settlement;
     class World;
-    class SceneSpriteLibrary;
 
     struct TileRenderMetrics;
 
     class SettlementMarkerRenderer
     {
     public:
-        void render(
+        SettlementMarkerRenderer() = default;
+
+        explicit SettlementMarkerRenderer(
+            SettlementWorldPresentationPolicy policy
+        ) noexcept
+            : policy_(policy)
+        {
+        }
+
+        void renderFlat(
             Renderer& renderer,
             const World& world,
             const Camera2D& camera,
-            const TileRenderMetrics& metrics,
-            const SceneSpriteLibrary* sprites = nullptr
+            const TileRenderMetrics& metrics
+        ) const;
+
+        void renderGlobe(
+            Renderer& renderer,
+            const World& world,
+            const Camera2D& camera
         ) const;
 
     private:
+        void drawMarker(
+            Renderer& renderer,
+            const World& world,
+            const Settlement& settlement,
+            float centerX,
+            float centerY,
+            float visibility = 1.0F
+        ) const;
+
+        SettlementWorldPresentationPolicy policy_;
         BitmapFontRenderer fontRenderer_;
     };
 } // namespace Paladin

@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
 #include "interaction/SettlementObjectPlacementController.h"
@@ -7,11 +8,9 @@
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
-#include "rendering/PlanetRotation.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
-#include "rendering/WorldSurface.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -26,38 +25,10 @@
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
-#include <cmath>
 #include <memory>
 
 namespace Paladin
 {
-    namespace
-    {
-        PlanetRotation settlementViewRotation(
-            const World& world,
-            WorldTilePosition position
-        )
-        {
-            constexpr double pi = 3.14159265358979323846;
-            const auto& grid = world.grid();
-            const double u = (position.x + .5) / grid.width();
-            const double v = (position.y + .5) / grid.height();
-            const double longitude = (u - .5) * 2 * pi;
-            const double latitude = (.5 - v) * pi;
-            const auto normal = WorldSurface::sphere(u, v);
-            const WorldSurface::Point3 north{
-                -std::sin(latitude) * std::sin(longitude),
-                std::cos(latitude),
-                -std::sin(latitude) * std::cos(longitude)
-            };
-            const auto centered =
-                PlanetRotation::between(normal, {0, 0, 1}).normalized();
-            const auto viewUp = centered.apply(north);
-            const double roll = std::atan2(viewUp.x, viewUp.y);
-            return (PlanetRotation::axis(0, 0, 1, roll) * centered).normalized();
-        }
-    } // namespace
-
     void Application::startWorldSession()
     {
         ledgerPanel_->close();
@@ -139,7 +110,7 @@ namespace Paladin
         mainMenu_->layout(renderer_->outputWidth(), renderer_->outputHeight());
     }
 
-    void Application::enterPlayerCapitalCity()
+    void Application::enterPresentedSettlement()
     {
         ledgerPanel_->close();
         if (screen_ != Screen::World || !simulation_ || !camera_ ||
@@ -156,20 +127,21 @@ namespace Paladin
             return;
         }
 
-        const SettlementId capitalId =
+        const SettlementId settlementId =
             simulation_->presentedSettlementId()
                 ? simulation_->presentedSettlementId()
                 : realm->capitalSettlementId();
+        Settlement* settlement = simulation_->world().settlement(settlementId);
 
-        if (!simulation_->prepareSettlementMap(capitalId) ||
-            !simulation_->setPresentedSettlement(capitalId) ||
-            !simulation_->setDetailedSimulationSettlement(capitalId))
+        if (!settlement || !simulation_->prepareSettlementMap(settlementId) ||
+            !simulation_->setPresentedSettlement(settlementId) ||
+            !simulation_->setDetailedSimulationSettlement(settlementId))
         {
             return;
         }
 
         const SettlementMap* settlementMap =
-            simulation_->settlementMap(capitalId);
+            simulation_->settlementMap(settlementId);
 
         if (!settlementMap)
         {
@@ -185,23 +157,21 @@ namespace Paladin
         );
 
         tileRenderMetrics_->tilePixels = 2.0;
-        simulation_->world()
-            .settlement(capitalId)
-            ->simulationState()
-            .citizens()
-            .placeUnpositionedCitizens(*settlementMap);
+        settlement->simulationState().citizens().placeUnpositionedCitizens(
+            *settlementMap
+        );
         if (!cityRenderer_)
         {
             cityRenderer_ = std::make_unique<CityRenderer>();
         }
         for (const auto& saved : cityCameras_)
         {
-            if (saved.first == capitalId)
+            if (saved.first == settlementId)
             {
                 *camera_ = *saved.second;
             }
         }
-        activeCitySettlementId_ = capitalId;
+        activeCitySettlementId_ = settlementId;
         cityHud_->setWorldMode(false);
         employmentPanel_->setWorldMode(false);
         edgeScrollDwellSeconds_ = 0.0;
@@ -218,12 +188,7 @@ namespace Paladin
         employmentCapturedPointer_ = false;
         cityHud_->setSettlementStatus(
             settlementMap->logistics.founded(),
-            simulation_->world()
-                .settlement(capitalId)
-                ->simulationState()
-                .citizens()
-                .citizens()
-                .size()
+            settlement->population()
         );
         screen_ = Screen::City;
 
@@ -236,7 +201,7 @@ namespace Paladin
         clampCameraToWorld();
     }
 
-    void Application::returnToWorldFromCity()
+    void Application::returnToWorldFromSettlement()
     {
         ledgerPanel_->close();
         employmentPanel_->close();
@@ -295,12 +260,11 @@ namespace Paladin
 
         if (leavingPosition)
         {
-            const auto& grid = simulation_->world().grid();
-            camera_->setPlanetRotation(
-                settlementViewRotation(simulation_->world(), *leavingPosition),
-                grid.width(),
-                grid.height()
-            );
+            static_cast<void>(GlobeCameraNavigation::focusNorthUp(
+                *camera_,
+                simulation_->world().grid(),
+                *leavingPosition
+            ));
         }
 
         tileRenderMetrics_->tilePixels = 4.0;
@@ -390,12 +354,12 @@ namespace Paladin
         worldHud_->setAdditionalSelection(false);
         if (mode == FoundingPanelMode::NewSettlement && settlementId)
         {
-            enterPlayerCapitalCity();
+            enterPresentedSettlement();
         }
         if (settlementId.isValid())
         {
             SDL_Log(
-                "Founded player capital %llu.",
+                "Founded player settlement %llu.",
                 static_cast<unsigned long long>(settlementId.value())
             );
         }
