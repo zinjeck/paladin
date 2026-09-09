@@ -77,6 +77,7 @@ namespace Paladin
         mutable CityLighting lighting_;
         mutable SceneSpriteLibrary sprites_;
         mutable SceneDrawQueue raised_;
+        mutable double minimapDaylight_ = 1.0;
         SettlementStructurePresentation structures_;
         WorldGridRenderer gridRenderer_;
         SettlementLogisticsRenderer logisticsRenderer_;
