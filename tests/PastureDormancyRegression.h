@@ -25,19 +25,20 @@ inline void runPastureDormancyRegression()
     }
 
     SettlementMap map(std::move(grid), {0, 0}, 1, 1, 32, 991);
-    const auto* keepDefinition =
-        SettlementObjectCatalog::definition(SettlementObjectTypes::CityKeep);
-    const auto* pastureDefinition =
-        SettlementObjectCatalog::definition(SettlementObjectTypes::Pastureland);
-    PALADIN_CHECK(keepDefinition && pastureDefinition);
+    auto keepDefinition =
+        *SettlementObjectCatalog::definition(SettlementObjectTypes::CityKeep);
+    auto pastureDefinition =
+        *SettlementObjectCatalog::definition(SettlementObjectTypes::Pastureland);
+    keepDefinition.bypassesConstruction = true;
+    pastureDefinition.bypassesConstruction = true;
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
-        *keepDefinition,
-        {{2, 2}, keepDefinition->previewWidth, keepDefinition->previewHeight}
+        keepDefinition,
+        {{2, 2}, keepDefinition.previewWidth, keepDefinition.previewHeight}
     ));
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
-        *pastureDefinition,
+        pastureDefinition,
         {{20, 20}, 4, 4}
     ));
     const auto pasture = map.objectState().completedObjects().back().id;
