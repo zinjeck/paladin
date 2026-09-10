@@ -9,7 +9,7 @@
 #include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
-#include "rendering/WorldTerritoryPresentationRenderer.h"
+#include "rendering/WorldRealmPresentationRenderer.h"
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
@@ -98,7 +98,7 @@ namespace Paladin
         mutable SceneSpriteLibrary artwork_;
         mutable CelestialGlobeRenderer globe_;
         OverlayRenderer overlayRenderer_;
-        mutable WorldTerritoryPresentationRenderer territoryPresentationRenderer_;
+        mutable WorldRealmPresentationRenderer territoryPresentationRenderer_;
         WorldObjectRenderer worldObjectRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;

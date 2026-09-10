@@ -16,6 +16,7 @@
 #include "world/settlements/SettlementFoundationProfile.h"
 #include "world/territory/TerritoryFoundationPolicy.h"
 #include "world/territory/TerritoryMap.h"
+#include "world/territory/TribalInfluenceMap.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -155,8 +156,14 @@ namespace Paladin
         [[nodiscard]]
         const WorldGrid& grid() const noexcept;
 
+        // Discrete controller cells are civic sovereignty only once a realm's
+        // origin is known. Tribal authority is intentionally separate and may
+        // overlap between realms.
         [[nodiscard]]
         const TerritoryMap& territory() const noexcept;
+
+        [[nodiscard]]
+        const TribalInfluenceMap& tribalInfluence() const;
 
         [[nodiscard]]
         const TerritoryFoundationPolicy&
@@ -269,6 +276,7 @@ namespace Paladin
         std::uint64_t generationSeed_ = 0;
         WorldGrid grid_;
         TerritoryMap territory_;
+        mutable TribalInfluenceMap tribalInfluence_;
         TerritoryFoundationPolicy territoryFoundationPolicy_;
 
         EntityRegistry<Settlement, SettlementId> settlements_;

@@ -169,6 +169,12 @@ void runWorldTests()
     PALADIN_CHECK(realm->startingOriginId() == "tribal");
     PALADIN_CHECK(realm->mapColor() == editedIdentity.mapColor);
     PALADIN_CHECK(realm->flag() == editedIdentity.flag);
+    PALADIN_CHECK(
+        !world.territory().controllerAt(capitalPosition).isValid()
+    );
+    PALADIN_CHECK(
+        world.tribalInfluence().influenceAt(capitalPosition, realmId) > 0.0F
+    );
 
     Paladin::WorldTilePosition aiCapitalPosition{};
     bool foundAiCapitalPosition = false;
@@ -245,9 +251,12 @@ void runWorldTests()
     PALADIN_CHECK(aiCapitalId.isValid());
 
     PALADIN_CHECK(
-        world.territory().controllerAt(
+        !world.territory().controllerAt(
             {aiCapitalPosition.x, aiCapitalPosition.y}
-        ) == aiRealmId
+        ).isValid()
+    );
+    PALADIN_CHECK(
+        world.tribalInfluence().influenceAt(aiCapitalPosition, aiRealmId) > 0.0F
     );
 
     for (std::int32_t y = 0; y < world.grid().height(); ++y)

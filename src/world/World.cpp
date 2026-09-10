@@ -27,6 +27,7 @@ namespace Paladin
         : generationSeed_(generationSettings.seed),
           grid_(generationSettings.width, generationSettings.height),
           territory_(generationSettings.width, generationSettings.height),
+          tribalInfluence_(generationSettings.width, generationSettings.height),
           territoryFoundationPolicy_(std::move(territoryFoundationPolicy))
     {
         WorldGenerator{}.generate(grid_, generationSettings);
@@ -66,6 +67,18 @@ namespace Paladin
     const TerritoryMap& World::territory() const noexcept
     {
         return territory_;
+    }
+
+
+    const TribalInfluenceMap& World::tribalInfluence() const
+    {
+        tribalInfluence_.synchronize(
+            grid_,
+            realms_.entities(),
+            settlements_.entities(),
+            territoryFoundationPolicy_.tribalInfluence
+        );
+        return tribalInfluence_;
     }
 
 
@@ -181,6 +194,8 @@ namespace Paladin
             return false;
         }
 
+        // Only civic sovereignty is binary. Tribal influence may overlap and
+        // therefore never blocks founding through controllerAt().
         const RealmId existingController =
             territory_.controllerAt({position.x, position.y});
 
@@ -275,8 +290,8 @@ namespace Paladin
         const SettlementFoundationProfile& foundationProfile
     )
     {
-        if (!canFoundSettlementAt(position, ownerRealmId) ||
-            !realms_.contains(ownerRealmId))
+        const Realm* ownerRealm = realms_.find(ownerRealmId);
+        if (!canFoundSettlementAt(position, ownerRealmId) || !ownerRealm)
         {
             return {};
         }
@@ -285,20 +300,26 @@ namespace Paladin
             position,
             std::string{},
             ownerRealmId,
-            realms_.find(ownerRealmId)->primaryCultureId(),
+            ownerRealm->primaryCultureId(),
             foundationProfile
         );
 
-        static_cast<void>(
-            TerritoryFoundationSystem{}.establishSettlementTerritory(
-                grid_,
-                territory_,
-                position,
-                ownerRealmId,
-                territoryFoundationPolicy_,
-                territoryFoundationPolicy_.settlementBorderlandTraversalBudget
-            )
-        );
+        // A not-yet-established realm keeps the legacy provisional claim until
+        // its origin is chosen. Once tribal, settlements never write binary
+        // controller cells; their population automatically feeds the field.
+        if (!ownerRealm->usesTribalInfluence())
+        {
+            static_cast<void>(
+                TerritoryFoundationSystem{}.establishSettlementTerritory(
+                    grid_,
+                    territory_,
+                    position,
+                    ownerRealmId,
+                    territoryFoundationPolicy_,
+                    territoryFoundationPolicy_.settlementBorderlandTraversalBudget
+                )
+            );
+        }
 
         return settlementId;
     }
@@ -376,16 +397,25 @@ namespace Paladin
             identity.flag
         );
 
-        static_cast<void>(
-            TerritoryFoundationSystem{}.establishSettlementTerritory(
-                grid_,
-                territory_,
-                position,
-                ownerRealmId,
-                territoryFoundationPolicy_,
-                territoryFoundationPolicy_.capitalBorderlandTraversalBudget
-            )
-        );
+        if (ownerRealm->usesTribalInfluence())
+        {
+            // Clear any provisional pre-capital cells. From this point forward
+            // tribal authority is exclusively the continuous influence field.
+            territory_.clearController(ownerRealmId);
+        }
+        else
+        {
+            static_cast<void>(
+                TerritoryFoundationSystem{}.establishSettlementTerritory(
+                    grid_,
+                    territory_,
+                    position,
+                    ownerRealmId,
+                    territoryFoundationPolicy_,
+                    territoryFoundationPolicy_.capitalBorderlandTraversalBudget
+                )
+            );
+        }
 
         return settlementId;
     }
@@ -537,6 +567,9 @@ namespace Paladin
             return false;
         }
 
+        const bool wasTribal = targetRealm->usesTribalInfluence();
+        const bool becomesTribal = identity.realmOriginId == "tribal";
+
         primaryCulture->setName(trimFoundingName(identity.cultureName));
 
         targetRealm->editIdentity(
@@ -545,6 +578,40 @@ namespace Paladin
             identity.realmOriginId,
             identity.flag
         );
+
+        if (!wasTribal && becomesTribal)
+        {
+            territory_.clearController(realmId);
+        }
+        else if (wasTribal && !becomesTribal)
+        {
+            // Converting to civic sovereignty materializes discrete control from
+            // all existing settlements. The capital receives the established
+            // capital borderland budget; ordinary settlements use theirs.
+            for (const Settlement& settlement : settlements_.entities())
+            {
+                if (settlement.ownerRealmId() != realmId)
+                {
+                    continue;
+                }
+                const bool capital =
+                    settlement.id() == targetRealm->capitalSettlementId();
+                static_cast<void>(
+                    TerritoryFoundationSystem{}.establishSettlementTerritory(
+                        grid_,
+                        territory_,
+                        settlement.position(),
+                        realmId,
+                        territoryFoundationPolicy_,
+                        capital
+                            ? territoryFoundationPolicy_
+                                  .capitalBorderlandTraversalBudget
+                            : territoryFoundationPolicy_
+                                  .settlementBorderlandTraversalBudget
+                    )
+                );
+            }
+        }
 
         return true;
     }
@@ -579,10 +646,18 @@ namespace Paladin
 
         // This setup operation deliberately cannot erase territory belonging
         // to additional settlements. A later colony/capital-transfer system
-        // can provide territory provenance for established realms.
+        // can provide territory provenance for established civic realms.
         if (ownedSettlementCount != 1)
         {
             return false;
+        }
+
+        if (targetRealm->usesTribalInfluence())
+        {
+            // No controller cells exist to relocate. Moving the power center is
+            // enough; the derived field notices the new position on next read.
+            capital->setPosition(position);
+            return true;
         }
 
         territory_.clearController(realmId);
