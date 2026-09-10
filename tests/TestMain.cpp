@@ -1,6 +1,7 @@
 #include <exception>
 #include <iostream>
 
+#include "CelestialSunChecks.h"
 #include "PastureDormancyRegression.h"
 #include "Pr16Regression.h"
 #include "TribalInfluenceChecks.h"
@@ -28,6 +29,7 @@ int main()
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();
+        Paladin::Test::runCelestialSunChecks();
         Paladin::Test::runTribalInfluenceTests();
     }
     catch (const std::exception& exception)
