@@ -25,9 +25,9 @@ namespace Paladin
         double viewV
     )
     {
-        const auto n = WorldSurface::sphere(u, v),
-                   solar = PlanetAstronomy::sunDirection(seconds),
-                   eye = WorldSurface::sphere(viewU, viewV);
+        const auto n = WorldSurface::sphere(u, v);
+        const auto solar = PlanetAstronomy::sunDirection(seconds);
+        const auto eye = WorldSurface::sphere(viewU, viewV);
         const WorldSurface::Point3 sun{solar.x, solar.y, solar.z};
         const double x = sun.x + eye.x, y = sun.y + eye.y, z = sun.z + eye.z;
         const double length = std::sqrt(x * x + y * y + z * z);
