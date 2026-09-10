@@ -33,6 +33,17 @@ namespace Paladin
 
         explicit WorldRenderer(WorldPresentationPolicy worldPresentationPolicy);
 
+        [[nodiscard]]
+        WorldMapMode mapMode() const noexcept
+        {
+            return mapMode_;
+        }
+
+        void setMapMode(WorldMapMode mode) noexcept
+        {
+            mapMode_ = mode;
+        }
+
         std::uint64_t terrainAtlasBuilds() const
         {
             return globe_.atlasBuilds;
@@ -102,6 +113,7 @@ namespace Paladin
         WorldObjectRenderer worldObjectRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;
+        WorldMapMode mapMode_ = WorldMapMode::Political;
         mutable bool pixelStabilityActive_ = false;
     };
 } // namespace Paladin
