@@ -107,6 +107,7 @@ add_executable(Paladin
     src/rendering/SettlementObjectRenderer.cpp
     src/rendering/TerritoryPresentationPolicy.cpp
     src/rendering/TerritoryRenderer.cpp
+    src/rendering/TribalInfluenceRenderer.cpp
     src/simulation/Simulation.cpp
     src/simulation/SimulationReports.cpp
     src/simulation/WorldSimulationPipeline.cpp
@@ -156,6 +157,7 @@ add_executable(Paladin
     src/world/territory/TerritoryFoundationPolicy.cpp
     src/world/territory/TerritoryFoundationSystem.cpp
     src/world/territory/TerritoryMap.cpp
+    src/world/territory/TribalInfluenceMap.cpp
     src/rendering/WorldGridRenderer.cpp
     src/ui/BitmapFontRenderer.cpp
     src/ui/CityHud.cpp
@@ -258,6 +260,7 @@ add_executable(PaladinTests
     src/world/territory/TerritoryFoundationPolicy.cpp
     src/world/territory/TerritoryFoundationSystem.cpp
     src/world/territory/TerritoryMap.cpp
+    src/world/territory/TribalInfluenceMap.cpp
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
