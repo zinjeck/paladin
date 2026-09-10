@@ -55,7 +55,6 @@ terrain.tundra environment-v4/nature/snow.png 2 2 0 0 0 0
 terrain.desert environment-v4/nature/sand.png 2 2 0 0 0 0
 terrain.mountain tribal-v13/mountain-rock-dark.png 2 2 0 0 0 0
 terrain.water tribal-v13/water-deep.png 2 2 0 0 0 0 3 2
-world.settlement environment-v4/buildings/house-marker.png 1 1.25 .5 1 0 0
 resource.pile environment-v4/props/stockpile-stack.png .75 .625 .5 1 0 0
 resource.fish tribal-v14/fish.png .75 .50 .5 1 0 0
 resource.meat tribal-v14/meat.png .75 .50 .5 1 0 0

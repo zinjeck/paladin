@@ -10,18 +10,18 @@ namespace Paladin
     // settlement data instead of introducing village/town/city type branches.
     struct SettlementWorldPresentationPolicy
     {
-        float minimumMarkerDiameterPixels = 12.0F;
-        float maximumMarkerDiameterPixels = 26.0F;
+        float minimumMarkerDiameterPixels = 10.0F;
+        float maximumMarkerDiameterPixels = 22.0F;
         std::uint64_t populationAtMaximumMarker = 4096;
-        float minimumLabelPixelSize = 1.75F;
-        float maximumLabelPixelSize = 2.25F;
+        float minimumLabelPixelSize = 1.45F;
+        float maximumLabelPixelSize = 1.90F;
     };
 
     struct SettlementWorldPresentation
     {
-        float markerDiameterPixels = 12.0F;
-        float borderPixels = 2.0F;
-        float labelPixelSize = 1.75F;
+        float markerDiameterPixels = 10.0F;
+        float borderPixels = 1.5F;
+        float labelPixelSize = 1.45F;
     };
 
     [[nodiscard]]
@@ -54,7 +54,7 @@ namespace Paladin
 
         return {
             diameter,
-            std::clamp(diameter * 0.14F, 2.0F, 4.0F),
+            std::clamp(diameter * 0.12F, 1.5F, 3.0F),
             minimumLabel + (maximumLabel - minimumLabel) * progress
         };
     }

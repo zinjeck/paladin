@@ -129,7 +129,7 @@ namespace Paladin
             return;
         }
 
-        constexpr float maximumLabelWidth = 180.0F;
+        constexpr float maximumLabelWidth = 160.0F;
         const float preferredPixelSize = presentation.labelPixelSize;
         const float preferredLabelWidth = fontRenderer_.measureWidth(
             settlement.name(),

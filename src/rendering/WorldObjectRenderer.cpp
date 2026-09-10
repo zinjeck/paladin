@@ -72,6 +72,7 @@ namespace Paladin
         double effectiveTilePixels,
         bool globe,
         const WorldPresentationState& presentation,
+        bool stabilizePixelPhase,
         std::span<const SpriteRenderItem> fallbackSprites,
         std::optional<WorldPlacementMarker> placementMarker
     ) const
@@ -110,12 +111,28 @@ namespace Paladin
             effectiveTilePixels
         );
 
+        const auto stabilize = [&](ProjectedWorldObject point)
+        {
+            if (stabilizePixelPhase)
+            {
+                point.x = stableWorldObjectScreenCoordinate(
+                    point.x,
+                    effectiveTilePixels
+                );
+                point.y = stableWorldObjectScreenCoordinate(
+                    point.y,
+                    effectiveTilePixels
+                );
+            }
+            return point;
+        };
+
         const auto project = [&](double tileX, double tileY)
             -> std::optional<ProjectedWorldObject>
         {
             if (!globe)
             {
-                return ProjectedWorldObject{
+                return stabilize(ProjectedWorldObject{
                     float(
                         renderer.outputWidth() * 0.5 +
                         (tileX - renderCamera.tileX()) * effectiveTilePixels
@@ -126,7 +143,7 @@ namespace Paladin
                     ),
                     1.0F,
                     1.0
-                };
+                });
             }
 
             const auto sphere = globeView.project(
@@ -146,18 +163,18 @@ namespace Paladin
 
             const float sphereVisibility =
                 std::clamp(float(sphere.z * 4.0), 0.0F, 1.0F);
-            return ProjectedWorldObject{
+            return stabilize(ProjectedWorldObject{
                 float(std::lerp(sphere.x, tangent.x, double(localWeight))),
                 float(std::lerp(sphere.y, tangent.y, double(localWeight))),
                 std::lerp(sphereVisibility, 1.0F, localWeight),
                 std::lerp(sphere.z, 1.0, double(localWeight))
-            };
+            });
         };
 
         // Everything below this point shares exactly the same 32-art-pixel
-        // lattice. At close zoom this is a transparent higher-resolution layer
-        // above the 16-pixel terrain scene, so strategic symbols do not inherit
-        // terrain's chunky raster or its sampling phase.
+        // lattice. At close zoom the already-snapped render camera and the
+        // explicit raster-phase quantization above make camera motion translate
+        // established object pixels instead of re-rasterizing them fractionally.
         WorldObjectPixelScene objectScene(renderer, effectiveTilePixels);
 
         // Persistent strategic roads live below the point objects. They are not
@@ -258,11 +275,6 @@ namespace Paladin
             );
             for (const auto& item : settlements)
             {
-                // Regional semantics call this the settlement marker. In the
-                // close band the same established rendering is temporarily the
-                // Settlement world-object fallback. Authored settlement sprites
-                // can replace only that close slot later without changing the
-                // simulation entity.
                 settlementMarkerRenderer_.drawAt(
                     renderer,
                     world,
@@ -304,8 +316,6 @@ namespace Paladin
                 const RenderColor tip =
                     visibleColor({244, 243, 232, 255}, visibility);
 
-                // Temporary no-sprite army presentation. It deliberately uses
-                // the same object grid as every other world object.
                 renderer.fillRectangle(
                     point->x - radius - 1.0F,
                     point->y - radius - 1.0F,
