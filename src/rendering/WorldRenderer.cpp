@@ -3,6 +3,7 @@
 #include "world/World.h"
 
 #include "rendering/Camera2D.h"
+#include "rendering/LocalTangentWorldView.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldFoliage.h"
 #include "rendering/WorldPixelGrid.h"
@@ -18,7 +19,8 @@ namespace Paladin
 {
     namespace
     {
-        constexpr double TwoPi = 6.28318530717958647692;
+        constexpr double Pi = 3.14159265358979323846;
+        constexpr double TwoPi = Pi * 2.0;
     }
 
     WorldRenderer::WorldRenderer()
@@ -121,13 +123,10 @@ namespace Paladin
             worldPresentationPolicy_
         );
 
-        // The authoritative camera remains perfectly continuous. Once the
-        // close/local world band is reached, only the camera used for drawing is
-        // snapped to one sixteenth of a tile. With WorldPixelScene that means a
-        // pan advances the prepared terrain by whole art pixels rather than
-        // continuously changing the nearest-neighbour sampling phase. The
-        // enter/exit gap prevents a zoom hovering on the threshold from toggling
-        // the stabilization every frame.
+        // PR #14's render-only snapping remains useful after the projection
+        // change. It now stabilizes translation on the tangent chart rather than
+        // trying to make a deforming spherical UV mesh behave like a flat pixel
+        // painting. The authoritative camera is still never mutated.
         pixelStabilityActive_ = worldPixelStabilityActive(
             pixelStabilityActive_,
             presentationTilePixels,
@@ -145,277 +144,176 @@ namespace Paladin
             );
         }
 
-        WorldPixelScene pixelScene(renderer, presentationTilePixels);
         artwork_.setTime(animationSeconds);
-
-        const double flatTilePixels =
-            metrics.scaledTilePixels(renderCamera.zoom());
 
         if (globeEnabled)
         {
-            globe_.render(
-                renderer,
-                world,
-                renderCamera,
-                artwork_,
-                overlays,
-                outlines
+            const float localWeight = std::clamp(
+                presentation.localWorldWeight,
+                0.0F,
+                1.0F
             );
 
-            // Realm presentation is now a globe-native layer rather than a
-            // flat political-map special case. Fill and labels fade away as the
-            // terrain becomes regional; borders remain faint in local view.
-            territoryPresentationRenderer_.renderGlobe(
-                renderer,
-                world,
-                renderCamera,
-                presentation,
-                worldPresentationPolicy_
-            );
-
-            const auto view = GlobeView::from(
-                renderCamera,
-                world.grid(),
-                renderer.outputWidth(),
-                renderer.outputHeight()
-            );
-            for (const auto& item : sprites)
+            // Keep the true sphere through the far/regional scales and beneath
+            // the transition. Once the tangent view is fully opaque there is no
+            // reason to pay for a hidden spherical terrain pass.
+            if (localWeight < 0.999F)
             {
-                if (!item.texture)
-                {
-                    continue;
-                }
-                const auto p = view.project(
-                    item.tileX / world.grid().width(),
-                    item.tileY / world.grid().height()
-                );
-                if (p.z <= 0)
-                {
-                    continue;
-                }
-                const float sw = item.sourceWidth > 0
-                                     ? item.sourceWidth
-                                     : float(item.texture->width());
-                const float sh = item.sourceHeight > 0
-                                     ? item.sourceHeight
-                                     : float(item.texture->height());
-                const float width = float(
-                    (item.displayWidthPixels > 0 ? item.displayWidthPixels
-                                                 : sw) *
-                    renderCamera.zoom()
-                );
-                const float height = float(
-                    (item.displayHeightPixels > 0 ? item.displayHeightPixels
-                                                  : sh) *
-                    renderCamera.zoom()
-                );
-                renderer.drawTexture(
-                    *item.texture,
-                    item.sourceX,
-                    item.sourceY,
-                    sw,
-                    sh,
-                    float(p.x) - width * item.anchorX,
-                    float(p.y) - height * item.anchorY,
-                    width,
-                    height
-                );
-            }
-
-            // The PR #12 cartographic symbol now belongs only to the regional
-            // layer. It is absent from distant realm view and fades away before
-            // the future physical settlement miniature layer takes over.
-            settlementMarkerRenderer_.renderGlobe(
-                renderer,
-                world,
-                renderCamera,
-                presentation.settlementMarkerWeight
-            );
-            if (placementMarker)
-            {
-                drawSettlementPlacementMarker(
+                WorldPixelScene globeScene(renderer, presentationTilePixels);
+                globe_.render(
                     renderer,
                     world,
                     renderCamera,
-                    presentationTilePixels,
-                    *placementMarker
+                    artwork_,
+                    overlays,
+                    outlines
+                );
+                territoryPresentationRenderer_.renderGlobe(
+                    renderer,
+                    world,
+                    renderCamera,
+                    presentation,
+                    worldPresentationPolicy_
                 );
             }
-            return;
-        }
 
-        // Flat and globe projections share the same semantic zoom policy and
-        // the same close-view pixel phase. Terrain is always available
-        // underneath; distant realm color is a presentation layer that
-        // crossfades away rather than replacing the world with a separate mode.
-        globe_.renderFlat(
-            renderer,
-            world,
-            renderCamera,
-            artwork_,
-            flatTilePixels
-        );
-        worldFoliageProjected(
-            renderer,
-            world,
-            renderCamera,
-            flatTilePixels,
-            false,
-            artwork_
-        );
-        territoryPresentationRenderer_.renderFlat(
-            renderer,
-            world,
-            renderCamera,
-            metrics,
-            presentation,
-            worldPresentationPolicy_
-        );
+            if (localWeight > 0.001F)
+            {
+                const LocalTangentWorldView tangent = LocalTangentWorldView::from(
+                    renderCamera,
+                    world.grid(),
+                    renderer.outputWidth(),
+                    renderer.outputHeight(),
+                    presentationTilePixels
+                );
 
-        const Camera2D& flat = renderCamera;
-        spriteRenderer_.render(renderer, sprites, flat, metrics);
-        settlementMarkerRenderer_.renderFlat(
-            renderer,
-            world,
-            flat,
-            metrics,
-            presentation.settlementMarkerWeight
-        );
-        overlayRenderer_.render(renderer, overlays, flat, metrics);
-        overlayRenderer_.renderOutlines(renderer, outlines, flat, metrics);
-        if (placementMarker)
-        {
-            drawSettlementPlacementMarker(
+                // Render a wider unrotated patch, then rotate/scale the finished
+                // pixel surface as one rigid image. The final tile scale is
+                // still exactly presentationTilePixels, but the overscan keeps
+                // rotated corners filled without sampling individual terrain
+                // texels through a changing curved mesh.
+                const double overscan = tangent.overscanScale();
+                const double planarTilePixels =
+                    presentationTilePixels / std::max(1.0, overscan);
+                const Camera2D planarCamera = tangent.planarCamera();
+                TileRenderMetrics planarMetrics;
+                planarMetrics.tilePixels = planarTilePixels;
+                const std::uint8_t opacity = static_cast<std::uint8_t>(
+                    std::clamp(
+                        std::lround(255.0 * double(localWeight)),
+                        0L,
+                        255L
+                    )
+                );
+                const double rotationDegrees =
+                    tangent.rollRadians() * 180.0 / Pi;
+
+                WorldPixelScene tangentScene(
+                    renderer,
+                    planarTilePixels,
+                    opacity,
+                    rotationDegrees,
+                    overscan
+                );
+                globe_.renderFlat(
+                    renderer,
+                    world,
+                    planarCamera,
+                    artwork_,
+                    planarTilePixels
+                );
+                worldFoliageProjected(
+                    renderer,
+                    world,
+                    planarCamera,
+                    planarTilePixels,
+                    false,
+                    artwork_
+                );
+                territoryPresentationRenderer_.renderFlat(
+                    renderer,
+                    world,
+                    planarCamera,
+                    planarMetrics,
+                    presentation,
+                    worldPresentationPolicy_
+                );
+                overlayRenderer_.render(
+                    renderer,
+                    overlays,
+                    planarCamera,
+                    planarMetrics
+                );
+                overlayRenderer_.renderOutlines(
+                    renderer,
+                    outlines,
+                    planarCamera,
+                    planarMetrics
+                );
+            }
+
+            // Strategic objects are deliberately not inside the 16-pixel
+            // terrain scene. Settlements/markers, armies, roads and temporary
+            // placement markers all share the separate 32-pixel object lattice.
+            worldObjectRenderer_.render(
                 renderer,
                 world,
                 renderCamera,
                 presentationTilePixels,
-                *placementMarker
+                true,
+                presentation,
+                sprites,
+                placementMarker
             );
-        }
-    }
-
-    void WorldRenderer::drawSettlementPlacementMarker(
-        Renderer& renderer,
-        const World& world,
-        const Camera2D& camera,
-        double tilePixels,
-        const WorldPlacementMarker& marker
-    ) const
-    {
-        if (!world.grid().isValidPosition(marker.position) ||
-            !std::isfinite(tilePixels) || tilePixels <= 0.0)
-        {
             return;
         }
 
-        float centerX = 0.0F;
-        float centerY = 0.0F;
-        RenderColor color = marker.color;
-        if (globeEnabled)
+        const double flatTilePixels =
+            metrics.scaledTilePixels(renderCamera.zoom());
         {
-            const auto view = GlobeView::from(
-                camera,
-                world.grid(),
-                renderer.outputWidth(),
-                renderer.outputHeight()
+            WorldPixelScene flatScene(renderer, presentationTilePixels);
+            globe_.renderFlat(
+                renderer,
+                world,
+                renderCamera,
+                artwork_,
+                flatTilePixels
             );
-            const auto projected = view.project(
-                (double(marker.position.x) + 0.5) / world.grid().width(),
-                (double(marker.position.y) + 0.5) / world.grid().height()
+            worldFoliageProjected(
+                renderer,
+                world,
+                renderCamera,
+                flatTilePixels,
+                false,
+                artwork_
             );
-            if (!std::isfinite(projected.x) || !std::isfinite(projected.y) ||
-                projected.z <= 0.0)
-            {
-                return;
-            }
-            centerX = float(projected.x);
-            centerY = float(projected.y);
-            color.alpha = static_cast<std::uint8_t>(std::clamp(
-                std::lround(double(color.alpha) *
-                            std::clamp(projected.z * 4.0, 0.0, 1.0)),
-                0L,
-                255L
-            ));
-        }
-        else
-        {
-            centerX = float(
-                renderer.outputWidth() * 0.5 +
-                (double(marker.position.x) + 0.5 - camera.tileX()) * tilePixels
+            territoryPresentationRenderer_.renderFlat(
+                renderer,
+                world,
+                renderCamera,
+                metrics,
+                presentation,
+                worldPresentationPolicy_
             );
-            centerY = float(
-                renderer.outputHeight() * 0.5 +
-                (double(marker.position.y) + 0.5 - camera.tileY()) * tilePixels
+            overlayRenderer_.render(renderer, overlays, renderCamera, metrics);
+            overlayRenderer_.renderOutlines(
+                renderer,
+                outlines,
+                renderCamera,
+                metrics
             );
         }
 
-        const float radius = std::clamp(float(tilePixels * 0.24), 5.0F, 10.0F);
-        RenderColor shadow{8, 15, 27, color.alpha};
-        shadow.alpha = static_cast<std::uint8_t>(
-            std::lround(double(shadow.alpha) * 0.8)
+        worldObjectRenderer_.render(
+            renderer,
+            world,
+            renderCamera,
+            presentationTilePixels,
+            false,
+            presentation,
+            sprites,
+            placementMarker
         );
-
-        // A small surface marker communicates the chosen point without exposing
-        // the rectangular settlement-region implementation on the sphere.
-        renderer.drawLine(
-            centerX,
-            centerY - radius - 1.0F,
-            centerX + radius + 1.0F,
-            centerY,
-            shadow
-        );
-        renderer.drawLine(
-            centerX + radius + 1.0F,
-            centerY,
-            centerX,
-            centerY + radius + 1.0F,
-            shadow
-        );
-        renderer.drawLine(
-            centerX,
-            centerY + radius + 1.0F,
-            centerX - radius - 1.0F,
-            centerY,
-            shadow
-        );
-        renderer.drawLine(
-            centerX - radius - 1.0F,
-            centerY,
-            centerX,
-            centerY - radius - 1.0F,
-            shadow
-        );
-
-        renderer.drawLine(
-            centerX,
-            centerY - radius,
-            centerX + radius,
-            centerY,
-            color
-        );
-        renderer.drawLine(
-            centerX + radius,
-            centerY,
-            centerX,
-            centerY + radius,
-            color
-        );
-        renderer.drawLine(
-            centerX,
-            centerY + radius,
-            centerX - radius,
-            centerY,
-            color
-        );
-        renderer.drawLine(
-            centerX - radius,
-            centerY,
-            centerX,
-            centerY - radius,
-            color
-        );
-        renderer.fillRectangle(centerX - 1.0F, centerY - 1.0F, 3.0F, 3.0F, color);
     }
 
     void WorldRenderer::toggleProjection(
@@ -438,7 +336,7 @@ namespace Paladin
             camera.tileY() / grid.height()
         };
         const double globeScale =
-            std::min(width, height) * .40 * 6.283185307 / grid.width();
+            std::min(width, height) * .40 * TwoPi / grid.width();
         if (!std::isfinite(globeScale) || globeScale <= 0.0)
         {
             return;
