@@ -118,15 +118,20 @@ namespace Paladin
             return;
         }
 
-        const WorldPresentationState presentation = worldPresentationState(
-            presentationTilePixels,
-            worldPresentationPolicy_
+        // Map mode is semantic presentation state, not projection state. Both
+        // the sphere and the flat chart consume the exact same weights below.
+        const WorldPresentationState presentation = presentationForMapMode(
+            worldPresentationState(
+                presentationTilePixels,
+                worldPresentationPolicy_
+            ),
+            mapMode_
         );
 
-        // PR #14's render-only snapping remains useful after the projection
-        // change. It now stabilizes translation on the tangent chart rather than
-        // trying to make a deforming spherical UV mesh behave like a flat pixel
-        // painting. The authoritative camera is still never mutated.
+        // The authoritative camera remains continuous for simulation and input.
+        // Once the close world band is reached, rendering alone locks to the
+        // canonical art-pixel phase. Terrain and strategic world objects both
+        // receive this same stable render camera.
         pixelStabilityActive_ = worldPixelStabilityActive(
             pixelStabilityActive_,
             presentationTilePixels,
@@ -252,9 +257,6 @@ namespace Paladin
                 );
             }
 
-            // Strategic objects are deliberately not inside the 16-pixel
-            // terrain scene. Settlements/markers, armies, roads and temporary
-            // placement markers all share the separate 32-pixel object lattice.
             worldObjectRenderer_.render(
                 renderer,
                 world,
@@ -262,6 +264,7 @@ namespace Paladin
                 presentationTilePixels,
                 true,
                 presentation,
+                pixelStabilityActive_,
                 sprites,
                 placementMarker
             );
@@ -311,6 +314,7 @@ namespace Paladin
             presentationTilePixels,
             false,
             presentation,
+            pixelStabilityActive_,
             sprites,
             placementMarker
         );
@@ -380,6 +384,34 @@ namespace Paladin
         const auto b =
             WorldMapNavigation::mapBounds(r.outputWidth(), r.outputHeight());
         ui.drawPanel(r, {b.x - 3, b.y - 3, b.width + 6, b.height + 6});
+
+        const auto politicalButton = WorldMapNavigation::politicalModeButtonBounds(
+            r.outputWidth(),
+            r.outputHeight()
+        );
+        const auto terrainButton = WorldMapNavigation::terrainModeButtonBounds(
+            r.outputWidth(),
+            r.outputHeight()
+        );
+        ui.drawButton(
+            r,
+            politicalButton,
+            "P",
+            false,
+            false,
+            mapMode_ == WorldMapMode::Political,
+            true
+        );
+        ui.drawButton(
+            r,
+            terrainButton,
+            "T",
+            false,
+            false,
+            mapMode_ == WorldMapMode::Terrain,
+            true
+        );
+
         if (const auto* t = globe_.mapTexture(0))
         {
             r.drawTexture(
