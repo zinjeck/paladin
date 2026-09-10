@@ -4,6 +4,7 @@
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
+#include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelStability.h"
