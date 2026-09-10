@@ -194,6 +194,11 @@ namespace Paladin
         int outputHeight() const noexcept;
         bool beginPixelScene(double pitch);
         void endPixelScene();
+        void endPixelScene(
+            std::uint8_t opacity,
+            double rotationDegrees,
+            double compositeScale
+        );
 
     private:
         std::shared_ptr<AssetManager> assetManager_;
