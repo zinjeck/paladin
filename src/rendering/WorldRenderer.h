@@ -4,17 +4,15 @@
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
-#include "rendering/SettlementMarkerRenderer.h"
-#include "rendering/SpriteRenderer.h"
 #include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
+#include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
 #include "rendering/WorldTerritoryPresentationRenderer.h"
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
-#include "world/WorldTilePosition.h"
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -25,12 +23,6 @@ namespace Paladin
     class World;
 
     struct TileRenderMetrics;
-
-    struct WorldPlacementMarker
-    {
-        WorldTilePosition position;
-        RenderColor color{255, 215, 131, 235};
-    };
 
     class WorldRenderer
     {
@@ -101,22 +93,13 @@ namespace Paladin
             const TileRenderMetrics&
         ) const noexcept;
 
-        void drawSettlementPlacementMarker(
-            Renderer&,
-            const World&,
-            const Camera2D&,
-            double effectiveTilePixels,
-            const WorldPlacementMarker&
-        ) const;
-
         std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
         mutable SceneSpriteLibrary artwork_;
         mutable CelestialGlobeRenderer globe_;
-        SpriteRenderer spriteRenderer_;
-        SettlementMarkerRenderer settlementMarkerRenderer_;
         OverlayRenderer overlayRenderer_;
         mutable WorldTerritoryPresentationRenderer territoryPresentationRenderer_;
+        WorldObjectRenderer worldObjectRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;
         mutable bool pixelStabilityActive_ = false;
