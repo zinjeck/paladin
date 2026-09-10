@@ -20,9 +20,22 @@ namespace Paladin
         float extent = 0;
     };
 
-    // Project the visible star through the same celestial orientation used by
-    // the fixed star shell. Nothing is clamped to the viewport: the sun can
-    // leave the screen naturally as the globe camera turns.
+    inline WorldSurface::Point3 celestialSunViewDirection(
+        const GlobeView& view,
+        double secondsIntoDay
+    )
+    {
+        const auto solar = PlanetAstronomy::sunDirection(secondsIntoDay);
+        return view.orient({solar.x, solar.y, solar.z});
+    }
+
+    // GlobeView uses +Z for the hemisphere facing the camera. A distant light
+    // source that can actually appear in the star background must therefore be
+    // on the far side of the planet, with negative view-space Z. Project that
+    // direction through a positive camera depth (-Z), preserving X/Y signs so
+    // the visible sun stays on the same side as the illuminated crescent.
+    // Nothing is clamped to the viewport: the sun can leave the screen
+    // naturally as the globe camera turns.
     inline std::optional<CelestialSunScreenPosition> projectCelestialSun(
         const GlobeView& view,
         int width,
@@ -35,10 +48,9 @@ namespace Paladin
             return std::nullopt;
         }
 
-        const auto solar = PlanetAstronomy::sunDirection(secondsIntoDay);
-        const auto direction = view.orient({solar.x, solar.y, solar.z});
+        const auto direction = celestialSunViewDirection(view, secondsIntoDay);
         if (!std::isfinite(direction.x) || !std::isfinite(direction.y) ||
-            !std::isfinite(direction.z) || direction.z <= .05)
+            !std::isfinite(direction.z) || direction.z >= -.05)
         {
             return std::nullopt;
         }
@@ -46,8 +58,9 @@ namespace Paladin
         const float minimumDimension = float(std::min(width, height));
         const float focal = minimumDimension * .65F;
         const float scale = std::clamp(minimumDimension / 1080.F, .75F, 1.60F);
-        const float x = float(view.cx) + focal * float(direction.x / direction.z);
-        const float y = float(view.cy) - focal * float(direction.y / direction.z);
+        const float depth = float(-direction.z);
+        const float x = float(view.cx) + focal * float(direction.x) / depth;
+        const float y = float(view.cy) - focal * float(direction.y) / depth;
         const float extent = 68.F * scale;
 
         if (x + extent < 0 || y + extent < 0 || x - extent >= width ||
@@ -217,9 +230,10 @@ namespace Paladin
 
         const float x = projected->x, y = projected->y;
         const float scale = projected->scale;
-        // The globe renderer already draws a 2.4% atmosphere outside the
-        // sphere. Keep the later celestial pass behind both the planet and that
-        // limb without a stencil or framebuffer readback.
+        // GlobeRenderer has already drawn the globe in this compatibility pass.
+        // Clip every solar element against the sphere + atmospheric limb so the
+        // result still behaves exactly like a background source without a
+        // framebuffer readback or blur pass.
         const float occlusionRadius = float(view.radius * 1.03);
         const float centerDistance =
             std::hypot(x - float(view.cx), y - float(view.cy));
@@ -326,9 +340,10 @@ namespace Paladin
         );
     }
 
-    // Keep the existing globe renderer untouched so this feature remains easy
-    // to reconcile with parallel renderer work. The celestial pass is bounded,
-    // allocation-free per frame, and clipped as if it lived behind the globe.
+    // Keep GlobeRenderer itself isolated from this follow-up so the visibility
+    // correction remains low-conflict with parallel renderer work. The solar
+    // pass is bounded, allocation-free per frame, and geometrically clipped as
+    // though it lived behind the globe.
     class CelestialGlobeRenderer : public GlobeRenderer
     {
     public:
