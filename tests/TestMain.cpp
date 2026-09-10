@@ -11,6 +11,7 @@ void runSettlementActivityTests();
 void runCoreTests();
 void runWorldTests();
 void runWorldGenerationTests();
+void runTribalInfluenceTests();
 
 int main()
 {
@@ -25,6 +26,7 @@ int main()
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();
+        runTribalInfluenceTests();
     }
     catch (const std::exception& exception)
     {
