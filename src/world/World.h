@@ -9,6 +9,7 @@
 #include "world/Realm.h"
 #include "world/Settlement.h"
 #include "world/WorldGrid.h"
+#include "world/WorldRoad.h"
 #include "world/WorldTilePosition.h"
 #include "world/WorldTime.h"
 #include "world/generation/WorldGenerationSettings.h"
@@ -56,6 +57,12 @@ namespace Paladin
 
         [[nodiscard]]
         ArmyId createArmy(WorldTilePosition position = {});
+
+        [[nodiscard]]
+        WorldRoadId createWorldRoad(
+            std::span<const WorldTilePosition> points,
+            RealmId ownerRealmId = {}
+        );
 
         [[nodiscard]]
         bool canFoundSettlementAt(WorldTilePosition position) const noexcept;
@@ -131,6 +138,12 @@ namespace Paladin
         const Army* army(ArmyId id) const noexcept;
 
         [[nodiscard]]
+        WorldRoad* worldRoad(WorldRoadId id) noexcept;
+
+        [[nodiscard]]
+        const WorldRoad* worldRoad(WorldRoadId id) const noexcept;
+
+        [[nodiscard]]
         WorldTime& time() noexcept;
 
         [[nodiscard]]
@@ -157,6 +170,18 @@ namespace Paladin
 
         [[nodiscard]]
         std::span<Settlement> settlements() noexcept;
+
+        [[nodiscard]]
+        std::span<const Army> armies() const noexcept;
+
+        [[nodiscard]]
+        std::span<Army> armies() noexcept;
+
+        [[nodiscard]]
+        std::span<const WorldRoad> worldRoads() const noexcept;
+
+        [[nodiscard]]
+        std::span<WorldRoad> worldRoads() noexcept;
 
         [[nodiscard]]
         std::span<const Culture> cultures() const noexcept;
@@ -208,6 +233,18 @@ namespace Paladin
 
 
         // ====================================================
+        // World-road relationships
+        // ====================================================
+
+        bool assignWorldRoadToRealm(
+            WorldRoadId roadId,
+            RealmId realmId
+        ) noexcept;
+
+        bool makeWorldRoadIndependent(WorldRoadId roadId) noexcept;
+
+
+        // ====================================================
         // Counts
         // ====================================================
 
@@ -222,6 +259,9 @@ namespace Paladin
 
         [[nodiscard]]
         std::size_t armyCount() const noexcept;
+
+        [[nodiscard]]
+        std::size_t worldRoadCount() const noexcept;
 
 
     private:
@@ -238,5 +278,7 @@ namespace Paladin
         EntityRegistry<Culture, CultureId> cultures_;
 
         EntityRegistry<Army, ArmyId> armies_;
+
+        EntityRegistry<WorldRoad, WorldRoadId> worldRoads_;
     };
 } // namespace Paladin

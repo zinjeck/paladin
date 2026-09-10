@@ -39,6 +39,28 @@ namespace Paladin
             float visibility = 1.0F
         ) const;
 
+        // WorldObjectRenderer owns projection/LOD now. Keep the established
+        // procedural symbol as the temporary regional marker and close-world
+        // settlement fallback until authored 32-pixel world sprites replace it.
+        void drawAt(
+            Renderer& renderer,
+            const World& world,
+            const Settlement& settlement,
+            float centerX,
+            float centerY,
+            float visibility = 1.0F
+        ) const
+        {
+            drawMarker(
+                renderer,
+                world,
+                settlement,
+                centerX,
+                centerY,
+                visibility
+            );
+        }
+
     private:
         void drawMarker(
             Renderer& renderer,

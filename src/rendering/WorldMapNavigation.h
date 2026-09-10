@@ -1,6 +1,9 @@
 #pragma once
 #include "rendering/GlobeView.h"
+#include "rendering/LocalTangentWorldView.h"
 #include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldPixelStability.h"
+#include "rendering/WorldPresentation.h"
 #include "ui/UiTypes.h"
 namespace Paladin
 {
@@ -37,7 +40,35 @@ namespace Paladin
         {
             if (globe)
             {
-                return GlobeView::from(c, g, w, h).pick(x, y);
+                const auto globeView = GlobeView::from(c, g, w, h);
+                const double effectivePixels =
+                    g.width() > 0
+                        ? globeView.radius * 6.28318530717958647692 / g.width()
+                        : 0.0;
+                const auto presentation =
+                    worldPresentationState(effectivePixels);
+                if (presentation.localWorldWeight >= 0.5F)
+                {
+                    // The close renderer is no longer the curved sphere. Pick
+                    // the same tangent chart that owns the visible terrain,
+                    // including the PR #14 render-only art-pixel snap.
+                    Camera2D renderCamera = pixelStableWorldCamera(
+                        c,
+                        g,
+                        w,
+                        h,
+                        true
+                    );
+                    return LocalTangentWorldView::from(
+                               renderCamera,
+                               g,
+                               w,
+                               h,
+                               effectivePixels
+                    )
+                        .pick(x, y);
+                }
+                return globeView.pick(x, y);
             }
             double u = (c.tileX() + (x - w * .5) / pixels) / g.width();
             double v = (c.tileY() + (y - h * .5) / pixels) / g.height();
