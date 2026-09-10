@@ -22,6 +22,7 @@
 #include "rendering/SpriteStyle.h"
 #include "rendering/StockpilePresentation.h"
 #include "rendering/TileRenderMetrics.h"
+#include "rendering/WorldCartography.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
