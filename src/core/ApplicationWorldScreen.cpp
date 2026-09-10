@@ -124,6 +124,10 @@ namespace Paladin
             settlementPlacementController_->hoveredPosition();
         const std::optional<WorldTilePosition> lockedPosition =
             settlementPlacementController_->lockedPosition();
+        const bool foundingOriginChosen =
+            foundingPanel_->isOpen() &&
+            foundingPanel_->mode() == FoundingPanelMode::Founding &&
+            !foundingPanel_->identity().realmOriginId.empty();
 
         if (settlementPlacementController_->isSelecting() && hoveredPosition)
         {
@@ -135,7 +139,7 @@ namespace Paladin
                     : RenderColor{215, 80, 86, 235};
             placementMarker = WorldPlacementMarker{*hoveredPosition, markerColor};
         }
-        else if (lockedPosition)
+        else if (lockedPosition && !foundingOriginChosen)
         {
             const MapColor selectedColor = foundingPanel_->isOpen()
                                                ? foundingPanel_->selectedColor()

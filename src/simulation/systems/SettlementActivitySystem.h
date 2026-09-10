@@ -115,7 +115,12 @@ namespace Paladin
         FisheryJobPolicy fishery;
         std::size_t decisionsPerMinute = 32;
         std::size_t pathsPerMinute = 24;
-        std::size_t maximumPathsPerStep = 4;
+        // Make the existing per-minute path budget available in one simulation
+        // step. This lets a group of already-idle general laborers respond to a
+        // distant player designation together instead of leaking out four at a
+        // time over successive minutes. Active citizen tasks are still left
+        // alone by the ordinary decision rules.
+        std::size_t maximumPathsPerStep = 24;
 
         void setWorkDayHours(int hours) noexcept
         {
