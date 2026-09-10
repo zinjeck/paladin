@@ -8,13 +8,26 @@
 
 namespace Paladin
 {
+    bool Renderer::beginPixelScene(double pitch, bool transparent)
+    {
+        const bool active = beginPixelScene(pitch);
+        pixelSceneTransparent_ = active && transparent;
+        if (pixelSceneTransparent_)
+        {
+            SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 0);
+            SDL_RenderClear(renderer_);
+        }
+        return active;
+    }
+
     void Renderer::endPixelScene(
         std::uint8_t opacity,
         double rotationDegrees,
         double compositeScale
     )
     {
-        if (opacity == 255 && std::abs(rotationDegrees) < 1e-9 &&
+        if (!pixelSceneTransparent_ && opacity == 255 &&
+            std::abs(rotationDegrees) < 1e-9 &&
             std::abs(compositeScale - 1.0) < 1e-9)
         {
             endPixelScene();
@@ -24,6 +37,7 @@ namespace Paladin
         if (!pixelScene_ || !std::isfinite(pixelPitch_) || pixelPitch_ <= 1.0)
         {
             pixelPitch_ = 1.0;
+            pixelSceneTransparent_ = false;
             return;
         }
 
@@ -62,7 +76,8 @@ namespace Paladin
         SDL_SetTextureAlphaMod(pixelScene_->texture_, opacity);
         SDL_SetTextureBlendMode(
             pixelScene_->texture_,
-            opacity < 255 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE
+            pixelSceneTransparent_ || opacity < 255 ? SDL_BLENDMODE_BLEND
+                                                    : SDL_BLENDMODE_NONE
         );
         SDL_RenderTextureRotated(
             renderer_,
@@ -76,5 +91,6 @@ namespace Paladin
         SDL_SetTextureAlphaMod(pixelScene_->texture_, 255);
         SDL_SetTextureBlendMode(pixelScene_->texture_, SDL_BLENDMODE_NONE);
         pixelPitch_ = 1.0;
+        pixelSceneTransparent_ = false;
     }
 } // namespace Paladin
