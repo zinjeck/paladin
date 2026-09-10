@@ -54,6 +54,18 @@ namespace Paladin
         }
 
         [[nodiscard]]
+        bool usesTribalInfluence() const noexcept
+        {
+            return startingOriginId_ == "tribal";
+        }
+
+        [[nodiscard]]
+        bool usesCivicControl() const noexcept
+        {
+            return startingOriginId_ == "civic";
+        }
+
+        [[nodiscard]]
         const RealmFlag& flag() const noexcept
         {
             return flag_;
