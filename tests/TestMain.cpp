@@ -2,6 +2,8 @@
 #include <iostream>
 
 #include "PastureDormancyRegression.h"
+#include "Pr16Regression.h"
+#include "TribalInfluenceChecks.h"
 
 void runEntityAttributeTests();
 void runWorldReliefTests();
@@ -22,9 +24,11 @@ int main()
         runSettlementEmploymentTests();
         runSettlementActivityTests();
         runPastureDormancyRegression();
+        runPr16Regression();
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();
+        Paladin::Test::runTribalInfluenceTests();
     }
     catch (const std::exception& exception)
     {

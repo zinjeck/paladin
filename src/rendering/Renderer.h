@@ -193,7 +193,13 @@ namespace Paladin
 
         int outputHeight() const noexcept;
         bool beginPixelScene(double pitch);
+        bool beginPixelScene(double pitch, bool transparent);
         void endPixelScene();
+        void endPixelScene(
+            std::uint8_t opacity,
+            double rotationDegrees,
+            double compositeScale
+        );
 
     private:
         std::shared_ptr<AssetManager> assetManager_;
@@ -201,6 +207,7 @@ namespace Paladin
         SDL_Renderer* renderer_ = nullptr;
         std::unique_ptr<Texture> pixelScene_;
         double pixelPitch_ = 1;
+        bool pixelSceneTransparent_ = false;
     };
 
 } // namespace Paladin
