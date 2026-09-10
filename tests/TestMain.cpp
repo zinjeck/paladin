@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "PastureDormancyRegression.h"
+#include "TribalInfluenceChecks.h"
 
 void runEntityAttributeTests();
 void runWorldReliefTests();
@@ -11,7 +12,6 @@ void runSettlementActivityTests();
 void runCoreTests();
 void runWorldTests();
 void runWorldGenerationTests();
-void runTribalInfluenceTests();
 
 int main()
 {
@@ -26,7 +26,7 @@ int main()
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();
-        runTribalInfluenceTests();
+        Paladin::Test::runTribalInfluenceTests();
     }
     catch (const std::exception& exception)
     {
