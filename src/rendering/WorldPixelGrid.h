@@ -28,7 +28,7 @@ namespace Paladin
             double compositeScale = 1.0
         )
             : renderer_(r),
-              active_(r.beginPixelScene(worldPixelPitch(tilePixels))),
+              active_(r.beginPixelScene(worldPixelPitch(tilePixels), false)),
               opacity_(opacity),
               rotationDegrees_(rotationDegrees),
               compositeScale_(compositeScale)
