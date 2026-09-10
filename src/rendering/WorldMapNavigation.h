@@ -17,8 +17,18 @@ namespace Paladin
         }
         static UiRectangle buttonBounds(int width, int height)
         {
-            auto b = mapBounds(width, height);
-            return {b.x, b.y - 34, b.width, 30};
+            const auto b = mapBounds(width, height);
+            return {b.x, b.y - 30.0F, 58.0F, 26.0F};
+        }
+        static UiRectangle politicalModeButtonBounds(int width, int height)
+        {
+            const auto b = buttonBounds(width, height);
+            return {b.x, b.y, 26.0F, b.height};
+        }
+        static UiRectangle terrainModeButtonBounds(int width, int height)
+        {
+            const auto b = buttonBounds(width, height);
+            return {b.x + 32.0F, b.y, 26.0F, b.height};
         }
         static WorldSurface::UV minimapPoint(UiRectangle b, double x, double y)
         {
@@ -51,7 +61,7 @@ namespace Paladin
                 {
                     // The close renderer is no longer the curved sphere. Pick
                     // the same tangent chart that owns the visible terrain,
-                    // including the PR #14 render-only art-pixel snap.
+                    // including the render-only art-pixel snap.
                     Camera2D renderCamera = pixelStableWorldCamera(
                         c,
                         g,
