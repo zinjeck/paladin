@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/TerrainType.h"
+#include "world/territory/TribalInfluencePolicy.h"
 
 #include <cstdint>
 
@@ -26,6 +27,11 @@ namespace Paladin
         TerritoryTerrainRule water{false, 0};
 
         TerritoryTerrainRule mountain{true, 2};
+
+        // Civic realms use the discrete controller map above. Tribal realms do
+        // not claim those cells; their authority is derived continuously from
+        // population-driven power centers using this policy.
+        TribalInfluencePolicy tribalInfluence;
 
         [[nodiscard]]
         const TerritoryTerrainRule& ruleFor(TerrainType terrain) const noexcept;
