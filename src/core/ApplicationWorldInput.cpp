@@ -229,40 +229,88 @@ namespace Paladin
             clampCameraToWorld();
             return;
         }
+
         const auto mapBounds = WorldMapNavigation::mapBounds(
             renderer_->outputWidth(),
             renderer_->outputHeight()
         );
-        const auto focusMap = [&](double x, double y)
+        const auto mapModeBounds = WorldMapNavigation::buttonBounds(
+            renderer_->outputWidth(),
+            renderer_->outputHeight()
+        );
+        const auto politicalButtonBounds =
+            WorldMapNavigation::politicalModeButtonBounds(
+                renderer_->outputWidth(),
+                renderer_->outputHeight()
+            );
+        const auto terrainButtonBounds =
+            WorldMapNavigation::terrainModeButtonBounds(
+                renderer_->outputWidth(),
+                renderer_->outputHeight()
+            );
+
+        const auto focusFlatMap = [&](double x, double y)
         {
             WorldMapNavigation::focus(
                 *camera_,
                 simulation_->world().grid(),
                 renderer_->outputWidth(),
                 renderer_->outputHeight(),
-                worldRenderer_->globeEnabled,
+                false,
                 WorldMapNavigation::minimapPoint(mapBounds, x, y)
             );
+            clampCameraToWorld();
         };
+
         if (!foundingPanel_->isOpen())
         {
+            const bool leftButtonEvent =
+                (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+                 event.type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+                event.button.button == SDL_BUTTON_LEFT;
+            if (leftButtonEvent &&
+                politicalButtonBounds.contains(event.button.x, event.button.y))
+            {
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+                {
+                    worldRenderer_->setMapMode(WorldMapMode::Political);
+                }
+                return;
+            }
+            if (leftButtonEvent &&
+                terrainButtonBounds.contains(event.button.x, event.button.y))
+            {
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+                {
+                    worldRenderer_->setMapMode(WorldMapMode::Terrain);
+                }
+                return;
+            }
+
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
                 event.button.button == SDL_BUTTON_LEFT &&
                 mapBounds.contains(event.button.x, event.button.y))
             {
-                worldNavigatorPress_ = 1;
-                if (worldNavigatorPress_ == 1)
+                // The minimap is the projection escape hatch. A click always
+                // addresses the canonical flat chart, regardless of which
+                // projection was visible one frame earlier.
+                if (worldRenderer_->globeEnabled)
                 {
-                    focusMap(event.button.x, event.button.y);
+                    worldRenderer_->toggleProjection(
+                        *camera_,
+                        simulation_->world().grid(),
+                        renderer_->outputWidth(),
+                        renderer_->outputHeight(),
+                        *tileRenderMetrics_
+                    );
                 }
+                worldNavigatorPress_ = 1;
+                focusFlatMap(event.button.x, event.button.y);
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION && worldNavigatorPress_)
             {
-                if (worldNavigatorPress_ == 1)
-                {
-                    focusMap(event.motion.x, event.motion.y);
-                }
+                focusFlatMap(event.motion.x, event.motion.y);
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
@@ -272,7 +320,11 @@ namespace Paladin
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_WHEEL &&
-                mapBounds.contains(event.wheel.mouse_x, event.wheel.mouse_y))
+                (mapBounds.contains(event.wheel.mouse_x, event.wheel.mouse_y) ||
+                 mapModeBounds.contains(
+                     event.wheel.mouse_x,
+                     event.wheel.mouse_y
+                 )))
             {
                 return;
             }
