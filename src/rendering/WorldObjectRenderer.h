@@ -27,6 +27,7 @@ namespace Paladin
             double effectiveTilePixels,
             bool globe,
             const WorldPresentationState& presentation,
+            bool stabilizePixelPhase,
             std::span<const SpriteRenderItem> fallbackSprites = {},
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt
         ) const;
