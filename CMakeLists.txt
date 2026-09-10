@@ -92,6 +92,7 @@ add_executable(Paladin
     src/rendering/SettlementEnvironmentDetails.cpp
     src/rendering/TerrainMaterialField.cpp
     src/rendering/Renderer.cpp
+    src/rendering/RendererPixelScene.cpp
     src/rendering/CityRenderer.cpp
     src/rendering/SceneSpriteLibrary.cpp
     src/rendering/SettlementStructurePresentation.cpp
@@ -101,6 +102,7 @@ add_executable(Paladin
     src/rendering/SpriteRenderer.cpp
     src/rendering/OverlayRenderer.cpp
     src/rendering/WorldRenderer.cpp
+    src/rendering/WorldObjectRenderer.cpp
     src/rendering/SettlementMarkerRenderer.cpp
     src/rendering/SettlementCitizenRenderer.cpp
     src/rendering/SettlementCommandRenderer.cpp
@@ -114,6 +116,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/world/World.cpp
+    src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp
     src/world/generation/SettlementMapGenerator.cpp
@@ -217,6 +220,7 @@ add_executable(PaladinTests
     tests/WorldGenerationTests.cpp
 
     src/world/World.cpp
+    src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp
     src/world/generation/SettlementMapGenerator.cpp
