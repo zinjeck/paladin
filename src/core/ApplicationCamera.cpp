@@ -508,6 +508,11 @@ namespace Paladin
                    renderer_->outputHeight()
                )
                    .contains(x, y) ||
+               WorldMapNavigation::buttonBounds(
+                   renderer_->outputWidth(),
+                   renderer_->outputHeight()
+               )
+                   .contains(x, y) ||
                worldHud_->containsInteractivePoint(x, y) ||
                (simulationControlsUnlocked_ &&
                 !settlementPlacementController_->isActive() &&
