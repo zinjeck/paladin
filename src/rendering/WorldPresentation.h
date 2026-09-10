@@ -4,9 +4,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace Paladin
 {
+    enum class WorldMapMode : std::uint8_t
+    {
+        Political,
+        Terrain
+    };
+
     // One authoritative zoom policy for the world screen.  The values are
     // expressed in effective screen pixels per logical world tile, so the same
     // presentation bands survive projection switches, window-size changes and
@@ -17,6 +24,10 @@ namespace Paladin
         double realmToRegionalEndPixels = 10.0;
         double regionalToLocalBeginPixels = 28.0;
         double regionalToLocalEndPixels = 40.0;
+
+        // Political color remains as a quiet wash in the closest world view so
+        // terrain features stay readable without making realm identity vanish.
+        float closeRealmFillOpacity = 0.18F;
 
         // Realm borders remain legible in the closest world view without
         // becoming the dominant visual layer.
@@ -69,7 +80,18 @@ namespace Paladin
         const float localArrival = static_cast<float>(
             detailBlend(effectiveTilePixels, localBegin, localEnd)
         );
-        const float realmWeight = 1.0F - regionalArrival;
+        const float realmLabelWeight = 1.0F - regionalArrival;
+        const float closeFillOpacity = std::clamp(
+            policy.closeRealmFillOpacity,
+            0.0F,
+            1.0F
+        );
+        const float realmFillWeight = std::clamp(
+            closeFillOpacity +
+                (1.0F - closeFillOpacity) * (1.0F - regionalArrival),
+            0.0F,
+            1.0F
+        );
         const float regionalWeight = std::clamp(
             regionalArrival * (1.0F - localArrival),
             0.0F,
@@ -82,12 +104,29 @@ namespace Paladin
         );
 
         return {
-            realmWeight,
-            realmWeight,
+            realmFillWeight,
+            realmLabelWeight,
             1.0F - localArrival * (1.0F - closeBorderOpacity),
             regionalWeight,
             regionalWeight,
             localArrival
         };
+    }
+
+    [[nodiscard]]
+    inline WorldPresentationState presentationForMapMode(
+        WorldPresentationState presentation,
+        WorldMapMode mode
+    ) noexcept
+    {
+        if (mode == WorldMapMode::Terrain)
+        {
+            // Terrain mode is a projection-independent presentation choice.
+            // Settlements and realm labels remain useful navigation context,
+            // while political paint and formal borders are removed.
+            presentation.realmFillWeight = 0.0F;
+            presentation.realmBorderWeight = 0.0F;
+        }
+        return presentation;
     }
 } // namespace Paladin
