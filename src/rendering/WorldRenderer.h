@@ -6,6 +6,7 @@
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
+#include "rendering/WorldCartography.h"
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
