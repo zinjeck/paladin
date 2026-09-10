@@ -27,7 +27,8 @@ namespace Paladin
         WorldObjectPixelScene(Renderer& renderer, double effectiveTilePixels)
             : renderer_(renderer),
               active_(renderer.beginPixelScene(
-                  worldObjectPixelPitch(effectiveTilePixels)
+                  worldObjectPixelPitch(effectiveTilePixels),
+                  true
               ))
         {
         }
@@ -36,7 +37,7 @@ namespace Paladin
         {
             if (active_)
             {
-                renderer_.endPixelScene();
+                renderer_.endPixelScene(255, 0.0, 1.0);
             }
         }
 
