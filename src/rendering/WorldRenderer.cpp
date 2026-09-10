@@ -45,6 +45,10 @@ namespace Paladin
         artRoot = PALADIN_ART_ROOT;
 #endif
         artwork_.load(renderer, artRoot);
+        // Build/upload the small procedural solar optical texture during the
+        // existing preparation path so the first interactive globe frame never
+        // pays that one-time cost.
+        sunRenderer_.prepare(renderer);
 
         // This path is shown only while world interaction is blocked. Advance
         // several of GlobeRenderer's existing bounded upload slices per present
@@ -257,6 +261,36 @@ namespace Paladin
                 );
             }
 
+            // The sun is deliberately composited only after both pixel-scene
+            // scopes have ended, at native output resolution. It is analytically
+            // clipped against the globe/atmosphere silhouette, so painter order
+            // cannot place it over the planet even though this pass escapes the
+            // nearest-neighbor world lattice. Fade it out before the local
+            // tangent presentation becomes dominant.
+            const float celestialWeight = std::clamp(
+                (.55F - localWeight) / .45F,
+                0.0F,
+                1.0F
+            );
+            if (celestialWeight > .001F)
+            {
+                const auto sunView = GlobeView::from(
+                    renderCamera,
+                    world.grid(),
+                    renderer.outputWidth(),
+                    renderer.outputHeight()
+                );
+                sunRenderer_.render(
+                    renderer,
+                    sunView,
+                    world.time().secondsIntoDay(),
+                    celestialWeight
+                );
+            }
+
+            // Strategic objects are deliberately not inside the 16-pixel
+            // terrain scene. Settlements/markers, armies, roads and temporary
+            // placement markers all share the separate 32-pixel object lattice.
             worldObjectRenderer_.render(
                 renderer,
                 world,
