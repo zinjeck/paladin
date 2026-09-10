@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "PastureDormancyRegression.h"
+#include "Pr16Regression.h"
 
 void runEntityAttributeTests();
 void runWorldReliefTests();
@@ -22,6 +23,7 @@ int main()
         runSettlementEmploymentTests();
         runSettlementActivityTests();
         runPastureDormancyRegression();
+        runPr16Regression();
         runCoreTests();
         runWorldTests();
         runWorldGenerationTests();
