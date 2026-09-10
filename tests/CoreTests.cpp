@@ -7,6 +7,8 @@
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
 #include "rendering/SettlementWorldPresentation.h"
+#include "rendering/WorldMapNavigation.h"
+#include "rendering/WorldObjectPresentation.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
 #include "world/WorldGrid.h"
@@ -206,12 +208,16 @@ namespace
         PALADIN_CHECK(std::abs(enormous.markerDiameterPixels -
                                large.markerDiameterPixels) < 1e-6F);
         PALADIN_CHECK(large.labelPixelSize >= growing.labelPixelSize);
-        PALADIN_CHECK(empty.markerDiameterPixels >= 1.0F);
+        PALADIN_CHECK(empty.markerDiameterPixels == 10.0F);
+        PALADIN_CHECK(large.markerDiameterPixels == 22.0F);
+        PALADIN_CHECK(large.labelPixelSize <= 1.90F);
         PALADIN_CHECK(large.borderPixels > 0.0F);
     }
 
     void testWorldPresentationLayers()
     {
+        using Paladin::presentationForMapMode;
+        using Paladin::WorldMapMode;
         using Paladin::worldPresentationState;
 
         const auto realm = worldPresentationState(4.0);
@@ -225,12 +231,13 @@ namespace
         PALADIN_CHECK(realm.settlementMarkerWeight < 0.001F);
         PALADIN_CHECK(realm.localWorldWeight < 0.001F);
 
-        PALADIN_CHECK(firstTransition.realmFillWeight > 0.0F);
+        PALADIN_CHECK(firstTransition.realmFillWeight > 0.18F);
         PALADIN_CHECK(firstTransition.realmFillWeight < 1.0F);
         PALADIN_CHECK(firstTransition.settlementMarkerWeight > 0.0F);
         PALADIN_CHECK(firstTransition.settlementMarkerWeight < 1.0F);
 
-        PALADIN_CHECK(regional.realmFillWeight < 0.001F);
+        PALADIN_CHECK(std::abs(regional.realmFillWeight - 0.18F) < 1e-5F);
+        PALADIN_CHECK(regional.realmLabelWeight < 0.001F);
         PALADIN_CHECK(regional.settlementMarkerWeight > 0.999F);
         PALADIN_CHECK(regional.localWorldWeight < 0.001F);
         PALADIN_CHECK(regional.realmBorderWeight > 0.999F);
@@ -241,10 +248,70 @@ namespace
         PALADIN_CHECK(secondTransition.localWorldWeight < 1.0F);
         PALADIN_CHECK(secondTransition.realmBorderWeight < 1.0F);
 
-        PALADIN_CHECK(local.realmFillWeight < 0.001F);
+        PALADIN_CHECK(std::abs(local.realmFillWeight - 0.18F) < 1e-5F);
+        PALADIN_CHECK(local.realmLabelWeight < 0.001F);
         PALADIN_CHECK(local.settlementMarkerWeight < 0.001F);
         PALADIN_CHECK(local.localWorldWeight > 0.999F);
         PALADIN_CHECK(std::abs(local.realmBorderWeight - 0.22F) < 1e-5F);
+
+        const auto terrain = presentationForMapMode(local, WorldMapMode::Terrain);
+        PALADIN_CHECK(terrain.realmFillWeight == 0.0F);
+        PALADIN_CHECK(terrain.realmBorderWeight == 0.0F);
+        PALADIN_CHECK(terrain.realmLabelWeight == local.realmLabelWeight);
+        PALADIN_CHECK(terrain.localWorldWeight == local.localWorldWeight);
+
+        const auto political =
+            presentationForMapMode(local, WorldMapMode::Political);
+        PALADIN_CHECK(political.realmFillWeight == local.realmFillWeight);
+        PALADIN_CHECK(political.realmBorderWeight == local.realmBorderWeight);
+    }
+
+    void testWorldObjectPixelStability()
+    {
+        using Paladin::stableWorldObjectScreenCoordinate;
+        using Paladin::worldObjectPixelPitch;
+
+        PALADIN_CHECK(std::abs(worldObjectPixelPitch(64.0) - 2.0) < 1e-12);
+        PALADIN_CHECK(
+            stableWorldObjectScreenCoordinate(101.2F, 64.0) == 102.0F
+        );
+        PALADIN_CHECK(
+            stableWorldObjectScreenCoordinate(101.8F, 64.0) == 102.0F
+        );
+
+        const double pitch = worldObjectPixelPitch(40.0);
+        const float snapped = stableWorldObjectScreenCoordinate(100.6F, 40.0);
+        PALADIN_CHECK(std::abs(pitch - 1.25) < 1e-12);
+        PALADIN_CHECK(
+            std::abs(double(snapped) / pitch -
+                     std::round(double(snapped) / pitch)) < 1e-6
+        );
+    }
+
+    void testWorldMapModeButtonLayout()
+    {
+        const auto map = Paladin::WorldMapNavigation::mapBounds(1280, 720);
+        const auto strip = Paladin::WorldMapNavigation::buttonBounds(1280, 720);
+        const auto political =
+            Paladin::WorldMapNavigation::politicalModeButtonBounds(1280, 720);
+        const auto terrain =
+            Paladin::WorldMapNavigation::terrainModeButtonBounds(1280, 720);
+
+        PALADIN_CHECK(political.y + political.height <= map.y);
+        PALADIN_CHECK(terrain.y + terrain.height <= map.y);
+        PALADIN_CHECK(political.x + political.width < terrain.x);
+        PALADIN_CHECK(
+            strip.contains(
+                political.x + political.width * 0.5F,
+                political.y + political.height * 0.5F
+            )
+        );
+        PALADIN_CHECK(
+            strip.contains(
+                terrain.x + terrain.width * 0.5F,
+                terrain.y + terrain.height * 0.5F
+            )
+        );
     }
 
     void testWorldPixelStability()
@@ -336,5 +403,7 @@ void runCoreTests()
     testGlobeNorthUpFocus();
     testSettlementWorldPresentationScale();
     testWorldPresentationLayers();
+    testWorldObjectPixelStability();
+    testWorldMapModeButtonLayout();
     testWorldPixelStability();
 }
