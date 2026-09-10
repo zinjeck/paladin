@@ -5,7 +5,7 @@
 
 namespace Paladin
 {
-    // Equinox sun: one revolution per authoritative game day. Camera rotation
+    // The world clock drives one authoritative solar direction. Camera rotation
     // never changes which longitude is at noon. No climate simulation coupling.
     inline double globeSunDot(double u, double v, double secondsIntoDay)
     {
@@ -26,8 +26,9 @@ namespace Paladin
     )
     {
         const auto n = WorldSurface::sphere(u, v),
-                   sun = WorldSurface::sphere(1 - seconds / 86400., .5),
+                   solar = PlanetAstronomy::sunDirection(seconds),
                    eye = WorldSurface::sphere(viewU, viewV);
+        const WorldSurface::Point3 sun{solar.x, solar.y, solar.z};
         const double x = sun.x + eye.x, y = sun.y + eye.y, z = sun.z + eye.z;
         const double length = std::sqrt(x * x + y * y + z * z);
         if (length < 1e-6)
