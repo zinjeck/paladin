@@ -5,6 +5,7 @@
 #include "world/WorldTilePosition.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace Paladin
 {
@@ -19,6 +20,25 @@ namespace Paladin
     inline double worldObjectPixelPitch(double effectiveTilePixels) noexcept
     {
         return std::max(1.0, effectiveTilePixels / WorldObjectPixelsPerTile);
+    }
+
+    // Object centers are quantized to the same low-resolution raster that will
+    // receive them. The authoritative camera remains continuous; this only
+    // prevents a moving camera from changing which object texel a fractional
+    // screen coordinate lands on from frame to frame.
+    [[nodiscard]]
+    inline float stableWorldObjectScreenCoordinate(
+        float coordinate,
+        double effectiveTilePixels
+    ) noexcept
+    {
+        if (!std::isfinite(coordinate) || !std::isfinite(effectiveTilePixels) ||
+            effectiveTilePixels <= 0.0)
+        {
+            return coordinate;
+        }
+        const double pitch = worldObjectPixelPitch(effectiveTilePixels);
+        return static_cast<float>(std::round(double(coordinate) / pitch) * pitch);
     }
 
     class WorldObjectPixelScene
