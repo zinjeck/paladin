@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rendering/GlobeRenderer.h"
+#include "rendering/CelestialSun.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
@@ -111,7 +111,7 @@ namespace Paladin
         std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
         mutable SceneSpriteLibrary artwork_;
-        mutable GlobeRenderer globe_;
+        mutable CelestialGlobeRenderer globe_;
         SpriteRenderer spriteRenderer_;
         SettlementMarkerRenderer settlementMarkerRenderer_;
         OverlayRenderer overlayRenderer_;
