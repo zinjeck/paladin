@@ -6,11 +6,10 @@
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
-#include "rendering/TribalInfluenceRenderer.h"
 #include "rendering/WorldGridRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
-#include "rendering/WorldTerritoryPresentationRenderer.h"
+#include "rendering/WorldRealmPresentationRenderer.h"
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
@@ -62,7 +61,6 @@ namespace Paladin
         {
             artwork_.reset();
             globe_.reset();
-            tribalInfluenceRenderer_.reset();
             territoryPresentationRenderer_.reset();
             pixelStabilityActive_ = false;
         }
@@ -117,8 +115,7 @@ namespace Paladin
         SpriteRenderer spriteRenderer_;
         SettlementMarkerRenderer settlementMarkerRenderer_;
         OverlayRenderer overlayRenderer_;
-        mutable TribalInfluenceRenderer tribalInfluenceRenderer_;
-        mutable WorldTerritoryPresentationRenderer territoryPresentationRenderer_;
+        mutable WorldRealmPresentationRenderer territoryPresentationRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;
         mutable bool pixelStabilityActive_ = false;
