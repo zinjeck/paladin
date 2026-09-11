@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rendering/LocalTangentWorldView.h"
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/WorldObjectPresentation.h"
@@ -29,7 +30,9 @@ namespace Paladin
             const WorldPresentationState& presentation,
             bool stabilizePixelPhase,
             std::span<const SpriteRenderItem> fallbackSprites = {},
-            std::optional<WorldPlacementMarker> placementMarker = std::nullopt
+            std::optional<WorldPlacementMarker> placementMarker = std::nullopt,
+            std::optional<LocalTangentWorldView> localTangentPresentation =
+                std::nullopt
         ) const;
 
     private:
