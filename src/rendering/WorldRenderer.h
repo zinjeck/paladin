@@ -66,6 +66,7 @@ namespace Paladin
         {
             artwork_.reset();
             globe_.reset();
+            sunRenderer_.reset();
             territoryPresentationRenderer_.reset();
             pixelStabilityActive_ = false;
         }
