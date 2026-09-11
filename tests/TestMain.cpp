@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "CelestialSunChecks.h"
+#include "CloseWorldStabilityChecks.h"
 #include "PastureDormancyRegression.h"
 #include "Pr16Regression.h"
 #include "TribalInfluenceChecks.h"
@@ -30,6 +31,7 @@ int main()
         runWorldTests();
         runWorldGenerationTests();
         Paladin::Test::runCelestialSunChecks();
+        Paladin::Test::runCloseWorldStabilityChecks();
         Paladin::Test::runTribalInfluenceTests();
     }
     catch (const std::exception& exception)
