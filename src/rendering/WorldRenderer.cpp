@@ -133,9 +133,9 @@ namespace Paladin
         );
 
         // The authoritative camera remains continuous for simulation and input.
-        // Once the close world band is reached, rendering alone locks to the
-        // canonical art-pixel phase. Terrain and strategic world objects both
-        // receive this same stable render camera.
+        // At close scale only the terrain SOURCE camera is snapped to the
+        // canonical art lattice. The finished tangent raster receives the
+        // remaining camera motion as a rigid whole-screen-pixel translation.
         pixelStabilityActive_ = worldPixelStabilityActive(
             pixelStabilityActive_,
             presentationTilePixels,
@@ -196,12 +196,25 @@ namespace Paladin
                     presentationTilePixels
                 );
 
-                // Render a wider unrotated patch, then rotate/scale the finished
-                // pixel surface as one rigid image. The final tile scale is
-                // still exactly presentationTilePixels, but the overscan keeps
-                // rotated corners filled without sampling individual terrain
-                // texels through a changing curved mesh.
-                const double overscan = tangent.overscanScale();
+                // The source camera moves only on canonical 1/16-tile art-pixel
+                // boundaries. Put the authoritative sub-art-pixel motion back
+                // AFTER rasterization as one integer physical-screen offset.
+                // Internal mountain/terrain pixels therefore remain identical
+                // from frame to frame instead of boiling or waiting several
+                // physical pixels and then jumping.
+                const auto residual = tangent.rigidOffsetToCenter(
+                    camera.tileX(),
+                    camera.tileY()
+                );
+
+                // A rotated rectangle must CONTAIN a widescreen viewport. The
+                // old square-only |cos|+|sin| overscan left the exact opposite
+                // black corner wedges visible in the supplied close-zoom shot.
+                // Include the residual plus a four-pixel guard for ceil/raster
+                // rounding so no valid roll/aspect exposes the clear color.
+                const double residualMargin =
+                    std::max(std::abs(residual.x), std::abs(residual.y)) + 4.0;
+                const double overscan = tangent.overscanScale(residualMargin);
                 const double planarTilePixels =
                     presentationTilePixels / std::max(1.0, overscan);
                 const Camera2D planarCamera = tangent.planarCamera();
@@ -222,7 +235,9 @@ namespace Paladin
                     planarTilePixels,
                     opacity,
                     rotationDegrees,
-                    overscan
+                    overscan,
+                    residual.x,
+                    residual.y
                 );
                 globe_.renderFlat(
                     renderer,
@@ -288,13 +303,16 @@ namespace Paladin
                 );
             }
 
-            // Strategic objects are deliberately not inside the 16-pixel
-            // terrain scene. Settlements/markers, armies, roads and temporary
-            // placement markers all share the separate 32-pixel object lattice.
+            // Strategic objects stay on their independent 32-pixel lattice. At
+            // local scale use the authoritative camera: the terrain's rigid
+            // residual makes its effective final center authoritative too, while
+            // WorldObjectRenderer performs its own 32-pixel phase quantization.
+            const Camera2D& objectCamera =
+                localWeight >= 0.5F ? camera : renderCamera;
             worldObjectRenderer_.render(
                 renderer,
                 world,
-                renderCamera,
+                objectCamera,
                 presentationTilePixels,
                 true,
                 presentation,
@@ -307,8 +325,30 @@ namespace Paladin
 
         const double flatTilePixels =
             metrics.scaledTilePixels(renderCamera.zoom());
+        const double flatResidualX = pixelStabilityActive_
+                                         ? std::round(
+                                               (renderCamera.tileX() -
+                                                camera.tileX()) *
+                                               presentationTilePixels
+                                           )
+                                         : 0.0;
+        const double flatResidualY = pixelStabilityActive_
+                                         ? std::round(
+                                               (renderCamera.tileY() -
+                                                camera.tileY()) *
+                                               presentationTilePixels
+                                           )
+                                         : 0.0;
         {
-            WorldPixelScene flatScene(renderer, presentationTilePixels);
+            WorldPixelScene flatScene(
+                renderer,
+                presentationTilePixels,
+                255,
+                0.0,
+                1.0,
+                flatResidualX,
+                flatResidualY
+            );
             globe_.renderFlat(
                 renderer,
                 world,
@@ -344,7 +384,7 @@ namespace Paladin
         worldObjectRenderer_.render(
             renderer,
             world,
-            renderCamera,
+            pixelStabilityActive_ ? camera : renderCamera,
             presentationTilePixels,
             false,
             presentation,
