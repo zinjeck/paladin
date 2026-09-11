@@ -23,12 +23,8 @@ namespace Paladin::Test
             PlanetRotation{}
         };
 
-        // At local noon the source is camera-side, effectively behind the
-        // viewer rather than in the distant starfield.
         PALADIN_CHECK(!projectCelestialSun(view, width, height, 12 * 3600.));
 
-        // At midnight it projects directly behind the globe. Projection is
-        // centered and the renderer's analytical mask fully occults the source.
         const auto midnight = projectCelestialSun(view, width, height, 0.);
         PALADIN_CHECK(midnight);
         PALADIN_CHECK(std::abs(midnight->x - view.cx) < 1e-4);
@@ -46,8 +42,6 @@ namespace Paladin::Test
             const auto direction = celestialSunViewDirection(view, seconds);
             PALADIN_CHECK(direction.z < 0);
 
-            // Screen direction to the optical source must be parallel to the
-            // exact X/Y part of the solar vector used by sunIncidence().
             const double sx = projected->x - view.cx;
             const double sy = view.cy - projected->y;
             const double screenLength = std::hypot(sx, sy);
@@ -59,9 +53,6 @@ namespace Paladin::Test
                     .999999
             );
 
-            // The visible limb nearest the rendered source must be strongly
-            // illuminated while the globe center is still dark. This directly
-            // ties what the player sees to the authoritative lighting model.
             const WorldSurface::Point3 limbView{
                 direction.x / horizontal,
                 direction.y / horizontal,
@@ -89,8 +80,6 @@ namespace Paladin::Test
         checkCrescentAlignment(3 * 3600.);
         checkCrescentAlignment(21 * 3600.);
 
-        // Near the far-side horizon the perspective projection can place the
-        // source completely outside the viewport. It must never be edge-clamped.
         view.rotation = PlanetRotation::axis(0, 1, 0, 1.45);
         const auto grazing = celestialSunViewDirection(view, 0.);
         PALADIN_CHECK(grazing.z < -.035);
@@ -113,13 +102,17 @@ namespace Paladin::Test
         PALADIN_CHECK(visible > 0);
         PALADIN_CHECK(absent > 0);
 
-        // The rebuilt source must not contain a flat white disc. Its white-hot
-        // center falls off continuously from the first few normalized samples.
+        // The core layer is deliberately translucent by itself. Additive
+        // overlap with the corona produces the white-hot center, preventing an
+        // opaque circular sprite edge from ever existing in source pixels.
+        const auto coronaCenter = celestialSunCoronaSample(0, 0);
         const auto coreCenter = celestialSunCoreSample(0, 0);
         const auto coreNear = celestialSunCoreSample(.04F, 0);
         const auto coreMid = celestialSunCoreSample(.10F, 0);
         const auto coreOuter = celestialSunCoreSample(.40F, 0);
-        PALADIN_CHECK(coreCenter.alpha == 255);
+        PALADIN_CHECK(coreCenter.alpha < 200);
+        PALADIN_CHECK(coreCenter.alpha > 120);
+        PALADIN_CHECK(coronaCenter.alpha + coreCenter.alpha > 300);
         PALADIN_CHECK(
             coreCenter.red == 255 && coreCenter.green >= 254 &&
             coreCenter.blue >= 250
@@ -127,15 +120,14 @@ namespace Paladin::Test
         PALADIN_CHECK(coreCenter.alpha > coreNear.alpha);
         PALADIN_CHECK(coreNear.alpha > coreMid.alpha);
         PALADIN_CHECK(coreMid.alpha > coreOuter.alpha);
-        PALADIN_CHECK(coreCenter.alpha - coreNear.alpha < 16);
+        PALADIN_CHECK(coreCenter.alpha - coreNear.alpha < 24);
 
-        // Glare is intentionally broad. A preferred lobe is clearly brighter
-        // than the surrounding corona, but not orders of magnitude brighter as
-        // a one-pixel line ray would be.
+        // A primary ray is visible but remains a broad optical cone, not a line
+        // several times brighter than everything around it.
         const float radius = .40F;
         const auto glareLobe = celestialSunCoronaSample(
-            radius * std::cos(.08F),
-            radius * std::sin(.08F)
+            radius * std::cos(.10F),
+            radius * std::sin(.10F)
         );
         const auto betweenLobes = celestialSunCoronaSample(
             radius * std::cos(.35F),
@@ -144,8 +136,6 @@ namespace Paladin::Test
         PALADIN_CHECK(glareLobe.alpha > betweenLobes.alpha * 1.3F);
         PALADIN_CHECK(glareLobe.alpha < betweenLobes.alpha * 2.5F);
 
-        // There is still diffuse light well away from a primary glare lobe, so
-        // the source reads as corona and bloom rather than disconnected spokes.
         const auto diffuseMiddle = celestialSunCoronaSample(
             .60F * std::cos(.35F),
             .60F * std::sin(.35F)
@@ -158,7 +148,6 @@ namespace Paladin::Test
         PALADIN_CHECK(diffuseOuter.alpha > 0);
         PALADIN_CHECK(diffuseMiddle.alpha > diffuseOuter.alpha);
 
-        // Lens ghosts remain a secondary camera artifact, never a second sun.
         const auto ghost = celestialSunLensGhostSample(.53F, 0);
         PALADIN_CHECK(ghost.alpha >= 10 && ghost.alpha <= 30);
         PALADIN_CHECK(ghost.red < ghost.blue);
