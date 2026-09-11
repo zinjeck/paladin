@@ -12,9 +12,9 @@ namespace Paladin
 {
     // Pixel-art stabilization is a presentation concern only. The authoritative
     // camera remains continuous for input, picking and simulation. At close
-    // world scale we quantize only the render camera to the canonical 16-art-
-    // pixels-per-tile lattice, so a tiny pan shifts the prepared terrain by a
-    // whole art pixel instead of resampling every high-contrast cluster.
+    // world scale we quantize only the terrain SOURCE camera to the canonical
+    // 16-art-pixels-per-tile lattice. The local tangent compositor later adds
+    // the sub-art-pixel camera residual back as rigid whole-screen-pixel motion.
     struct WorldPixelStabilityPolicy
     {
         double enterTilePixels = 28.0;
@@ -79,27 +79,22 @@ namespace Paladin
             return stable;
         }
 
-        // Preserve the real camera's roll/orientation. Apply only the minimum
-        // world-space correction needed to move the view center from the
-        // continuous surface coordinate onto the nearest art-pixel coordinate.
+        // Snap only the centered world coordinate. Preserve the current local
+        // screen roll EXACTLY instead of deriving it from a small quaternion
+        // correction. Otherwise every 1/16-tile source-camera step can also
+        // perturb the tangent angle and force a full nearest-neighbour reraster.
         const auto view = GlobeView::from(
             camera,
             grid,
             screenWidth,
             screenHeight
         );
-        const auto actualCenter = WorldSurface::sphere(
-            camera.tileX() / grid.width(),
-            camera.tileY() / grid.height()
-        );
-        const auto snappedCenter = WorldSurface::sphere(
-            snappedX / grid.width(),
-            snappedY / grid.height()
-        );
-        const auto correction =
-            PlanetRotation::between(snappedCenter, actualCenter).normalized();
+        const double surfaceRoll = view.surfaceRollRadians();
         stable.setPlanetRotation(
-            (view.orientation() * correction).normalized(),
+            GlobeView::orientationAt(
+                {snappedX / grid.width(), snappedY / grid.height()},
+                surfaceRoll
+            ),
             grid.width(),
             grid.height()
         );
