@@ -21,6 +21,12 @@ namespace Paladin
         [[nodiscard]]
         int height() const noexcept;
 
+        // Runtime optical effects such as emitted light need additive
+        // composition without exposing SDL_Texture outside this abstraction.
+        // Authored sprites continue to use their existing alpha/premultiplied
+        // paths unless a caller opts into this explicitly.
+        void setAdditiveBlending(bool enabled) noexcept;
+
     private:
         friend class Renderer;
 
