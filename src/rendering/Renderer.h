@@ -198,7 +198,9 @@ namespace Paladin
         void endPixelScene(
             std::uint8_t opacity,
             double rotationDegrees,
-            double compositeScale
+            double compositeScale,
+            double compositeOffsetX = 0.0,
+            double compositeOffsetY = 0.0
         );
 
     private:
