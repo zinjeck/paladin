@@ -1,0 +1,135 @@
+diff --git a/src/core/ApplicationCityScreen.cpp b/src/core/ApplicationCityScreen.cpp
+index f5d8d58..b031c42 100644
+--- a/src/core/ApplicationCityScreen.cpp
++++ b/src/core/ApplicationCityScreen.cpp
+@@ -144,6 +144,23 @@ namespace Paladin
+                 }
+             }
+         }
++        std::array<ResourceDailyRates, 4> goodsRates{};
++        if (settlementMap && citySettlement)
++        {
++            const auto& report = settlementMap->commerce.dailyResourceReport(
++                *settlementMap, citySettlement->simulationState().citizens(),
++                double(worldTime.totalGameMinutes())
++            );
++            constexpr std::array names{"stone", "lumber", "fish", "meat"};
++            for (std::size_t i = 0; i < names.size(); ++i)
++            {
++                if (const auto found = report.find(names[i]); found != report.end())
++                {
++                    goodsRates[i] = found->second;
++                }
++            }
++        }
++        cityHud_->setGoodsDailyRates(goodsRates);
+         cityHud_->setGoodsAmounts(
+             goodsAmounts[0],
+             goodsAmounts[1],
+diff --git a/src/rendering/SceneSpriteLibrary.cpp b/src/rendering/SceneSpriteLibrary.cpp
+index 7e2d370..eabf32d 100644
+--- a/src/rendering/SceneSpriteLibrary.cpp
++++ b/src/rendering/SceneSpriteLibrary.cpp
+@@ -473,7 +473,8 @@ namespace Paladin
+             return 1 + seed % 3;
+         };
+         const auto* trunk = find("tree.trunk." + std::to_string(choice()));
+-        const auto* branch = find("tree.branch." + std::to_string(choice()));
++        const auto branchVariant = choice();
++        const auto* branch = find("tree.branch." + std::to_string(branchVariant));
+         const auto* crown = find("tree.crown." + std::to_string(choice()));
+         if (!trunk || !branch || !crown)
+         {
+@@ -519,7 +520,10 @@ namespace Paladin
+             const auto* bark =
+                 find("tree.birch-trunk." + std::to_string(1 + id % 3));
+             part(bark ? *bark : *trunk, 0, 1, 0, 0);
+-            part(*branch, .40 * crownScale, crownScale * .75, sway * .35, 1);
++            const auto* birchBranch =
++                find("tree.birch-branch." + std::to_string(branchVariant));
++            part(birchBranch ? *birchBranch : *branch,
++                 .40 * crownScale, crownScale * .75, sway * .35, 1);
+             part(
+                 *crown,
+                 .62 * crownScale,
+diff --git a/src/rendering/SettlementEnvironmentDetails.cpp b/src/rendering/SettlementEnvironmentDetails.cpp
+index 5e739c2..9b011bd 100644
+--- a/src/rendering/SettlementEnvironmentDetails.cpp
++++ b/src/rendering/SettlementEnvironmentDetails.cpp
+@@ -140,6 +140,21 @@ namespace Paladin
+         {
+             return;
+         }
++        const auto* building = map.objectState().completedObjectAt(f.topLeft);
++        const bool northEntry = building && building->footprint == f &&
++            building->objectTypeId == SettlementObjectTypes::House &&
++            building->door && building->door->y == f.topLeft.y;
++        std::vector<bool> northRoad(std::size_t(f.width), false);
++        if (northEntry)
++        {
++            for (int column = 0; column < f.width; ++column)
++            {
++                const auto* neighbor = map.objectState().completedObjectAt(
++                    {f.topLeft.x + column, f.topLeft.y - 1});
++                northRoad[std::size_t(column)] = neighbor &&
++                    neighbor->objectTypeId == SettlementObjectTypes::Road;
++            }
++        }
+         // Keep the authored wall/foundation nearly against neighboring roads.
+         // The cached dirt skirt is intentionally compact; close-view stones,
+         // weeds and timber ends add breakup without creating a fake front yard.
+@@ -182,9 +197,20 @@ namespace Paladin
+                     std::min(std::max(dx, dy), 0.) - .25;
+                 const double grain = .028 * std::sin(x * 9 + y * 5) +
+                                      .018 * std::sin(y * 17 - x * 3);
+-                const int alpha = int(
++                int alpha = int(
+                     88 * std::clamp((.20 - distance + grain) / .34, 0., 1.)
+                 );
++                const int column = int(std::floor(x + cell * .5)) - f.topLeft.x;
++                if (northEntry && column >= 0 && column < f.width &&
++                    northRoad[std::size_t(column)] &&
++                    y + cell * .5 < f.topLeft.y + 1)
++                {
++                    // The hipped roof exposes small corners of the north wall
++                    // ring. Join their ground to the adjacent road using that
++                    // road's identical world-anchored material. The roof and
++                    // usable interior are unchanged; cutaway floors draw above.
++                    alpha = 255;
++                }
+                 groundPatch(q, p, sprites, *soil, x, y, cell, cell, id, alpha);
+             }
+         }
+diff --git a/src/rendering/SettlementGroundCache.h b/src/rendering/SettlementGroundCache.h
+index 0060568..e90e68a 100644
+--- a/src/rendering/SettlementGroundCache.h
++++ b/src/rendering/SettlementGroundCache.h
+@@ -54,6 +54,28 @@ namespace Paladin
+                     }
+                 }
+             }
++            if (object.objectTypeId != SettlementObjectTypes::Road)
++            {
++                add(object.door ? std::uint32_t(object.door->x) : ~0u);
++                add(object.door ? std::uint32_t(object.door->y) : ~0u);
++                // Building ground now depends on touching roads. Keep this a
++                // local perimeter dependency, not a global cache invalidation.
++                const auto neighbor = [&](int x, int y)
++                {
++                    const auto* at = map.objectState().completedObjectAt({x, y});
++                    add(at ? at->id.value() : 0);
++                };
++                for (int x = f.topLeft.x - 1; x <= f.topLeft.x + f.width; ++x)
++                {
++                    neighbor(x, f.topLeft.y - 1);
++                    neighbor(x, f.topLeft.y + f.height);
++                }
++                for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
++                {
++                    neighbor(f.topLeft.x - 1, y);
++                    neighbor(f.topLeft.x + f.width, y);
++                }
++            }
+             return hash;
+         }
+ 

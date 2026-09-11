@@ -1,25 +1,36 @@
-name: City review source snapshot
+name: Apply city review fixes
 on:
   push:
     branches: [fix/city-art-resource-flow]
-    paths: [.github/workflows/city-review-snapshot.yml]
+    paths:
+      - '.github/workflows/city-review-snapshot.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
-  snapshot:
+  apply:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch the game's pinned rendering dependencies
-        run: |
-          mkdir -p /tmp/paladin-deps
-          cd /tmp/paladin-deps
-          git clone --depth 1 --branch release-3.2.20 https://github.com/libsdl-org/SDL.git sdl3
-          git clone --depth 1 --branch release-3.2.2 --recurse-submodules --shallow-submodules https://github.com/libsdl-org/SDL_ttf.git sdl3_ttf
-          git clone --depth 1 --branch release-3.2.4 https://github.com/libsdl-org/SDL_image.git sdl3_image
-          find . -name .git -type d -prune -exec rm -rf '{}' +
-          tar -czf /tmp/paladin-deps.tar.gz .
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: city-review-deps
-          path: /tmp/paladin-deps.tar.gz
-          retention-days: 1
+          fetch-depth: 0
+      - name: Apply reviewed source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          for patch in .review-patches/*.patch; do
+            git apply --check "$patch"
+            git apply "$patch"
+          done
+          rm -rf .review-patches
+          rm .github/workflows/city-review-snapshot.yml
+          git diff --check
+      - name: Commit reviewed changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Fix city art presentation and goods flow reporting"
+          git push origin HEAD:fix/city-art-resource-flow

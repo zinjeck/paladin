@@ -1,0 +1,158 @@
+diff --git a/src/world/settlements/SettlementCommerce.cpp b/src/world/settlements/SettlementCommerce.cpp
+index 303b6b4..b434b82 100644
+--- a/src/world/settlements/SettlementCommerce.cpp
++++ b/src/world/settlements/SettlementCommerce.cpp
+@@ -1,4 +1,6 @@
+ #include "world/settlements/SettlementCommerce.h"
++#include "world/settlements/SettlementFoodDemand.h"
++#include "world/settlements/SettlementResourceDefinition.h"
+ #include "world/settlements/SettlementMap.h"
+ #include "world/settlements/citizens/SettlementCitizenState.h"
+ #include "world/settlements/objects/SettlementObjectDefinition.h"
+@@ -8,6 +10,77 @@
+ 
+ namespace Paladin
+ {
++    void SettlementCommerce::recordProduction(std::string_view resource, int amount)
++    {
++        if (amount <= 0) { return; }
++        resourceTotals_[std::string(resource)].produced += amount;
++        resourceFlows_.record(resource, currentMinute_, amount, 0);
++    }
++
++    void SettlementCommerce::recordConsumption(std::string_view resource, int amount)
++    {
++        if (amount <= 0) { return; }
++        resourceTotals_[std::string(resource)].consumed += amount;
++        resourceFlows_.record(resource, currentMinute_, 0, amount);
++    }
++
++    const std::unordered_map<std::string, ResourceDailyRates>&
++    SettlementCommerce::dailyResourceReport(
++        const SettlementMap& map, const SettlementCitizenState& people,
++        double minute
++    ) const
++    {
++        // HUD reads are pure; refresh at most once per game minute, not per
++        // rendered frame. Each settlement owns its own history and snapshot.
++        const double now = std::floor(std::max(0.0, minute));
++        if (reportMinute_ == now && reportPopulation_ == people.citizens().size())
++        {
++            return dailyReport_;
++        }
++        reportMinute_ = now;
++        reportPopulation_ = people.citizens().size();
++        dailyReport_.clear();
++        double demand = 0, eaten = 0, available = 0;
++        for (const auto& citizen : people.citizens())
++        {
++            demand += citizenFoodPerDay(citizen, map.activities.policy);
++        }
++        std::unordered_map<std::string, double> foodStocks;
++        for (const auto& inventory : map.logistics.inventories())
++        {
++            if (inventory.kind == InventoryKind::Construction) { continue; }
++            for (const auto& goods : inventory.goods)
++            {
++                const auto* definition = SettlementResourceCatalog::definition(goods.resource);
++                if (definition && definition->edible && goods.amount > 0)
++                {
++                    foodStocks[goods.resource] += goods.amount;
++                    available += goods.amount;
++                }
++            }
++        }
++        for (const auto& definition : SettlementResourceCatalog::definitions())
++        {
++            auto rates = resourceFlows_.lastDay(definition.id, now);
++            if (definition.edible) { eaten += rates.depletion; }
++            dailyReport_[std::string(definition.id)] = rates;
++        }
++        for (const auto& definition : SettlementResourceCatalog::definitions())
++        {
++            if (!definition.edible) { continue; }
++            auto& rates = dailyReport_.at(std::string(definition.id));
++            // Observed meal mix includes public/market meals and food eaten
++            // while carrying. Before the first meal use available food shares.
++            // Shares sum to ONE city demand, never one full demand per food.
++            const double share = eaten > 0 ? rates.depletion / eaten
++                : available > 0 ? foodStocks[std::string(definition.id)] / available
++                                : 0;
++            rates.depletion = demand * share;
++            rates.foodEstimate = true;
++        }
++        return dailyReport_;
++    }
++
+     void SettlementCommerce::recordFlow(
+         InventoryId source,
+         InventoryId destination,
+@@ -22,11 +95,11 @@ namespace Paladin
+         }
+         if (!source && destination)
+         {
+-            resourceTotals_[std::string(resource)].produced += amount;
++            recordProduction(resource, amount);
+         }
+         if (source && consumer && !destination)
+         {
+-            resourceTotals_[std::string(resource)].consumed += amount;
++            recordConsumption(resource, amount);
+         }
+         const auto key = std::to_string(source.value()) + ":" +
+                          std::to_string(destination.value()) + ":" +
+@@ -143,7 +216,7 @@ namespace Paladin
+                     std::min(requested, map.logistics.freeSpace(to->id));
+                 if (map.logistics.add(to->id, flow.resource, amount, minute))
+                 {
+-                    resourceTotals_[flow.resource].produced += amount;
++                    recordProduction(flow.resource, amount);
+                 }
+             }
+             else if (from && to)
+@@ -205,7 +278,7 @@ namespace Paladin
+                     map.logistics
+                         .moveAvailable(source.id, {}, flow.resource, 1);
+                     recordMeal(*person, price == 0);
+-                    resourceTotals_[flow.resource].consumed += 1;
++                    recordConsumption(flow.resource, 1);
+                 }
+             }
+         }
+diff --git a/src/world/settlements/SettlementCommerce.h b/src/world/settlements/SettlementCommerce.h
+index 29c1e22..eabae6d 100644
+--- a/src/world/settlements/SettlementCommerce.h
++++ b/src/world/settlements/SettlementCommerce.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "core/StrongId.h"
++#include "world/settlements/ResourceFlowHistory.h"
+ #include "world/settlements/SettlementLogistics.h"
+ #include <algorithm>
+ #include <cstdint>
+@@ -84,6 +85,13 @@ namespace Paladin
+         {
+             return resourceTotals_;
+         }
++        // Call only after physical production/consumption succeeds. Internal
++        // transfers, reservations and refunded construction goods are not flows.
++        void recordProduction(std::string_view resource, int amount);
++        void recordConsumption(std::string_view resource, int amount);
++        const std::unordered_map<std::string, ResourceDailyRates>& dailyResourceReport(
++            const SettlementMap&, const SettlementCitizenState&, double minute
++        ) const;
+         CommercePolicy policy;
+         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
+         bool keepFoodSalesEnabled = false;
+@@ -204,6 +212,10 @@ namespace Paladin
+ 
+     private:
+         std::unordered_map<std::string, ResourceTotals> resourceTotals_;
++        ResourceFlowHistory resourceFlows_;
++        mutable double reportMinute_ = -1;
++        mutable std::size_t reportPopulation_ = 0;
++        mutable std::unordered_map<std::string, ResourceDailyRates> dailyReport_;
+         struct FrozenFlow
+         {
+             InventoryId source, destination;
