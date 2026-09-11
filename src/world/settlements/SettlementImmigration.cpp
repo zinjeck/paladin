@@ -1,4 +1,5 @@
 #include "world/settlements/SettlementImmigration.h"
+#include "world/settlements/SettlementFoodDemand.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
@@ -56,13 +57,7 @@ namespace Paladin
             ++conditions_.residents;
             happiness += c.happiness;
             unhoused += !c.homeId;
-            const double share = !c.child ? 1
-                                 : c.ageYears < needs.independentEatingAge
-                                     ? needs.nursingFoodShare
-                                     : needs.dependentFoodShare;
-            conditions_.foodPerDay += needs.hungerPerDay /
-                                      std::max(1.0, needs.mealRestoration) *
-                                      share;
+            conditions_.foodPerDay += citizenFoodPerDay(c, needs);
         }
         for (const auto& inventory : map.logistics.inventories())
         {

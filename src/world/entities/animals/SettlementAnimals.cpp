@@ -348,6 +348,7 @@ namespace Paladin
             animalSpecies(a->species)->huntMeat,
             minute
         );
+        map.commerce.recordProduction("meat", animalSpecies(a->species)->huntMeat);
         a->health = 0;
         --pendingOrders_;
         a->order = AnimalOrder::None;

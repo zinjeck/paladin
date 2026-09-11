@@ -1162,7 +1162,32 @@ namespace Paladin
             {
                 if (goodsCells_[i].contains(x, y))
                 {
-                    return goods[i];
+                    if (i >= goodsDailyRates_.size()) { return goods[i]; }
+                    const auto& rates = goodsDailyRates_[i];
+                    const auto number = [](double value)
+                    {
+                        std::ostringstream text;
+                        text << std::fixed << std::setprecision(1) << value;
+                        return text.str();
+                    };
+                    std::string text = std::string(goods[i]) +
+                        "\nProduction/day: " + number(rates.production);
+                    if (rates.depletion > 1e-7)
+                    {
+                        text += "\nDepletion/day: " + number(rates.depletion);
+                        if (rates.foodEstimate) { text += " (estimated need)"; }
+                    }
+                    text += "\nProduction: last 24 game hours.";
+                    if (rates.foodEstimate && rates.depletion > 1e-7)
+                    {
+                        text += "\nDaily food need, shared by recent diet."
+                                "\nBefore meals are observed: available food mix.";
+                    }
+                    else if (rates.depletion > 1e-7)
+                    {
+                        text += "\nDepletion: actual use in the last 24 game hours.";
+                    }
+                    return text;
                 }
             }
         }

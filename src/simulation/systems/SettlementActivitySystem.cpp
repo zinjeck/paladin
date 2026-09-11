@@ -139,7 +139,12 @@ namespace Paladin
                 occupiedHomes.insert(c.homeId);
             }
         }
+        const auto fuelBefore = map.heating.lumberBurned();
         map.heating.advance(map.logistics, occupiedHomes, minute, elapsed);
+        map.commerce.recordConsumption(
+            SettlementResourceTypes::Lumber,
+            int(map.heating.lumberBurned() - fuelBefore)
+        );
         map.naturalFeatures().regrow(map.grid(), map.objectState(), minute);
         if (jobBoard_.refreshCommandBoard(map))
         {
@@ -222,6 +227,7 @@ namespace Paladin
                 cargoDefinition->edible &&
                 map.logistics.consumeCarriedUnit(c.id))
             {
+                map.commerce.recordConsumption(c.carriedResource, 1);
                 --c.carriedAmount;
                 c.modifyAttributes(
                     {{AttributeEffect::Meals, -policy.mealRestoration}}
@@ -870,6 +876,14 @@ namespace Paladin
             );
             if (object)
             {
+                if (const auto* delivered = map.logistics.inventory(
+                        map.logistics.forSite(c.task.site)))
+                {
+                    for (const auto& goods : delivered->goods)
+                    {
+                        map.commerce.recordConsumption(goods.resource, goods.amount);
+                    }
+                }
                 map.logistics.consumeSite(c.task.site);
                 map.logistics.synchronize(map.objectState(), minute);
                 finish(map, c, minute);
@@ -914,6 +928,12 @@ namespace Paladin
                             : SettlementResourceTypes::Stone,
                         4,
                         minute
+                    );
+                    map.commerce.recordProduction(
+                        feature.kind == NaturalFeatureKind::Tree
+                            ? SettlementResourceTypes::Lumber
+                            : SettlementResourceTypes::Stone,
+                        4
                     );
                     map.naturalFeatures().harvest(c.task.workTile, minute);
                 }
@@ -1414,19 +1434,11 @@ namespace Paladin
                     map.objectState().accrueProduction(objectId, elapsed * rate)
                 )
             );
-            if (fish > 0)
+            if (fish > 0 && map.logistics.add(
+                    inventory, SettlementResourceTypes::Fish, fish, minute))
             {
                 map.commerce.recordFlow(
-                    {},
-                    inventory,
-                    SettlementResourceTypes::Fish,
-                    fish
-                );
-                map.logistics.add(
-                    inventory,
-                    SettlementResourceTypes::Fish,
-                    fish,
-                    minute
+                    {}, inventory, SettlementResourceTypes::Fish, fish
                 );
             }
         }
