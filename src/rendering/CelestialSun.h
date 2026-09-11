@@ -65,8 +65,7 @@ namespace Paladin
         const float y = float(view.cy) - focal * float(direction.y) / depth;
 
         // This is the very faint outer glare radius used only for culling. The
-        // white source itself is tiny; almost all apparent size comes from soft
-        // optical bloom and glare.
+        // actual overexposed source is tiny; apparent size comes from bloom.
         const float extent = 310.F * scale;
         if (x + extent < 0 || y + extent < 0 || x - extent >= width ||
             y - extent >= height)
@@ -100,24 +99,24 @@ namespace Paladin
             float width;
             float length;
             float strength;
-            float curvature;
         };
 
-        // These are deliberately broad optical lobes, not line primitives.
-        // Their different widths, lengths and slight curvature prevent the
-        // familiar "circle with spokes" silhouette while retaining the long,
-        // irregular glare seen in orbital photography.
-        inline constexpr std::array<GlareLobe, 10> GlareLobes{{
-            {.08F, .055F, .98F, .30F, .050F},
-            {3.20F, .052F, .92F, .25F, -.040F},
-            {1.52F, .060F, .84F, .22F, -.030F},
-            {4.74F, .062F, .78F, .20F, .040F},
-            {.72F, .078F, .71F, .17F, .050F},
-            {3.88F, .082F, .68F, .14F, -.060F},
-            {2.28F, .070F, .61F, .13F, .040F},
-            {5.42F, .074F, .58F, .11F, -.040F},
-            {1.02F, .105F, .52F, .085F, .020F},
-            {5.94F, .110F, .47F, .075F, -.020F}
+        // Broad deterministic glare cones. They are texture fields, never line
+        // primitives. Width expands with distance so each ray diffuses into the
+        // corona instead of reading as a spoke drawn from a circle.
+        inline constexpr std::array<GlareLobe, 12> GlareLobes{{
+            {.10F, .045F, .98F, .18F},
+            {3.25F, .050F, .92F, .15F},
+            {1.47F, .048F, .88F, .16F},
+            {4.67F, .052F, .83F, .14F},
+            {.72F, .060F, .76F, .12F},
+            {3.86F, .064F, .71F, .10F},
+            {2.24F, .058F, .66F, .11F},
+            {5.39F, .062F, .61F, .095F},
+            {1.02F, .072F, .57F, .080F},
+            {4.12F, .075F, .52F, .070F},
+            {2.74F, .068F, .48F, .065F},
+            {5.88F, .080F, .44F, .055F}
         }};
 
         inline float glareLobe(
@@ -134,28 +133,26 @@ namespace Paladin
                 return 0.F;
             }
 
-            const float lateral =
-                -x * s + y * c - lobe.curvature * longitudinal * longitudinal;
+            const float lateral = std::abs(-x * s + y * c);
             const float along = std::clamp(
                 longitudinal / std::max(.001F, lobe.length),
                 0.F,
                 1.F
             );
-            const float width = lobe.width * (.82F + .70F * along);
+            const float width = lobe.width * (.45F + 1.15F * along);
             const float transverse = std::exp(
                 -.5F * (lateral / width) * (lateral / width)
             );
             const float fade = std::exp(-std::pow(
                 longitudinal / std::max(.001F, lobe.length),
-                1.28F
+                1.15F
             ));
             return lobe.strength * transverse * fade;
         }
     } // namespace CelestialSunOptics
 
-    // Broad, smooth optical glare. This deliberately contains no hard solar
-    // disc and no rendered line rays. The source is built from continuous
-    // radial falloff, a slightly irregular corona and wide anisotropic lobes.
+    // Main optical field. It contains no hard solar disc and no line-rendered
+    // rays. The image is continuous radial bloom plus broad anisotropic glare.
     inline RenderColor celestialSunCoronaSample(float x, float y)
     {
         using namespace CelestialSunOptics;
@@ -166,44 +163,36 @@ namespace Paladin
         }
 
         const float angle = std::atan2(y, x);
-        const float coronaVariation = std::clamp(
-            1.F + .065F * std::sin(5.F * angle + .8F) +
-                .040F * std::sin(9.F * angle + 2.2F) +
-                .025F * std::sin(17.F * angle - .35F),
-            .78F,
-            1.22F
+        const float irregularity = std::clamp(
+            1.F + .035F * std::sin(7.F * angle + .3F) +
+                .020F * std::sin(15.F * angle + 1.1F),
+            .90F,
+            1.10F
         );
 
-        const float sourceVeil = .14F * std::exp(-std::pow(radius / .055F, 2.F));
+        const float sourceBloom =
+            .18F * std::exp(-std::pow(radius / .065F, 2.F));
         const float innerCorona =
-            .26F * std::exp(-std::pow(radius / .12F, 1.55F));
+            .42F * std::exp(-std::pow(radius / .22F, 1.35F));
         const float middleCorona =
-            .18F * std::exp(-std::pow(radius / .28F, 1.28F)) *
-            coronaVariation;
+            .16F * std::exp(-std::pow(radius / .46F, 1.18F));
         const float outerHalo =
-            .048F * std::exp(-std::pow(radius / .58F, 1.40F));
+            .045F * std::exp(-std::pow(radius / .80F, 1.55F));
 
         float glare = 0.F;
         for (const auto& lobe : GlareLobes)
         {
             glare += glareLobe(x, y, lobe);
         }
-        glare *= smooth01((radius - .04F) / .09F) *
+        glare *= smooth01((radius - .045F) / .09F) *
                  smooth01((1.F - radius) / .12F);
 
-        // A pair of very broad optical streaks gives the source photographic
-        // glare without reintroducing visible geometric spokes.
-        const float broadStreaks =
-            .020F * std::exp(-std::abs(y) * 18.F) *
-                std::exp(-radius * 2.2F) +
-            .016F * std::exp(-std::abs(x) * 20.F) *
-                std::exp(-radius * 2.4F);
-
         const float radiance = std::clamp(
-            sourceVeil + innerCorona + middleCorona + outerHalo + glare +
-                broadStreaks * smooth01((radius - .03F) / .08F),
+            (sourceBloom + innerCorona + middleCorona + outerHalo) *
+                    irregularity +
+                glare,
             0.F,
-            .94F
+            .92F
         );
         if (radiance < .0015F)
         {
@@ -213,15 +202,15 @@ namespace Paladin
         const float hot = std::exp(-radius * 4.5F);
         return {
             255,
-            channel(226.F + 29.F * hot),
-            channel(176.F + 79.F * hot),
+            channel(230.F + 25.F * hot),
+            channel(190.F + 65.F * hot),
             channel(255.F * radiance)
         };
     }
 
-    // Tiny, continuously graded white-hot source. It has no flat circular
-    // plateau: intensity falls immediately from the center so the result reads
-    // as overexposure and bloom rather than a painted white game disc.
+    // Tiny source contribution. It is intentionally not an opaque white disc.
+    // Additive composition with the corona clips only the innermost few pixels
+    // to white, reproducing camera overexposure without exposing a circle edge.
     inline RenderColor celestialSunCoreSample(float x, float y)
     {
         using namespace CelestialSunOptics;
@@ -231,23 +220,24 @@ namespace Paladin
             return {0, 0, 0, 0};
         }
 
-        const float hot = std::exp(-std::pow(radius / .18F, 2.F));
-        const float bloom = .42F * std::exp(-std::pow(radius / .52F, 1.70F));
-        float radiance = 1.F - (1.F - hot) * (1.F - bloom);
-        radiance *= CelestialSunOptics::smooth01((1.F - radius) / .16F);
+        const float hot = .44F * std::exp(-std::pow(radius / .10F, 2.F));
+        const float bloom =
+            .10F * std::exp(-std::pow(radius / .55F, 1.70F));
+        float radiance = (hot + bloom) *
+                         smooth01((1.F - radius) / .18F);
+        radiance = std::clamp(radiance, 0.F, .54F);
 
         const float white = std::exp(-std::pow(radius / .45F, 1.6F));
         return {
             255,
-            channel(244.F + 11.F * white),
-            channel(220.F + 35.F * white),
-            channel(255.F * std::clamp(radiance, 0.F, 1.F))
+            channel(248.F + 7.F * white),
+            channel(232.F + 23.F * white),
+            channel(255.F * radiance)
         };
     }
 
-    // A faint camera artifact used only when the white source itself is at
-    // least partially visible. It is intentionally broad, translucent and
-    // ring-like rather than a bright UI-style lens flare sprite.
+    // Faint secondary camera artifact. It remains broad and translucent so it
+    // never competes with the actual source.
     inline RenderColor celestialSunLensGhostSample(float x, float y)
     {
         using namespace CelestialSunOptics;
@@ -260,7 +250,11 @@ namespace Paladin
         const float ring = std::exp(-std::pow((radius - .53F) / .17F, 2.F));
         const float haze = .35F * std::exp(-std::pow(radius / .72F, 2.F));
         const float edge = smooth01((1.F - radius) / .18F);
-        const float radiance = std::clamp((.080F * ring + .025F * haze) * edge, 0.F, .10F);
+        const float radiance = std::clamp(
+            (.080F * ring + .025F * haze) * edge,
+            0.F,
+            .10F
+        );
         return {205, 222, 255, channel(255.F * radiance)};
     }
 
@@ -308,9 +302,6 @@ namespace Paladin
             const float globeY = float(view.cy);
             const float globeRadius = float(view.radius * 1.03);
 
-            // The broad corona carries almost all apparent size. The actual
-            // white source is intentionally tiny, closer to a camera-clipped
-            // star than a visible circular sprite.
             drawOccludedLayer(
                 renderer,
                 *coronaTexture_,
@@ -327,7 +318,7 @@ namespace Paladin
                 *coreTexture_,
                 projected->x,
                 projected->y,
-                46.F * projected->scale,
+                18.F * projected->scale,
                 globeX,
                 globeY,
                 globeRadius,
@@ -356,7 +347,7 @@ namespace Paladin
                 projected.x - globeX,
                 projected.y - globeY
             );
-            const float sourceRadius = 10.F * projected.scale;
+            const float sourceRadius = 7.F * projected.scale;
             const float lower = globeRadius - sourceRadius;
             const float upper = globeRadius + sourceRadius;
             return CelestialSunOptics::smooth01(
@@ -510,10 +501,6 @@ namespace Paladin
                 const float y0 = top + diameter * v0;
                 const float y1 = top + diameter * v1;
 
-                // Mask at the Y within this approximately one-pixel strip that
-                // is nearest the globe center. This intentionally over-occludes
-                // by a subpixel amount instead of leaking bright light through
-                // the planet silhouette.
                 const float maskY = std::clamp(globeY, y0, y1);
                 const float dy = maskY - globeY;
                 const float circle = globeRadius * globeRadius - dy * dy;
@@ -614,11 +601,6 @@ namespace Paladin
                 return texture;
             };
 
-            // 1024 source pixels keep the large, soft glare smooth even on high
-            // DPI output. The smaller layers are still oversampled relative to
-            // their on-screen size. CPU generation happens only during prepare
-            // or after an explicit renderer reset, then the temporary pixels are
-            // released immediately.
             coronaTexture_ = create(1024, celestialSunCoronaSample);
             coreTexture_ = create(384, celestialSunCoreSample);
             lensGhostTexture_ = create(256, celestialSunLensGhostSample);
