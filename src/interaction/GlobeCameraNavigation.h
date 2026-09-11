@@ -30,14 +30,28 @@ namespace Paladin
             {
                 return;
             }
+
+            // Panning should move the point under the camera, not quietly add a
+            // second roll channel. The old raw quaternion step parallel-
+            // transported the local tangent frame, changing its screen angle on
+            // every WASD/edge-scroll frame. At close zoom that forced the rigid
+            // nearest-neighbour tangent raster to be re-rotated every frame and
+            // produced the visible terrain shimmer. Preserve the exact current
+            // surface roll; Q/E remains the sole intentional roll control.
+            const double surfaceRoll = view.surfaceRollRadians();
             const auto step = PlanetRotation::axis(
                 -dy,
                 -dx,
                 0,
                 screenPixels * length / view.radius
             );
+            const auto tentative =
+                (step * view.orientation()).normalized();
+            const auto center = WorldSurface::coordinates(
+                tentative.inverse().apply({0, 0, 1})
+            );
             camera.setPlanetRotation(
-                step * view.orientation(),
+                GlobeView::orientationAt(center, surfaceRoll),
                 grid.width(),
                 grid.height()
             );
@@ -74,23 +88,11 @@ namespace Paladin
                 return {};
             }
 
-            constexpr double pi = 3.14159265358979323846;
-            const double u = (position.x + .5) / grid.width();
-            const double v = (position.y + .5) / grid.height();
-            const double longitude = (u - .5) * 2 * pi;
-            const double latitude = (.5 - v) * pi;
-            const auto normal = WorldSurface::sphere(u, v);
-            const WorldSurface::Point3 north{
-                -std::sin(latitude) * std::sin(longitude),
-                std::cos(latitude),
-                -std::sin(latitude) * std::cos(longitude)
-            };
-            const auto centered =
-                PlanetRotation::between(normal, {0, 0, 1}).normalized();
-            const auto viewUp = centered.apply(north);
-            const double rollAngle = std::atan2(viewUp.x, viewUp.y);
-            return (PlanetRotation::axis(0, 0, 1, rollAngle) * centered)
-                .normalized();
+            return GlobeView::orientationAt(
+                {(position.x + .5) / grid.width(),
+                 (position.y + .5) / grid.height()},
+                0.0
+            );
         }
 
         static bool focusNorthUp(
@@ -139,9 +141,17 @@ namespace Paladin
                 }
                 return WorldSurface::Point3{x, y, std::sqrt(1 - r2)};
             };
+
+            const double surfaceRoll = view.surfaceRollRadians();
+            const auto tentative =
+                (PlanetRotation::between(ball(oldX, oldY), ball(newX, newY)) *
+                 view.orientation())
+                    .normalized();
+            const auto center = WorldSurface::coordinates(
+                tentative.inverse().apply({0, 0, 1})
+            );
             camera.setPlanetRotation(
-                PlanetRotation::between(ball(oldX, oldY), ball(newX, newY)) *
-                    view.orientation(),
+                GlobeView::orientationAt(center, surfaceRoll),
                 grid.width(),
                 grid.height()
             );
