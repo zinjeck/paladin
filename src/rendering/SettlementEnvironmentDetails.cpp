@@ -140,6 +140,21 @@ namespace Paladin
         {
             return;
         }
+        const auto* building = map.objectState().completedObjectAt(f.topLeft);
+        const bool northEntry = building && building->footprint == f &&
+            building->objectTypeId == SettlementObjectTypes::House &&
+            building->door && building->door->y == f.topLeft.y;
+        std::vector<bool> northRoad(std::size_t(f.width), false);
+        if (northEntry)
+        {
+            for (int column = 0; column < f.width; ++column)
+            {
+                const auto* neighbor = map.objectState().completedObjectAt(
+                    {f.topLeft.x + column, f.topLeft.y - 1});
+                northRoad[std::size_t(column)] = neighbor &&
+                    neighbor->objectTypeId == SettlementObjectTypes::Road;
+            }
+        }
         // Keep the authored wall/foundation nearly against neighboring roads.
         // The cached dirt skirt is intentionally compact; close-view stones,
         // weeds and timber ends add breakup without creating a fake front yard.
@@ -182,9 +197,20 @@ namespace Paladin
                     std::min(std::max(dx, dy), 0.) - .25;
                 const double grain = .028 * std::sin(x * 9 + y * 5) +
                                      .018 * std::sin(y * 17 - x * 3);
-                const int alpha = int(
+                int alpha = int(
                     88 * std::clamp((.20 - distance + grain) / .34, 0., 1.)
                 );
+                const int column = int(std::floor(x + cell * .5)) - f.topLeft.x;
+                if (northEntry && column >= 0 && column < f.width &&
+                    northRoad[std::size_t(column)] &&
+                    y + cell * .5 < f.topLeft.y + 1)
+                {
+                    // The hipped roof exposes small corners of the north wall
+                    // ring. Join their ground to the adjacent road using that
+                    // road's identical world-anchored material. The roof and
+                    // usable interior are unchanged; cutaway floors draw above.
+                    alpha = 255;
+                }
                 groundPatch(q, p, sprites, *soil, x, y, cell, cell, id, alpha);
             }
         }

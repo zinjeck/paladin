@@ -486,6 +486,7 @@ namespace Paladin
                           "rock",
                           "tree.trunk",
                           "tree.birch-trunk",
+                          "tree.birch-branch",
                           "tree.conifer-crown",
                           "tree.branch",
                           "tree.crown"})
@@ -1371,17 +1372,6 @@ namespace Paladin
                               0,
                               spriteSide,
                               spriteSide}}
-                        );
-                    }
-                    if (custom && f.frame % 2)
-                    {
-                        queue.submit(
-                            {projection.bounds({x, y, 0, 1, .1, .5, .5}),
-                             {255, 215, 50, 255},
-                             y,
-                             id,
-                             2,
-                             0}
                         );
                     }
                 }
