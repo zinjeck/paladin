@@ -18,6 +18,8 @@ namespace Paladin
         std::uint8_t opacity_ = 255;
         double rotationDegrees_ = 0.0;
         double compositeScale_ = 1.0;
+        double compositeOffsetX_ = 0.0;
+        double compositeOffsetY_ = 0.0;
 
     public:
         WorldPixelScene(
@@ -25,13 +27,17 @@ namespace Paladin
             double tilePixels,
             std::uint8_t opacity = 255,
             double rotationDegrees = 0.0,
-            double compositeScale = 1.0
+            double compositeScale = 1.0,
+            double compositeOffsetX = 0.0,
+            double compositeOffsetY = 0.0
         )
             : renderer_(r),
               active_(r.beginPixelScene(worldPixelPitch(tilePixels), false)),
               opacity_(opacity),
               rotationDegrees_(rotationDegrees),
-              compositeScale_(compositeScale)
+              compositeScale_(compositeScale),
+              compositeOffsetX_(compositeOffsetX),
+              compositeOffsetY_(compositeOffsetY)
         {
         }
         ~WorldPixelScene()
@@ -41,7 +47,9 @@ namespace Paladin
                 renderer_.endPixelScene(
                     opacity_,
                     rotationDegrees_,
-                    compositeScale_
+                    compositeScale_,
+                    compositeOffsetX_,
+                    compositeOffsetY_
                 );
             }
         }
