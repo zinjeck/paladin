@@ -23,12 +23,16 @@ namespace Paladin
     void Renderer::endPixelScene(
         std::uint8_t opacity,
         double rotationDegrees,
-        double compositeScale
+        double compositeScale,
+        double compositeOffsetX,
+        double compositeOffsetY
     )
     {
         if (!pixelSceneTransparent_ && opacity == 255 &&
             std::abs(rotationDegrees) < 1e-9 &&
-            std::abs(compositeScale - 1.0) < 1e-9)
+            std::abs(compositeScale - 1.0) < 1e-9 &&
+            std::abs(compositeOffsetX) < 1e-9 &&
+            std::abs(compositeOffsetY) < 1e-9)
         {
             endPixelScene();
             return;
@@ -71,6 +75,20 @@ namespace Paladin
                 (float(outputWidth()) - destinationWidth) * 0.5F;
             destination.y =
                 (float(outputHeight()) - destinationHeight) * 0.5F;
+        }
+
+        // The tangent terrain source camera is snapped only so its INTERNAL
+        // nearest-neighbour raster never changes phase. Apply the authoritative
+        // camera remainder after rasterization as a rigid physical-screen
+        // translation. Callers quantize this offset to whole output pixels, so
+        // no terrain texel is independently resampled while panning.
+        if (std::isfinite(compositeOffsetX))
+        {
+            destination.x += float(compositeOffsetX);
+        }
+        if (std::isfinite(compositeOffsetY))
+        {
+            destination.y += float(compositeOffsetY);
         }
 
         SDL_SetTextureAlphaMod(pixelScene_->texture_, opacity);
