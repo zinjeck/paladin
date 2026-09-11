@@ -9,13 +9,17 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Archive tracked source for offline review
-        run: git archive --format=zip HEAD -o /tmp/paladin-source.zip
+      - name: Fetch the game's pinned rendering dependencies
+        run: |
+          mkdir -p /tmp/paladin-deps
+          cd /tmp/paladin-deps
+          git clone --depth 1 --branch release-3.2.20 https://github.com/libsdl-org/SDL.git sdl3
+          git clone --depth 1 --branch release-3.2.2 --recurse-submodules --shallow-submodules https://github.com/libsdl-org/SDL_ttf.git sdl3_ttf
+          git clone --depth 1 --branch release-3.2.4 https://github.com/libsdl-org/SDL_image.git sdl3_image
+          find . -name .git -type d -prune -exec rm -rf '{}' +
+          tar -czf /tmp/paladin-deps.tar.gz .
       - uses: actions/upload-artifact@v4
         with:
-          name: city-review-source
-          path: /tmp/paladin-source.zip
+          name: city-review-deps
+          path: /tmp/paladin-deps.tar.gz
           retention-days: 1
