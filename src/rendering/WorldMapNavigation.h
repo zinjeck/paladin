@@ -59,9 +59,11 @@ namespace Paladin
                     worldPresentationState(effectivePixels);
                 if (presentation.localWorldWeight >= 0.5F)
                 {
-                    // The close renderer is no longer the curved sphere. Pick
-                    // the same tangent chart that owns the visible terrain,
-                    // including the render-only art-pixel snap.
+                    // The close renderer rasterizes around a snapped 1/16-tile
+                    // source camera, then translates that finished raster by the
+                    // authoritative camera remainder. Picking must use the same
+                    // final translated chart or clicks drift by several screen
+                    // pixels at maximum zoom.
                     Camera2D renderCamera = pixelStableWorldCamera(
                         c,
                         g,
@@ -69,14 +71,17 @@ namespace Paladin
                         h,
                         true
                     );
-                    return LocalTangentWorldView::from(
-                               renderCamera,
-                               g,
-                               w,
-                               h,
-                               effectivePixels
-                    )
-                        .pick(x, y);
+                    auto tangent = LocalTangentWorldView::from(
+                        renderCamera,
+                        g,
+                        w,
+                        h,
+                        effectivePixels
+                    );
+                    const auto residual =
+                        tangent.rigidOffsetToCenter(c.tileX(), c.tileY());
+                    tangent = tangent.translated(residual.x, residual.y);
+                    return tangent.pick(x, y);
                 }
                 return globeView.pick(x, y);
             }
