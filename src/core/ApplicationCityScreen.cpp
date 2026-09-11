@@ -144,6 +144,23 @@ namespace Paladin
                 }
             }
         }
+        std::array<ResourceDailyRates, 4> goodsRates{};
+        if (settlementMap && citySettlement)
+        {
+            const auto& report = settlementMap->commerce.dailyResourceReport(
+                *settlementMap, citySettlement->simulationState().citizens(),
+                double(worldTime.totalGameMinutes())
+            );
+            constexpr std::array names{"stone", "lumber", "fish", "meat"};
+            for (std::size_t i = 0; i < names.size(); ++i)
+            {
+                if (const auto found = report.find(names[i]); found != report.end())
+                {
+                    goodsRates[i] = found->second;
+                }
+            }
+        }
+        cityHud_->setGoodsDailyRates(goodsRates);
         cityHud_->setGoodsAmounts(
             goodsAmounts[0],
             goodsAmounts[1],

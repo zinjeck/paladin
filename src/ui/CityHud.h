@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/Texture.h"
+#include "world/settlements/ResourceFlowHistory.h"
 #include "ui/UiButton.h"
 #include <memory>
 
@@ -97,6 +98,10 @@ namespace Paladin
             meatAmount_ = meat;
         }
 
+        void setGoodsDailyRates(std::array<ResourceDailyRates, 4> rates) noexcept
+        {
+            goodsDailyRates_ = rates;
+        }
         void pointerMoved(float x, float y) noexcept;
         std::string tooltipAt(float x, float y) const;
 
@@ -157,6 +162,7 @@ namespace Paladin
         double lumberAmount_ = 0;
         double fishAmount_ = 0;
         double meatAmount_ = 0;
+        std::array<ResourceDailyRates, 4> goodsDailyRates_{};
         std::array<UiButton, CategoryCount> bottomButtons_;
         UiRectangle toolbarBounds_;
         std::vector<UiButton> optionButtons_;

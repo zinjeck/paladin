@@ -473,7 +473,8 @@ namespace Paladin
             return 1 + seed % 3;
         };
         const auto* trunk = find("tree.trunk." + std::to_string(choice()));
-        const auto* branch = find("tree.branch." + std::to_string(choice()));
+        const auto branchVariant = choice();
+        const auto* branch = find("tree.branch." + std::to_string(branchVariant));
         const auto* crown = find("tree.crown." + std::to_string(choice()));
         if (!trunk || !branch || !crown)
         {
@@ -519,7 +520,10 @@ namespace Paladin
             const auto* bark =
                 find("tree.birch-trunk." + std::to_string(1 + id % 3));
             part(bark ? *bark : *trunk, 0, 1, 0, 0);
-            part(*branch, .40 * crownScale, crownScale * .75, sway * .35, 1);
+            const auto* birchBranch =
+                find("tree.birch-branch." + std::to_string(branchVariant));
+            part(birchBranch ? *birchBranch : *branch,
+                 .40 * crownScale, crownScale * .75, sway * .35, 1);
             part(
                 *crown,
                 .62 * crownScale,

@@ -54,6 +54,28 @@ namespace Paladin
                     }
                 }
             }
+            if (object.objectTypeId != SettlementObjectTypes::Road)
+            {
+                add(object.door ? std::uint32_t(object.door->x) : ~0u);
+                add(object.door ? std::uint32_t(object.door->y) : ~0u);
+                // Building ground now depends on touching roads. Keep this a
+                // local perimeter dependency, not a global cache invalidation.
+                const auto neighbor = [&](int x, int y)
+                {
+                    const auto* at = map.objectState().completedObjectAt({x, y});
+                    add(at ? at->id.value() : 0);
+                };
+                for (int x = f.topLeft.x - 1; x <= f.topLeft.x + f.width; ++x)
+                {
+                    neighbor(x, f.topLeft.y - 1);
+                    neighbor(x, f.topLeft.y + f.height);
+                }
+                for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
+                {
+                    neighbor(f.topLeft.x - 1, y);
+                    neighbor(f.topLeft.x + f.width, y);
+                }
+            }
             return hash;
         }
 

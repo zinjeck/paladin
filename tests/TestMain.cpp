@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "CelestialSunChecks.h"
+#include "CityResourceFlowChecks.h"
 #include "CloseWorldStabilityChecks.h"
 #include "PastureDormancyRegression.h"
 #include "Pr16Regression.h"
@@ -20,6 +21,7 @@ int main()
 {
     try
     {
+        Paladin::Test::runCityResourceFlowChecks();
         runEntityAttributeTests();
         runWorldReliefTests();
         runSettlementSimulationLoopTests();
