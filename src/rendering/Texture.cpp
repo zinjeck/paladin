@@ -26,4 +26,16 @@ namespace Paladin
     {
         return height_;
     }
+
+    void Texture::setAdditiveBlending(bool enabled) noexcept
+    {
+        if (!texture_)
+        {
+            return;
+        }
+        SDL_SetTextureBlendMode(
+            texture_,
+            enabled ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_BLEND
+        );
+    }
 } // namespace Paladin
