@@ -3,6 +3,7 @@
 #include "rendering/SettlementMarkerRenderer.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/WorldObjectPresentation.h"
+#include "rendering/WorldSurface.h"
 #include "rendering/WorldPresentation.h"
 
 #include <optional>
@@ -15,8 +16,8 @@ namespace Paladin
     class World;
 
     // Strategic objects intentionally sit above the 16-pixel terrain scene.
-    // Settlements/markers, armies, roads and temporary placement markers all
-    // share the 32-pixel object lattice. Natural features do not enter here.
+    // World roads and sprites share the 32-pixel object lattice. Screen-sized
+    // symbols and labels are native plates anchored to the same source camera.
     class WorldObjectRenderer
     {
     public:
@@ -29,7 +30,8 @@ namespace Paladin
             const WorldPresentationState& presentation,
             bool stabilizePixelPhase,
             std::span<const SpriteRenderItem> fallbackSprites = {},
-            std::optional<WorldPlacementMarker> placementMarker = std::nullopt
+            std::optional<WorldPlacementMarker> placementMarker = std::nullopt,
+            WorldSurface::Point3 rigidResidual = {}
         ) const;
 
     private:

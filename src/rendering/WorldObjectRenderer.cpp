@@ -74,7 +74,8 @@ namespace Paladin
         const WorldPresentationState& presentation,
         bool stabilizePixelPhase,
         std::span<const SpriteRenderItem> fallbackSprites,
-        std::optional<WorldPlacementMarker> placementMarker
+        std::optional<WorldPlacementMarker> placementMarker,
+        WorldSurface::Point3 rigidResidual
     ) const
     {
         if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0 ||
@@ -111,28 +112,12 @@ namespace Paladin
             effectiveTilePixels
         );
 
-        const auto stabilize = [&](ProjectedWorldObject point)
-        {
-            if (stabilizePixelPhase)
-            {
-                point.x = stableWorldObjectScreenCoordinate(
-                    point.x,
-                    effectiveTilePixels
-                );
-                point.y = stableWorldObjectScreenCoordinate(
-                    point.y,
-                    effectiveTilePixels
-                );
-            }
-            return point;
-        };
-
         const auto project = [&](double tileX, double tileY)
             -> std::optional<ProjectedWorldObject>
         {
             if (!globe)
             {
-                return stabilize(ProjectedWorldObject{
+                return ProjectedWorldObject{
                     float(
                         renderer.outputWidth() * 0.5 +
                         (tileX - renderCamera.tileX()) * effectiveTilePixels
@@ -143,7 +128,7 @@ namespace Paladin
                     ),
                     1.0F,
                     1.0
-                });
+                };
             }
 
             const auto sphere = globeView.project(
@@ -163,20 +148,36 @@ namespace Paladin
 
             const float sphereVisibility =
                 std::clamp(float(sphere.z * 4.0), 0.0F, 1.0F);
-            return stabilize(ProjectedWorldObject{
+            return ProjectedWorldObject{
                 float(std::lerp(sphere.x, tangent.x, double(localWeight))),
                 float(std::lerp(sphere.y, tangent.y, double(localWeight))),
                 std::lerp(sphereVisibility, 1.0F, localWeight),
                 std::lerp(sphere.z, 1.0, double(localWeight))
-            });
+            };
         };
 
-        // Everything below this point shares exactly the same 32-art-pixel
-        // lattice. At close zoom the already-snapped render camera and the
-        // explicit raster-phase quantization above make camera motion translate
-        // established object pixels instead of re-rasterizing them fractionally.
-        WorldObjectPixelScene objectScene(renderer, effectiveTilePixels);
-
+        // Real world geometry retains its 32 px/tile detail. At close globe
+        // scale it is rasterized in the SAME unrotated source chart as terrain,
+        // then rotated and translated as one layer. The residual is not rounded
+        // independently for every road endpoint or sprite.
+        const bool planarObjects = globe && localWeight >= .999F;
+        const double overscan = planarObjects
+            ? tangentView.overscanScale(effectiveTilePixels / WorldPixelsPerTile + 4.0) : 1.0;
+        const double geometryPixels = effectiveTilePixels / overscan;
+        const auto geometryProject = [&](double x, double y)
+            -> std::optional<ProjectedWorldObject>
+        {
+            if (!planarObjects) return project(x,y);
+            double dx = x-renderCamera.tileX();
+            dx -= std::round(dx/world.grid().width())*world.grid().width();
+            return ProjectedWorldObject{
+                float(renderer.outputWidth()*.5 + dx*geometryPixels),
+                float(renderer.outputHeight()*.5 + (y-renderCamera.tileY())*geometryPixels),1,1};
+        };
+        {
+            WorldObjectPixelScene objectScene(renderer, geometryPixels,
+                planarObjects ? tangentView.rollRadians()*180.0/3.14159265358979323846 : 0.0,
+                overscan, rigidResidual.x, rigidResidual.y);
         // Persistent strategic roads live below the point objects. They are not
         // settlement roads and have no effect on settlement navigation yet.
         if (worldObjectVisibility > 0.001F)
@@ -202,11 +203,11 @@ namespace Paladin
                 );
                 for (std::size_t index = 1; index < points.size(); ++index)
                 {
-                    const auto a = project(
+                    const auto a = geometryProject(
                         double(points[index - 1].x) + 0.5,
                         double(points[index - 1].y) + 0.5
                     );
-                    const auto b = project(
+                    const auto b = geometryProject(
                         double(points[index].x) + 0.5,
                         double(points[index].y) + 0.5
                     );
@@ -244,6 +245,74 @@ namespace Paladin
             }
         }
 
+        if (worldObjectVisibility > .001F)
+        {
+            for (const SpriteRenderItem& item : fallbackSprites)
+            {
+                if (!item.texture)
+                {
+                    continue;
+                }
+                const auto point = geometryProject(item.tileX, item.tileY);
+                if (!point || outside(*point, renderer, 256.0F))
+                {
+                    continue;
+                }
+                const float sourceWidth = item.sourceWidth > 0.0F
+                                              ? item.sourceWidth
+                                              : float(item.texture->width());
+                const float sourceHeight = item.sourceHeight > 0.0F
+                                               ? item.sourceHeight
+                                               : float(item.texture->height());
+                const float width =
+                    (item.displayWidthPixels > 0.0F ? item.displayWidthPixels
+                                                    : sourceWidth) *
+                    float(renderCamera.zoom() / overscan);
+                const float height =
+                    (item.displayHeightPixels > 0.0F ? item.displayHeightPixels
+                                                     : sourceHeight) *
+                    float(renderCamera.zoom() / overscan);
+                renderer.drawTexture(
+                    *item.texture,
+                    item.sourceX,
+                    item.sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    point->x - width * item.anchorX,
+                    point->y - height * item.anchorY,
+                    width,
+                    height,
+                    static_cast<std::uint8_t>(std::clamp(
+                        std::lround(
+                            255.0 * worldObjectVisibility * point->visibility
+                        ),
+                        0L,
+                        255L
+                    ))
+                );
+            }
+        }
+
+        }
+
+        // Native-resolution cartography is not squeezed through the world art
+        // layer. Every symbol has immutable local geometry; only its whole plate
+        // origin moves, using the snapped source camera plus the terrain's SAME
+        // final integer-screen residual. Population still controls size.
+        const auto annotationProject = [&](double x, double y)
+            -> std::optional<ProjectedWorldObject>
+        {
+            auto p = project(x,y);
+            if (!p) return p;
+            if (stabilizePixelPhase)
+            {
+                p->x = std::round(p->x);
+                p->y = std::round(p->y);
+            }
+            p->x += float(rigidResidual.x);
+            p->y += float(rigidResidual.y);
+            return p;
+        };
         if (worldObjectVisibility > 0.001F)
         {
             struct SettlementProjection
@@ -256,7 +325,7 @@ namespace Paladin
             for (const Settlement& settlement : world.settlements())
             {
                 const auto position = settlement.position();
-                auto point = project(
+                auto point = annotationProject(
                     double(position.x) + 0.5,
                     double(position.y) + 0.5
                 );
@@ -288,7 +357,7 @@ namespace Paladin
             for (const Army& army : world.armies())
             {
                 const auto position = army.position();
-                const auto point = project(
+                const auto point = annotationProject(
                     double(position.x) + 0.5,
                     double(position.y) + 0.5
                 );
@@ -339,55 +408,11 @@ namespace Paladin
                 );
             }
 
-            for (const SpriteRenderItem& item : fallbackSprites)
-            {
-                if (!item.texture)
-                {
-                    continue;
-                }
-                const auto point = project(item.tileX, item.tileY);
-                if (!point || outside(*point, renderer, 256.0F))
-                {
-                    continue;
-                }
-                const float sourceWidth = item.sourceWidth > 0.0F
-                                              ? item.sourceWidth
-                                              : float(item.texture->width());
-                const float sourceHeight = item.sourceHeight > 0.0F
-                                               ? item.sourceHeight
-                                               : float(item.texture->height());
-                const float width =
-                    (item.displayWidthPixels > 0.0F ? item.displayWidthPixels
-                                                    : sourceWidth) *
-                    float(renderCamera.zoom());
-                const float height =
-                    (item.displayHeightPixels > 0.0F ? item.displayHeightPixels
-                                                     : sourceHeight) *
-                    float(renderCamera.zoom());
-                renderer.drawTexture(
-                    *item.texture,
-                    item.sourceX,
-                    item.sourceY,
-                    sourceWidth,
-                    sourceHeight,
-                    point->x - width * item.anchorX,
-                    point->y - height * item.anchorY,
-                    width,
-                    height,
-                    static_cast<std::uint8_t>(std::clamp(
-                        std::lround(
-                            255.0 * worldObjectVisibility * point->visibility
-                        ),
-                        0L,
-                        255L
-                    ))
-                );
-            }
         }
 
         if (placementMarker)
         {
-            const auto point = project(
+            const auto point = annotationProject(
                 double(placementMarker->position.x) + 0.5,
                 double(placementMarker->position.y) + 0.5
             );

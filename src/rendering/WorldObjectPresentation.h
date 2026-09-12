@@ -11,8 +11,8 @@ namespace Paladin
 {
     // Terrain deliberately stays on the 16-art-pixels-per-tile world lattice.
     // Strategic world objects receive exactly twice that authored detail and
-    // must all pass through this one presentation grid so settlements, markers,
-    // armies and roads never drift into different pixel scales.
+    // pass through this one presentation grid. Cartographic labels and symbols
+    // are native-screen annotations and deliberately do not enter that raster.
     inline constexpr int WorldObjectPixelsPerTile = WorldPixelsPerTile * 2;
     static_assert(WorldObjectPixelsPerTile == 32);
 
@@ -22,34 +22,29 @@ namespace Paladin
         return std::max(1.0, effectiveTilePixels / WorldObjectPixelsPerTile);
     }
 
-    // Object centers are quantized to the same low-resolution raster that will
-    // receive them. The authoritative camera remains continuous; this only
-    // prevents a moving camera from changing which object texel a fractional
-    // screen coordinate lands on from frame to frame.
+    // Cartographic symbols are screen-sized annotations, not world sprites.
+    // Quantize their finished origin to ONE physical pixel. Never divide their
+    // 10-22 px dimensions by the zoom-dependent 32-art-pixel world raster.
     [[nodiscard]]
     inline float stableWorldObjectScreenCoordinate(
-        float coordinate,
-        double effectiveTilePixels
-    ) noexcept
+        float coordinate, double /*effectiveTilePixels*/) noexcept
     {
-        if (!std::isfinite(coordinate) || !std::isfinite(effectiveTilePixels) ||
-            effectiveTilePixels <= 0.0)
-        {
-            return coordinate;
-        }
-        const double pitch = worldObjectPixelPitch(effectiveTilePixels);
-        return static_cast<float>(std::round(double(coordinate) / pitch) * pitch);
+        return std::isfinite(coordinate) ? std::round(coordinate) : coordinate;
     }
 
     class WorldObjectPixelScene
     {
     public:
-        WorldObjectPixelScene(Renderer& renderer, double effectiveTilePixels)
+        WorldObjectPixelScene(Renderer& renderer, double effectiveTilePixels,
+                              double rotation = 0.0, double scale = 1.0,
+                              double offsetX = 0.0, double offsetY = 0.0)
             : renderer_(renderer),
               active_(renderer.beginPixelScene(
                   worldObjectPixelPitch(effectiveTilePixels),
-                  true
-              ))
+                  true,
+                  std::abs(rotation) > 1e-9 || std::abs(scale - 1) > 1e-9 ||
+                      offsetX != 0 || offsetY != 0
+              )), rotation_(rotation), scale_(scale), offsetX_(offsetX), offsetY_(offsetY)
         {
         }
 
@@ -57,7 +52,7 @@ namespace Paladin
         {
             if (active_)
             {
-                renderer_.endPixelScene(255, 0.0, 1.0);
+                renderer_.endPixelScene(255, rotation_, scale_, offsetX_, offsetY_);
             }
         }
 
@@ -67,6 +62,7 @@ namespace Paladin
     private:
         Renderer& renderer_;
         bool active_ = false;
+        double rotation_, scale_, offsetX_, offsetY_;
     };
 
     struct WorldPlacementMarker

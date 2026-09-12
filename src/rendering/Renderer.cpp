@@ -780,11 +780,13 @@ namespace Paladin
 
     bool Renderer::beginPixelScene(double pitch)
     {
-        if (pitch <= 1)
-        {
-            return false;
-        }
+        if (!std::isfinite(pitch) || pitch <= 1) return false;
+        return activatePixelScene(pitch);
+    }
+    bool Renderer::activatePixelScene(double pitch)
+    {
         const int w = outputWidth(), h = outputHeight();
+        if (w <= 0 || h <= 0) return false;
         if (!pixelScene_ || pixelScene_->width() != w ||
             pixelScene_->height() != h)
         {
@@ -810,6 +812,7 @@ namespace Paladin
             throw std::runtime_error("Cannot activate world pixel grid");
         }
         pixelPitch_ = pitch;
+        pixelSceneActive_ = true;
         SDL_SetRenderScale(renderer_, float(1 / pitch), float(1 / pitch));
         SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
         SDL_RenderClear(renderer_);
@@ -825,6 +828,7 @@ namespace Paladin
             dest{0, 0, float(w * pixelPitch_), float(h * pixelPitch_)};
         SDL_RenderTexture(renderer_, pixelScene_->texture_, &source, &dest);
         pixelPitch_ = 1;
+        pixelSceneActive_ = false;
     }
     bool Renderer::updateTexturePixels(
         Texture& texture,

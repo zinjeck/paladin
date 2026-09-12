@@ -66,7 +66,7 @@ namespace Paladin
 
         // This is the very faint outer glare radius used only for culling. The
         // actual overexposed source is tiny; apparent size comes from bloom.
-        const float extent = 310.F * scale;
+        const float extent = 430.F * scale;
         if (x + extent < 0 || y + extent < 0 || x - extent >= width ||
             y - extent >= height)
         {
@@ -101,111 +101,86 @@ namespace Paladin
             float strength;
         };
 
-        // Broad deterministic glare cones. They are texture fields, never line
-        // primitives. Width expands with distance so each ray diffuses into the
-        // corona instead of reading as a spoke drawn from a circle.
-        inline constexpr std::array<GlareLobe, 12> GlareLobes{{
-            {.10F, .045F, .98F, .18F},
-            {3.25F, .050F, .92F, .15F},
-            {1.47F, .048F, .88F, .16F},
-            {4.67F, .052F, .83F, .14F},
-            {.72F, .060F, .76F, .12F},
-            {3.86F, .064F, .71F, .10F},
-            {2.24F, .058F, .66F, .11F},
-            {5.39F, .062F, .61F, .095F},
-            {1.02F, .072F, .57F, .080F},
-            {4.12F, .075F, .52F, .070F},
-            {2.74F, .068F, .48F, .065F},
-            {5.88F, .080F, .44F, .055F}
+        // Unequal, non-periodic aperture/scatter lobes. These are continuous
+        // optical intensity profiles, not line primitives. The long axes end at
+        // different distances and widen softly; some develop a violet fringe.
+        inline constexpr std::array<GlareLobe, 24> GlareLobes{{
+            {.10F,.014F,.96F,.78F}, {3.25F,.011F,.84F,.66F},
+            {1.47F,.009F,.78F,.69F}, {4.67F,.013F,.94F,.81F},
+            {.72F,.013F,.68F,.58F}, {3.86F,.009F,.80F,.60F},
+            {2.24F,.017F,.91F,.68F}, {5.39F,.008F,.62F,.56F},
+            {1.02F,.018F,.46F,.37F}, {4.12F,.020F,.55F,.42F},
+            {2.74F,.011F,.60F,.46F}, {5.88F,.019F,.78F,.56F},
+            {.32F,.025F,.34F,.22F}, {3.50F,.023F,.30F,.27F},
+            {1.72F,.018F,.51F,.28F}, {4.42F,.023F,.40F,.23F},
+            {.91F,.008F,.29F,.28F}, {3.65F,.027F,.26F,.19F},
+            {2.48F,.024F,.37F,.25F}, {5.62F,.017F,.43F,.23F},
+            {1.26F,.014F,.32F,.25F}, {4.93F,.022F,.29F,.26F},
+            {2.97F,.021F,.25F,.21F}, {6.12F,.017F,.39F,.25F}
         }};
 
-        inline float glareLobe(
-            float x,
-            float y,
-            const GlareLobe& lobe
-        )
+        inline float smoothC2(float t)
         {
-            const float c = std::cos(lobe.angle);
-            const float s = std::sin(lobe.angle);
-            const float longitudinal = x * c + y * s;
-            if (longitudinal <= 0.F)
-            {
-                return 0.F;
-            }
+            t = std::clamp(t, 0.F, 1.F);
+            return t*t*t*(10.F+t*(-15.F+6.F*t));
+        }
 
-            const float lateral = std::abs(-x * s + y * c);
-            const float along = std::clamp(
-                longitudinal / std::max(.001F, lobe.length),
-                0.F,
-                1.F
-            );
-            const float width = lobe.width * (.45F + 1.15F * along);
-            const float transverse = std::exp(
-                -.5F * (lateral / width) * (lateral / width)
-            );
-            const float fade = std::exp(-std::pow(
-                longitudinal / std::max(.001F, lobe.length),
-                1.15F
-            ));
-            return lobe.strength * transverse * fade;
+        inline float glareLobe(float x, float y, const GlareLobe& lobe)
+        {
+            const float c=std::cos(lobe.angle), s=std::sin(lobe.angle);
+            const float along=x*c+y*s;
+            if (along <= 0 || along >= lobe.length) return 0;
+            const float q=along/lobe.length;
+            const float width=.0018F+lobe.width*(.22F+q*.9F);
+            const float lateral=(-x*s+y*c)/width;
+            return lobe.strength * std::exp(-.5F*lateral*lateral) *
+                   std::exp(-2.4F*q) * (1.F-smoothC2((q-.48F)/.52F));
         }
     } // namespace CelestialSunOptics
 
-    // Main optical field. It contains no hard solar disc and no line-rendered
-    // rays. The image is continuous radial bloom plus broad anisotropic glare.
+    // Optical glare is a camera-response approximation, not a full physical
+    // light-transport simulation. Crucially ALL energy reaches zero smoothly
+    // before the finite texture boundary, not just the rays. The previous code
+    // cut nonzero radial corona energy at radius=1, exposing a pasted disk.
     inline RenderColor celestialSunCoronaSample(float x, float y)
     {
         using namespace CelestialSunOptics;
-        const float radius = std::hypot(x, y);
-        if (!std::isfinite(radius) || radius >= 1.F)
+        const float radius=std::hypot(x,y);
+        if (!std::isfinite(radius) || radius >= 1) return {0,0,0,0};
+        const float halo = .80F*std::exp(-std::pow(radius/.045F,2.F)) +
+                           .58F*std::exp(-std::pow(radius/.135F,1.45F)) +
+                           .13F*std::exp(-std::pow(radius/.30F,1.7F)) +
+                           .010F*std::exp(-std::pow(radius/.52F,2.F));
+        const float hot=std::exp(-radius*13.F);
+        float red=halo, green=halo*(.92F+.08F*hot), blue=halo*(.79F+.21F*hot);
+        const float emergence=smoothC2(radius/.020F);
+        for (std::size_t i=0;i<GlareLobes.size();++i)
         {
-            return {0, 0, 0, 0};
+            const auto& lobe=GlareLobes[i];
+            const float along=x*std::cos(lobe.angle)+y*std::sin(lobe.angle);
+            const float end=(i%3 != 1) ? smoothC2((along/lobe.length-.20F)/.50F) : 0.F;
+            const float energy=glareLobe(x,y,lobe)*emergence;
+            red+=energy*(.96F+.04F*hot);
+            green+=energy*(.97F-.44F*end);
+            blue+=energy*(.93F+.07F*end);
+            // A restrained displaced blue/violet wing gives selected ray ends
+            // color dispersion without tinting the entire sun purple.
+            auto fringe=lobe;
+            fringe.angle+=.008F;
+            fringe.width*=1.25F;
+            const float chroma=.22F*end*glareLobe(x,y,fringe)*emergence;
+            red+=chroma*.65F; green+=chroma*.23F; blue+=chroma;
         }
-
-        const float angle = std::atan2(y, x);
-        const float irregularity = std::clamp(
-            1.F + .035F * std::sin(7.F * angle + .3F) +
-                .020F * std::sin(15.F * angle + 1.1F),
-            .90F,
-            1.10F
-        );
-
-        const float sourceBloom =
-            .18F * std::exp(-std::pow(radius / .065F, 2.F));
-        const float innerCorona =
-            .42F * std::exp(-std::pow(radius / .22F, 1.35F));
-        const float middleCorona =
-            .16F * std::exp(-std::pow(radius / .46F, 1.18F));
-        const float outerHalo =
-            .045F * std::exp(-std::pow(radius / .80F, 1.55F));
-
-        float glare = 0.F;
-        for (const auto& lobe : GlareLobes)
-        {
-            glare += glareLobe(x, y, lobe);
-        }
-        glare *= smooth01((radius - .045F) / .09F) *
-                 smooth01((1.F - radius) / .12F);
-
-        const float radiance = std::clamp(
-            (sourceBloom + innerCorona + middleCorona + outerHalo) *
-                    irregularity +
-                glare,
-            0.F,
-            .92F
-        );
-        if (radiance < .0015F)
-        {
-            return {0, 0, 0, 0};
-        }
-
-        const float hot = std::exp(-radius * 4.5F);
-        return {
-            255,
-            channel(230.F + 25.F * hot),
-            channel(190.F + 65.F * hot),
-            channel(255.F * radiance)
-        };
+        const float envelope=1.F-smoothC2((radius-.65F)/.35F);
+        red*=envelope; green*=envelope; blue*=envelope;
+        const float energy=std::max({red,green,blue});
+        if (energy <= 0) return {0,0,0,0};
+        // Encode additive intensity without throwing away chromatic ratios.
+        // Black, zero-alpha guard texels prevent filtering a visible disk edge.
+        const auto alpha=channel(255.F*std::min(1.F,energy));
+        if (!alpha) return {0,0,0,0};
+        return {channel(255.F*red/energy),channel(255.F*green/energy),
+                channel(255.F*blue/energy),alpha};
     }
 
     // Tiny source contribution. It is intentionally not an opaque white disc.
@@ -261,6 +236,8 @@ namespace Paladin
     class CelestialSunRenderer
     {
     public:
+        std::uint64_t textureBuilds() const noexcept { return textureBuilds_; }
+
         bool prepare(Renderer& renderer) const
         {
             return ensureTextures(renderer);
@@ -302,12 +279,16 @@ namespace Paladin
             const float globeY = float(view.cy);
             const float globeRadius = float(view.radius * 1.03);
 
+            // Glare requires a visible light source. A fully occulted source
+            // must not leave the outer half of its halo hanging around a planet.
+            opacity *= sourceVisibility(*projected, globeX, globeY, globeRadius);
+            if (opacity <= .001F) return;
             drawOccludedLayer(
                 renderer,
                 *coronaTexture_,
                 projected->x,
                 projected->y,
-                285.F * projected->scale,
+                410.F * projected->scale,
                 globeX,
                 globeY,
                 globeRadius,
@@ -450,11 +431,12 @@ namespace Paladin
             std::array<int, MaxQuads * 6> indices{};
             std::size_t quadCount = 0;
 
-            const int stripCount = std::clamp(
-                int(std::ceil(diameter)),
-                64,
-                int(MaxStrips)
-            );
+            // Integer physical scan rows avoid fractional-strip gaps in SDL's
+            // software triangle path. Offscreen regions never enter the mesh.
+            const int firstRow=std::max(0,int(std::ceil(top)));
+            const int lastRow=std::min(renderer.outputHeight(),int(std::floor(top+diameter)));
+            if (lastRow<=firstRow) return;
+            const int rowStep=std::max(1,(lastRow-firstRow+int(MaxStrips)-1)/int(MaxStrips));
             const auto alpha = static_cast<std::uint8_t>(std::clamp(
                 std::lround(255.F * opacity),
                 0L,
@@ -494,13 +476,18 @@ namespace Paladin
                 ++quadCount;
             };
 
-            for (int strip = 0; strip < stripCount; ++strip)
+            // Unoccluded glare is one smooth quad, not hundreds of strips.
+            const float nearestX=std::clamp(globeX,left,right);
+            const float nearestY=std::clamp(globeY,top,top+diameter);
+            const bool separate=std::hypot(nearestX-globeX,nearestY-globeY)>=globeRadius;
+            if (separate)
             {
-                const float v0 = float(strip) / float(stripCount);
-                const float v1 = float(strip + 1) / float(stripCount);
-                const float y0 = top + diameter * v0;
-                const float y1 = top + diameter * v1;
-
+                addQuad(left,right,top,top+diameter,0,1,0,1);
+            }
+            for (int row=firstRow; !separate && row<lastRow; row+=rowStep)
+            {
+                const float y0=float(row), y1=float(std::min(row+rowStep,lastRow));
+                const float v0=(y0-top)/diameter, v1=(y1-top)/diameter;
                 const float maskY = std::clamp(globeY, y0, y1);
                 const float dy = maskY - globeY;
                 const float circle = globeRadius * globeRadius - dy * dy;
@@ -609,9 +596,11 @@ namespace Paladin
                 reset();
                 return false;
             }
+            ++textureBuilds_;
             return true;
         }
 
+        mutable std::uint64_t textureBuilds_ = 0;
         mutable std::unique_ptr<Texture> coronaTexture_;
         mutable std::unique_ptr<Texture> coreTexture_;
         mutable std::unique_ptr<Texture> lensGhostTexture_;

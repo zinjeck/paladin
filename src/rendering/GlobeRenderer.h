@@ -1,5 +1,6 @@
 #pragma once
 #include "rendering/GlobeLighting.h"
+#include "rendering/WorldPoliticalSurface.h"
 #include "rendering/GlobeView.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/OverlayRenderer.h"
@@ -248,7 +249,7 @@ namespace Paladin
                                    ->terrain != TerrainType::Water;
                     };
                     const double land =
-                        surfaceField(sample.x, sample.y, occupied);
+                        worldLandField(grid, sample.x, sample.y);
                     const int ix = int(std::floor(sample.x - .5)),
                               iy = int(std::floor(sample.y - .5));
                     const bool dry = land >= .5;
@@ -1070,13 +1071,14 @@ namespace Paladin
                                   double th,
                                   double opacity = 1)
             {
-                const double x0 = std::max({left, tx, 0.}),
-                             y0 = std::max({top, ty, 0.});
+                // Fixed map-space mesh nodes, not viewport-dependent tessellation.
+                const double x0 = std::max({std::floor(left / 2) * 2, tx, 0.}),
+                             y0 = std::max({std::floor(top / 2) * 2, ty, 0.});
                 const double x1 = std::min(
-                                 {left + r.outputWidth() / pixels, tx + tw, gw}
+                                 {std::ceil((left + r.outputWidth() / pixels) / 2) * 2, tx + tw, gw}
                              ),
                              y1 = std::min(
-                                 {top + r.outputHeight() / pixels, ty + th, gh}
+                                 {std::ceil((top + r.outputHeight() / pixels) / 2) * 2, ty + th, gh}
                              );
                 if (x1 <= x0 || y1 <= y0)
                 {
@@ -1084,8 +1086,12 @@ namespace Paladin
                 }
                 std::vector<MeshVertex> verts;
                 std::vector<int> ids;
-                const int nx = std::clamp(int((x1 - x0) / gw * 96) + 1, 1, 96),
-                          ny = std::clamp(int((y1 - y0) / gh * 48) + 1, 1, 48);
+                const int nx = std::clamp(int(std::ceil((x1 - x0) / 2)), 1, 96),
+                          ny = std::clamp(int(std::ceil((y1 - y0) / 2)), 1, 96);
+                const double pitch = r.currentPixelPitch();
+                const auto screen = [pitch](double position) {
+                    return float(std::round(position / pitch) * pitch);
+                };
                 for (int j = 0; j <= ny; ++j)
                 {
                     for (int i = 0; i <= nx; ++i)
@@ -1093,8 +1099,8 @@ namespace Paladin
                         const double x = std::lerp(x0, x1, double(i) / nx),
                                      y = std::lerp(y0, y1, double(j) / ny);
                         verts.push_back(
-                            {float(std::round((x - left) * pixels)),
-                             float(std::round((y - top) * pixels)),
+                            {screen((x - left) * pixels),
+                             screen((y - top) * pixels),
                              float((x - tx) / tw),
                              float((y - ty) / th),
                              globeLight(
@@ -1658,35 +1664,7 @@ namespace Paladin
                     }
                 }
             };
-            for (const auto& city : world.settlements())
-            {
-                const auto at = city.position();
-                // Foliage submission skips the settlement clearing; the
-                // underlying textured ground and biome remain intact.
-                auto p = view.project(
-                    (at.x + .5) / world.grid().width(),
-                    (at.y + .5) / world.grid().height()
-                );
-                if (p.z <= 0)
-                {
-                    continue;
-                }
-                if (const auto* marker = art.find("world.settlement"))
-                {
-                    auto f = art.frame(*marker, false);
-                    r.drawTexture(
-                        *marker->texture,
-                        f.x,
-                        f.y,
-                        f.width,
-                        f.height,
-                        float(p.x - 10),
-                        float(p.y - 16),
-                        20,
-                        20
-                    );
-                }
-            }
+            // Settlement symbols belong exclusively to WorldObjectRenderer.
             for (const auto& o : overlays)
             {
                 outline(o.tileX, o.tileY, o.widthTiles, o.heightTiles, o.color);
