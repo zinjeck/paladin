@@ -1,90 +1,37 @@
 #pragma once
 
-#include "rendering/TribalInfluenceRenderer.h"
-#include "rendering/WorldTerritoryPresentationRenderer.h"
+#include "rendering/WorldPresentation.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 namespace Paladin
 {
-    // One façade preserves WorldRenderer's existing call sites while selecting
-    // the correct territorial language for each realm. Tribal authority is
-    // painted first as a continuous field. Civic control is painted second so
-    // formal sovereignty wins any overlap. The final relief pass adds only a
-    // restrained inward civic shade and does not alter control or borders.
+    class Camera2D;
+    class Renderer;
+    class World;
+    struct TileRenderMetrics;
+
+    // Both projections consume the same coast-clipped political samples. Fill,
+    // civic border and restrained relief are prepared together, never independently
+    // offset tile rectangles. The simulation's two territorial models are intact.
     class WorldRealmPresentationRenderer
     {
     public:
-        void reset()
-        {
-            tribal_.reset();
-            civic_.reset();
-        }
-
-        void renderFlat(
-            Renderer& renderer,
-            const World& world,
-            const Camera2D& camera,
-            const TileRenderMetrics& metrics,
-            const WorldPresentationState& presentation,
-            const WorldPresentationPolicy& policy
-        )
-        {
-            tribal_.renderTribalFlat(
-                renderer,
-                world,
-                camera,
-                metrics,
-                presentation,
-                policy
-            );
-            civic_.renderFlat(
-                renderer,
-                world,
-                camera,
-                metrics,
-                presentation,
-                policy
-            );
-            tribal_.renderCivicReliefFlat(
-                renderer,
-                world,
-                camera,
-                metrics,
-                presentation
-            );
-        }
-
-        void renderGlobe(
-            Renderer& renderer,
-            const World& world,
-            const Camera2D& camera,
-            const WorldPresentationState& presentation,
-            const WorldPresentationPolicy& policy
-        )
-        {
-            tribal_.renderTribalGlobe(
-                renderer,
-                world,
-                camera,
-                presentation,
-                policy
-            );
-            civic_.renderGlobe(
-                renderer,
-                world,
-                camera,
-                presentation,
-                policy
-            );
-            tribal_.renderCivicReliefGlobe(
-                renderer,
-                world,
-                camera,
-                presentation
-            );
-        }
-
+        WorldRealmPresentationRenderer();
+        ~WorldRealmPresentationRenderer();
+        WorldRealmPresentationRenderer(const WorldRealmPresentationRenderer&) = delete;
+        WorldRealmPresentationRenderer& operator=(const WorldRealmPresentationRenderer&) = delete;
+        void reset();
+        void renderFlat(Renderer&, const World&, const Camera2D&,
+                        const TileRenderMetrics&, const WorldPresentationState&,
+                        const WorldPresentationPolicy&);
+        void renderGlobe(Renderer&, const World&, const Camera2D&,
+                         const WorldPresentationState&, const WorldPresentationPolicy&);
+        std::uint64_t cacheBuilds() const noexcept;
+        std::size_t detailCacheBytes() const noexcept;
     private:
-        TribalInfluenceRenderer tribal_;
-        WorldTerritoryPresentationRenderer civic_;
+        struct Cache;
+        std::unique_ptr<Cache> cache_;
     };
 } // namespace Paladin

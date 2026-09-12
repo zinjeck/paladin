@@ -45,8 +45,10 @@ namespace Paladin
 
         const SettlementWorldPresentation presentation =
             settlementWorldPresentation(settlement.population(), policy_);
-        const float size = presentation.markerDiameterPixels;
-        const float border = presentation.borderPixels;
+        centerX = std::round(centerX);
+        centerY = std::round(centerY);
+        const float size = std::round(presentation.markerDiameterPixels);
+        const float border = std::round(presentation.borderPixels);
 
         // The marker is intentionally procedural. It is a stable cartographic
         // symbol whose size comes from settlement data, not a sprite or a
@@ -68,12 +70,12 @@ namespace Paladin
         }
         ownership = visibleColor(ownership, visibility);
 
-        const float top = centerY - size * 0.5F;
-        const float bodyTop = top + size * 0.25F;
-        const float bodyHeight = size * 0.67F;
-        const float towerWidth = std::max(3.0F, size * 0.34F);
-        const float towerHeight = size * 0.38F;
-        const float bodyLeft = centerX - size * 0.5F;
+        const float top = std::round(centerY - size * 0.5F);
+        const float bodyTop = top + std::round(size * 0.25F);
+        const float bodyHeight = std::round(size * 0.67F);
+        const float towerWidth = std::max(3.0F, std::round(size * 0.34F));
+        const float towerHeight = std::round(size * 0.38F);
+        const float bodyLeft = std::round(centerX - size * 0.5F);
 
         renderer.fillRectangle(
             bodyLeft - 1.0F,
@@ -83,7 +85,7 @@ namespace Paladin
             shadow
         );
         renderer.fillRectangle(
-            centerX - towerWidth * 0.5F - 1.0F,
+            std::round(centerX - towerWidth * 0.5F) - 1.0F,
             top + 1.0F,
             towerWidth + 2.0F,
             towerHeight + 1.0F,
@@ -92,7 +94,7 @@ namespace Paladin
 
         renderer.fillRectangle(bodyLeft, bodyTop, size, bodyHeight, parchment);
         renderer.fillRectangle(
-            centerX - towerWidth * 0.5F,
+            std::round(centerX - towerWidth * 0.5F),
             top,
             towerWidth,
             towerHeight,
@@ -114,8 +116,8 @@ namespace Paladin
             ink
         );
 
-        const float ownershipWidth = std::max(4.0F, size * 0.58F);
-        const float ownershipHeight = std::max(2.0F, size * 0.12F);
+        const float ownershipWidth = std::max(4.0F, std::round(size * 0.58F));
+        const float ownershipHeight = std::max(2.0F, std::round(size * 0.12F));
         renderer.fillRectangle(
             centerX - ownershipWidth * 0.5F,
             bodyTop + bodyHeight - border - ownershipHeight,
@@ -141,8 +143,8 @@ namespace Paladin
                                     : preferredPixelSize;
         const float labelWidth =
             fontRenderer_.measureWidth(settlement.name(), pixelSize);
-        const float labelX = centerX - labelWidth * 0.5F;
-        const float labelY = top - 7.0F * pixelSize - 5.0F;
+        const float labelX = std::round(centerX - labelWidth * 0.5F);
+        const float labelY = std::round(top - 7.0F * pixelSize - 5.0F);
 
         fontRenderer_.drawText(
             renderer,

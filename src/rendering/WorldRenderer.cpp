@@ -163,6 +163,7 @@ namespace Paladin
                 1.0F
             );
 
+            WorldSurface::Point3 objectResidual{};
             // Keep the true sphere through the far/regional scales and beneath
             // the transition. Once the tangent view is fully opaque there is no
             // reason to pay for a hidden spherical terrain pass.
@@ -206,6 +207,7 @@ namespace Paladin
                     camera.tileX(),
                     camera.tileY()
                 );
+                objectResidual = {residual.x * localWeight, residual.y * localWeight, 0};
 
                 // A rotated rectangle must CONTAIN a widescreen viewport. The
                 // old square-only |cos|+|sin| overscan left the exact opposite
@@ -213,7 +215,7 @@ namespace Paladin
                 // Include the residual plus a four-pixel guard for ceil/raster
                 // rounding so no valid roll/aspect exposes the clear color.
                 const double residualMargin =
-                    std::max(std::abs(residual.x), std::abs(residual.y)) + 4.0;
+                    presentationTilePixels / WorldPixelsPerTile + 4.0;
                 const double overscan = tangent.overscanScale(residualMargin);
                 const double planarTilePixels =
                     presentationTilePixels / std::max(1.0, overscan);
@@ -303,22 +305,19 @@ namespace Paladin
                 );
             }
 
-            // Strategic objects stay on their independent 32-pixel lattice. At
-            // local scale use the authoritative camera: the terrain's rigid
-            // residual makes its effective final center authoritative too, while
-            // WorldObjectRenderer performs its own 32-pixel phase quantization.
-            const Camera2D& objectCamera =
-                localWeight >= 0.5F ? camera : renderCamera;
+            // Geometry and native annotations share the source camera and the
+            // same final residual. No independently snapped object camera.
             worldObjectRenderer_.render(
                 renderer,
                 world,
-                objectCamera,
+                renderCamera,
                 presentationTilePixels,
                 true,
                 presentation,
                 pixelStabilityActive_,
                 sprites,
-                placementMarker
+                placementMarker,
+                objectResidual
             );
             return;
         }
@@ -384,13 +383,14 @@ namespace Paladin
         worldObjectRenderer_.render(
             renderer,
             world,
-            pixelStabilityActive_ ? camera : renderCamera,
+            renderCamera,
             presentationTilePixels,
             false,
             presentation,
             pixelStabilityActive_,
             sprites,
-            placementMarker
+            placementMarker,
+            {flatResidualX, flatResidualY, 0}
         );
     }
 

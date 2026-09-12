@@ -192,8 +192,9 @@ namespace Paladin
         [[nodiscard]]
 
         int outputHeight() const noexcept;
+        double currentPixelPitch() const noexcept { return pixelSceneActive_ ? pixelPitch_ : 1.0; }
         bool beginPixelScene(double pitch);
-        bool beginPixelScene(double pitch, bool transparent);
+        bool beginPixelScene(double pitch, bool transparent, bool force = false);
         void endPixelScene();
         void endPixelScene(
             std::uint8_t opacity,
@@ -204,6 +205,8 @@ namespace Paladin
         );
 
     private:
+        bool activatePixelScene(double pitch);
+        bool pixelSceneActive_ = false;
         std::shared_ptr<AssetManager> assetManager_;
         std::string assetPackageSignature_;
         SDL_Renderer* renderer_ = nullptr;

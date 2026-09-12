@@ -8,9 +8,9 @@
 
 namespace Paladin
 {
-    bool Renderer::beginPixelScene(double pitch, bool transparent)
+    bool Renderer::beginPixelScene(double pitch, bool transparent, bool force)
     {
-        const bool active = beginPixelScene(pitch);
+        const bool active = force ? activatePixelScene(std::isfinite(pitch) ? std::max(1.0, pitch) : 1.0) : beginPixelScene(pitch);
         pixelSceneTransparent_ = active && transparent;
         if (pixelSceneTransparent_)
         {
@@ -38,7 +38,7 @@ namespace Paladin
             return;
         }
 
-        if (!pixelScene_ || !std::isfinite(pixelPitch_) || pixelPitch_ <= 1.0)
+        if (!pixelSceneActive_ || !pixelScene_ || !std::isfinite(pixelPitch_) || pixelPitch_ < 1.0)
         {
             pixelPitch_ = 1.0;
             pixelSceneTransparent_ = false;
@@ -72,9 +72,9 @@ namespace Paladin
             std::abs(safeScale - 1.0) >= 1e-9)
         {
             destination.x =
-                (float(outputWidth()) - destinationWidth) * 0.5F;
+                float(outputWidth() * (1.0 - safeScale) * 0.5);
             destination.y =
-                (float(outputHeight()) - destinationHeight) * 0.5F;
+                float(outputHeight() * (1.0 - safeScale) * 0.5);
         }
 
         // The tangent terrain source camera is snapped only so its INTERNAL
@@ -91,6 +91,9 @@ namespace Paladin
             destination.y += float(compositeOffsetY);
         }
 
+        // Rotate about the true viewport center, NOT the ceil-padded texture's
+        // center. Padding must never shift a chart relative to its annotations.
+        const SDL_FPoint pivot{float(outputWidth()*.5*safeScale), float(outputHeight()*.5*safeScale)};
         SDL_SetTextureAlphaMod(pixelScene_->texture_, opacity);
         SDL_SetTextureBlendMode(
             pixelScene_->texture_,
@@ -103,12 +106,13 @@ namespace Paladin
             &source,
             &destination,
             std::isfinite(rotationDegrees) ? rotationDegrees : 0.0,
-            nullptr,
+            &pivot,
             SDL_FLIP_NONE
         );
         SDL_SetTextureAlphaMod(pixelScene_->texture_, 255);
         SDL_SetTextureBlendMode(pixelScene_->texture_, SDL_BLENDMODE_NONE);
         pixelPitch_ = 1.0;
         pixelSceneTransparent_ = false;
+        pixelSceneActive_ = false;
     }
 } // namespace Paladin

@@ -109,7 +109,7 @@ add_executable(Paladin
     src/rendering/SettlementObjectRenderer.cpp
     src/rendering/TerritoryPresentationPolicy.cpp
     src/rendering/TerritoryRenderer.cpp
-    src/rendering/TribalInfluenceRenderer.cpp
+    src/rendering/WorldRealmPresentationRenderer.cpp
     src/simulation/Simulation.cpp
     src/simulation/SimulationReports.cpp
     src/simulation/WorldSimulationPipeline.cpp
@@ -301,22 +301,32 @@ option(PALADIN_BUILD_APPLICATION_SMOKE_TESTS "Build application routing and mand
 if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
     get_target_property(PALADIN_APPLICATION_SOURCES Paladin SOURCES)
     list(REMOVE_ITEM PALADIN_APPLICATION_SOURCES src/main.cpp)
-    add_executable(PaladinApplicationSmokeTests
-        tests/ApplicationSmokeTests.cpp
-        ${PALADIN_APPLICATION_SOURCES}
-    )
-    target_include_directories(PaladinApplicationSmokeTests PRIVATE src tests)
-    target_link_libraries(PaladinApplicationSmokeTests PRIVATE SDL3::SDL3 SDL3_ttf::SDL3_ttf PaladinAssetImport)
-    target_include_directories(PaladinApplicationSmokeTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_definitions(PaladinApplicationSmokeTests PRIVATE PALADIN_SOURCE_ART PALADIN_TEST_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
-    # Reuse the game's runtime DLL/font packaging even when building only this target.
+    # Share the identical instrumented application object code between the old
+    # smoke suite and focused world/sun raster regressions. Do not compile the
+    # entire engine a third time merely to gain a dedicated rendering fixture.
+    add_library(PaladinSmokeCore STATIC ${PALADIN_APPLICATION_SOURCES})
+    target_include_directories(PaladinSmokeCore PUBLIC src tests ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(PaladinSmokeCore PUBLIC SDL3::SDL3 SDL3_ttf::SDL3_ttf PaladinAssetImport)
+    target_compile_definitions(PaladinSmokeCore PUBLIC PALADIN_SOURCE_ART PALADIN_TEST_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_executable(PaladinApplicationSmokeTests tests/ApplicationSmokeTests.cpp)
+    target_link_libraries(PaladinApplicationSmokeTests PRIVATE PaladinSmokeCore)
+    add_executable(PaladinWorldSurfaceTests tests/WorldSurfaceRenderTests.cpp)
+    target_link_libraries(PaladinWorldSurfaceTests PRIVATE PaladinSmokeCore)
+    # Reuse the game's runtime DLL/font packaging even when building only tests.
     add_dependencies(PaladinApplicationSmokeTests Paladin)
+    add_dependencies(PaladinWorldSurfaceTests Paladin)
     add_test(NAME PaladinApplicationSmokeTests COMMAND PaladinApplicationSmokeTests)
+    add_test(NAME PaladinWorldSurfaceTests COMMAND PaladinWorldSurfaceTests)
+    set_tests_properties(PaladinWorldSurfaceTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software"
+        TIMEOUT 120)
     add_custom_target(PaladinArtCheck
         COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinWorldSurfaceTests>
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
             $<TARGET_FILE:PaladinApplicationSmokeTests>
-        DEPENDS PaladinApplicationSmokeTests
-        COMMENT "Verify final world pixel grid, daylight/night rendering and sprite integration"
+        DEPENDS PaladinApplicationSmokeTests PaladinWorldSurfaceTests
+        COMMENT "Verify coast alignment, native marker motion, solar optics and day/night art"
         VERBATIM
     )
     set_tests_properties(PaladinApplicationSmokeTests PROPERTIES

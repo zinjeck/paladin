@@ -122,8 +122,8 @@ namespace Paladin::Test
         PALADIN_CHECK(coreMid.alpha > coreOuter.alpha);
         PALADIN_CHECK(coreCenter.alpha - coreNear.alpha < 24);
 
-        // A primary ray is visible but remains a broad optical cone, not a line
-        // several times brighter than everything around it.
+        // Selected diffraction/scatter axes carry considerably more energy
+        // than their surroundings, but are still continuous optical profiles.
         const float radius = .40F;
         const auto glareLobe = celestialSunCoronaSample(
             radius * std::cos(.10F),
@@ -134,7 +134,7 @@ namespace Paladin::Test
             radius * std::sin(.35F)
         );
         PALADIN_CHECK(glareLobe.alpha > betweenLobes.alpha * 1.3F);
-        PALADIN_CHECK(glareLobe.alpha < betweenLobes.alpha * 2.5F);
+        PALADIN_CHECK(glareLobe.alpha > betweenLobes.alpha * 2.5F);
 
         const auto diffuseMiddle = celestialSunCoronaSample(
             .60F * std::cos(.35F),
@@ -144,10 +144,20 @@ namespace Paladin::Test
             .85F * std::cos(.35F),
             .85F * std::sin(.35F)
         );
-        PALADIN_CHECK(diffuseMiddle.alpha > 10);
-        PALADIN_CHECK(diffuseOuter.alpha > 0);
+        PALADIN_CHECK(diffuseMiddle.alpha > 0);
+        PALADIN_CHECK(diffuseOuter.alpha <= 1);
         PALADIN_CHECK(diffuseMiddle.alpha > diffuseOuter.alpha);
 
+        // All corona contributions taper, not just the ray term. Sample every
+        // direction just INSIDE the old disk cutoff; there must be zero energy.
+        for (int i=0;i<720;++i)
+        {
+            const float a=float(i*2*pi/720.);
+            for (float r : {.98F,.995F,1.F,1.01F})
+                PALADIN_CHECK(celestialSunCoronaSample(r*std::cos(a),r*std::sin(a)).alpha==0);
+        }
+        const auto violet=celestialSunCoronaSample(.46F*std::cos(.10F),.46F*std::sin(.10F));
+        PALADIN_CHECK(violet.blue>violet.green && violet.red>violet.green);
         const auto ghost = celestialSunLensGhostSample(.53F, 0);
         PALADIN_CHECK(ghost.alpha >= 10 && ghost.alpha <= 30);
         PALADIN_CHECK(ghost.red < ghost.blue);

@@ -273,7 +273,7 @@ namespace
 
         PALADIN_CHECK(std::abs(worldObjectPixelPitch(64.0) - 2.0) < 1e-12);
         PALADIN_CHECK(
-            stableWorldObjectScreenCoordinate(101.2F, 64.0) == 102.0F
+            stableWorldObjectScreenCoordinate(101.2F, 64.0) == 101.0F
         );
         PALADIN_CHECK(
             stableWorldObjectScreenCoordinate(101.8F, 64.0) == 102.0F
@@ -283,8 +283,7 @@ namespace
         const float snapped = stableWorldObjectScreenCoordinate(100.6F, 40.0);
         PALADIN_CHECK(std::abs(pitch - 1.25) < 1e-12);
         PALADIN_CHECK(
-            std::abs(double(snapped) / pitch -
-                     std::round(double(snapped) / pitch)) < 1e-6
+            snapped == 101.0F
         );
     }
 

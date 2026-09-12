@@ -32,7 +32,9 @@ namespace Paladin
             double compositeOffsetY = 0.0
         )
             : renderer_(r),
-              active_(r.beginPixelScene(worldPixelPitch(tilePixels), false)),
+              active_(r.beginPixelScene(worldPixelPitch(tilePixels), false,
+                  opacity != 255 || rotationDegrees != 0 || compositeScale != 1 ||
+                  compositeOffsetX != 0 || compositeOffsetY != 0)),
               opacity_(opacity),
               rotationDegrees_(rotationDegrees),
               compositeScale_(compositeScale),

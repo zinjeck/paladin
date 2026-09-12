@@ -67,11 +67,21 @@ jobs:
           --target PaladinArtCheck
           --parallel
 
+      - name: Require focused world regression evidence
+        shell: pwsh
+        run: |
+          $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv")
+          foreach ($file in $required) {
+            if (-not (Test-Path "art-review/$file")) { throw "Missing mandatory render evidence: $file" }
+          }
+          $frames = Import-Csv "art-review/pr25-marker-motion.csv"
+          if ($frames.Count -ne 480) { throw "Expected 480 marker-motion frames, got $($frames.Count)" }
+
       - name: Upload software-rendered review images
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: paladin-software-art-review
           path: art-review
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
