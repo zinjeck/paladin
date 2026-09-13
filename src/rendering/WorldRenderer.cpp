@@ -64,10 +64,20 @@ namespace Paladin
             globe_.updateAtlas(renderer, world, artwork_);
             if (globe_.detailReady())
             {
-                return true;
+                break;
             }
         }
-        return globe_.detailReady();
+        if (!globe_.detailReady()) return false;
+        // Complete the initial country overview during loading. Subsequent
+        // demographic and ownership changes refresh inside render's bounded
+        // work budget, without interrupting interaction with a loading screen.
+        if (preparedPoliticalWorld_ != &world)
+        {
+            if (!territoryPresentationRenderer_.prepare(renderer, world))
+                return false;
+            preparedPoliticalWorld_ = &world;
+        }
+        return true;
     }
 
     double WorldRenderer::effectiveTilePixels(
@@ -108,6 +118,14 @@ namespace Paladin
         std::optional<WorldPlacementMarker> placementMarker
     ) const
     {
+        if (profileRendering) renderTimings.fill(0);
+        auto stamp = profileRendering ? SDL_GetTicksNS() : 0;
+        const auto stage = [&](int index) {
+            if (!profileRendering) return;
+            const auto now = SDL_GetTicksNS();
+            renderTimings[index] += (now - stamp) / 1e6;
+            stamp = now;
+        };
         std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
 #ifdef PALADIN_ART_ROOT
         artRoot = PALADIN_ART_ROOT;
@@ -154,6 +172,7 @@ namespace Paladin
         }
 
         artwork_.setTime(animationSeconds);
+        stage(0);
 
         if (globeEnabled)
         {
@@ -178,6 +197,7 @@ namespace Paladin
                     overlays,
                     outlines
                 );
+                stage(1);
                 territoryPresentationRenderer_.renderGlobe(
                     renderer,
                     world,
@@ -187,6 +207,7 @@ namespace Paladin
                 );
             }
 
+            stage(2);
             if (localWeight > 0.001F)
             {
                 const LocalTangentWorldView tangent = LocalTangentWorldView::from(
@@ -248,6 +269,7 @@ namespace Paladin
                     artwork_,
                     planarTilePixels
                 );
+                stage(3);
                 worldFoliageProjected(
                     renderer,
                     world,
@@ -256,6 +278,7 @@ namespace Paladin
                     false,
                     artwork_
                 );
+                stage(4);
                 territoryPresentationRenderer_.renderFlat(
                     renderer,
                     world,
@@ -278,6 +301,7 @@ namespace Paladin
                 );
             }
 
+            stage(5);
             // The sun is deliberately composited only after both pixel-scene
             // scopes have ended, at native output resolution. It is
             // analytically clipped at the solid globe; camera bloom may spill
@@ -301,10 +325,12 @@ namespace Paladin
                     renderer,
                     sunView,
                     world.time().secondsIntoDay(),
-                    celestialWeight
+                    celestialWeight,
+                    animationSeconds
                 );
             }
 
+            stage(6);
             // Geometry and native annotations share the source camera and the
             // same final residual. No independently snapped object camera.
             worldObjectRenderer_.render(
@@ -319,6 +345,7 @@ namespace Paladin
                 placementMarker,
                 objectResidual
             );
+            stage(7);
             return;
         }
 

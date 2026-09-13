@@ -67,6 +67,7 @@ namespace Paladin
         bool isValid() const noexcept;
 
         void beginFrame();
+        std::uint64_t frameId() const noexcept { return frameId_; }
         void compositeLighting(Texture& light, Texture& glow);
 
         void endFrame();
@@ -205,6 +206,7 @@ namespace Paladin
         );
 
     private:
+        std::uint64_t frameId_ = 0;
         bool activatePixelScene(double pitch);
         bool pixelSceneActive_ = false;
         std::shared_ptr<AssetManager> assetManager_;

@@ -142,11 +142,9 @@ namespace Paladin
 
         inline std::uint8_t channel(float value)
         {
-            return static_cast<std::uint8_t>(std::clamp(
-                std::lround(value),
-                0L,
-                255L
-            ));
+            return static_cast<std::uint8_t>(
+                std::clamp(std::lround(value), 0L, 255L)
+            );
         }
 
         struct GlareLobe
@@ -160,37 +158,40 @@ namespace Paladin
         // Unequal, non-periodic aperture/scatter lobes. These are continuous
         // optical intensity profiles, not line primitives. The long axes end at
         // different distances and widen softly; some develop a violet fringe.
-        inline constexpr std::array<GlareLobe, 24> GlareLobes{{
-            {.10F,.014F,.96F,.78F}, {3.25F,.011F,.84F,.66F},
-            {1.47F,.009F,.78F,.69F}, {4.67F,.013F,.94F,.81F},
-            {.72F,.013F,.68F,.58F}, {3.86F,.009F,.80F,.60F},
-            {2.24F,.017F,.91F,.68F}, {5.39F,.008F,.62F,.56F},
-            {1.02F,.018F,.46F,.37F}, {4.12F,.020F,.55F,.42F},
-            {2.74F,.011F,.60F,.46F}, {5.88F,.019F,.78F,.56F},
-            {.32F,.025F,.34F,.22F}, {3.50F,.023F,.30F,.27F},
-            {1.72F,.018F,.51F,.28F}, {4.42F,.023F,.40F,.23F},
-            {.91F,.008F,.29F,.28F}, {3.65F,.027F,.26F,.19F},
-            {2.48F,.024F,.37F,.25F}, {5.62F,.017F,.43F,.23F},
-            {1.26F,.014F,.32F,.25F}, {4.93F,.022F,.29F,.26F},
-            {2.97F,.021F,.25F,.21F}, {6.12F,.017F,.39F,.25F}
-        }};
+        inline constexpr std::array<GlareLobe, 24> GlareLobes{
+            {{.10F, .014F, .96F, .78F},  {3.25F, .011F, .84F, .66F},
+             {1.47F, .009F, .78F, .69F}, {4.67F, .013F, .94F, .81F},
+             {.72F, .013F, .68F, .58F},  {3.86F, .009F, .80F, .60F},
+             {2.24F, .017F, .91F, .68F}, {5.39F, .008F, .62F, .56F},
+             {1.02F, .018F, .46F, .37F}, {4.12F, .020F, .55F, .42F},
+             {2.74F, .011F, .60F, .46F}, {5.88F, .019F, .78F, .56F},
+             {.32F, .025F, .34F, .22F},  {3.50F, .023F, .30F, .27F},
+             {1.72F, .018F, .51F, .28F}, {4.42F, .023F, .40F, .23F},
+             {.91F, .008F, .29F, .28F},  {3.65F, .027F, .26F, .19F},
+             {2.48F, .024F, .37F, .25F}, {5.62F, .017F, .43F, .23F},
+             {1.26F, .014F, .32F, .25F}, {4.93F, .022F, .29F, .26F},
+             {2.97F, .021F, .25F, .21F}, {6.12F, .017F, .39F, .25F}}
+        };
 
         inline float smoothC2(float t)
         {
             t = std::clamp(t, 0.F, 1.F);
-            return t*t*t*(10.F+t*(-15.F+6.F*t));
+            return t * t * t * (10.F + t * (-15.F + 6.F * t));
         }
 
         inline float glareLobe(float x, float y, const GlareLobe& lobe)
         {
-            const float c=std::cos(lobe.angle), s=std::sin(lobe.angle);
-            const float along=x*c+y*s;
-            if (along <= 0 || along >= lobe.length) return 0;
-            const float q=along/lobe.length;
-            const float width=.0018F+lobe.width*(.22F+q*.9F);
-            const float lateral=(-x*s+y*c)/width;
-            return lobe.strength * std::exp(-.5F*lateral*lateral) *
-                   std::exp(-2.4F*q) * (1.F-smoothC2((q-.48F)/.52F));
+            const float c = std::cos(lobe.angle), s = std::sin(lobe.angle);
+            const float along = x * c + y * s;
+            if (along <= 0 || along >= lobe.length)
+            {
+                return 0;
+            }
+            const float q = along / lobe.length;
+            const float width = .0018F + lobe.width * (.22F + q * .9F);
+            const float lateral = (-x * s + y * c) / width;
+            return lobe.strength * std::exp(-.5F * lateral * lateral) *
+                   std::exp(-2.4F * q) * (1.F - smoothC2((q - .48F) / .52F));
         }
     } // namespace CelestialSunOptics
 
@@ -198,45 +199,71 @@ namespace Paladin
     // light-transport simulation. Crucially ALL energy reaches zero smoothly
     // before the finite texture boundary, not just the rays. The previous code
     // cut nonzero radial corona energy at radius=1, exposing a pasted disk.
-    inline RenderColor celestialSunCoronaSample(float x, float y)
+    inline RenderColor celestialSunCoronaSample(
+        float x,
+        float y,
+        bool includeRays = true
+    )
     {
         using namespace CelestialSunOptics;
-        const float radius=std::hypot(x,y);
-        if (!std::isfinite(radius) || radius >= 1) return {0,0,0,0};
-        const float halo = .80F*std::exp(-std::pow(radius/.045F,2.F)) +
-                           .58F*std::exp(-std::pow(radius/.135F,1.45F)) +
-                           .13F*std::exp(-std::pow(radius/.30F,1.7F)) +
-                           .010F*std::exp(-std::pow(radius/.52F,2.F));
-        const float hot=std::exp(-radius*13.F);
-        float red=halo, green=halo*(.92F+.08F*hot), blue=halo*(.79F+.21F*hot);
-        const float emergence=smoothC2(radius/.020F);
-        for (std::size_t i=0;i<GlareLobes.size();++i)
+        const float radius = std::hypot(x, y);
+        if (!std::isfinite(radius) || radius >= 1)
         {
-            const auto& lobe=GlareLobes[i];
-            const float along=x*std::cos(lobe.angle)+y*std::sin(lobe.angle);
-            const float end=(i%3 != 1) ? smoothC2((along/lobe.length-.20F)/.50F) : 0.F;
-            const float energy=glareLobe(x,y,lobe)*emergence;
-            red+=energy*(.96F+.04F*hot);
-            green+=energy*(.97F-.44F*end);
-            blue+=energy*(.93F+.07F*end);
+            return {0, 0, 0, 0};
+        }
+        const float halo = .80F * std::exp(-std::pow(radius / .045F, 2.F)) +
+                           .58F * std::exp(-std::pow(radius / .135F, 1.45F)) +
+                           .13F * std::exp(-std::pow(radius / .30F, 1.7F)) +
+                           .010F * std::exp(-std::pow(radius / .52F, 2.F));
+        const float hot = std::exp(-radius * 13.F);
+        float red = halo, green = halo * (.92F + .08F * hot),
+              blue = halo * (.79F + .21F * hot);
+        const float emergence = smoothC2(radius / .020F);
+        for (std::size_t i = 0; includeRays && i < GlareLobes.size(); ++i)
+        {
+            const auto& lobe = GlareLobes[i];
+            const float along =
+                x * std::cos(lobe.angle) + y * std::sin(lobe.angle);
+            const float end =
+                (i % 3 != 1) ? smoothC2((along / lobe.length - .20F) / .50F)
+                             : 0.F;
+            const float energy = glareLobe(x, y, lobe) * emergence;
+            red += energy * (.96F + .04F * hot);
+            green += energy * (.97F - .44F * end);
+            blue += energy * (.93F + .07F * end);
             // A restrained displaced blue/violet wing gives selected ray ends
             // color dispersion without tinting the entire sun purple.
-            auto fringe=lobe;
-            fringe.angle+=.008F;
-            fringe.width*=1.25F;
-            const float chroma=.22F*end*glareLobe(x,y,fringe)*emergence;
-            red+=chroma*.65F; green+=chroma*.23F; blue+=chroma;
+            auto fringe = lobe;
+            fringe.angle += .008F;
+            fringe.width *= 1.25F;
+            const float chroma =
+                .22F * end * glareLobe(x, y, fringe) * emergence;
+            red += chroma * .65F;
+            green += chroma * .23F;
+            blue += chroma;
         }
-        const float envelope=1.F-smoothC2((radius-.65F)/.35F);
-        red*=envelope; green*=envelope; blue*=envelope;
-        const float energy=std::max({red,green,blue});
-        if (energy <= 0) return {0,0,0,0};
+        const float envelope = 1.F - smoothC2((radius - .65F) / .35F);
+        red *= envelope;
+        green *= envelope;
+        blue *= envelope;
+        const float energy = std::max({red, green, blue});
+        if (energy <= 0)
+        {
+            return {0, 0, 0, 0};
+        }
         // Encode additive intensity without throwing away chromatic ratios.
         // Black, zero-alpha guard texels prevent filtering a visible disk edge.
-        const auto alpha=channel(255.F*std::min(1.F,energy));
-        if (!alpha) return {0,0,0,0};
-        return {channel(255.F*red/energy),channel(255.F*green/energy),
-                channel(255.F*blue/energy),alpha};
+        const auto alpha = channel(255.F * std::min(1.F, energy));
+        if (!alpha)
+        {
+            return {0, 0, 0, 0};
+        }
+        return {
+            channel(255.F * red / energy),
+            channel(255.F * green / energy),
+            channel(255.F * blue / energy),
+            alpha
+        };
     }
 
     // Tiny source contribution. It is intentionally not an opaque white disc.
@@ -252,10 +279,8 @@ namespace Paladin
         }
 
         const float hot = .44F * std::exp(-std::pow(radius / .10F, 2.F));
-        const float bloom =
-            .10F * std::exp(-std::pow(radius / .55F, 1.70F));
-        float radiance = (hot + bloom) *
-                         smooth01((1.F - radius) / .18F);
+        const float bloom = .10F * std::exp(-std::pow(radius / .55F, 1.70F));
+        float radiance = (hot + bloom) * smooth01((1.F - radius) / .18F);
         radiance = std::clamp(radiance, 0.F, .54F);
 
         const float white = std::exp(-std::pow(radius / .45F, 1.6F));
@@ -281,18 +306,18 @@ namespace Paladin
         const float ring = std::exp(-std::pow((radius - .53F) / .17F, 2.F));
         const float haze = .35F * std::exp(-std::pow(radius / .72F, 2.F));
         const float edge = smooth01((1.F - radius) / .18F);
-        const float radiance = std::clamp(
-            (.080F * ring + .025F * haze) * edge,
-            0.F,
-            .10F
-        );
+        const float radiance =
+            std::clamp((.080F * ring + .025F * haze) * edge, 0.F, .10F);
         return {205, 222, 255, channel(255.F * radiance)};
     }
 
     class CelestialSunRenderer
     {
     public:
-        std::uint64_t textureBuilds() const noexcept { return textureBuilds_; }
+        std::uint64_t textureBuilds() const noexcept
+        {
+            return textureBuilds_;
+        }
 
         bool prepare(Renderer& renderer) const
         {
@@ -305,6 +330,7 @@ namespace Paladin
             coreTexture_.reset();
             lensGhostTexture_.reset();
             discTexture_.reset();
+            rayTexture_.reset();
             textureOwner_ = nullptr;
         }
 
@@ -312,7 +338,8 @@ namespace Paladin
             Renderer& renderer,
             const GlobeView& view,
             double secondsIntoDay,
-            float opacity = 1.F
+            float opacity = 1.F,
+            double animationSeconds = 0
         ) const
         {
             opacity = std::clamp(opacity, 0.F, 1.F);
@@ -337,6 +364,10 @@ namespace Paladin
             // Only the solid planet occludes light. The thin atmosphere is
             // translucent; masking its outer radius made an opaque black band.
             const float globeRadius = float(view.radius);
+            // Continuous phases follow the pause/speed-controlled presentation
+            // clock, never wall time or frame-random noise.
+            const double time =
+                std::isfinite(animationSeconds) ? animationSeconds : 0.;
 
             renderLimbScatter(
                 renderer,
@@ -344,7 +375,7 @@ namespace Paladin
                 globeX,
                 globeY,
                 globeRadius,
-                opacity
+                opacity * float(.95 + .05 * std::sin(time * .63))
             );
             const float visible =
                 sourceVisibility(*projected, globeX, globeY, globeRadius);
@@ -378,12 +409,25 @@ namespace Paladin
                 projected->x + (projected->x - globeX) / distance * shift;
             const float glareY =
                 projected->y + (projected->y - globeY) / distance * shift;
+            const float breathing = float(
+                .96 + .04 * std::sin(time * .79) * std::sin(time * .31 + 1)
+            );
+            renderRays(
+                renderer,
+                glareX,
+                glareY,
+                410.F * projected->scale * size,
+                std::atan2(projected->y - globeY, projected->x - globeX),
+                visible,
+                opacity * response,
+                time
+            );
             drawOpticalLayer(
                 renderer,
                 *coronaTexture_,
                 glareX,
                 glareY,
-                410.F * projected->scale * size,
+                410.F * projected->scale * size * breathing,
                 opacity * response
             );
             drawOpticalLayer(
@@ -391,7 +435,7 @@ namespace Paladin
                 *coreTexture_,
                 glareX,
                 glareY,
-                18.F * projected->scale * size,
+                18.F * projected->scale * size * breathing,
                 opacity * response
             );
 
@@ -401,11 +445,71 @@ namespace Paladin
                 globeX,
                 globeY,
                 globeRadius,
-                opacity * response
+                opacity * response,
+                time
             );
         }
 
     private:
+        void renderRays(
+            Renderer& renderer,
+            float x,
+            float y,
+            float extent,
+            float outwardAngle,
+            float visible,
+            float opacity,
+            double time
+        ) const
+        {
+            using namespace CelestialSunOptics;
+            constexpr auto Count = GlareLobes.size();
+            std::array<MeshVertex, Count * 4> vertices{};
+            std::array<int, Count * 6> indices{};
+            for (std::size_t i = 0; i < Count; ++i)
+            {
+                const auto& lobe = GlareLobes[i];
+                const double phase = i * 2.399963;
+                const float swell =
+                    float(std::sin(time * (.43 + .031 * (i % 7)) + phase));
+                const float shimmer = float(
+                    std::sin(time * (1.13 + .047 * (i % 5)) + phase * 1.7)
+                );
+                const float angle = lobe.angle + .009F * shimmer;
+                const float contact = 1.F - visible;
+                const float facing = .5F + .5F * std::cos(angle - outwardAngle);
+                const float length = extent * lobe.length *
+                                     (.90F + .16F * swell) *
+                                     (1.F - .20F * contact * (1.F - facing));
+                const float width =
+                    extent * 3.F * (.002F + lobe.width) * (1.F + .16F * shimmer);
+                const float strength = opacity * lobe.strength *
+                                       (.82F + .15F * swell + .03F * shimmer) *
+                                       (1.F - .35F * contact * (1.F - facing));
+                const float dx = std::cos(angle), dy = std::sin(angle);
+                const float px = -dy * width, py = dx * width;
+                const auto alpha = channel(255.F * strength);
+                const RenderColor root{255, 248, 232, alpha};
+                const RenderColor tip = i % 3 != 1
+                                            ? RenderColor{235, 173, 255, alpha}
+                                            : RenderColor{255, 240, 214, alpha};
+                const int v = int(i * 4), n = int(i * 6);
+                vertices[v] = {x - px, y - py, 0, 0, root};
+                vertices[v + 1] =
+                    {x + length * dx - px, y + length * dy - py, 1, 0, tip};
+                vertices[v + 2] =
+                    {x + length * dx + px, y + length * dy + py, 1, 1, tip};
+                vertices[v + 3] = {x + px, y + py, 0, 1, root};
+                indices[n] = v;
+                indices[n + 1] = v + 1;
+                indices[n + 2] = v + 2;
+                indices[n + 3] = v;
+                indices[n + 4] = v + 2;
+                indices[n + 5] = v + 3;
+            }
+            renderer.drawMesh(*rayTexture_, vertices, indices);
+        }
+
         static float sourceVisibility(
             const CelestialSunScreenPosition& projected,
             float globeX,
@@ -413,10 +517,8 @@ namespace Paladin
             float globeRadius
         )
         {
-            const float distance = std::hypot(
-                projected.x - globeX,
-                projected.y - globeY
-            );
+            const float distance =
+                std::hypot(projected.x - globeX, projected.y - globeY);
             const float sourceRadius = 7.F * projected.scale;
             return CelestialSunOptics::visibleDiscFraction(
                 distance,
@@ -521,15 +623,12 @@ namespace Paladin
             float globeX,
             float globeY,
             float globeRadius,
-            float opacity
+            float opacity,
+            double time
         ) const
         {
-            const float visible = sourceVisibility(
-                projected,
-                globeX,
-                globeY,
-                globeRadius
-            );
+            const float visible =
+                sourceVisibility(projected, globeX, globeY, globeRadius);
             if (visible <= .01F || !lensGhostTexture_)
             {
                 return;
@@ -546,27 +645,28 @@ namespace Paladin
                 float radius;
                 float strength;
             };
-            static constexpr std::array<Ghost, 3> ghosts{{
-                {.43F, 24.F, .090F},
-                {.74F, 42.F, .052F},
-                {1.08F, 18.F, .034F}
-            }};
+            static constexpr std::array<Ghost, 3> ghosts{
+                {{.43F, 24.F, .090F}, {.74F, 42.F, .052F}, {1.08F, 18.F, .034F}}
+            };
 
             for (const auto& ghost : ghosts)
             {
-                const float radius = ghost.radius * projected.scale;
-                const float strength = opacity * visible * ghost.strength;
+                const float drift =
+                    float(std::sin(time * .57 + ghost.along * 9));
+                const float radius =
+                    ghost.radius * projected.scale * (1.F + .06F * drift);
+                const float strength =
+                    opacity * visible * ghost.strength * (.90F + .10F * drift);
                 if (strength <= .002F)
                 {
                     continue;
                 }
-                const auto alpha = static_cast<std::uint8_t>(std::clamp(
-                    std::lround(255.F * strength),
-                    0L,
-                    255L
-                ));
-                const float x = projected.x + axisX * ghost.along - radius;
-                const float y = projected.y + axisY * ghost.along - radius;
+                const auto alpha = static_cast<std::uint8_t>(
+                    std::clamp(std::lround(255.F * strength), 0L, 255L)
+                );
+                const float along = ghost.along + .012F * drift;
+                const float x = projected.x + axisX * along - radius;
+                const float y = projected.y + axisY * along - radius;
                 renderer.drawTexture(
                     *lensGhostTexture_,
                     0,
@@ -612,15 +712,22 @@ namespace Paladin
 
             // Integer physical scan rows avoid fractional-strip gaps in SDL's
             // software triangle path. Offscreen regions never enter the mesh.
-            const int firstRow=std::max(0,int(std::ceil(top)));
-            const int lastRow=std::min(renderer.outputHeight(),int(std::floor(top+diameter)));
-            if (lastRow<=firstRow) return;
-            const int rowStep=std::max(1,(lastRow-firstRow+int(MaxStrips)-1)/int(MaxStrips));
-            const auto alpha = static_cast<std::uint8_t>(std::clamp(
-                std::lround(255.F * opacity),
-                0L,
-                255L
-            ));
+            const int firstRow = std::max(0, int(std::ceil(top)));
+            const int lastRow = std::min(
+                renderer.outputHeight(),
+                int(std::floor(top + diameter))
+            );
+            if (lastRow <= firstRow)
+            {
+                return;
+            }
+            const int rowStep = std::max(
+                1,
+                (lastRow - firstRow + int(MaxStrips) - 1) / int(MaxStrips)
+            );
+            const auto alpha = static_cast<std::uint8_t>(
+                std::clamp(std::lround(255.F * opacity), 0L, 255L)
+            );
             const RenderColor modulation{255, 255, 255, alpha};
 
             const auto addQuad = [&](float x0,
@@ -632,8 +739,7 @@ namespace Paladin
                                      float v0,
                                      float v1)
             {
-                if (x1 - x0 <= .01F || y1 - y0 <= .01F ||
-                    quadCount >= MaxQuads)
+                if (x1 - x0 <= .01F || y1 - y0 <= .01F || quadCount >= MaxQuads)
                 {
                     return;
                 }
@@ -656,17 +762,20 @@ namespace Paladin
             };
 
             // Unoccluded glare is one smooth quad, not hundreds of strips.
-            const float nearestX=std::clamp(globeX,left,right);
-            const float nearestY=std::clamp(globeY,top,top+diameter);
-            const bool separate=std::hypot(nearestX-globeX,nearestY-globeY)>=globeRadius;
+            const float nearestX = std::clamp(globeX, left, right);
+            const float nearestY = std::clamp(globeY, top, top + diameter);
+            const bool separate =
+                std::hypot(nearestX - globeX, nearestY - globeY) >= globeRadius;
             if (separate)
             {
-                addQuad(left,right,top,top+diameter,0,1,0,1);
+                addQuad(left, right, top, top + diameter, 0, 1, 0, 1);
             }
-            for (int row=firstRow; !separate && row<lastRow; row+=rowStep)
+            for (int row = firstRow; !separate && row < lastRow; row += rowStep)
             {
-                const float y0=float(row), y1=float(std::min(row+rowStep,lastRow));
-                const float v0=(y0-top)/diameter, v1=(y1-top)/diameter;
+                const float y0 = float(row),
+                            y1 = float(std::min(row + rowStep, lastRow));
+                const float v0 = (y0 - top) / diameter,
+                            v1 = (y1 - top) / diameter;
                 const float maskY = std::clamp(globeY, y0, y1);
                 const float dy = maskY - globeY;
                 const float circle = globeRadius * globeRadius - dy * dy;
@@ -730,7 +839,7 @@ namespace Paladin
         bool ensureTextures(Renderer& renderer) const
         {
             if (coronaTexture_ && coreTexture_ && lensGhostTexture_ &&
-                discTexture_ && textureOwner_ == &renderer)
+                discTexture_ && rayTexture_ && textureOwner_ == &renderer)
             {
                 return true;
             }
@@ -738,8 +847,8 @@ namespace Paladin
             reset();
             textureOwner_ = &renderer;
 
-            const auto create = [&](int side, auto&& sampler)
-                -> std::unique_ptr<Texture>
+            const auto create = [&](int side,
+                                    auto&& sampler) -> std::unique_ptr<Texture>
             {
                 std::vector<RenderColor> pixels(
                     std::size_t(side) * side,
@@ -747,8 +856,7 @@ namespace Paladin
                 );
                 for (int y = 0; y < side; ++y)
                 {
-                    const float ny =
-                        (float(y) + .5F) / float(side) * 2.F - 1.F;
+                    const float ny = (float(y) + .5F) / float(side) * 2.F - 1.F;
                     for (int x = 0; x < side; ++x)
                     {
                         const float nx =
@@ -757,7 +865,8 @@ namespace Paladin
                     }
                 }
 
-                auto texture = renderer.createTextureFromPixels(side, side, pixels);
+                auto texture =
+                    renderer.createTextureFromPixels(side, side, pixels);
                 if (!texture)
                 {
                     return {};
@@ -767,7 +876,34 @@ namespace Paladin
                 return texture;
             };
 
-            coronaTexture_ = create(1024, celestialSunCoronaSample);
+            coronaTexture_ = create(
+                1024,
+                [](float x, float y)
+                { return celestialSunCoronaSample(x, y, false); }
+            );
+            rayTexture_ = create(
+                256,
+                [](float x, float y) -> RenderColor
+                {
+                    const float along = (x + 1.F) * .5F;
+                    const float width = .32F + .64F * along;
+                    const float energy =
+                        std::exp(-2.4F * along) *
+                        std::exp(-4.F * y * y / (width * width)) *
+                        CelestialSunOptics::smoothC2(along / .024F) *
+                        (1.F -
+                         CelestialSunOptics::smoothC2((along - .48F) / .52F)) *
+                        (1.F - CelestialSunOptics::smoothC2(
+                                   (std::abs(y) - .65F) / .35F
+                               ));
+                    return {
+                        255,
+                        255,
+                        255,
+                        CelestialSunOptics::channel(255.F * energy)
+                    };
+                }
+            );
             coreTexture_ = create(384, celestialSunCoreSample);
             lensGhostTexture_ = create(256, celestialSunLensGhostSample);
             discTexture_ = create(
@@ -786,7 +922,7 @@ namespace Paladin
                 }
             );
             if (!coronaTexture_ || !coreTexture_ || !lensGhostTexture_ ||
-                !discTexture_)
+                !discTexture_ || !rayTexture_)
             {
                 reset();
                 return false;
@@ -800,6 +936,7 @@ namespace Paladin
         mutable std::unique_ptr<Texture> coreTexture_;
         mutable std::unique_ptr<Texture> lensGhostTexture_;
         mutable std::unique_ptr<Texture> discTexture_;
+        mutable std::unique_ptr<Texture> rayTexture_;
         mutable const Renderer* textureOwner_ = nullptr;
     };
 } // namespace Paladin

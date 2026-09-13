@@ -6,19 +6,30 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 
 namespace Paladin
 {
     // The terrain atlas and political presentation MUST sample the same warped
-    // land field. Logical controller cells remain simulation data, not polygons.
-    inline double worldLandField(const WorldGrid& grid, double x, double y)
+    // land field. Logical controller cells remain simulation data, not
+    // polygons.
+    template<class GridSource>
+    inline double worldLandField(const GridSource& grid, double x, double y)
     {
         const int w = grid.width(), h = grid.height();
-        if (w <= 0 || h <= 0) return 0.0;
-        return surfaceField(x, y, [&](int ix, int iy) {
-            return grid.tile({(ix % w + w) % w, std::clamp(iy, 0, h - 1)})
-                       ->terrain != TerrainType::Water;
-        });
+        if (w <= 0 || h <= 0)
+        {
+            return 0.0;
+        }
+        return surfaceField(
+            x,
+            y,
+            [&](int ix, int iy)
+            {
+                return grid.tile({(ix % w + w) % w, std::clamp(iy, 0, h - 1)})
+                           ->terrain != TerrainType::Water;
+            }
+        );
     }
 
     struct WorldPoliticalSurfaceSample
@@ -30,14 +41,131 @@ namespace Paladin
         double landWeight = 0.0;
     };
 
+    // Immutable after its rows have been prepared. Runtime political rasters
+    // use this compact read-only source so each canonical sample does not call
+    // through debug simulation getters and realm/controller hash lookups.
+    class WorldPoliticalSurfaceSource
+    {
+        struct Cell
+        {
+            TerrainType terrain;
+            RealmId controller;
+        };
+        struct CivicRealm
+        {
+            bool usesTribalInfluence() const noexcept
+            {
+                return false;
+            }
+        };
+        int width_, height_;
+        std::vector<Cell> cells_;
+
+    public:
+        explicit WorldPoliticalSurfaceSource(const World& world)
+            : width_(world.grid().width()), height_(world.grid().height())
+        {
+            cells_.reserve(std::size_t(width_) * height_);
+        }
+        int width() const noexcept
+        {
+            return width_;
+        }
+        int height() const noexcept
+        {
+            return height_;
+        }
+        bool complete() const noexcept
+        {
+            return cells_.size() == std::size_t(width_) * height_;
+        }
+        void appendRow(const World& world)
+        {
+            if (complete() || width_ <= 0)
+            {
+                return;
+            }
+            const int y = int(cells_.size() / width_);
+            const auto& grid = world.grid();
+            const auto& territory = world.territory();
+            for (int x = 0; x < width_; ++x)
+            {
+                Cell cell{grid.tile({x, y})->terrain, {}};
+                if (cell.terrain != TerrainType::Water)
+                {
+                    const auto id = territory.controllerAt({x, y});
+                    const auto* realm = world.realm(id);
+                    if (realm && !realm->usesTribalInfluence())
+                    {
+                        cell.controller = id;
+                    }
+                }
+                cells_.push_back(cell);
+            }
+        }
+        const WorldPoliticalSurfaceSource& grid() const noexcept
+        {
+            return *this;
+        }
+        const WorldPoliticalSurfaceSource& territory() const noexcept
+        {
+            return *this;
+        }
+        const Cell* tile(WorldTilePosition p) const noexcept
+        {
+            return &cells_[std::size_t(p.y) * width_ + p.x];
+        }
+        RealmId controllerAt(WorldTilePosition p) const noexcept
+        {
+            return tile(p)->controller;
+        }
+        const CivicRealm* realm(RealmId id) const noexcept
+        {
+            static const CivicRealm civic;
+            return id ? &civic : nullptr;
+        }
+    };
+
+    class WorldTribalSurfaceSource
+    {
+        int width_, height_;
+        std::vector<TribalInfluenceSample> cells_;
+
+    public:
+        explicit WorldTribalSurfaceSource(const TribalInfluenceMap& influence)
+            : width_(influence.width()), height_(influence.height()),
+              cells_(influence.samples().begin(), influence.samples().end())
+        {
+        }
+        TribalInfluenceSample sampleAt(WorldTilePosition p) const noexcept
+        {
+            if (p.y < 0 || p.y >= height_ || width_ <= 0)
+            {
+                return {};
+            }
+            if (p.x < 0 || p.x >= width_)
+            {
+                p.x = (p.x % width_ + width_) % width_;
+            }
+            return cells_[std::size_t(p.y) * width_ + p.x];
+        }
+    };
+
+    template<class WorldSource>
     inline WorldPoliticalSurfaceSample worldPoliticalSurfaceAt(
-        const World& world, double x, double y)
+        const WorldSource& world,
+        double x,
+        double y
+    )
     {
         WorldPoliticalSurfaceSample result;
         const auto& grid = world.grid();
         const int w = grid.width(), h = grid.height();
         if (w <= 0 || h <= 0 || !std::isfinite(x) || !std::isfinite(y) ||
-            y < 0.0 || y >= h) return result;
+            y < 0.0 || y >= h)
+        {
+            return result;
+        }
         x -= std::floor(x / w) * w;
         const auto warped = coastSample(x, y, true);
         const int ix = int(std::floor(warped.x - .5));
@@ -52,29 +180,46 @@ namespace Paladin
             {
                 const int k = j * 2 + i;
                 const WorldTilePosition p{
-                    ((ix + i) % w + w) % w, std::clamp(iy + j, 0, h - 1)};
+                    ((ix + i) % w + w) % w,
+                    std::clamp(iy + j, 0, h - 1)
+                };
                 result.positions[k] = p;
-                if (grid.tile(p)->terrain == TerrainType::Water) continue;
+                if (grid.tile(p)->terrain == TerrainType::Water)
+                {
+                    continue;
+                }
                 const double weight = (i ? u : 1 - u) * (j ? v : 1 - v);
                 result.dryWeights[k] = weight;
                 result.landWeight += weight;
                 const RealmId id = world.territory().controllerAt(p);
                 const auto* realm = world.realm(id);
-                if (realm && !realm->usesTribalInfluence()) owners[k] = id;
+                if (realm && !realm->usesTribalInfluence())
+                {
+                    owners[k] = id;
+                }
             }
         }
         // Use the identical expression/order as the terrain for threshold ties.
         result.land = worldLandField(grid, warped.x, warped.y) >= .5;
-        if (!result.land) return result;
+        if (!result.land)
+        {
+            return result;
+        }
 
-        // Compare realm weights with unclaimed DRY land, not ocean. A controlled
-        // island must reach its visible shoreline, including its rounded corners.
+        // Compare realm weights with unclaimed DRY land, not ocean. A
+        // controlled island must reach its visible shoreline, including its
+        // rounded corners.
         double best = -1.0;
         for (int i = 0; i != 4; ++i)
         {
             double weight = 0;
             for (int j = 0; j != 4; ++j)
-                if (owners[i] == owners[j]) weight += result.dryWeights[j];
+            {
+                if (owners[i] == owners[j])
+                {
+                    weight += result.dryWeights[j];
+                }
+            }
             if (weight > best ||
                 (weight == best && owners[i].value() < result.civic.value()))
             {
@@ -88,36 +233,70 @@ namespace Paladin
     // Interpolate actual authority from the same dry surface samples. This does
     // not award tribal controller cells or change any influence equation. It
     // only avoids clipping a tribe at the OLD square coastline during display.
+    template<class InfluenceSource>
     inline TribalInfluenceSample worldTribalSurfaceSample(
-        const TribalInfluenceMap& influence,
-        const WorldPoliticalSurfaceSample& surface)
+        const InfluenceSource& influence,
+        const WorldPoliticalSurfaceSample& surface
+    )
     {
         TribalInfluenceSample result{};
-        if (!surface.land || surface.civic || surface.landWeight <= 0) return result;
-        struct Entry { RealmId id; double value = 0; };
+        if (!surface.land || surface.civic || surface.landWeight <= 0)
+        {
+            return result;
+        }
+        struct Entry
+        {
+            RealmId id;
+            double value = 0;
+        };
         std::array<Entry, 8> entries{};
         int count = 0;
-        const auto add = [&](RealmId id, double value) {
-            if (!id || value <= 0) return;
+        const auto add = [&](RealmId id, double value)
+        {
+            if (!id || value <= 0)
+            {
+                return;
+            }
             for (int i = 0; i < count; ++i)
             {
-                if (entries[i].id == id) { entries[i].value += value; return; }
+                if (entries[i].id == id)
+                {
+                    entries[i].value += value;
+                    return;
+                }
             }
             entries[count++] = {id, value};
         };
         for (int k = 0; k != 4; ++k)
         {
-            if (surface.dryWeights[k] <= 0) continue;
+            if (surface.dryWeights[k] <= 0)
+            {
+                continue;
+            }
             const auto sample = influence.sampleAt(surface.positions[k]);
             const double weight = surface.dryWeights[k] / surface.landWeight;
             add(sample.primaryRealm, sample.primaryInfluence * weight);
             add(sample.secondaryRealm, sample.secondaryInfluence * weight);
         }
-        std::sort(entries.begin(), entries.begin() + count, [](auto a, auto b) {
-            return a.value != b.value ? a.value > b.value : a.id.value() < b.id.value();
-        });
-        if (count) { result.primaryRealm = entries[0].id; result.primaryInfluence = entries[0].value; }
-        if (count > 1) { result.secondaryRealm = entries[1].id; result.secondaryInfluence = entries[1].value; }
+        std::sort(
+            entries.begin(),
+            entries.begin() + count,
+            [](auto a, auto b)
+            {
+                return a.value != b.value ? a.value > b.value
+                                          : a.id.value() < b.id.value();
+            }
+        );
+        if (count)
+        {
+            result.primaryRealm = entries[0].id;
+            result.primaryInfluence = entries[0].value;
+        }
+        if (count > 1)
+        {
+            result.secondaryRealm = entries[1].id;
+            result.secondaryInfluence = entries[1].value;
+        }
         return result;
     }
 } // namespace Paladin

@@ -23,6 +23,11 @@ namespace Paladin
         WorldRealmPresentationRenderer(const WorldRealmPresentationRenderer&) = delete;
         WorldRealmPresentationRenderer& operator=(const WorldRealmPresentationRenderer&) = delete;
         void reset();
+        // Loading may prepare the first complete political presentation. Later
+        // influence refreshes retain it while replacement work is time sliced.
+        bool prepare(Renderer&, const World&);
+        bool preparationReady() const noexcept;
+        bool hasPendingWork() const noexcept;
         void renderFlat(Renderer&, const World&, const Camera2D&,
                         const TileRenderMetrics&, const WorldPresentationState&,
                         const WorldPresentationPolicy&);

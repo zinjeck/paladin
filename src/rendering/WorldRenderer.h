@@ -14,6 +14,7 @@
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -29,6 +30,8 @@ namespace Paladin
     {
     public:
         double animationSeconds = 0;
+        bool profileRendering = false;
+        mutable std::array<double, 8> renderTimings{};
         bool globeEnabled = false;
         WorldRenderer();
 
@@ -58,6 +61,10 @@ namespace Paladin
             return globe_.fullDetailReady();
         }
         bool prepareTerrain(Renderer&, const World&) const;
+        bool politicalWorkPending() const
+        {
+            return territoryPresentationRenderer_.hasPendingWork();
+        }
         float terrainPreparationProgress() const
         {
             return globe_.preparationProgress();
@@ -68,6 +75,7 @@ namespace Paladin
             globe_.reset();
             sunRenderer_.reset();
             territoryPresentationRenderer_.reset();
+            preparedPoliticalWorld_ = nullptr;
             pixelStabilityActive_ = false;
         }
 
@@ -113,6 +121,7 @@ namespace Paladin
         mutable CelestialSunRenderer sunRenderer_;
         OverlayRenderer overlayRenderer_;
         mutable WorldRealmPresentationRenderer territoryPresentationRenderer_;
+        mutable const World* preparedPoliticalWorld_ = nullptr;
         WorldObjectRenderer worldObjectRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;

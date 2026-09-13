@@ -1245,32 +1245,106 @@ namespace Paladin
             {
                 WorldSurface::Point3 p;
                 double u, v;
+                MeshVertex shaded{};
+            };
+            const auto& g = world.grid();
+            const int gridWidth = g.width(), gridHeight = g.height();
+            const double seconds = world.time().secondsIntoDay();
+            const auto shadeVertex = [&](const V& v)
+            {
+                auto light = globeLight(v.u, v.v, seconds, v.p.z);
+                const auto* landTile = g.tile(
+                    {(int(std::floor(v.u * gridWidth)) % gridWidth +
+                      gridWidth) %
+                         gridWidth,
+                     std::clamp(int(v.v * gridHeight), 0, gridHeight - 1)}
+                );
+                if (landTile->terrain == TerrainType::Mountain ||
+                    landTile->relief == ReliefType::Hills)
+                {
+                    const auto heightAt = [&](double u, double vv)
+                    {
+                        double x = u * gridWidth - .5, y = vv * gridHeight - .5;
+                        int ix = int(std::floor(x)), iy = int(std::floor(y));
+                        double fx = x - ix, fy = y - iy;
+                        const auto e = [&](int x, int y)
+                        {
+                            return g
+                                .tile(
+                                    {(x % gridWidth + gridWidth) % gridWidth,
+                                     std::clamp(y, 0, gridHeight - 1)}
+                                )
+                                ->elevation.value();
+                        };
+                        return (1 - fy) *
+                                   ((1 - fx) * e(ix, iy) + fx * e(ix + 1, iy)) +
+                               fy * ((1 - fx) * e(ix, iy + 1) +
+                                     fx * e(ix + 1, iy + 1));
+                    };
+                    const double du = 1. / gridWidth, dv = 1. / gridHeight;
+                    const double dx = heightAt(v.u + du, v.v) -
+                                      heightAt(v.u - du, v.v),
+                                 dy = heightAt(v.u, v.v + dv) -
+                                      heightAt(v.u, v.v - dv);
+                    const double east = (globeSunDot(v.u + du, v.v, seconds) -
+                                         globeSunDot(v.u - du, v.v, seconds)) /
+                                        (du * 2);
+                    const double south = (globeSunDot(v.u, v.v + dv, seconds) -
+                                          globeSunDot(v.u, v.v - dv, seconds)) /
+                                         (dv * 2);
+                    const double shade = std::clamp(
+                        1. - std::max(0., dx * east + dy * south) * 1.5,
+                        .72,
+                        1.
+                    );
+                    light.red = std::uint8_t(light.red * shade);
+                    light.green = std::uint8_t(light.green * shade);
+                    light.blue = std::uint8_t(light.blue * shade);
+                }
+                return MeshVertex{
+                    float(view.cx + v.p.x * view.radius),
+                    float(view.cy - v.p.y * view.radius),
+                    float(v.u),
+                    float(v.v),
+                    light
+                };
             };
             const auto vertex = [&](double u, double v)
-            { return V{view.orient(WorldSurface::sphere(u, v)), u, v}; };
-            const auto triangle = [&](V a, V b, V c)
             {
-                std::array<V, 5> poly{};
-                int count = 0;
-                const V input[] = {a, b, c};
+                V result{view.orient(WorldSurface::sphere(u, v)), u, v};
+                if (result.p.z >= 0)
+                {
+                    result.shaded = shadeVertex(result);
+                }
+                return result;
+            };
+            const auto triangle = [&](const V& a, const V& b, const V& c)
+            {
+                std::array<const V*, 5> poly{};
+                std::array<V, 2> intersections{};
+                int count = 0, intersectionCount = 0;
+                const V* input[] = {&a, &b, &c};
                 for (int i = 0; i < 3; ++i)
                 {
-                    const auto& p = input[i];
-                    const auto& q = input[(i + 1) % 3];
+                    const auto& p = *input[i];
+                    const auto& q = *input[(i + 1) % 3];
                     if (p.p.z >= 0)
                     {
-                        poly[count++] = p;
+                        poly[count++] = &p;
                     }
                     if ((p.p.z >= 0) != (q.p.z >= 0))
                     {
                         const double t = p.p.z / (p.p.z - q.p.z);
-                        poly[count++] = {
+                        auto& intersection = intersections[intersectionCount++];
+                        intersection = {
                             {std::lerp(p.p.x, q.p.x, t),
                              std::lerp(p.p.y, q.p.y, t),
                              0},
                             std::lerp(p.u, q.u, t),
                             std::lerp(p.v, q.v, t)
                         };
+                        intersection.shaded = shadeVertex(intersection);
+                        poly[count++] = &intersection;
                     }
                 }
                 if (count < 3)
@@ -1280,75 +1354,7 @@ namespace Paladin
                 const int first = int(vertices_.size());
                 for (int i = 0; i < count; ++i)
                 {
-                    const auto& v = poly[i];
-                    auto light = globeLight(
-                        v.u,
-                        v.v,
-                        world.time().secondsIntoDay(),
-                        v.p.z
-                    );
-                    const auto& g = world.grid();
-                    const auto* landTile = g.tile(
-                        {(int(std::floor(v.u * g.width())) % g.width() +
-                          g.width()) %
-                             g.width(),
-                         std::clamp(int(v.v * g.height()), 0, g.height() - 1)}
-                    );
-                    if (landTile->terrain == TerrainType::Mountain ||
-                        landTile->relief == ReliefType::Hills)
-                    {
-                        const auto heightAt = [&](double u, double vv)
-                        {
-                            double x = u * g.width() - .5,
-                                   y = vv * g.height() - .5;
-                            int ix = int(std::floor(x)),
-                                iy = int(std::floor(y));
-                            double fx = x - ix, fy = y - iy;
-                            const auto e = [&](int x, int y)
-                            {
-                                return g
-                                    .tile(
-                                        {(x % g.width() + g.width()) %
-                                             g.width(),
-                                         std::clamp(y, 0, g.height() - 1)}
-                                    )
-                                    ->elevation.value();
-                            };
-                            return (1 - fy) * ((1 - fx) * e(ix, iy) +
-                                               fx * e(ix + 1, iy)) +
-                                   fy * ((1 - fx) * e(ix, iy + 1) +
-                                         fx * e(ix + 1, iy + 1));
-                        };
-                        const double du = 1. / g.width(), dv = 1. / g.height();
-                        const double dx = heightAt(v.u + du, v.v) -
-                                          heightAt(v.u - du, v.v),
-                                     dy = heightAt(v.u, v.v + dv) -
-                                          heightAt(v.u, v.v - dv);
-                        const double seconds = world.time().secondsIntoDay();
-                        const double east =
-                            (globeSunDot(v.u + du, v.v, seconds) -
-                             globeSunDot(v.u - du, v.v, seconds)) /
-                            (du * 2);
-                        const double south =
-                            (globeSunDot(v.u, v.v + dv, seconds) -
-                             globeSunDot(v.u, v.v - dv, seconds)) /
-                            (dv * 2);
-                        const double shade = std::clamp(
-                            1. - std::max(0., dx * east + dy * south) * 1.5,
-                            .72,
-                            1.
-                        );
-                        light.red = std::uint8_t(light.red * shade);
-                        light.green = std::uint8_t(light.green * shade);
-                        light.blue = std::uint8_t(light.blue * shade);
-                    }
-                    vertices_.push_back(
-                        {float(view.cx + v.p.x * view.radius),
-                         float(view.cy - v.p.y * view.radius),
-                         float(v.u),
-                         float(v.v),
-                         light}
-                    );
+                    vertices_.push_back(poly[i]->shaded);
                 }
                 for (int i = 1; i < count - 1; ++i)
                 {
@@ -1358,21 +1364,38 @@ namespace Paladin
                 }
             };
             constexpr int columns = 96, rows = 48;
-            for (int y = 0; y < rows; ++y)
+            // Adjacent triangles share the exact projected point and light.
+            // Two rows keep those values local to this frame and mesh, without
+            // allocation or camera/time/terrain invalidation state. Horizon
+            // intersections still receive their own original surface sample.
+            std::array<std::array<V, columns + 1>, 2> gridRows;
+            const auto gridMesh = [&](int width, int height, const auto& point)
             {
-                for (int x = 0; x < columns; ++x)
+                for (int y = 0; y <= height; ++y)
                 {
-                    auto a = vertex(double(x) / columns, double(y) / rows),
-                         b = vertex(double(x + 1) / columns, double(y) / rows);
-                    auto c = vertex(
-                             double(x + 1) / columns,
-                             double(y + 1) / rows
-                         ),
-                         d = vertex(double(x) / columns, double(y + 1) / rows);
-                    triangle(a, b, c);
-                    triangle(a, c, d);
+                    auto& current = gridRows[y % 2];
+                    const auto& previous = gridRows[(y + 1) % 2];
+                    for (int x = 0; x <= width; ++x)
+                    {
+                        current[x] = point(x, y);
+                    }
+                    if (y == 0)
+                    {
+                        continue;
+                    }
+                    for (int x = 0; x < width; ++x)
+                    {
+                        triangle(previous[x], previous[x + 1], current[x + 1]);
+                        triangle(previous[x], current[x + 1], current[x]);
+                    }
                 }
-            }
+            };
+            gridMesh(
+                columns,
+                rows,
+                [&](int x, int y)
+                { return vertex(double(x) / columns, double(y) / rows); }
+            );
             const double tilePixels =
                 view.radius * 6.283185307 / world.grid().width();
             // All canonical detail is resident before interaction. Camera
@@ -1507,29 +1530,13 @@ namespace Paladin
                     indices_.clear();
                     const auto& a = region.area;
                     const int width = a.w / a.density, height = a.h / a.density;
-                    for (int y = 0; y < height; y += 2)
+                    gridMesh((width + 1) / 2, (height + 1) / 2, [&](int x, int y)
                     {
-                        for (int x = 0; x < width; x += 2)
-                        {
-                            const double
-                                u0 = double(a.left + x) / world.grid().width(),
-                                u1 = double(a.left + std::min(x + 2, width)) /
-                                     world.grid().width(),
-                                v0 = double(a.top + y) / world.grid().height(),
-                                v1 = double(a.top + std::min(y + 2, height)) /
-                                     world.grid().height();
-                            triangle(
-                                vertex(u0, v0),
-                                vertex(u1, v0),
-                                vertex(u1, v1)
-                            );
-                            triangle(
-                                vertex(u0, v0),
-                                vertex(u1, v1),
-                                vertex(u0, v1)
-                            );
-                        }
-                    }
+                        return vertex(
+                            double(a.left + std::min(x * 2, width)) / gridWidth,
+                            double(a.top + std::min(y * 2, height)) / gridHeight
+                        );
+                    });
                     for (auto& v : vertices_)
                     {
                         const double x = v.u * world.grid().width() - a.left,

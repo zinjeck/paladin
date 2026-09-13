@@ -442,6 +442,7 @@ namespace Paladin
 
     void Renderer::beginFrame()
     {
+        ++frameId_;
         SDL_SetRenderDrawColor(renderer_, 18, 20, 24, 255);
 
         SDL_RenderClear(renderer_);

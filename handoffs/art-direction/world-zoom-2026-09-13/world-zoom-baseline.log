@@ -1,0 +1,4 @@
+World zoom renderer=direct3d11 seed=73517 size=600x440 viewport=1280x720 realms=37 settlements=142
+pass=0 mean_ms=20.1135 p95_ms=68.1595 worst_ms=1404.82 over_50_ms=13
+pass=1 mean_ms=7.58545 p95_ms=12.5118 worst_ms=68.7614 over_50_ms=1
+pass=2 mean_ms=4.57473 p95_ms=10.3549 worst_ms=13.0713 over_50_ms=0

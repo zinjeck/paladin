@@ -351,10 +351,10 @@ namespace Paladin
                 static_cast<std::uint64_t>(settlement.kind())
             );
             signature = mixSignature(signature, settlement.population());
-            signature = mixSignature(
-                signature,
-                settlement.simulationState().population().version()
-            );
+            // Influence consumes the resident count, not demographic rates or
+            // the fractional growth accumulator. Their version changes every
+            // strategic tick even when this field is identical; including it
+            // discarded every political texture during normal simulation.
         }
 
         if (sourceSignature_ == signature)

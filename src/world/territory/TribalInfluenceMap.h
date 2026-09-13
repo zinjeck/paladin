@@ -142,6 +142,14 @@ namespace Paladin
             return revision_;
         }
 
+        // A presentation snapshot copies the finished field, never the mutable
+        // simulation or its path-search/cache state.
+        [[nodiscard]]
+        std::span<const TribalInfluenceSample> samples() const noexcept
+        {
+            return cells_;
+        }
+
     private:
         struct CachedConnection
         {

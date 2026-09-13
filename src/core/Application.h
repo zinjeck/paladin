@@ -55,6 +55,7 @@ namespace Paladin
         int run();
         // Opt-in, bounded diagnostic in the actual game executable.
         int runCameraBenchmark();
+        int runWorldBenchmark();
 
     private:
         friend struct ApplicationSmokeTest;

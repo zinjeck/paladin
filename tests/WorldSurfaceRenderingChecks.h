@@ -81,6 +81,168 @@ namespace Paladin::Test
         }
         PALADIN_CHECK(dry>0 && wet>0 && curved>0);
 
+        // The compact renderer sources must produce exactly the reference
+        // simulation-backed samples, including two competing tribal signals.
+        // This separate world keeps the visual fixture below unchanged.
+        {
+            World sourceWorld(settings);
+            for (int y = 0; y < settings.height; ++y)
+            {
+                for (int x = 0; x < settings.width; ++x)
+                {
+                    *sourceWorld.grid().tile({x, y}) =
+                        *world.grid().tile({x, y});
+                }
+            }
+            sourceWorld.grid().terrainChanged();
+            const auto civicOwner = sourceWorld.createRealm();
+            const auto firstTribe = sourceWorld.createRealm();
+            const auto secondTribe = sourceWorld.createRealm();
+            PALADIN_CHECK(sourceWorld.foundCapitalSettlement(
+                {28, 24},
+                civicOwner,
+                {"Civic source", "Coastfolk", "HALDEN", {190, 90, 145}, "civic"}
+            ));
+            const auto firstCenter = sourceWorld.foundCapitalSettlement(
+                {42, 24},
+                firstTribe,
+                {"First source", "Greenfolk", "WALD", {79, 140, 122}, "tribal"}
+            );
+            PALADIN_CHECK(firstCenter);
+            PALADIN_CHECK(sourceWorld.foundCapitalSettlement(
+                {56, 24},
+                secondTribe,
+                {"Second source", "Ashfolk", "ASH", {160, 100, 130}, "tribal"}
+            ));
+            const auto buildSource = [&]
+            {
+                WorldPoliticalSurfaceSource source(sourceWorld);
+                while (!source.complete())
+                {
+                    source.appendRow(sourceWorld);
+                }
+                return source;
+            };
+            const auto source = buildSource();
+            const auto& referenceInfluence = sourceWorld.tribalInfluence();
+            const WorldTribalSurfaceSource influence(referenceInfluence);
+            const auto equalSurface = [](const auto& a, const auto& b)
+            {
+                PALADIN_CHECK(a.land == b.land && a.civic == b.civic);
+                PALADIN_CHECK(a.positions == b.positions);
+                PALADIN_CHECK(a.dryWeights == b.dryWeights);
+                PALADIN_CHECK(a.landWeight == b.landWeight);
+            };
+            const auto equalInfluence = [](const auto& a, const auto& b)
+            {
+                PALADIN_CHECK(a.primaryRealm == b.primaryRealm);
+                PALADIN_CHECK(a.secondaryRealm == b.secondaryRealm);
+                PALADIN_CHECK(a.primaryInfluence == b.primaryInfluence);
+                PALADIN_CHECK(a.secondaryInfluence == b.secondaryInfluence);
+            };
+            std::size_t civicSamples = 0, tribalSamples = 0,
+                        contestedSamples = 0;
+            const auto compare = [&](double x, double y)
+            {
+                const auto reference =
+                    worldPoliticalSurfaceAt(sourceWorld, x, y);
+                const auto cached = worldPoliticalSurfaceAt(source, x, y);
+                equalSurface(reference, cached);
+                const auto referenceTribal =
+                    worldTribalSurfaceSample(referenceInfluence, reference);
+                equalInfluence(
+                    referenceTribal,
+                    worldTribalSurfaceSample(influence, cached)
+                );
+                civicSamples += bool(cached.civic);
+                tribalSamples += bool(referenceTribal.primaryRealm);
+                contestedSamples += bool(referenceTribal.secondaryRealm);
+            };
+            for (int y = 20 * 16; y < 30 * 16; ++y)
+            {
+                for (int x = 24 * 16; x < 64 * 16; ++x)
+                {
+                    compare((x + .5) / 16, (y + .5) / 16);
+                }
+            }
+            // Longitude wrapping, polar clamping, and rejected latitudes must
+            // agree too, not only the ordinary interior sampling domain.
+            for (double y : {-1., 0., .03125, 24.5, 47.96875, 48.})
+            {
+                for (double x : {-128.03125, -.03125, 0., 63.96875, 64., 128.5})
+                {
+                    compare(x, y);
+                }
+            }
+            for (int y = -1; y <= settings.height; ++y)
+            {
+                for (int x = -settings.width; x < settings.width * 2; ++x)
+                {
+                    equalInfluence(
+                        referenceInfluence.sampleAt({x, y}),
+                        influence.sampleAt({x, y})
+                    );
+                }
+            }
+            PALADIN_CHECK(civicSamples && tribalSamples && contestedSamples);
+
+            // A prepared source owns its data. Later terrain and population
+            // revisions must leave it intact while a new source matches the
+            // changed authoritative world.
+            const auto oldCoast = worldPoliticalSurfaceAt(source, 29.5, 28.5);
+            auto changedTile = *sourceWorld.grid().tile({29, 28});
+            changedTile.terrain = TerrainType::Land;
+            changedTile.biome = BiomeType::Plain;
+            PALADIN_CHECK(sourceWorld.grid().setTile({29, 28}, changedTile));
+            const auto changedSource = buildSource();
+            const auto changedCoast =
+                worldPoliticalSurfaceAt(changedSource, 29.5, 28.5);
+            equalSurface(
+                changedCoast,
+                worldPoliticalSurfaceAt(sourceWorld, 29.5, 28.5)
+            );
+            equalSurface(oldCoast, worldPoliticalSurfaceAt(source, 29.5, 28.5));
+            PALADIN_CHECK(oldCoast.landWeight != changedCoast.landWeight);
+            PALADIN_CHECK(sourceWorld.editRealmIdentity(
+                civicOwner,
+                {"Civic source",
+                 "Coastfolk",
+                 "HALDEN",
+                 {190, 90, 145},
+                 "tribal"}
+            ));
+            const auto changedOwners = buildSource();
+            equalSurface(
+                worldPoliticalSurfaceAt(changedOwners, 28.5, 24.5),
+                worldPoliticalSurfaceAt(sourceWorld, 28.5, 24.5)
+            );
+            PALADIN_CHECK(
+                !worldPoliticalSurfaceAt(changedOwners, 28.5, 24.5).civic
+            );
+            PALADIN_CHECK(
+                worldPoliticalSurfaceAt(source, 28.5, 24.5).civic == civicOwner
+            );
+            const auto oldAuthority = influence.sampleAt({42, 24});
+            auto& population = sourceWorld.settlement(firstCenter)
+                                   ->simulationState()
+                                   .population();
+            population = SettlementPopulation{
+                population.residents() + 1000,
+                population.rates()
+            };
+            const auto& grownField = sourceWorld.tribalInfluence();
+            const WorldTribalSurfaceSource grownInfluence(grownField);
+            equalInfluence(oldAuthority, influence.sampleAt({42, 24}));
+            equalInfluence(
+                grownField.sampleAt({42, 24}),
+                grownInfluence.sampleAt({42, 24})
+            );
+            PALADIN_CHECK(
+                grownInfluence.sampleAt({42, 24}).primaryInfluence >
+                oldAuthority.primaryInfluence
+            );
+        }
+
         WorldRealmPresentationRenderer politics;
         Camera2D camera(30,24); camera.setWorldZoom(1);
         TileRenderMetrics metrics; metrics.tilePixels=64;
@@ -92,7 +254,13 @@ namespace Paladin::Test
             renderer.fillRectangle(0,0,960,640,{0,0,0,255});
             politics.renderFlat(renderer,world,camera,metrics,weights,{});
         };
-        for (int i=0;i<16;++i) drawMask();
+        const auto settleMask=[&] {
+            const auto deadline=SDL_GetTicks()+30000;
+            do { drawMask(); }
+            while (politics.hasPendingWork() && SDL_GetTicks()<deadline);
+            PALADIN_CHECK(!politics.hasPendingWork());
+        };
+        settleMask();
         const auto warm=politics.cacheBuilds();
         const auto mask=readWorldReview(native);
         std::size_t seaInk=0,landInk=0;
@@ -112,8 +280,41 @@ namespace Paladin::Test
         PALADIN_CHECK(politics.detailCacheBytes()<=32*1024*1024);
         // One terrain revision invalidates both layers, never only the border.
         auto tile=*world.grid().tile({29,28}); tile.terrain=TerrainType::Land; tile.biome=BiomeType::Plain;
-        PALADIN_CHECK(world.grid().setTile({29,28},tile)); drawMask();
+        PALADIN_CHECK(world.grid().setTile({29,28},tile)); settleMask();
         PALADIN_CHECK(politics.cacheBuilds()>warm);
+
+        // Repeated real population changes must not restart an unfinished
+        // presentation forever. Once updates stop, its final pixels must equal
+        // a freshly built cache of that exact world revision.
+        auto& people=world.settlement(world.realm(tribe)->capitalSettlementId())
+                         ->simulationState().population();
+        const auto originalPeople=people;
+        const auto beforeRefresh=politics.cacheBuilds();
+        const auto refreshDeadline=SDL_GetTicks()+30000;
+        do {
+            people=SettlementPopulation{people.residents()+1,people.rates()};
+            drawMask();
+        } while (politics.cacheBuilds()==beforeRefresh && SDL_GetTicks()<refreshDeadline);
+        PALADIN_CHECK(politics.cacheBuilds()>beforeRefresh);
+        settleMask();
+        const auto refreshed=readWorldReview(native);
+        WorldRealmPresentationRenderer referencePolitics;
+        const auto referenceDeadline=SDL_GetTicks()+30000;
+        do {
+            renderer.beginFrame();
+            renderer.fillRectangle(0,0,960,640,{0,0,0,255});
+            WorldPixelScene scene(renderer,64);
+            renderer.fillRectangle(0,0,960,640,{0,0,0,255});
+            referencePolitics.renderFlat(renderer,world,camera,metrics,weights,{});
+        } while (referencePolitics.hasPendingWork() && SDL_GetTicks()<referenceDeadline);
+        PALADIN_CHECK(!referencePolitics.hasPendingWork());
+        const auto referenceMask=readWorldReview(native);
+        for (int y=0;y<640;++y) for (int x=0;x<960;++x) {
+            const auto a=reviewPixel(refreshed.get(),x,y), b=reviewPixel(referenceMask.get(),x,y);
+            PALADIN_CHECK(a.red==b.red && a.green==b.green && a.blue==b.blue && a.alpha==b.alpha);
+        }
+        people=originalPeople;
+        settleMask();
 
         // Real native-pixel marker rasters, compared after removing ONLY whole-
         // plate translation. Include crossing snapped-camera epochs, roll,
@@ -177,7 +378,14 @@ namespace Paladin::Test
         // membership and the influence field must not mutate during rendering.
         WorldRenderer map;
         const auto deadline=SDL_GetTicks()+30000;
-        while (!map.prepareTerrain(renderer,world) && SDL_GetTicks()<deadline) SDL_Delay(1);
+        bool prepared=false;
+        do {
+            renderer.beginFrame(); prepared=map.prepareTerrain(renderer,world);
+            renderer.endFrame();
+            if (!prepared) SDL_Delay(1);
+        }
+        while (!prepared && SDL_GetTicks()<deadline);
+        PALADIN_CHECK(prepared);
         PALADIN_CHECK(map.terrainLocalDetailReady());
         world.time().advanceMinutes(6*60); // clear daytime at central longitudes
         for (bool globe : {false,true}) for (bool political : {false,true})
@@ -190,7 +398,10 @@ namespace Paladin::Test
                 camera.setPlanetRotation(GlobeView::orientationAt({30./64,24./48},.37),64,48);
                 camera.setZoom(64.*64/(640*.4*2*3.14159265358979323846));
             }
-            for (int i=0;i<16;++i) { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }
+            const auto settleDeadline=SDL_GetTicks()+30000;
+            do { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }
+            while (political && map.politicalWorkPending() && SDL_GetTicks()<settleDeadline);
+            if (political) PALADIN_CHECK(!map.politicalWorkPending());
             const auto full=readWorldReview(native);
             std::size_t black=0;
             for (int y=4;y<636;++y) for (int x=4;x<956;++x)
@@ -201,6 +412,18 @@ namespace Paladin::Test
         }
         PALADIN_CHECK(world.territory().controlledTileCount()==civicTiles);
         PALADIN_CHECK(world.territory().controlledTileCount(tribe)==0);
+
+        // Both projections request territory pages during the curved-to-local
+        // transition. Neither may cancel the other's unfinished page forever.
+        map.globeEnabled=true;
+        map.setMapMode(WorldMapMode::Political);
+        camera.setPlanetRotation(GlobeView::orientationAt({30./64,24./48},.37),64,48);
+        camera.setZoom(34.*64/(640*.4*2*3.14159265358979323846));
+        const auto blendDeadline=SDL_GetTicks()+30000;
+        do { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }
+        while (map.politicalWorkPending() && SDL_GetTicks()<blendDeadline);
+        PALADIN_CHECK(!map.politicalWorkPending());
+        saveWorldReview(native,"world-zoom-blended-political.png");
 
         // Solar optical field, immutable cache and full occultation regression.
         CelestialSunRenderer sun;
@@ -273,9 +496,47 @@ namespace Paladin::Test
         }
         for (int i=0;i<24;++i) { solar.rotation=PlanetRotation::axis(0,0,1,2.65+i*.002); sun.render(renderer,solar,3*3600.); }
         PALADIN_CHECK(sun.textureBuilds()==sunBuilds);
+        // Rays change independently at fixed astronomy/camera; holding the
+        // presentation timestamp (pause) produces exactly the same image.
+        solar.rotation=PlanetRotation::axis(0,0,1,2.65);
+        const auto dynamicFrame = [&](double time)
+        {
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{8,15,27,255});
+            sun.render(renderer,solar,3*3600.,1.F,time);
+            return readWorldReview(native);
+        };
+        const auto firstDynamic = dynamicFrame(0);
+        saveWorldReview(native,"dynamic-sun-0.png");
+        const auto nextDynamic = dynamicFrame(1./60.);
+        const auto laterDynamic = dynamicFrame(3);
+        saveWorldReview(native,"dynamic-sun-3.png");
+        const auto pausedDynamic = dynamicFrame(3);
+        std::uint64_t nearbyDifference=0, laterDifference=0;
+        std::size_t movingPixels=0;
+        for (int y=0;y<640;++y) for (int x=0;x<960;++x)
+        {
+            const auto a=reviewPixel(firstDynamic.get(),x,y), b=reviewPixel(laterDynamic.get(),x,y);
+            const auto c=reviewPixel(pausedDynamic.get(),x,y), d=reviewPixel(nextDynamic.get(),x,y);
+            PALADIN_CHECK(b.red==c.red && b.green==c.green && b.blue==c.blue);
+            const int change=std::abs(int(a.red)-b.red)+std::abs(int(a.green)-b.green)+std::abs(int(a.blue)-b.blue);
+            movingPixels+=change>6;
+            laterDifference+=change;
+            nearbyDifference+=std::abs(int(a.red)-d.red)+std::abs(int(a.green)-d.green)+std::abs(int(a.blue)-d.blue);
+        }
+        PALADIN_CHECK(movingPixels>300);
+        PALADIN_CHECK(nearbyDifference<laterDifference/4);
+        const auto opticalStart=SDL_GetTicksNS();
+        for (int i=0;i<120;++i)
+        {
+            renderer.beginFrame(); sun.render(renderer,solar,3*3600.,1.F,i/60.);
+            SDL_FlushRenderer(native);
+        }
+        std::cout<<"Dynamic sun: changed_pixels="<<movingPixels<<" mean_ms="
+            <<(SDL_GetTicksNS()-opticalStart)/1e6/120<<'\n';
+        PALADIN_CHECK(sun.textureBuilds()==sunBuilds);
         solar.rotation=PlanetRotation{};
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{8,15,27,255});
-        sun.render(renderer,solar,0);
+        sun.render(renderer,solar,0,1.F,9.);
         const auto hidden=readWorldReview(native);
         for (int y=0;y<640;++y) for (int x=0;x<960;++x)
         { const auto c=reviewPixel(hidden.get(),x,y); PALADIN_CHECK(c.red==8 && c.green==15 && c.blue==27); }
@@ -307,6 +568,16 @@ namespace Paladin::Test
                 native,
                 "tweak-sun-contact-" + std::to_string(sequence++) + ".png"
             );
+            if (wantedGap == 0.)
+            {
+                for (int frame=0;frame<4;++frame)
+                {
+                    map.animationSeconds=frame*1.5;
+                    renderer.beginFrame(); map.render(renderer,world,camera,metrics);
+                    saveWorldReview(native,"dynamic-sun-limb-"+std::to_string(frame)+".png");
+                }
+                map.animationSeconds=0;
+            }
         }
         for (const auto* origin : {"civic", "tribal"})
         {
@@ -347,11 +618,14 @@ namespace Paladin::Test
             linkedMap.globeEnabled = false;
             linkedMap.setMapMode(WorldMapMode::Political);
             const auto deadline = SDL_GetTicks() + 30000;
-            while (!linkedMap.prepareTerrain(renderer, linked) &&
-                   SDL_GetTicks() < deadline)
-            {
-                SDL_Delay(1);
-            }
+            bool linkedPrepared=false;
+            do {
+                renderer.beginFrame();
+                linkedPrepared=linkedMap.prepareTerrain(renderer, linked);
+                renderer.endFrame();
+                if (!linkedPrepared) SDL_Delay(1);
+            } while (!linkedPrepared && SDL_GetTicks()<deadline);
+            PALADIN_CHECK(linkedPrepared);
             PALADIN_CHECK(linkedMap.terrainLocalDetailReady());
             linked.time().advanceMinutes(12 * 60);
             Camera2D linkedCamera(65, 38);

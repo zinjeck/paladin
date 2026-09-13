@@ -2,6 +2,7 @@
 
 #include "TestFramework.h"
 
+#include "simulation/systems/SettlementPopulationSystem.h"
 #include "world/BiomeType.h"
 #include "world/FoundingIdentity.h"
 #include "world/TerrainType.h"
@@ -10,6 +11,7 @@
 #include "world/territory/TribalInfluenceMap.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace Paladin::Test
@@ -132,9 +134,42 @@ namespace Paladin::Test
         );
         const std::uint64_t weakRevision = weakField.revision();
 
-        PALADIN_CHECK(
-            world.settlement(firstCapital)->simulationState().spawnCitizens(1900)
-        );
+        // Strategic demography updates fractional growth each tick. Neither
+        // that bookkeeping nor a rate change can alter the integer-population
+        // influence field, so both must retain its revision and GPU caches.
+        auto& population =
+            world.settlement(firstCapital)->simulationState().population();
+        population.setRates({0.0, 0.0, 1.0, 0.0, 0.0});
+        PALADIN_CHECK(world.tribalInfluence().revision() == weakRevision);
+        const auto demographicVersion = population.version();
+        const auto residents = population.residents();
+        SettlementPopulationSystem populationSystem;
+        const std::array<SettlementSimulationStep, 1> demographicSteps{
+            {{firstCapital,
+              SettlementSimulationTier::Strategic,
+              SettlementSimulationResolution::StrategicAggregate,
+              1440}}
+        };
+        for (int day = 0; day < 30; ++day)
+        {
+            populationSystem.tick(world, {1440, demographicSteps});
+            PALADIN_CHECK(population.residents() == residents);
+            PALADIN_CHECK(world.tribalInfluence().revision() == weakRevision);
+            const auto contact = world.tribalInfluence().sampleAt({26, 20});
+            PALADIN_CHECK(contact.primaryRealm == weakContact.primaryRealm);
+            PALADIN_CHECK(contact.secondaryRealm == weakContact.secondaryRealm);
+            PALADIN_CHECK(
+                contact.primaryInfluence == weakContact.primaryInfluence
+            );
+            PALADIN_CHECK(
+                contact.secondaryInfluence == weakContact.secondaryInfluence
+            );
+        }
+        PALADIN_CHECK(population.version() > demographicVersion);
+
+        PALADIN_CHECK(world.settlement(firstCapital)
+                          ->simulationState()
+                          .spawnCitizens(1900));
         PALADIN_CHECK(
             world.settlement(secondCapital)->simulationState().spawnCitizens(1900)
         );

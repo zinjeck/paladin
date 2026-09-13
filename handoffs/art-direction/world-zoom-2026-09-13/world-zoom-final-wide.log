@@ -1,0 +1,11 @@
+World zoom renderer=direct3d11 seed=73517 size=600x440 viewport=1920x1200 realms=37 settlements=142 preparation_ms=6625.25
+pass=0 mean_ms=7.18391 p95_ms=13.069 worst_ms=21.2531 over_50_ms=0
+pass=1 mean_ms=7.40435 p95_ms=12.73 worst_ms=23.7394 over_50_ms=0
+pass=2 mean_ms=3.67543 p95_ms=8.8217 worst_ms=10.5022 over_50_ms=0
+capture=0 settle_frames=1 settle_ms=95.6929
+capture=36 settle_frames=168 settle_ms=2361.67
+capture=52 settle_frames=1 settle_ms=127.198
+capture=66 settle_frames=1 settle_ms=121.727
+capture=89 settle_frames=1 settle_ms=138.034
+pass=3 scenario=fractional_demography mean_ms=6.58055 p95_ms=11.6487 worst_ms=18.1296 over_50_ms=0 influence_changes=0 residents_added=0
+pass=4 scenario=resident_growth mean_ms=9.19966 p95_ms=15.2329 worst_ms=22.5832 over_50_ms=0 influence_changes=4 residents_added=568
