@@ -115,7 +115,7 @@ namespace Paladin::Test
             weakField.influenceAt({20, 20}, firstRealm) <
             weakField.influenceAt({16, 20}, firstRealm)
         );
-        PALADIN_CHECK(weakField.influenceAt({48, 20}, firstRealm) == 0.0F);
+        PALADIN_CHECK(weakField.influenceAt({40, 20}, firstRealm) == 0.0F);
 
         const TribalInfluenceSample weakContact = weakField.sampleAt({26, 20});
         PALADIN_CHECK(weakContact.primaryRealm.isValid());
@@ -141,7 +141,7 @@ namespace Paladin::Test
 
         const TribalInfluenceMap& strongField = world.tribalInfluence();
         PALADIN_CHECK(strongField.revision() > weakRevision);
-        PALADIN_CHECK(strongField.influenceAt({48, 20}, firstRealm) > 0.0F);
+        PALADIN_CHECK(strongField.influenceAt({40, 20}, firstRealm) > 0.0F);
         PALADIN_CHECK(strongField.influenceAt({63, 20}, firstRealm) > 0.0F);
 
         const TribalInfluenceSample strongContact =

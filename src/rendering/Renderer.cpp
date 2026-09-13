@@ -249,6 +249,15 @@ namespace Paladin
             vertices.clear();
             indices.clear();
         };
+        const bool sceneLattice =
+            pixelSceneActive_ && pixelScene_ &&
+            SDL_GetRenderTarget(renderer_) == pixelScene_->texture_;
+        const auto latticeCoordinate = [&](float value)
+        { return float(std::floor(double(value) / pixelPitch_ + .50001)); };
+        if (sceneLattice)
+        {
+            SDL_SetRenderScale(renderer_, 1, 1);
+        }
         for (const auto& item : items)
         {
             SDL_Texture* next = item.texture ? item.texture->texture_ : nullptr;
@@ -258,6 +267,19 @@ namespace Paladin
                 page = next;
             }
             auto d = item.destination;
+            // Fitted atlas quads must use integral source-raster endpoints.
+            // Otherwise floating-point interpolation can select different
+            // window/attachment texels after an exact one-art-pixel pan.
+            if (sceneLattice)
+            {
+                const float right = latticeCoordinate(d.x + d.width);
+                const float bottom = latticeCoordinate(d.y + d.height);
+                d.x = latticeCoordinate(d.x);
+                d.y = latticeCoordinate(d.y);
+                d.width = right - d.x;
+                d.height = bottom - d.y;
+            }
+
             if (d.width <= 0 || d.height <= 0)
             {
                 continue;
@@ -295,6 +317,14 @@ namespace Paladin
             indices.insert(indices.end(), {n, n + 1, n + 2, n, n + 2, n + 3});
         }
         flush();
+        if (sceneLattice)
+        {
+            SDL_SetRenderScale(
+                renderer_,
+                float(1 / pixelPitch_),
+                float(1 / pixelPitch_)
+            );
+        }
     }
     void Renderer::drawMesh(
         const Texture& texture,

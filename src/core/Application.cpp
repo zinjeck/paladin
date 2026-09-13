@@ -130,6 +130,11 @@ namespace Paladin
             return 1;
         }
 
+        if (SDL_getenv("PALADIN_CAMERA_BENCHMARK"))
+        {
+            return runCameraBenchmark();
+        }
+
         bool running = true;
         while (running)
         {

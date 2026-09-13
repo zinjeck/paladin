@@ -4,6 +4,7 @@
 #include "ui/UiTextField.h"
 #include "world/FoundingIdentity.h"
 #include "world/RealmOrigin.h"
+#include "world/SettlementKind.h"
 
 #include <array>
 #include <cstddef>
@@ -19,12 +20,14 @@ namespace Paladin
     {
         None,
         Cancel,
-        Confirm
+        Confirm,
+        SelectRegion
     };
     enum class FoundingPanelStep
     {
         Realm,
-        Capital
+        Capital,
+        SettlementType
     };
     enum class FoundingPanelMode
     {
@@ -41,6 +44,15 @@ namespace Paladin
 
         void open();
         void openForSettlement();
+        void openSettlementChoice();
+        SettlementKind settlementKind() const noexcept
+        {
+            return settlementKind_;
+        }
+        void setRulerNameSeed(std::uint64_t seed) noexcept
+        {
+            rulerNameIndex_ = seed % 100;
+        }
         void openForCapitalRename(std::string_view currentName);
         void openForRealmEdit(const FoundingIdentity& identity);
         void close() noexcept;
@@ -94,6 +106,11 @@ namespace Paladin
         UiButton leftButton_;
         UiButton rightButton_;
         UiButton pickerDoneButton_;
+        UiButton rulerReloadButton_{"Reload name"};
+        UiRectangle rulerBounds_;
+        std::array<UiRectangle, 2> settlementKindBounds_{};
+        SettlementKind settlementKind_ = SettlementKind::City;
+        std::uint64_t rulerNameIndex_ = 0;
 
         UiRectangle panelBounds_;
         UiRectangle mapColorBounds_;

@@ -69,6 +69,7 @@ add_custom_target(PaladinCompileAssets
 
 add_executable(Paladin
     src/main.cpp
+    src/core/ApplicationCameraBenchmark.cpp
     src/core/Application.cpp
     src/core/ApplicationMainMenu.cpp
     src/core/ApplicationWorldScreen.cpp
@@ -115,6 +116,8 @@ add_executable(Paladin
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
+    src/simulation/RealmRulerSystem.cpp
+    src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
@@ -209,6 +212,7 @@ enable_testing()
 
 add_executable(PaladinTests
     tests/TestMain.cpp
+    tests/RealmFeatureTests.cpp
     tests/EntityAttributeTests.cpp
     tests/WorldReliefTests.cpp
     src/simulation/SimulationReports.cpp
@@ -219,6 +223,8 @@ add_executable(PaladinTests
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
 
+    src/simulation/RealmRulerSystem.cpp
+    src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp

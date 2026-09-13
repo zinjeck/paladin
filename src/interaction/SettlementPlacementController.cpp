@@ -6,11 +6,13 @@ namespace Paladin
 {
     void SettlementPlacementController::beginSelection(
         RealmId ownerRealmId,
-        bool additional
+        bool additional,
+        SettlementKind kind
     ) noexcept
     {
         selecting_ = true;
         additional_ = additional;
+        kind_ = kind;
         lockedPosition_.reset();
         ownerRealmId_ = ownerRealmId;
     }
@@ -58,11 +60,13 @@ namespace Paladin
         return selecting_ && hoveredPosition_.has_value() &&
                (additional_ ? world.canFoundAdditionalSettlementAt(
                                   *hoveredPosition_,
-                                  ownerRealmId_
+                                  ownerRealmId_,
+                                  kind_
                               )
                             : world.canFoundSettlementAt(
                                   *hoveredPosition_,
-                                  ownerRealmId_
+                                  ownerRealmId_,
+                                  kind_
                               ));
     }
 

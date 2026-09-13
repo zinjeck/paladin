@@ -3,6 +3,7 @@
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityPixelView.h"
 #include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
@@ -547,15 +548,14 @@ namespace Paladin
             return std::nullopt;
         }
 
-        const double tileX =
-            camera_->tileX() +
-            (screenX - static_cast<double>(renderer_->outputWidth()) * 0.5) /
-                tilePixels;
-
-        const double tileY =
-            camera_->tileY() +
-            (screenY - static_cast<double>(renderer_->outputHeight()) * 0.5) /
-                tilePixels;
+        const CityPixelView view(
+            *camera_,
+            tilePixels,
+            renderer_->outputWidth(),
+            renderer_->outputHeight()
+        );
+        const double tileX = view.pickX(screenX, renderer_->outputWidth());
+        const double tileY = view.pickY(screenY, renderer_->outputHeight());
 
         const SettlementTilePosition position{
             static_cast<std::int32_t>(std::floor(tileX)),

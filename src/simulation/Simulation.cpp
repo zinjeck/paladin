@@ -1,5 +1,7 @@
 #include "simulation/Simulation.h"
+#include "simulation/RealmRulerSystem.h"
 #include "world/PlanetAstronomy.h"
+#include "world/generation/AiRealmGenerator.h"
 
 #include "simulation/WorldSimulationPipeline.h"
 
@@ -35,6 +37,11 @@ namespace Paladin
         }
 
         playerRealmId_ = world_->createRealm();
+        populateAiRealms_ = generationSettings.populateAiRealms;
+        if (populateAiRealms_)
+        {
+            AiRealmGenerator{}.generate(*world_);
+        }
     }
 
 
@@ -84,6 +91,13 @@ namespace Paladin
                             gameDeltaMinutes,
                             false
                         );
+                        map->activities.advanceInactiveLifecycle(
+                            *map,
+                            state.citizens(),
+                            world_->time().totalGameMinutes() +
+                                pendingGameMinutes_,
+                            gameDeltaMinutes
+                        );
                         map->commerce.tickInactive(
                             *map,
                             state.citizens(),
@@ -125,6 +139,7 @@ namespace Paladin
             }
         }
 
+        RealmRulerSystem::tick(*world_, playerRealmId_, gameDeltaMinutes);
         pendingGameMinutes_ += gameDeltaMinutes;
 
         const double wholeMinutes = std::floor(pendingGameMinutes_);
@@ -310,9 +325,15 @@ namespace Paladin
         if (existingMap &&
             existingMap->sourceRegionCenter() == settlement->position() &&
             existingMap->sourceRegionWidth() ==
-                territoryPolicy.settlementRegionWidth &&
+                settlementRegionDimension(
+                    territoryPolicy.settlementRegionWidth,
+                    settlement->kind()
+                ) &&
             existingMap->sourceRegionHeight() ==
-                territoryPolicy.settlementRegionHeight &&
+                settlementRegionDimension(
+                    territoryPolicy.settlementRegionHeight,
+                    settlement->kind()
+                ) &&
             existingMap->localTilesPerWorldTile() ==
                 settings.localTilesPerWorldTile)
         {
@@ -323,8 +344,14 @@ namespace Paladin
             settlementMapGenerator_.generate(
                 world_->grid(),
                 settlement->position(),
-                territoryPolicy.settlementRegionWidth,
-                territoryPolicy.settlementRegionHeight,
+                settlementRegionDimension(
+                    territoryPolicy.settlementRegionWidth,
+                    settlement->kind()
+                ),
+                settlementRegionDimension(
+                    territoryPolicy.settlementRegionHeight,
+                    settlement->kind()
+                ),
                 world_->generationSeed(),
                 settings
             );
@@ -379,6 +406,15 @@ namespace Paladin
 
         if (settlementId.isValid())
         {
+            RealmRulerSystem::establishPlayer(
+                *world_,
+                playerRealmId_,
+                identity.rulerName
+            );
+            if (populateAiRealms_)
+            {
+                AiRealmGenerator{}.ensurePlayerNeighbors(*world_, position);
+            }
             static_cast<void>(setPresentedSettlement(settlementId));
         }
 
@@ -388,12 +424,17 @@ namespace Paladin
 
     SettlementId Simulation::foundPlayerSettlement(
         WorldTilePosition position,
-        std::string name
+        std::string name,
+        SettlementKind kind
     )
     {
         const Realm* playerRealm = world_->realm(playerRealmId_);
         if (!playerRealm || !isValidFoundingName(name) ||
-            !world_->canFoundAdditionalSettlementAt(position, playerRealmId_))
+            !world_->canFoundAdditionalSettlementAt(
+                position,
+                playerRealmId_,
+                kind
+            ))
         {
             return {};
         }
@@ -402,8 +443,8 @@ namespace Paladin
         auto map = settlementMapGenerator_.generate(
             world_->grid(),
             position,
-            policy.settlementRegionWidth,
-            policy.settlementRegionHeight,
+            settlementRegionDimension(policy.settlementRegionWidth, kind),
+            settlementRegionDimension(policy.settlementRegionHeight, kind),
             world_->generationSeed(),
             SettlementMapGenerationSettings{}
         );
@@ -417,6 +458,7 @@ namespace Paladin
             world_->generationSeed() ^ (std::uint64_t(position.x) << 32) ^
             std::uint32_t(position.y)
         );
+        profile.kind = kind;
         const auto id =
             world_->foundSettlement(position, playerRealmId_, profile);
         if (!id)

@@ -5,6 +5,7 @@
 #include "TestFramework.h"
 #include "core/Application.h"
 #include "core/SimulationClock.h"
+#include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
 #include "interaction/SettlementObjectPlacementController.h"
@@ -24,6 +25,7 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldCartography.h"
 #include "rendering/WorldRenderer.h"
+#include "simulation/RealmRulerSystem.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -111,21 +113,41 @@ namespace Paladin
             auto* rgba = SDL_ConvertSurface(raw, SDL_PIXELFORMAT_RGBA32);
             SDL_DestroySurface(raw);
             PALADIN_CHECK(rgba);
+            // A rigid physical-pixel camera translation changes the lattice's
+            // origin. Every layer must still share one uniform pitch and phase.
+            const auto pixel = [&](int x, int y)
+            {
+                return reinterpret_cast<const std::uint32_t*>(
+                    static_cast<const Uint8*>(rgba->pixels) + y * rgba->pitch
+                )[x];
+            };
+            bool aligned = false;
+            for (int phaseY = 0; phaseY < pitch && !aligned; ++phaseY)
+            {
+                for (int phaseX = 0; phaseX < pitch && !aligned; ++phaseX)
+                {
+                    bool matches = true;
+                    for (int y = 0; y < rgba->h && matches; ++y)
+                    {
+                        for (int x = 0; x < rgba->w && matches; ++x)
+                        {
+                            const int bx =
+                                std::max(0, x - (x + pitch - phaseX) % pitch);
+                            const int by =
+                                std::max(0, y - (y + pitch - phaseY) % pitch);
+                            matches = pixel(x, y) == pixel(bx, by);
+                        }
+                    }
+                    aligned = matches;
+                }
+            }
+            PALADIN_CHECK(aligned);
             std::unordered_set<std::uint32_t> colors;
             for (int y = 0; y < rgba->h; ++y)
             {
                 for (int x = 0; x < rgba->w; ++x)
                 {
-                    const auto* row = reinterpret_cast<const std::uint32_t*>(
-                        static_cast<const Uint8*>(rgba->pixels) +
-                        y * rgba->pitch
-                    );
-                    const auto* anchor = reinterpret_cast<const std::uint32_t*>(
-                        static_cast<const Uint8*>(rgba->pixels) +
-                        (y / pitch * pitch) * rgba->pitch
-                    );
-                    PALADIN_CHECK(row[x] == anchor[x / pitch * pitch]);
-                    colors.insert(row[x]);
+                    colors.insert(pixel(x, y));
                 }
             }
             PALADIN_CHECK(colors.size() > 8);
@@ -179,6 +201,62 @@ namespace Paladin
             app.layoutFrame();
             app.updateFrame();
             app.renderFrame();
+        }
+
+        static void realmPanelChecks(Application& app)
+        {
+            auto& renderer = *app.renderer_;
+            FoundingPanel panel;
+            panel.open();
+            panel.appendText("Aster Realm");
+            panel.focusNextField();
+            panel.appendText("Aster Folk");
+            panel.layout(renderer.outputWidth(), renderer.outputHeight());
+            const float x = (renderer.outputWidth() - 760.F) * .5F;
+            const float y =
+                (renderer.outputHeight() -
+                 std::min(680.F, float(renderer.outputHeight()) - 24.F)) *
+                .5F;
+            panel.pointerPressed(x + 240, y + 325);
+            static_cast<void>(panel.pointerReleased(x + 240, y + 325));
+            const auto oldName = panel.identity().rulerName;
+            panel.pointerPressed(x + 550, y + 414);
+            static_cast<void>(panel.pointerReleased(x + 550, y + 414));
+            PALADIN_CHECK(panel.identity().rulerName != oldName);
+            renderer.beginFrame();
+            panel.render(renderer, *app.grayUiRenderer_);
+            capture(app, "realm-founding.bmp");
+            PALADIN_CHECK(
+                panel.submit() == FoundingPanelAction::None &&
+                panel.step() == FoundingPanelStep::Capital
+            );
+            panel.openSettlementChoice();
+            panel.layout(renderer.outputWidth(), renderer.outputHeight());
+            const float sx = (renderer.outputWidth() - 680.F) * .5F,
+                        sy = (renderer.outputHeight() - 380.F) * .5F;
+            panel.pointerPressed(sx + 450, sy + 145);
+            static_cast<void>(panel.pointerReleased(sx + 450, sy + 145));
+            PALADIN_CHECK(panel.settlementKind() == SettlementKind::Fortress);
+            PALADIN_CHECK(panel.submit() == FoundingPanelAction::SelectRegion);
+            renderer.beginFrame();
+            panel.render(renderer, *app.grayUiRenderer_);
+            capture(app, "settlement-choice.bmp");
+            panel.openForSettlement();
+            panel.appendText("North Watch");
+            PALADIN_CHECK(
+                panel.canConfirm() &&
+                panel.settlementKind() == SettlementKind::Fortress
+            );
+            CityHud hud;
+            hud.setFortress(true);
+            hud.setSettlementStatus(true, 8);
+            hud.setCityInformation("North Watch", 1, 12, 0);
+            hud.layout(renderer.outputWidth(), renderer.outputHeight());
+            renderer.beginFrame();
+            hud.render(renderer, *app.grayUiRenderer_);
+            capture(app, "fortress-toolbar.bmp");
+            std::cout << "Realm founding, name reload and fortress chooser "
+                         "checks passed\n";
         }
 
         static void presentationChecks(Application& app)
@@ -250,16 +328,32 @@ namespace Paladin
             SDL_Delay(30);
             visualClock.beginFrame();
             PALADIN_CHECK(visualClock.presentationSeconds() > 0);
+            for (double speed : {1., 2., 3., 5.})
+            {
+                const double before = visualClock.presentationSeconds();
+                visualClock.setSpeedMultiplier(speed);
+                SDL_Delay(12);
+                visualClock.beginFrame();
+                PALADIN_CHECK(
+                    std::abs(
+                        visualClock.presentationSeconds() - before -
+                        visualClock.frameDeltaSeconds() * speed
+                    ) < 1e-9
+                );
+            }
             visualClock.setPaused(true);
             const auto frozenTime = visualClock.presentationSeconds();
             SDL_Delay(30);
             visualClock.beginFrame();
             PALADIN_CHECK(visualClock.presentationSeconds() == frozenTime);
             auto& renderer = *app.renderer_;
-            renderingRevisionChecks(
-                *app.renderer_,
-                SDL_GetRenderer(app.window_->nativeHandle())
-            );
+            if (!SDL_getenv("PALADIN_CITY_PIXEL_REVIEW"))
+            {
+                renderingRevisionChecks(
+                    *app.renderer_,
+                    SDL_GetRenderer(app.window_->nativeHandle())
+                );
+            }
             environmentTerrainSmokeChecks(
                 renderer,
                 SDL_GetRenderer(app.window_->nativeHandle())
@@ -689,13 +783,122 @@ namespace Paladin
                 renderer.endFrame();
             }
             draw(12);
-            requireUniformWorldPixels(app, 4);
             capture(app, "uniform-pixels-day.bmp");
+            requireUniformWorldPixels(app, 4);
             renderer.endFrame();
             draw(0);
             requireUniformWorldPixels(app, 4);
             capture(app, "uniform-pixels-night.bmp");
             renderer.endFrame();
+            // Scrolling across source-texel boundaries must translate the
+            // finished day/night image exactly, including roofs and lighting.
+            const double motionX = camera.tileX(), motionY = camera.tileY();
+            const bool clouds = city.presentation.cloudsEnabled;
+            const double overrideTime = city.animationTimeOverride;
+            city.presentation.cloudsEnabled = false;
+            city.animationTimeOverride = 0;
+            const auto readScene = [&]()
+            {
+                auto* raw = SDL_RenderReadPixels(
+                    SDL_GetRenderer(app.window_->nativeHandle()),
+                    nullptr
+                );
+                PALADIN_CHECK(raw);
+                auto* rgba = SDL_ConvertSurface(raw, SDL_PIXELFORMAT_RGBA32);
+                SDL_DestroySurface(raw);
+                PALADIN_CHECK(rgba);
+                std::vector<std::uint32_t> result(
+                    std::size_t(rgba->w) * rgba->h
+                );
+                for (int y = 0; y < rgba->h; ++y)
+                {
+                    std::copy_n(
+                        reinterpret_cast<const std::uint32_t*>(
+                            static_cast<const Uint8*>(rgba->pixels) +
+                            y * rgba->pitch
+                        ),
+                        rgba->w,
+                        result.begin() + std::size_t(y) * rgba->w
+                    );
+                }
+                SDL_DestroySurface(rgba);
+                return result;
+            };
+            for (double hour : {12., 0.})
+            {
+                camera.setPosition(motionX, motionY);
+                draw(hour);
+                const auto first = readScene();
+                capture(
+                    app,
+                    hour == 12 ? "city-motion-day-0.bmp"
+                               : "city-motion-night-0.bmp"
+                );
+                renderer.endFrame();
+                for (int step = 1; step <= 8; ++step)
+                {
+                    camera.setPosition(motionX + step / 64.0, motionY);
+                    draw(hour);
+                    const auto moved = readScene();
+                    if (step == 2)
+                    {
+                        capture(
+                            app,
+                            hour == 12 ? "city-motion-day-2.bmp"
+                                       : "city-motion-night-2.bmp"
+                        );
+                    }
+                    requireUniformWorldPixels(app, 4);
+                    renderer.endFrame();
+                    const int w = renderer.outputWidth(),
+                              h = renderer.outputHeight();
+                    std::size_t different = 0;
+                    int worstChannelDelta = 0;
+                    for (int y = 32; y < h - 32; ++y)
+                    {
+                        for (int x = 32; x < w - 40; ++x)
+                        {
+                            const auto actual = moved[std::size_t(y) * w + x];
+                            const auto expected =
+                                first[std::size_t(y) * w + x + step];
+                            int difference = 0;
+                            for (int channel = 0; channel < 3; ++channel)
+                            {
+                                difference = std::max(
+                                    difference,
+                                    std::abs(
+                                        int((actual >> (channel * 8)) & 255) -
+                                        int((expected >> (channel * 8)) & 255)
+                                    )
+                                );
+                            }
+                            worstChannelDelta =
+                                std::max(worstChannelDelta, difference);
+                            // The existing linearly filtered quarter-resolution
+                            // light field can round a channel by up to 2/255
+                            // after translation. Day geometry is bit-exact;
+                            // every lit frame must also retain the exact common
+                            // pixel grid.
+                            different += difference > (hour == 12 ? 0 : 2);
+                        }
+                    }
+                    if (different)
+                    {
+                        std::cout << "city motion hour=" << hour
+                                  << " step=" << step
+                                  << " changed_pixels=" << different
+                                  << " max_channel_delta=" << worstChannelDelta
+                                  << std::endl;
+                    }
+                    PALADIN_CHECK(different == 0);
+                }
+            }
+            camera.setPosition(motionX, motionY);
+            city.presentation.cloudsEnabled = clouds;
+            city.animationTimeOverride = overrideTime;
+            std::cout
+                << "City motion: stable geometry and shared pixel grid across "
+                   "day/night source-texel boundaries\n";
             camera.setZoom(previousZoom);
             {
                 const SceneProjection view{10, 10, 64, 1280, 720};
@@ -818,11 +1021,12 @@ namespace Paladin
                       "market.stall",
                       "stockpile.stack",
                       "fishing_grounds.station",
-                      "wheat_farm.crop",
-                      "world.settlement"})
+                      "wheat_farm.crop"})
                 {
                     PALADIN_CHECK(installed.find(id));
                 }
+                // Settlement symbols are native plates, covered by the marker
+                // motion raster tests; there is no world.settlement sprite.
                 // The bakery is a user-sized footprint: its roof must cover
                 // the complete 6x6 gallery building, preserving its overhang.
                 SceneDrawQueue fitted;
@@ -1520,20 +1724,32 @@ namespace Paladin
             city.presentation.roofsVisible = true;
             city.presentation.localLightsEnabled = false;
             draw(0);
-            const auto dark = pixel(
-                renderer.outputWidth() / 2 + 75,
-                renderer.outputHeight() / 2 + 85
-            );
+            const auto darkScene = readScene();
             renderer.endFrame();
             city.presentation.localLightsEnabled = true;
             draw(0);
             capture(app, "art-house-night.bmp");
-            const auto lit = pixel(
-                renderer.outputWidth() / 2 + 75,
-                renderer.outputHeight() / 2 + 85
-            );
-            PALADIN_CHECK(lit.red > dark.red + 20);
+            const auto litScene = readScene();
+            // Verify the actual illuminated area; a fixed screen coordinate
+            // can land on a different roof/attachment texel after camera-grid
+            // alignment changes. Local lights must visibly warm many pixels.
+            std::size_t warmedPixels = 0;
+            for (std::size_t i = 0; i < litScene.size(); ++i)
+            {
+                warmedPixels +=
+                    int(litScene[i] & 255) > int(darkScene[i] & 255) + 20;
+            }
+            PALADIN_CHECK(warmedPixels > 400);
             renderer.endFrame();
+            const auto closeReviewZoom = camera.zoom();
+            camera.setZoom(8);
+            draw(12);
+            capture(app, "realm-city-normal-day.bmp");
+            renderer.endFrame();
+            draw(0);
+            capture(app, "realm-city-normal-night.bmp");
+            renderer.endFrame();
+            camera.setZoom(closeReviewZoom);
             if (installed.find("grass.tuft"))
             {
                 city.animationTimeOverride = 0;
@@ -2318,6 +2534,7 @@ namespace Paladin
                 PALADIN_CHECK(city.submittedItems() == 0);
                 return;
             }
+            realmPanelChecks(app);
             // Permit targeted UI verification while artist-owned exports are
             // changing; the default run still checks placeholder rendering.
             if (!SDL_getenv("PALADIN_SMOKE_UI_ONLY"))
@@ -2346,6 +2563,7 @@ namespace Paladin
             WorldGenerationSettings settings;
             settings.width = settings.height = 64;
             settings.seed = 701;
+            settings.populateAiRealms = false;
             app.simulation_ = std::make_unique<Simulation>(settings);
             auto& grid = app.simulation_->world().grid();
             for (int y = 0; y < grid.height(); ++y)
@@ -2409,22 +2627,15 @@ namespace Paladin
             PALADIN_CHECK(
                 std::abs(app.camera_->tileX() / grid.width() - .25) < 1e-5
             );
-            app.worldRenderer_->toggleProjection(
-                *app.camera_,
-                grid,
-                int(width),
-                int(height),
-                *app.tileRenderMetrics_
-            );
             PALADIN_CHECK(!app.worldRenderer_->globeEnabled);
-            app.worldRenderer_->toggleProjection(
-                *app.camera_,
-                grid,
-                int(width),
-                int(height),
-                *app.tileRenderMetrics_
-            );
+            const auto savedMode = app.worldRenderer_->mapMode();
+            PALADIN_CHECK(click(
+                app,
+                mini.x + mini.width * .25F,
+                mini.y + mini.height * .4F
+            ));
             PALADIN_CHECK(app.worldRenderer_->globeEnabled);
+            PALADIN_CHECK(app.worldRenderer_->mapMode() == savedMode);
             const auto globeZoom = app.camera_->zoom();
             app.applyCameraZoom(1.2, width * .5F, height * .5F);
             PALADIN_CHECK(app.camera_->zoom() > globeZoom);
@@ -2830,6 +3041,100 @@ namespace Paladin
             SDL_Delay(70);
             frame(app);
             PALADIN_CHECK(app.simulation_->tickCount() == pausedTicks);
+            app.foundingAdditionalSettlement_ = true;
+            app.foundingPanel_->openSettlementChoice();
+            frame(app);
+            PALADIN_CHECK(click(
+                app,
+                (width - 680) * .5F + 450,
+                (height - 380) * .5F + 145
+            ));
+            key(app, SDL_SCANCODE_RETURN);
+            PALADIN_CHECK(app.settlementPlacementController_->isSelecting());
+            grid.tile({38, 32})->biome = BiomeType::Plain;
+            PALADIN_CHECK(app.simulation_->world().canFoundAdditionalSettlementAt(
+                {38, 32}, app.simulation_->playerRealmId(), SettlementKind::Fortress));
+            PALADIN_CHECK(!app.simulation_->world().canFoundAdditionalSettlementAt(
+                {38, 32}, app.simulation_->playerRealmId(), SettlementKind::City));
+            frame(app);
+            // Re-entering region selection must retain the fortress footprint.
+            PALADIN_CHECK(click(app, width * .5F, 38));
+            app.worldRenderer_->globeEnabled = false;
+            app.camera_->setPosition(38.5, 32.5);
+            app.camera_->setWorldZoom(8);
+            frame(app);
+            PALADIN_CHECK(click(app, width * .5F, height * .5F));
+            PALADIN_CHECK(
+                app.settlementPlacementController_->hasLockedSelection()
+            );
+            PALADIN_CHECK(app.foundingPanel_->isOpen());
+            app.foundingPanel_->appendText("North Watch");
+            key(app, SDL_SCANCODE_RETURN);
+            const auto fort = app.activeCitySettlementId_;
+            PALADIN_CHECK(app.screen_ == Application::Screen::City);
+            PALADIN_CHECK(
+                fort != capital &&
+                app.simulation_->world().settlement(fort)->isFortress()
+            );
+            PALADIN_CHECK(
+                app.simulation_->settlementMap(fort)->grid().width() == 192
+            );
+            PALADIN_CHECK(
+                app.simulation_->settlementMap(fort)->grid().height() == 192
+            );
+            frame(app);
+            capture(app, "fortress-local-map.bmp");
+            app.returnToWorldFromSettlement();
+            PALADIN_CHECK(!app.worldRenderer_->globeEnabled);
+            PALADIN_CHECK(std::abs(app.camera_->tileX() - 38.5) < 1e-8);
+            PALADIN_CHECK(std::abs(app.camera_->tileY() - 32.5) < 1e-8);
+            // Exercise the other type and projection through actual input too.
+            app.foundingAdditionalSettlement_ = true;
+            app.foundingPanel_->openSettlementChoice();
+            frame(app);
+            key(app, SDL_SCANCODE_RETURN);
+            app.worldRenderer_->globeEnabled = true;
+            grid.tile({46, 48})->biome = BiomeType::Plain;
+            GlobeCameraNavigation::focusNorthUp(*app.camera_, grid, {46, 48});
+            frame(app);
+            PALADIN_CHECK(click(app, width * .5F, height * .5F));
+            PALADIN_CHECK(app.foundingPanel_->isOpen());
+            PALADIN_CHECK(
+                app.settlementPlacementController_->hasLockedSelection()
+            );
+            app.foundingPanel_->appendText("River Town");
+            key(app, SDL_SCANCODE_RETURN);
+            PALADIN_CHECK(app.screen_ == Application::Screen::City);
+            PALADIN_CHECK(!app.simulation_->world()
+                               .settlement(app.activeCitySettlementId_)
+                               ->isFortress());
+            app.returnToWorldFromSettlement();
+            // AI settlements can be inspected but cannot acquire a local map.
+            auto& aiWorld = app.simulation_->world();
+            const auto enemy = aiWorld.createRealm();
+            auto aiProfile = defaultSettlementFoundationProfile();
+            aiProfile.initialDetailedCitizenCount = 0;
+            aiWorld.grid().tile({16, 16})->biome = BiomeType::Plain;
+            const auto enemyCity = aiWorld.foundCapitalSettlement(
+                {16, 16},
+                enemy,
+                {"Neighbor Realm",
+                 "Neighbor Folk",
+                 "Neighbor City",
+                 {},
+                 "civic",
+                 {}},
+                aiProfile
+            );
+            PALADIN_CHECK(enemyCity);
+            RealmRulerSystem::establishAi(aiWorld, enemy);
+            PALADIN_CHECK(!app.simulation_->prepareSettlementMap(enemyCity));
+            PALADIN_CHECK(!app.simulation_->setPresentedSettlement(enemyCity));
+            app.inspectedWorldSettlementId_ = enemyCity;
+            frame(app);
+            capture(app, "realm-inspection.bmp");
+            std::cout
+                << "Fortress creation and AI map isolation routing passed\n";
             PALADIN_CHECK(click(app, 70, height - 22)); // World Back.
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(!app.simulation_);

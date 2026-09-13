@@ -78,6 +78,62 @@ namespace Paladin
 
     namespace CelestialSunOptics
     {
+        // Exact projected disc area left visible by an opaque circular planet.
+        inline float visibleDiscFraction(
+            double distance,
+            double planetRadius,
+            double sourceRadius
+        )
+        {
+            if (distance >= planetRadius + sourceRadius)
+            {
+                return 1;
+            }
+            if (distance <= planetRadius - sourceRadius)
+            {
+                return 0;
+            }
+            if (distance <= sourceRadius - planetRadius)
+            {
+                return float(
+                    1 -
+                    planetRadius * planetRadius / (sourceRadius * sourceRadius)
+                );
+            }
+            const double d2 = distance * distance,
+                         r2 = sourceRadius * sourceRadius;
+            const double p2 = planetRadius * planetRadius;
+            const double sourceAngle = std::acos(
+                std::clamp(
+                    (d2 + r2 - p2) / (2 * distance * sourceRadius),
+                    -1.,
+                    1.
+                )
+            );
+            const double planetAngle = std::acos(
+                std::clamp(
+                    (d2 + p2 - r2) / (2 * distance * planetRadius),
+                    -1.,
+                    1.
+                )
+            );
+            const double chord = std::sqrt(
+                std::max(
+                    0.,
+                    (-distance + sourceRadius + planetRadius) *
+                        (distance + sourceRadius - planetRadius) *
+                        (distance - sourceRadius + planetRadius) *
+                        (distance + sourceRadius + planetRadius)
+                )
+            );
+            return float(std::clamp(
+                1 - (r2 * sourceAngle + p2 * planetAngle - .5 * chord) /
+                        (3.141592653589793 * r2),
+                0.,
+                1.
+            ));
+        }
+
         inline float smooth01(float value)
         {
             value = std::clamp(value, 0.F, 1.F);
@@ -248,6 +304,7 @@ namespace Paladin
             coronaTexture_.reset();
             coreTexture_.reset();
             lensGhostTexture_.reset();
+            discTexture_.reset();
             textureOwner_ = nullptr;
         }
 
@@ -277,33 +334,65 @@ namespace Paladin
 
             const float globeX = float(view.cx);
             const float globeY = float(view.cy);
-            const float globeRadius = float(view.radius * 1.03);
+            // Only the solid planet occludes light. The thin atmosphere is
+            // translucent; masking its outer radius made an opaque black band.
+            const float globeRadius = float(view.radius);
 
-            // Glare requires a visible light source. A fully occulted source
-            // must not leave the outer half of its halo hanging around a planet.
-            opacity *= sourceVisibility(*projected, globeX, globeY, globeRadius);
-            if (opacity <= .001F) return;
-            drawOccludedLayer(
+            renderLimbScatter(
                 renderer,
-                *coronaTexture_,
-                projected->x,
-                projected->y,
-                410.F * projected->scale,
+                *projected,
                 globeX,
                 globeY,
                 globeRadius,
                 opacity
             );
+            const float visible =
+                sourceVisibility(*projected, globeX, globeY, globeRadius);
+            if (visible <= 0)
+            {
+                return;
+            }
+            // Block the actual photosphere geometrically; its uncovered
+            // crescent stays bright. Bloom/diffraction happen inside the camera
+            // AFTER occlusion, so they can spill over the silhouette.
             drawOccludedLayer(
                 renderer,
-                *coreTexture_,
+                *discTexture_,
                 projected->x,
                 projected->y,
-                18.F * projected->scale,
+                7.F * projected->scale,
                 globeX,
                 globeY,
                 globeRadius,
                 opacity
+            );
+            const float response =
+                (1.F - std::exp(-7.F * visible)) / (1.F - std::exp(-7.F));
+            const float size = .24F + .76F * std::sqrt(visible);
+            const float distance = std::max(
+                1.F,
+                std::hypot(projected->x - globeX, projected->y - globeY)
+            );
+            const float shift = (1.F - visible) * 5.5F * projected->scale;
+            const float glareX =
+                projected->x + (projected->x - globeX) / distance * shift;
+            const float glareY =
+                projected->y + (projected->y - globeY) / distance * shift;
+            drawOpticalLayer(
+                renderer,
+                *coronaTexture_,
+                glareX,
+                glareY,
+                410.F * projected->scale * size,
+                opacity * response
+            );
+            drawOpticalLayer(
+                renderer,
+                *coreTexture_,
+                glareX,
+                glareY,
+                18.F * projected->scale * size,
+                opacity * response
             );
 
             renderLensGhosts(
@@ -312,7 +401,7 @@ namespace Paladin
                 globeX,
                 globeY,
                 globeRadius,
-                opacity
+                opacity * response
             );
         }
 
@@ -329,11 +418,101 @@ namespace Paladin
                 projected.y - globeY
             );
             const float sourceRadius = 7.F * projected.scale;
-            const float lower = globeRadius - sourceRadius;
-            const float upper = globeRadius + sourceRadius;
-            return CelestialSunOptics::smooth01(
-                (distance - lower) / std::max(1.F, upper - lower)
+            return CelestialSunOptics::visibleDiscFraction(
+                distance,
+                globeRadius,
+                sourceRadius
             );
+        }
+
+        static void drawOpticalLayer(
+            Renderer& renderer,
+            const Texture& texture,
+            float x,
+            float y,
+            float radius,
+            float opacity
+        )
+        {
+            renderer.drawTexture(
+                texture,
+                0,
+                0,
+                float(texture.width()),
+                float(texture.height()),
+                x - radius,
+                y - radius,
+                radius * 2,
+                radius * 2,
+                CelestialSunOptics::channel(255 * opacity)
+            );
+        }
+
+        void renderLimbScatter(
+            Renderer& renderer,
+            const CelestialSunScreenPosition& source,
+            float cx,
+            float cy,
+            float radius,
+            float opacity
+        ) const
+        {
+            const float distance = std::hypot(source.x - cx, source.y - cy);
+            const float thickness = std::clamp(radius * .014F, 2.F, 16.F);
+            const float altitude = distance - radius;
+            const float emergence =
+                std::exp(-std::pow(altitude / (thickness * 2.4F), 2.F));
+            if (emergence * opacity < .002F || radius < 1)
+            {
+                return;
+            }
+            const float angle = std::atan2(source.y - cy, source.x - cx);
+            constexpr int Segments = 128, Bands = 4;
+            constexpr std::array<float, Bands> heights{0.F, .18F, .65F, 2.8F};
+            constexpr std::array<RenderColor, Bands> colors{
+                {{255, 195, 121, 220},
+                 {182, 223, 255, 210},
+                 {75, 149, 255, 100},
+                 {35, 84, 180, 0}}
+            };
+            std::array<MeshVertex, (Segments + 1) * Bands> vertices{};
+            std::array<int, Segments*(Bands - 1) * 6> indices{};
+            for (int i = 0; i <= Segments; ++i)
+            {
+                const float delta = (float(i) / Segments * 2 - 1) * .70F;
+                const float envelope =
+                    std::exp(-std::pow(delta / .24F, 2.F)) *
+                    (1.F -
+                     CelestialSunOptics::smoothC2(std::abs(delta) / .70F));
+                for (int j = 0; j < Bands; ++j)
+                {
+                    auto color = colors[j];
+                    color.alpha = CelestialSunOptics::channel(
+                        color.alpha * envelope * emergence * opacity
+                    );
+                    const float r = radius + heights[j] * thickness;
+                    vertices[i * Bands + j] = {
+                        cx + r * std::cos(angle + delta),
+                        cy + r * std::sin(angle + delta),
+                        .5F,
+                        .5F,
+                        color
+                    };
+                }
+            }
+            int k = 0;
+            for (int i = 0; i < Segments; ++i)
+            {
+                for (int j = 0; j < Bands - 1; ++j)
+                {
+                    const int a = i * Bands + j, b = a + Bands;
+                    for (int v : {a, b, b + 1, a, b + 1, a + 1})
+                    {
+                        indices[k++] = v;
+                    }
+                }
+            }
+            renderer.drawMesh(*discTexture_, vertices, indices);
         }
 
         void renderLensGhosts(
@@ -551,7 +730,7 @@ namespace Paladin
         bool ensureTextures(Renderer& renderer) const
         {
             if (coronaTexture_ && coreTexture_ && lensGhostTexture_ &&
-                textureOwner_ == &renderer)
+                discTexture_ && textureOwner_ == &renderer)
             {
                 return true;
             }
@@ -591,7 +770,23 @@ namespace Paladin
             coronaTexture_ = create(1024, celestialSunCoronaSample);
             coreTexture_ = create(384, celestialSunCoreSample);
             lensGhostTexture_ = create(256, celestialSunLensGhostSample);
-            if (!coronaTexture_ || !coreTexture_ || !lensGhostTexture_)
+            discTexture_ = create(
+                128,
+                [](float x, float y) -> RenderColor
+                {
+                    const float r = std::hypot(x, y);
+                    const float edge =
+                        CelestialSunOptics::smooth01((1.F - r) * 64.F);
+                    return {
+                        255,
+                        251,
+                        235,
+                        CelestialSunOptics::channel(255 * edge)
+                    };
+                }
+            );
+            if (!coronaTexture_ || !coreTexture_ || !lensGhostTexture_ ||
+                !discTexture_)
             {
                 reset();
                 return false;
@@ -604,6 +799,7 @@ namespace Paladin
         mutable std::unique_ptr<Texture> coronaTexture_;
         mutable std::unique_ptr<Texture> coreTexture_;
         mutable std::unique_ptr<Texture> lensGhostTexture_;
+        mutable std::unique_ptr<Texture> discTexture_;
         mutable const Renderer* textureOwner_ = nullptr;
     };
 } // namespace Paladin

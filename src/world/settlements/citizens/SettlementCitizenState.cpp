@@ -113,7 +113,70 @@ namespace Paladin
         }
 
         behaviorSeed_ = nameSeed;
-        return spawn(citizenCount);
+        if (!appendCitizens(citizenCount, false))
+        {
+            return false;
+        }
+        // The founding party is always four men and four women, in seeded
+        // order.
+        if (citizenCount == 8)
+        {
+            const auto offset = GenerationNoise::mix(nameSeed) % 8;
+            for (std::size_t i = 0; i < 8; ++i)
+            {
+                auto& c = citizens_[i];
+                c.sex = ((i + offset) % 8 < 4) ? CitizenSex::Male
+                                               : CitizenSex::Female;
+                c.name =
+                    (c.sex == CitizenSex::Male
+                         ? maleNames
+                         : femaleNames)[(nameSeed + i * 17) % maleNames.size()];
+            }
+        }
+        matchSingles();
+        return true;
+    }
+
+    std::string_view SettlementCitizenState::maleName(
+        std::uint64_t index
+    ) noexcept
+    {
+        return maleNames[index % maleNames.size()];
+    }
+
+    bool SettlementCitizenState::chooseFoundingRulerName(std::string_view name)
+    {
+        if (std::find(maleNames.begin(), maleNames.end(), name) ==
+            maleNames.end())
+        {
+            return false;
+        }
+        for (auto& c : citizens_)
+        {
+            if (c.sex == CitizenSex::Male && c.health > 0)
+            {
+                c.name = name;
+                ++version_;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void SettlementCitizenState::rememberAncestry(const SettlementCitizen& c)
+    {
+        if (std::none_of(
+                ancestors_.begin(),
+                ancestors_.end(),
+                [&](const auto& a) { return a.id == c.id; }
+            ))
+        {
+            ancestors_.push_back(
+                {c.id,
+                 c.birthFatherId ? c.birthFatherId : c.fatherId,
+                 c.birthMotherId ? c.birthMotherId : c.motherId}
+            );
+        }
     }
 
     bool SettlementCitizenState::spawn(std::uint64_t citizenCount)

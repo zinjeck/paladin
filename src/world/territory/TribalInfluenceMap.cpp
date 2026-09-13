@@ -5,6 +5,7 @@
 #include "world/TerrainType.h"
 #include "world/WorldGrid.h"
 #include "world/WorldTile.h"
+#include "world/territory/RealmTerritoryConnections.h"
 
 #include <algorithm>
 #include <array>
@@ -345,6 +346,10 @@ namespace Paladin
                 signature,
                 static_cast<std::uint32_t>(settlement.position().y)
             );
+            signature = mixSignature(
+                signature,
+                static_cast<std::uint64_t>(settlement.kind())
+            );
             signature = mixSignature(signature, settlement.population());
             signature = mixSignature(
                 signature,
@@ -385,11 +390,16 @@ namespace Paladin
                 continue;
             }
 
-            const TribalPowerCenterProfile profile = tribalPowerCenterProfile(
+            TribalPowerCenterProfile profile = tribalPowerCenterProfile(
                 settlement.population(),
                 realm->capitalSettlementId() == settlement.id(),
                 policy
             );
+            profile.radiusTiles *= settlement.isFortress() ? 1.45 : .70;
+            if (settlement.isFortress())
+            {
+                profile.amplitude = std::min(1.0, profile.amplitude * 1.30);
+            }
             if (profile.radiusTiles <= 0.0 || profile.amplitude <= 0.0)
             {
                 continue;
@@ -504,6 +514,78 @@ namespace Paladin
                     distances[neighborIndex] = nextCost;
                     frontier.push({nextCost, neighbor});
                 }
+            }
+        }
+
+        std::uint64_t connectionSignature =
+            mixSignature(grid.revision(), width_);
+        connectionSignature = mixSignature(connectionSignature, height_);
+        for (const auto& s : settlements)
+        {
+            connectionSignature =
+                mixSignature(connectionSignature, s.id().value());
+            connectionSignature =
+                mixSignature(connectionSignature, s.ownerRealmId().value());
+            connectionSignature = mixSignature(
+                connectionSignature,
+                std::uint32_t(s.position().x)
+            );
+            connectionSignature = mixSignature(
+                connectionSignature,
+                std::uint32_t(s.position().y)
+            );
+            connectionSignature =
+                mixSignature(connectionSignature, std::uint64_t(s.kind()));
+        }
+        if (connectionSignature_ != connectionSignature)
+        {
+            connections_.clear();
+            for (std::size_t i = 0; i < settlements.size(); ++i)
+            {
+                for (std::size_t j = i + 1; j < settlements.size(); ++j)
+                {
+                    auto cells = realmTerritoryConnection(
+                        grid,
+                        settlements[i],
+                        settlements[j],
+                        settlements
+                    );
+                    if (cells.empty())
+                    {
+                        continue;
+                    }
+                    CachedConnection link{i, j, {}};
+                    link.cells.reserve(cells.size());
+                    for (const auto& cell : cells)
+                    {
+                        link.cells.push_back(
+                            {indexOf(cell.position), cell.strength}
+                        );
+                    }
+                    connections_.push_back(std::move(link));
+                }
+            }
+            connectionSignature_ = connectionSignature;
+        }
+        for (const auto& link : connections_)
+        {
+            const auto& a = settlements[link.first];
+            const auto& b = settlements[link.second];
+            const auto* realm = findRealm(realms, a.ownerRealmId());
+            if (!realm || !realm->usesTribalInfluence() || !a.population() ||
+                !b.population())
+            {
+                continue;
+            }
+            const float strength = float(std::min(
+                tribalPowerCenterProfile(a.population(), false, policy)
+                    .amplitude,
+                tribalPowerCenterProfile(b.population(), false, policy)
+                    .amplitude
+            ));
+            for (const auto& [index, weight] : link.cells)
+            {
+                consider(index, realm->id(), strength * weight);
             }
         }
 

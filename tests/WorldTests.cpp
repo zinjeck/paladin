@@ -503,21 +503,23 @@ void runWorldTests()
                       )
                       .isValid());
 
+    const auto borderlandControl =
+        borderlandPolicy.forSettlement(Paladin::SettlementKind::City);
     const std::int32_t regionHalfWidth =
-        borderlandPolicy.settlementRegionWidth / 2;
+        borderlandControl.settlementRegionWidth / 2;
 
     const std::int32_t regionHalfHeight =
-        borderlandPolicy.settlementRegionHeight / 2;
+        borderlandControl.settlementRegionHeight / 2;
 
     const std::int32_t regionMinimumX = borderlandCapital.x - regionHalfWidth;
 
     const std::int32_t regionMaximumX =
-        regionMinimumX + borderlandPolicy.settlementRegionWidth - 1;
+        regionMinimumX + borderlandControl.settlementRegionWidth - 1;
 
     const std::int32_t regionMinimumY = borderlandCapital.y - regionHalfHeight;
 
     const std::int32_t regionMaximumY =
-        regionMinimumY + borderlandPolicy.settlementRegionHeight - 1;
+        regionMinimumY + borderlandControl.settlementRegionHeight - 1;
 
     std::size_t claimedImmediateBorderlandTiles = 0;
     std::size_t possibleImmediateBorderlandTiles = 0;

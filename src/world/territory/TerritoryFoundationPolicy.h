@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/SettlementKind.h"
 #include "world/TerrainType.h"
 #include "world/territory/TribalInfluencePolicy.h"
 
@@ -32,6 +33,29 @@ namespace Paladin
         // not claim those cells; their authority is derived continuously from
         // population-driven power centers using this policy.
         TribalInfluencePolicy tribalInfluence;
+
+        // Control is independent of the playable region. Cities retain their
+        // 9x9 maps but claim a smaller core; a fortress projects a wider
+        // frontier.
+        TerritoryFoundationPolicy forSettlement(
+            SettlementKind kind
+        ) const noexcept
+        {
+            auto result = *this;
+            if (kind == SettlementKind::City)
+            {
+                result.settlementRegionWidth =
+                    std::max(1, settlementRegionWidth * 5 / 9);
+                result.settlementRegionHeight =
+                    std::max(1, settlementRegionHeight * 5 / 9);
+            }
+            else
+            {
+                result.settlementBorderlandTraversalBudget += 6;
+                result.capitalBorderlandTraversalBudget += 6;
+            }
+            return result;
+        }
 
         [[nodiscard]]
         const TerritoryTerrainRule& ruleFor(TerrainType terrain) const noexcept;

@@ -70,6 +70,14 @@ namespace Paladin
             activeSettlementName_ = std::move(name);
         }
 
+        void setFortress(bool value) noexcept
+        {
+            if (fortress_ != value)
+            {
+                closeCategoryMenus();
+                fortress_ = value;
+            }
+        }
         void closeCategoryMenus() noexcept;
 
         void layout(int viewportWidth, int viewportHeight) noexcept;
@@ -131,6 +139,11 @@ namespace Paladin
         void reloadArt() { goodsIconsLoaded_ = false; goodsIcons_ = {}; }
 
     private:
+        bool fortress_ = false;
+        std::size_t visibleCategoryCount() const noexcept
+        {
+            return fortress_ ? 3 : CategoryCount;
+        }
         bool worldMode_ = false;
         std::string activeSettlementName_;
         UiRectangle activeSettlementPanel_;

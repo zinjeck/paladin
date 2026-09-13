@@ -4,6 +4,7 @@
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
+#include "world/SettlementKind.h"
 #include "world/WorldTilePosition.h"
 #include "world/generation/SettlementMapGenerator.h"
 
@@ -118,7 +119,8 @@ namespace Paladin
         [[nodiscard]]
         SettlementId foundPlayerSettlement(
             WorldTilePosition position,
-            std::string name
+            std::string name,
+            SettlementKind kind = SettlementKind::City
         );
 
         SettlementId foundPlayerCapital(
@@ -145,6 +147,7 @@ namespace Paladin
         std::unique_ptr<World> world_;
         std::unique_ptr<WorldSimulationPipeline> worldSimulationPipeline_;
 
+        bool populateAiRealms_ = true;
         RealmId playerRealmId_;
         SettlementId presentedSettlementId_;
         SettlementId detailedSimulationSettlementId_;

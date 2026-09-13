@@ -171,6 +171,12 @@ namespace Paladin
             double minute,
             double elapsed
         );
+        void advanceInactiveLifecycle(
+            SettlementMap&,
+            SettlementCitizenState&,
+            double minute,
+            double elapsed
+        );
         static std::string activityLabel(const SettlementCitizen&);
         void synchronizeHomes(
             SettlementMap& map,
@@ -181,6 +187,12 @@ namespace Paladin
         }
 
     private:
+        void retireCitizen(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute
+        );
         enum class RouteFailureDomain : std::uint8_t
         {
             Inventory,

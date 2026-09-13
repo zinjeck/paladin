@@ -37,6 +37,71 @@ namespace Paladin
                 std::clamp((y - b.y) / b.height, 0., std::nextafter(1., 0.))
             };
         }
+        static std::optional<WorldSurface::Point3> annotationPosition(
+            const Camera2D& camera,
+            const WorldGrid& grid,
+            int width,
+            int height,
+            double pixels,
+            bool globe,
+            double x,
+            double y
+        )
+        {
+            const bool stable = worldPixelStabilityActive(false, pixels);
+            const auto source =
+                stable
+                    ? pixelStableWorldCamera(camera, grid, width, height, globe)
+                    : camera;
+            if (!globe)
+            {
+                const double projectedX =
+                    width * .5 + (x - source.tileX()) * pixels;
+                const double projectedY =
+                    height * .5 + (y - source.tileY()) * pixels;
+                return WorldSurface::Point3{
+                    stable ? std::round(float(projectedX)) +
+                                 std::round(
+                                     (source.tileX() - camera.tileX()) * pixels
+                                 )
+                           : projectedX,
+                    stable ? std::round(float(projectedY)) +
+                                 std::round(
+                                     (source.tileY() - camera.tileY()) * pixels
+                                 )
+                           : projectedY,
+                    1
+                };
+            }
+            const auto sphere =
+                GlobeView::from(source, grid, width, height)
+                    .project(x / grid.width(), y / grid.height());
+            const double weight =
+                worldPresentationState(pixels).localWorldWeight;
+            if (sphere.z <= 0 && weight < .5)
+            {
+                return std::nullopt;
+            }
+            const auto tangent = LocalTangentWorldView::from(
+                source,
+                grid,
+                width,
+                height,
+                pixels
+            );
+            const auto point = tangent.projectTiles(x, y);
+            const auto residual =
+                tangent.rigidOffsetToCenter(camera.tileX(), camera.tileY());
+            const double projectedX = std::lerp(sphere.x, point.x, weight);
+            const double projectedY = std::lerp(sphere.y, point.y, weight);
+            return WorldSurface::Point3{
+                (stable ? std::round(float(projectedX)) : projectedX) +
+                    residual.x * weight,
+                (stable ? std::round(float(projectedY)) : projectedY) +
+                    residual.y * weight,
+                1
+            };
+        }
         static std::optional<WorldSurface::UV> pick(
             const Camera2D& c,
             const WorldGrid& g,

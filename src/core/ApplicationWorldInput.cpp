@@ -57,7 +57,11 @@ namespace Paladin
             {
                 const FoundingPanelAction action = foundingPanel_->submit();
 
-                if (action == FoundingPanelAction::Confirm)
+                if (action == FoundingPanelAction::SelectRegion)
+                {
+                    beginAdditionalSettlementSelection();
+                }
+                else if (action == FoundingPanelAction::Confirm)
                 {
                     confirmFoundingFlow();
                 }
@@ -89,6 +93,10 @@ namespace Paladin
             {
                 cancelFoundingFlow();
             }
+            else if (action == FoundingPanelAction::SelectRegion)
+            {
+                beginAdditionalSettlementSelection();
+            }
             else if (action == FoundingPanelAction::Confirm)
             {
                 confirmFoundingFlow();
@@ -103,7 +111,15 @@ namespace Paladin
         const bool hudCapturedPointer =
             worldHud_->pointerPressed(event.button.x, event.button.y);
 
-        if (!hudCapturedPointer && event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+        static_cast<void>(hudCapturedPointer);
+    }
+
+    void Application::handleWorldPointerReleased(const SDL_Event& event)
+    {
+        const WorldHudAction action =
+            worldHud_->pointerReleased(event.button.x, event.button.y);
+
+        if (!activeHudContainsPoint(event.button.x, event.button.y) &&
             settlementPlacementController_->isSelecting())
         {
             updateSettlementPlacementHover(
@@ -136,25 +152,24 @@ namespace Paladin
                     }
                     else
                     {
+                        foundingPanel_->setRulerNameSeed(
+                            simulation_->world().generationSeed()
+                        );
                         foundingPanel_->open();
                     }
                     SDL_StartTextInput(window_->nativeHandle());
                 }
             }
+            return;
         }
-    }
-
-    void Application::handleWorldPointerReleased(const SDL_Event& event)
-    {
-        const WorldHudAction action =
-            worldHud_->pointerReleased(event.button.x, event.button.y);
 
         if (action == WorldHudAction::SelectRegion)
         {
             movingCapital_ = false;
             settlementPlacementController_->beginSelection(
                 simulation_->playerRealmId(),
-                foundingAdditionalSettlement_
+                foundingAdditionalSettlement_,
+                foundingPanel_->settlementKind()
             );
         }
         else if (action == WorldHudAction::MoveCapital)
@@ -249,14 +264,14 @@ namespace Paladin
                 renderer_->outputHeight()
             );
 
-        const auto focusFlatMap = [&](double x, double y)
+        const auto focusMinimap = [&](double x, double y)
         {
             WorldMapNavigation::focus(
                 *camera_,
                 simulation_->world().grid(),
                 renderer_->outputWidth(),
                 renderer_->outputHeight(),
-                false,
+                worldRenderer_->globeEnabled,
                 WorldMapNavigation::minimapPoint(mapBounds, x, y)
             );
             clampCameraToWorld();
@@ -291,26 +306,20 @@ namespace Paladin
                 event.button.button == SDL_BUTTON_LEFT &&
                 mapBounds.contains(event.button.x, event.button.y))
             {
-                // The minimap is the projection escape hatch. A click always
-                // addresses the canonical flat chart, regardless of which
-                // projection was visible one frame earlier.
-                if (worldRenderer_->globeEnabled)
-                {
-                    worldRenderer_->toggleProjection(
-                        *camera_,
-                        simulation_->world().grid(),
-                        renderer_->outputWidth(),
-                        renderer_->outputHeight(),
-                        *tileRenderMetrics_
-                    );
-                }
+                worldRenderer_->toggleProjection(
+                    *camera_,
+                    simulation_->world().grid(),
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight(),
+                    *tileRenderMetrics_
+                );
                 worldNavigatorPress_ = 1;
-                focusFlatMap(event.button.x, event.button.y);
+                focusMinimap(event.button.x, event.button.y);
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION && worldNavigatorPress_)
             {
-                focusFlatMap(event.motion.x, event.motion.y);
+                focusMinimap(event.motion.x, event.motion.y);
                 return;
             }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
@@ -388,10 +397,6 @@ namespace Paladin
                 globeDragging_ = false;
                 return;
             }
-            if (settlementPlacementController_->isSelecting())
-            {
-                handleWorldPointerPressed(event);
-            }
         }
         if (handleWorldManagement(event))
         {
@@ -412,6 +417,7 @@ namespace Paladin
         if (event.type == SDL_EVENT_KEY_DOWN &&
             event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
+            inspectedWorldSettlementId_ = {};
             settlementPlacementController_->cancelSelection();
             movingCapital_ = false;
             foundingAdditionalSettlement_ = false;
@@ -426,6 +432,7 @@ namespace Paladin
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event.button.button == SDL_BUTTON_RIGHT)
         {
+            inspectedWorldSettlementId_ = {};
             settlementPlacementController_->cancelSelection();
             movingCapital_ = false;
             foundingAdditionalSettlement_ = false;
@@ -508,13 +515,9 @@ namespace Paladin
                 employmentCapturedPointer_ = false;
                 if (employmentPanel_->takeFoundSettlement())
                 {
+                    employmentPanel_->close();
                     foundingAdditionalSettlement_ = true;
-                    movingCapital_ = false;
-                    worldHud_->setAdditionalSelection(true);
-                    settlementPlacementController_->beginSelection(
-                        simulation_->playerRealmId(),
-                        true
-                    );
+                    foundingPanel_->openSettlementChoice();
                 }
                 return true;
             }
@@ -552,69 +555,43 @@ namespace Paladin
             if (!activeHudContainsPoint(event.button.x, event.button.y))
             {
                 const auto& grid = simulation_->world().grid();
-                const auto view = GlobeView::from(
-                    *camera_,
-                    grid,
-                    renderer_->outputWidth(),
-                    renderer_->outputHeight()
-                );
-                const auto hit = WorldMapNavigation::pick(
-                    *camera_,
-                    grid,
-                    renderer_->outputWidth(),
-                    renderer_->outputHeight(),
-                    tileRenderMetrics_->scaledTilePixels(camera_->zoom()),
-                    worldRenderer_->globeEnabled,
-                    event.button.x,
-                    event.button.y
-                );
-                if (!hit)
-                {
-                    return false;
-                }
+                const int width = renderer_->outputWidth(),
+                          height = renderer_->outputHeight();
+                const auto view =
+                    GlobeView::from(*camera_, grid, width, height);
                 const double pixels =
                     worldRenderer_->globeEnabled
-                        ? view.radius * 6.283185307 / grid.width()
+                        ? view.radius * 6.283185307179586 / grid.width()
                         : tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-                const double x = hit->u * grid.width(),
-                             y = hit->v * grid.height();
                 SettlementId nearest;
-                double best = std::max(12., pixels * 1.5);
+                double best = 20.0;
                 for (const auto& city : simulation_->world().settlements())
                 {
-                    if (city.ownerRealmId() != simulation_->playerRealmId())
+                    const auto point = WorldMapNavigation::annotationPosition(
+                        *camera_,
+                        grid,
+                        width,
+                        height,
+                        pixels,
+                        worldRenderer_->globeEnabled,
+                        city.position().x + .5,
+                        city.position().y + .5
+                    );
+                    if (!point)
                     {
                         continue;
                     }
-                    double distance;
-                    if (worldRenderer_->globeEnabled)
-                    {
-                        const auto at = view.project(
-                            (city.position().x + .5) / grid.width(),
-                            (city.position().y + .5) / grid.height()
-                        );
-                        if (at.z <= 0)
-                        {
-                            continue;
-                        }
-                        distance = std::hypot(
-                            at.x - event.button.x,
-                            at.y - event.button.y
-                        );
-                    }
-                    else
-                    {
-                        double dx = x - city.position().x - .5;
-                        dx -= std::round(dx / grid.width()) * grid.width();
-                        distance =
-                            std::hypot(dx, y - city.position().y - .5) * pixels;
-                    }
+                    const double distance = std::hypot(
+                        point->x - event.button.x,
+                        point->y - event.button.y
+                    );
                     if (distance < best)
                     {
                         best = distance;
                         nearest = city.id();
                     }
                 }
+                inspectedWorldSettlementId_ = nearest;
                 if (nearest && simulation_->setPresentedSettlement(nearest))
                 {
                     if (event.button.clicks >= 2)

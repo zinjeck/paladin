@@ -2,6 +2,7 @@
 #include "world/RealmOrigin.h"
 #include "world/TerrainType.h"
 #include "world/generation/WorldGenerator.h"
+#include "world/territory/RealmTerritoryConnections.h"
 #include "world/territory/TerritoryFoundationSystem.h"
 
 #include <utility>
@@ -159,7 +160,8 @@ namespace Paladin
 
     bool World::canFoundSettlementAt(
         WorldTilePosition position,
-        RealmId ownerRealmId
+        RealmId ownerRealmId,
+        SettlementKind kind
     ) const noexcept
     {
         const WorldTile* tile = grid_.tile({position.x, position.y});
@@ -170,22 +172,42 @@ namespace Paladin
             return false;
         }
 
-        if (territoryFoundationPolicy_.settlementRegionWidth <= 0 ||
-            territoryFoundationPolicy_.settlementRegionHeight <= 0)
+        if (settlementRegionDimension(
+                territoryFoundationPolicy_.settlementRegionWidth,
+                kind
+            ) <= 0 ||
+            settlementRegionDimension(
+                territoryFoundationPolicy_.settlementRegionHeight,
+                kind
+            ) <= 0)
         {
             return false;
         }
 
         const WorldTilePosition regionTopLeft{
-            position.x - territoryFoundationPolicy_.settlementRegionWidth / 2,
-            position.y - territoryFoundationPolicy_.settlementRegionHeight / 2
+            position.x - settlementRegionDimension(
+                             territoryFoundationPolicy_.settlementRegionWidth,
+                             kind
+                         ) / 2,
+            position.y - settlementRegionDimension(
+                             territoryFoundationPolicy_.settlementRegionHeight,
+                             kind
+                         ) / 2
         };
 
         const WorldTilePosition regionBottomRight{
-            regionTopLeft.x + territoryFoundationPolicy_.settlementRegionWidth -
+            regionTopLeft.x +
+                settlementRegionDimension(
+                    territoryFoundationPolicy_.settlementRegionWidth,
+                    kind
+                ) -
                 1,
             regionTopLeft.y +
-                territoryFoundationPolicy_.settlementRegionHeight - 1
+                settlementRegionDimension(
+                    territoryFoundationPolicy_.settlementRegionHeight,
+                    kind
+                ) -
+                1
         };
 
         if (!grid_.isValidPosition(regionTopLeft) ||
@@ -206,7 +228,20 @@ namespace Paladin
 
         for (const Settlement& settlement : settlements_.entities())
         {
-            if (settlement.position() == position)
+            const int otherWidth = settlementRegionDimension(
+                territoryFoundationPolicy_.settlementRegionWidth,
+                settlement.kind()
+            );
+            const int otherHeight = settlementRegionDimension(
+                territoryFoundationPolicy_.settlementRegionHeight,
+                settlement.kind()
+            );
+            const int left = settlement.position().x - otherWidth / 2;
+            const int top = settlement.position().y - otherHeight / 2;
+            if (regionTopLeft.x < left + otherWidth &&
+                regionBottomRight.x >= left &&
+                regionTopLeft.y < top + otherHeight &&
+                regionBottomRight.y >= top)
             {
                 return false;
             }
@@ -218,10 +253,11 @@ namespace Paladin
 
     bool World::canFoundAdditionalSettlementAt(
         WorldTilePosition position,
-        RealmId owner
+        RealmId owner,
+        SettlementKind kind
     ) const noexcept
     {
-        if (!canFoundSettlementAt(position, owner))
+        if (!canFoundSettlementAt(position, owner, kind))
         {
             return false;
         }
@@ -238,12 +274,32 @@ namespace Paladin
         {
             return false;
         }
-        const int width = territoryFoundationPolicy_.settlementRegionWidth;
-        const int height = territoryFoundationPolicy_.settlementRegionHeight;
+        const int width = settlementRegionDimension(
+            territoryFoundationPolicy_.settlementRegionWidth,
+            kind
+        );
+        const int height = settlementRegionDimension(
+            territoryFoundationPolicy_.settlementRegionHeight,
+            kind
+        );
         for (const auto& settlement : settlements_.entities())
         {
-            if (std::abs(position.x - settlement.position().x) < width &&
-                std::abs(position.y - settlement.position().y) < height)
+            if (std::abs(position.x - settlement.position().x) <
+                    (width +
+                     settlementRegionDimension(
+                         territoryFoundationPolicy_.settlementRegionWidth,
+                         settlement.kind()
+                     ) +
+                     1) /
+                        2 &&
+                std::abs(position.y - settlement.position().y) <
+                    (height +
+                     settlementRegionDimension(
+                         territoryFoundationPolicy_.settlementRegionHeight,
+                         settlement.kind()
+                     ) +
+                     1) /
+                        2)
             {
                 return false;
             }
@@ -291,7 +347,12 @@ namespace Paladin
     )
     {
         const Realm* ownerRealm = realms_.find(ownerRealmId);
-        if (!canFoundSettlementAt(position, ownerRealmId) || !ownerRealm)
+        if (!canFoundSettlementAt(
+                position,
+                ownerRealmId,
+                foundationProfile.kind
+            ) ||
+            !ownerRealm)
         {
             return {};
         }
@@ -315,12 +376,17 @@ namespace Paladin
                     territory_,
                     position,
                     ownerRealmId,
-                    territoryFoundationPolicy_,
-                    territoryFoundationPolicy_.settlementBorderlandTraversalBudget
+                    territoryFoundationPolicy_.forSettlement(
+                        foundationProfile.kind
+                    ),
+                    territoryFoundationPolicy_
+                        .forSettlement(foundationProfile.kind)
+                        .settlementBorderlandTraversalBudget
                 )
             );
         }
 
+        connectRealmTerritory(ownerRealmId);
         return settlementId;
     }
 
@@ -350,7 +416,11 @@ namespace Paladin
         Realm* ownerRealm = realms_.find(ownerRealmId);
 
         if (!ownerRealm || ownerRealm->capitalSettlementId().isValid() ||
-            !canFoundSettlementAt(position, ownerRealmId) ||
+            !canFoundSettlementAt(
+                position,
+                ownerRealmId,
+                foundationProfile.kind
+            ) ||
             !isValidFoundingName(identity.realmName) ||
             !isValidFoundingName(identity.cultureName) ||
             !isValidFoundingName(identity.capitalName) ||
@@ -411,8 +481,12 @@ namespace Paladin
                     territory_,
                     position,
                     ownerRealmId,
-                    territoryFoundationPolicy_,
-                    territoryFoundationPolicy_.capitalBorderlandTraversalBudget
+                    territoryFoundationPolicy_.forSettlement(
+                        foundationProfile.kind
+                    ),
+                    territoryFoundationPolicy_
+                        .forSettlement(foundationProfile.kind)
+                        .capitalBorderlandTraversalBudget
                 )
             );
         }
@@ -602,20 +676,65 @@ namespace Paladin
                         territory_,
                         settlement.position(),
                         realmId,
-                        territoryFoundationPolicy_,
-                        capital
-                            ? territoryFoundationPolicy_
-                                  .capitalBorderlandTraversalBudget
-                            : territoryFoundationPolicy_
-                                  .settlementBorderlandTraversalBudget
+                        territoryFoundationPolicy_.forSettlement(
+                            settlement.kind()
+                        ),
+                        capital ? territoryFoundationPolicy_
+                                      .forSettlement(settlement.kind())
+                                      .capitalBorderlandTraversalBudget
+                                : territoryFoundationPolicy_
+                                      .forSettlement(settlement.kind())
+                                      .settlementBorderlandTraversalBudget
                     )
                 );
             }
         }
 
+        connectRealmTerritory(realmId);
+
         return true;
     }
 
+
+    void World::connectRealmTerritory(RealmId realmId)
+    {
+        const auto* owner = realms_.find(realmId);
+        if (!owner || owner->usesTribalInfluence())
+        {
+            return;
+        }
+        const auto all = settlements_.entities();
+        for (std::size_t i = 0; i < all.size(); ++i)
+        {
+            if (all[i].ownerRealmId() != realmId)
+            {
+                continue;
+            }
+            for (std::size_t j = i + 1; j < all.size(); ++j)
+            {
+                if (all[j].ownerRealmId() != realmId)
+                {
+                    continue;
+                }
+                for (const auto& cell : realmTerritoryConnection(
+                         grid_,
+                         all[i],
+                         all[j],
+                         all,
+                         &territory_
+                     ))
+                {
+                    if (cell.strength >= .16F)
+                    {
+                        static_cast<void>(territory_.claimIfUncontrolled(
+                            cell.position,
+                            realmId
+                        ));
+                    }
+                }
+            }
+        }
+    }
 
     bool World::relocateSoleCapital(RealmId realmId, WorldTilePosition position)
     {
@@ -669,8 +788,9 @@ namespace Paladin
                 territory_,
                 position,
                 realmId,
-                territoryFoundationPolicy_,
-                territoryFoundationPolicy_.capitalBorderlandTraversalBudget
+                territoryFoundationPolicy_.forSettlement(capital->kind()),
+                territoryFoundationPolicy_.forSettlement(capital->kind())
+                    .capitalBorderlandTraversalBudget
             )
         );
 

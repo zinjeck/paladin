@@ -70,6 +70,36 @@ namespace Paladin::Test
             );
         }
 
+        // Close zoom also crosses both poles instead of bouncing at the
+        // latitude chart's singularity. A complete orbit returns to its start.
+        {
+            Camera2D orbit;
+            orbit.setZoom(8);
+            orbit.setPlanetRotation({}, grid.width(), grid.height());
+            const double radius =
+                GlobeView::from(orbit, grid, 1280, 720).radius;
+            double minimum = 1, maximum = 0;
+            for (int i = 0; i < 720; ++i)
+            {
+                GlobeCameraNavigation::pan(
+                    orbit,
+                    grid,
+                    1280,
+                    720,
+                    0,
+                    -1,
+                    6.283185307179586 * radius / 720
+                );
+                const auto view = GlobeView::from(orbit, grid, 1280, 720);
+                const auto center = view.pick(view.cx, view.cy);
+                PALADIN_CHECK(center);
+                minimum = std::min(minimum, center->v);
+                maximum = std::max(maximum, center->v);
+            }
+            PALADIN_CHECK(minimum < 1e-6 && maximum > 1 - 1e-6);
+            PALADIN_CHECK(orbit.planetRotation()->apply({0, 0, 1}).z > .999999);
+        }
+
         // Snapping the terrain SOURCE camera to 1/16 tile must not perturb the
         // tangent angle. Otherwise every art-pixel step rerotates the full map.
         {

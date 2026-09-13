@@ -22,5 +22,8 @@ namespace Paladin
         std::int32_t maximumContinentCount = 0;
 
         float seaLevel = 0.46F;
+        // Scenario fixtures may isolate terrain/UI without generating political
+        // entities.
+        bool populateAiRealms = true;
     };
 } // namespace Paladin

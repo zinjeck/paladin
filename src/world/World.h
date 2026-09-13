@@ -71,13 +71,15 @@ namespace Paladin
         [[nodiscard]]
         bool canFoundSettlementAt(
             WorldTilePosition position,
-            RealmId ownerRealmId
+            RealmId ownerRealmId,
+            SettlementKind kind = SettlementKind::City
         ) const noexcept;
 
         [[nodiscard]]
         bool canFoundAdditionalSettlementAt(
             WorldTilePosition position,
-            RealmId owner
+            RealmId owner,
+            SettlementKind kind = SettlementKind::City
         ) const noexcept;
 
         SettlementId foundSettlement(
@@ -272,6 +274,7 @@ namespace Paladin
 
 
     private:
+        void connectRealmTerritory(RealmId realmId);
         WorldTime time_;
         std::uint64_t generationSeed_ = 0;
         WorldGrid grid_;

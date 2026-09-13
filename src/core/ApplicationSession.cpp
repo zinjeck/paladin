@@ -61,6 +61,7 @@ namespace Paladin
         movingCapital_ = false;
         savedWorldCamera_.reset();
         activeCitySettlementId_ = {};
+        inspectedWorldSettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
         foundingAdditionalSettlement_ = false;
@@ -99,6 +100,7 @@ namespace Paladin
         edgeScrollDwellSeconds_ = 0.0;
         movingCapital_ = false;
         activeCitySettlementId_ = {};
+        inspectedWorldSettlementId_ = {};
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = false;
         foundingAdditionalSettlement_ = false;
@@ -258,7 +260,14 @@ namespace Paladin
             );
         }
 
-        if (leavingPosition)
+        if (leavingPosition && !worldRenderer_->globeEnabled)
+        {
+            camera_->setPosition(
+                leavingPosition->x + .5,
+                leavingPosition->y + .5
+            );
+        }
+        else if (leavingPosition)
         {
             static_cast<void>(GlobeCameraNavigation::focusNorthUp(
                 *camera_,
@@ -269,6 +278,7 @@ namespace Paladin
 
         tileRenderMetrics_->tilePixels = 4.0;
         activeCitySettlementId_ = {};
+        inspectedWorldSettlementId_ = {};
         edgeScrollDwellSeconds_ = 0.0;
         screen_ = Screen::World;
         cityHud_->setWorldMode(simulationControlsUnlocked_);
@@ -288,6 +298,21 @@ namespace Paladin
         SDL_StopTextInput(window_->nativeHandle());
         settlementPlacementController_->cancelSelection();
         movingCapital_ = false;
+    }
+
+    void Application::beginAdditionalSettlementSelection()
+    {
+        const auto kind = foundingPanel_->settlementKind();
+        globePointerDown_ = globeDragging_ = false;
+        cityHudCapturedPointer_ = employmentCapturedPointer_ = false;
+        employmentPanel_->close();
+        foundingPanel_->close();
+        SDL_StopTextInput(window_->nativeHandle());
+        foundingAdditionalSettlement_ = true;
+        movingCapital_ = false;
+        worldHud_->setAdditionalSelection(true);
+        settlementPlacementController_
+            ->beginSelection(simulation_->playerRealmId(), true, kind);
     }
 
     void Application::confirmFoundingFlow()
@@ -328,7 +353,8 @@ namespace Paladin
             }
             settlementId = simulation_->foundPlayerSettlement(
                 *position,
-                identity.capitalName
+                identity.capitalName,
+                foundingPanel_->settlementKind()
             );
             completed = bool(settlementId);
         }

@@ -7,6 +7,7 @@
 #include "world/territory/TerritoryMap.h"
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <queue>
@@ -137,6 +138,23 @@ namespace Paladin
                     minimumX + localX,
                     minimumY + localY
                 };
+
+                const double dx = position.x - settlementPosition.x;
+                const double dy = position.y - settlementPosition.y;
+                const double angle = std::atan2(dy, dx);
+                const double phase = settlementPosition.x * .71 +
+                                     settlementPosition.y * 1.13 +
+                                     realmId.value();
+                const double edge = 1.0 + .15 * std::sin(3 * angle + phase) +
+                                    .09 * std::cos(5 * angle - phase);
+                const double rx =
+                    std::max(1.0, policy.settlementRegionWidth * .5);
+                const double ry =
+                    std::max(1.0, policy.settlementRegionHeight * .5);
+                if (dx * dx / (rx * rx) + dy * dy / (ry * ry) > edge * edge)
+                {
+                    continue;
+                }
 
                 const WorldTile* tile = grid.tile(position);
 

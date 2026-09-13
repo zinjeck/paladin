@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace Paladin
@@ -142,6 +143,13 @@ namespace Paladin
         }
 
     private:
+        struct CachedConnection
+        {
+            std::size_t first, second;
+            std::vector<std::pair<std::size_t, float>> cells;
+        };
+        std::uint64_t connectionSignature_ = 0;
+        std::vector<CachedConnection> connections_;
         [[nodiscard]]
         std::size_t indexOf(WorldTilePosition position) const noexcept;
 

@@ -13,6 +13,57 @@
 
 namespace Paladin
 {
+    void SettlementActivitySystem::retireCitizen(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& deceased,
+        double minute
+    )
+    {
+        citizens.rememberAncestry(deceased);
+        for (auto& survivor : citizens.citizens_)
+        {
+            survivor.familiarities.erase(deceased.id);
+        }
+        map.commerce.citizenDeparted(deceased.id);
+        map.employment().citizenDeparted(deceased.workplaceId);
+        deceased.workplaceId = {};
+        finish(map, deceased, minute);
+    }
+
+    void SettlementActivitySystem::advanceInactiveLifecycle(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        double minute,
+        double elapsed
+    )
+    {
+        if (!map.logistics.founded())
+        {
+            return;
+        }
+        families_.update(map, citizens, policy, *this, minute, elapsed);
+        bool died = false;
+        for (auto& person : citizens.citizens_)
+        {
+            if (person.health <= 1e-7)
+            {
+                retireCitizen(map, citizens, person, minute);
+                died = true;
+            }
+        }
+        if (died)
+        {
+            citizens.recordAttributes(minute, 0);
+            std::erase_if(
+                citizens.citizens_,
+                [](const auto& c) { return c.health <= 1e-7; }
+            );
+            ++citizens.familyVersion_;
+            ++citizens.version_;
+        }
+    }
+
     void SettlementActivitySystem::assignHomes(
         SettlementMap& map,
         SettlementCitizenState& citizens
@@ -166,14 +217,7 @@ namespace Paladin
         const auto handleDeath = [&](SettlementCitizen& deceased)
         {
             citizenDied = true;
-            for (auto& survivor : citizens.citizens_)
-            {
-                survivor.familiarities.erase(deceased.id);
-            }
-            map.commerce.citizenDeparted(deceased.id);
-            map.employment().citizenDeparted(deceased.workplaceId);
-            deceased.workplaceId = {};
-            finish(map, deceased, minute);
+            retireCitizen(map, citizens, deceased, minute);
         };
         for (auto& c : citizens.citizens_)
         {

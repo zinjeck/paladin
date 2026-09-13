@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/GlobeView.h"
+#include "rendering/WorldPixelStability.h"
 #include "world/WorldTilePosition.h"
 
 #include <cmath>
@@ -31,14 +32,6 @@ namespace Paladin
                 return;
             }
 
-            // Panning should move the point under the camera, not quietly add a
-            // second roll channel. The old raw quaternion step parallel-
-            // transported the local tangent frame, changing its screen angle on
-            // every WASD/edge-scroll frame. At close zoom that forced the rigid
-            // nearest-neighbour tangent raster to be re-rotated every frame and
-            // produced the visible terrain shimmer. Preserve the exact current
-            // surface roll; Q/E remains the sole intentional roll control.
-            const double surfaceRoll = view.surfaceRollRadians();
             const auto step = PlanetRotation::axis(
                 -dy,
                 -dx,
@@ -47,14 +40,7 @@ namespace Paladin
             );
             const auto tentative =
                 (step * view.orientation()).normalized();
-            const auto center = WorldSurface::coordinates(
-                tentative.inverse().apply({0, 0, 1})
-            );
-            camera.setPlanetRotation(
-                GlobeView::orientationAt(center, surfaceRoll),
-                grid.width(),
-                grid.height()
-            );
+            applyNavigation(camera, grid, view, tentative);
         }
 
         static void roll(
@@ -142,19 +128,41 @@ namespace Paladin
                 return WorldSurface::Point3{x, y, std::sqrt(1 - r2)};
             };
 
-            const double surfaceRoll = view.surfaceRollRadians();
             const auto tentative =
                 (PlanetRotation::between(ball(oldX, oldY), ball(newX, newY)) *
                  view.orientation())
                     .normalized();
-            const auto center = WorldSurface::coordinates(
-                tentative.inverse().apply({0, 0, 1})
+            applyNavigation(camera, grid, view, tentative);
+        }
+
+    private:
+        static void applyNavigation(
+            Camera2D& camera,
+            const WorldGrid& grid,
+            const GlobeView& view,
+            PlanetRotation tentative
+        )
+        {
+            const auto center =
+                WorldSurface::coordinates(tentative.inverse().apply({0, 0, 1}));
+            const auto previous = WorldSurface::coordinates(
+                view.orientation().inverse().apply({0, 0, 1})
             );
-            camera.setPlanetRotation(
-                GlobeView::orientationAt(center, surfaceRoll),
-                grid.width(),
-                grid.height()
-            );
+            const double pixels =
+                view.radius * 6.283185307179586 / grid.width();
+            // The curved globe needs the full trackball rotation. Only the
+            // close tangent raster holds its screen roll during translation.
+            // Latitude charts are singular at a pole: transport the frame
+            // through the cap instead of reflecting it back into the same
+            // hemisphere.
+            const bool regularChart = std::min(center.v, previous.v) > .03 &&
+                                      std::max(center.v, previous.v) < .97;
+            if (worldPixelStabilityActive(false, pixels) && regularChart)
+            {
+                tentative =
+                    GlobeView::orientationAt(center, view.surfaceRollRadians());
+            }
+            camera.setPlanetRotation(tentative, grid.width(), grid.height());
         }
     };
 } // namespace Paladin

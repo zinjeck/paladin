@@ -126,6 +126,24 @@ namespace Paladin
             ownership
         );
 
+        if (settlement.isFortress())
+        {
+            // Flanking battlements distinguish bastions without scaling a world
+            // sprite.
+            for (float x : {bodyLeft, bodyLeft + size - towerWidth})
+            {
+                renderer
+                    .fillRectangle(x, top, towerWidth, towerHeight, parchment);
+                renderer.fillRectangle(
+                    x + border,
+                    top + border,
+                    std::max(1.F, towerWidth - 2 * border),
+                    std::max(1.F, towerHeight - border),
+                    ink
+                );
+            }
+        }
+
         if (settlement.name().empty())
         {
             return;

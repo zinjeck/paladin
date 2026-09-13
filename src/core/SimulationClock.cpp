@@ -57,7 +57,9 @@ namespace Paladin
         frameDeltaSeconds_ = frameTimeSeconds;
         if (!paused_)
         {
-            presentationSeconds_ += frameTimeSeconds;
+            // Sample environmental phases once per rendered frame. Accelerating
+            // their clock adds no simulation steps or per-object update loops.
+            presentationSeconds_ += frameTimeSeconds * speedMultiplier_;
             accumulatorSeconds_ += frameTimeSeconds * speedMultiplier_;
             // Slow simulation rather than accumulating an unbounded
             // input-blocking debt.

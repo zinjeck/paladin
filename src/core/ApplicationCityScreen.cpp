@@ -22,6 +22,9 @@ namespace Paladin
 {
     void Application::layoutCityScreen()
     {
+        const auto* settlement =
+            simulation_->world().settlement(activeCitySettlementId_);
+        cityHud_->setFortress(settlement && settlement->isFortress());
         cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
         cityHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
     }

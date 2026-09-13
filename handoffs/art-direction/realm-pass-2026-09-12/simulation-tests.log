@@ -1,0 +1,23 @@
+Realm pass: 12 AI realms, 61 settlements, 2 empires; succession and lightweight simulation passed
+[audit] cancellation timestamps and conservation passed
+[audit] both death paths and cargo cleanup passed
+[audit] finite and ordinary interpolation passed
+[audit] direct interior path timing passed
+[audit] entry, exit, fallback and mid-step rerouting passed
+Fishery four-day production: 62
+Pasture four-day production: 65
+Healthy, housed day-88 population: mean 74.125 range 44-128
+Checking physical storage and exclusive reservations...
+Checking gathering, individual road labor, and construction...
+Checking hunger, physical pickup, starvation and recovery...
+Checking unreachable-food fallback and exclusive fishery zones...
+Checking cancellation preserves delivered and carried materials...
+Checking assigned-stockpile ownership and unemployed fallback...
+Checking distant construction materials and fed recovery...
+geography seed=73517 substantial_landmasses=6
+ocean coverage globe=0.690589 grid=0.642003
+geography seed=84391 substantial_landmasses=5
+ocean coverage globe=0.723473 grid=0.681061
+geography seed=992 substantial_landmasses=6
+ocean coverage globe=0.751639 grid=0.691246
+All Paladin tests passed.

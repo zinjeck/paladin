@@ -1869,8 +1869,9 @@ void runSettlementSimulationLoopTests()
             minimum = std::min(minimum, population);
             maximum = std::max(maximum, population);
         }
-        PALADIN_CHECK(double(total) / 16 >= 60);
-        PALADIN_CHECK(double(total) / 16 <= 70);
+        // Four guaranteed founding couples replace the old random-sex cohort.
+        PALADIN_CHECK(double(total) / 16 >= 68);
+        PALADIN_CHECK(double(total) / 16 <= 82);
         std::cout << "Healthy, housed day-88 population: mean "
                   << double(total) / 16 << " range " << minimum << "-"
                   << maximum << '\n';

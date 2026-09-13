@@ -21,6 +21,15 @@ namespace Paladin
     class Settlement
     {
     public:
+        SettlementKind kind() const noexcept
+        {
+            return kind_;
+        }
+        bool isFortress() const noexcept
+        {
+            return kind_ == SettlementKind::Fortress;
+        }
+
         Settlement(SettlementId id, WorldTilePosition position) noexcept
             : id_(id), position_(position)
         {
@@ -35,7 +44,8 @@ namespace Paladin
             const SettlementFoundationProfile& foundationProfile
         )
             : id_(id), position_(position), name_(std::move(name)),
-              ownerRealmId_(ownerRealmId), primaryCultureId_(primaryCultureId)
+              ownerRealmId_(ownerRealmId), primaryCultureId_(primaryCultureId),
+              kind_(foundationProfile.kind)
         {
             if (!simulationState_.bootstrap(foundationProfile))
             {
@@ -117,6 +127,7 @@ namespace Paladin
             ownerRealmId_ = realmId;
         }
 
+        SettlementKind kind_ = SettlementKind::City;
         SettlementId id_;
 
         WorldTilePosition position_;

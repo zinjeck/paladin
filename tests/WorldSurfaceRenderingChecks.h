@@ -204,12 +204,61 @@ namespace Paladin::Test
 
         // Solar optical field, immutable cache and full occultation regression.
         CelestialSunRenderer sun;
+        PALADIN_CHECK(
+            CelestialSunOptics::visibleDiscFraction(190, 180, 7) == 1
+        );
+        PALADIN_CHECK(
+            CelestialSunOptics::visibleDiscFraction(172, 180, 7) == 0
+        );
+        PALADIN_CHECK(
+            std::abs(
+                CelestialSunOptics::visibleDiscFraction(180, 180, 7) - .5F
+            ) < .01F
+        );
+        float previousVisibility = 0;
+        for (int i = 0; i <= 280; ++i)
+        {
+            const auto visible =
+                CelestialSunOptics::visibleDiscFraction(173 + i * .05, 180, 7);
+            PALADIN_CHECK(visible >= previousVisibility);
+            previousVisibility = visible;
+        }
         PALADIN_CHECK(sun.prepare(renderer)); const auto sunBuilds=sun.textureBuilds();
         GlobeView solar{480,320,180,0,0,PlanetRotation::axis(0,0,1,2.65)};
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{8,15,27,255});
         sun.render(renderer,solar,3*3600.);
         saveWorldReview(native,"pr25-sun-glare.png");
         const auto lit=readWorldReview(native); std::size_t white=0;
+        auto limb = solar;
+        const auto limbSource = projectCelestialSun(limb, 960, 640, 3 * 3600.);
+        PALADIN_CHECK(limbSource);
+        limb.radius =
+            std::hypot(limbSource->x - limb.cx, limbSource->y - limb.cy) - 5;
+        renderer.beginFrame();
+        renderer.fillRectangle(0, 0, 960, 640, {8, 15, 27, 255});
+        sun.render(renderer, limb, 3 * 3600.);
+        const auto limbImage = readWorldReview(native);
+        saveWorldReview(native, "realm-pass-sun-limb.png");
+        std::size_t litAtmosphere = 0;
+        for (int y = 0; y < 640; ++y)
+        {
+            for (int x = 0; x < 960; ++x)
+            {
+                const double radius =
+                    std::hypot(x + .5 - limb.cx, y + .5 - limb.cy);
+                const auto c = reviewPixel(limbImage.get(), x, y);
+                if (radius > limb.radius + 1 && radius < limb.radius * 1.028 &&
+                    c.red > 10)
+                {
+                    ++litAtmosphere;
+                }
+                // Lens ghosts are camera optics and may overlay the globe; the
+                // existing fully-hidden-source check below tests solid
+                // occultation.
+            }
+        }
+        PALADIN_CHECK(litAtmosphere > 15);
+
         for (int y=0;y<640;++y) for (int x=0;x<960;++x)
         { const auto c=reviewPixel(lit.get(),x,y); white+=c.red>245 && c.green>245 && c.blue>240; }
         PALADIN_CHECK(white>5);
@@ -236,6 +285,89 @@ namespace Paladin::Test
         camera.setPlanetRotation(PlanetRotation::axis(0,0,1,-.55),64,48); camera.setZoom(1);
         renderer.beginFrame(); map.render(renderer,world,camera,metrics);
         saveWorldReview(native,"pr25-sun-planet.png");
+        // Real planet sequence through first contact, crescent and full cover.
+        int sequence = 0;
+        for (double wantedGap : {18., 5., 0., -3., -5., -9., -22.})
+        {
+            const auto solarDirection =
+                PlanetAstronomy::sunDirection(world.time().secondsIntoDay());
+            const double radial = (256. + wantedGap) / (640. * .65);
+            const double length = std::sqrt(1 + radial * radial);
+            camera.setPlanetRotation(
+                PlanetRotation::between(
+                    {solarDirection.x, solarDirection.y, solarDirection.z},
+                    {-.8 * radial / length, .6 * radial / length, -1. / length}
+                ),
+                64,
+                48
+            );
+            renderer.beginFrame();
+            map.render(renderer, world, camera, metrics);
+            saveWorldReview(
+                native,
+                "tweak-sun-contact-" + std::to_string(sequence++) + ".png"
+            );
+        }
+        for (const auto* origin : {"civic", "tribal"})
+        {
+            WorldGenerationSettings linkedSettings;
+            linkedSettings.width = 128;
+            linkedSettings.height = 80;
+            linkedSettings.seed = 731;
+            World linked(linkedSettings);
+            for (int y = 0; y < 80; ++y)
+            {
+                for (int x = 0; x < 128; ++x)
+                {
+                    auto& t = *linked.grid().tile({x, y});
+                    const bool water =
+                        y < 12 + int(3 * std::sin(x * .15)) || y > 64;
+                    t.terrain = water ? TerrainType::Water : TerrainType::Land;
+                    t.biome = water ? BiomeType::Ocean : BiomeType::Plain;
+                    t.relief = ReliefType::Lowland;
+                    t.temperature = Temperature{.5};
+                    t.rainfall = Rainfall{.5};
+                }
+            }
+            linked.grid().terrainChanged();
+            const auto owner = linked.createRealm();
+            PALADIN_CHECK(linked.foundCapitalSettlement(
+                {28, 36},
+                owner,
+                {"Connected Realm", "Folk", "HOME", {204, 133, 84}, origin}
+            ));
+            for (auto p :
+                 {WorldTilePosition{48, 30},
+                  WorldTilePosition{68, 36},
+                  WorldTilePosition{103, 44}})
+            {
+                PALADIN_CHECK(linked.foundSettlement(p, owner));
+            }
+            WorldRenderer linkedMap;
+            linkedMap.globeEnabled = false;
+            linkedMap.setMapMode(WorldMapMode::Political);
+            const auto deadline = SDL_GetTicks() + 30000;
+            while (!linkedMap.prepareTerrain(renderer, linked) &&
+                   SDL_GetTicks() < deadline)
+            {
+                SDL_Delay(1);
+            }
+            PALADIN_CHECK(linkedMap.terrainLocalDetailReady());
+            linked.time().advanceMinutes(12 * 60);
+            Camera2D linkedCamera(65, 38);
+            linkedCamera.setWorldZoom(1);
+            TileRenderMetrics linkedMetrics;
+            linkedMetrics.tilePixels = 8;
+            for (int i = 0; i < 16; ++i)
+            {
+                renderer.beginFrame();
+                linkedMap.render(renderer, linked, linkedCamera, linkedMetrics);
+            }
+            saveWorldReview(
+                native,
+                std::string("tweak-territory-") + origin + ".png"
+            );
+        }
         std::cout<<"PR25 world-surface, marker, map-mode and solar raster checks passed\n";
     }
 } // namespace Paladin::Test

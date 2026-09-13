@@ -129,7 +129,7 @@ namespace Paladin
         constexpr float informationBottomHeight = 48.0F;
 
         const float rowWidth =
-            categoryButtonWidth * static_cast<float>(bottomButtons_.size());
+            categoryButtonWidth * static_cast<float>(visibleCategoryCount());
 
         const float rowX =
             (static_cast<float>(viewportWidth) - rowWidth) * 0.5F;
@@ -137,7 +137,7 @@ namespace Paladin
         const float rowY =
             static_cast<float>(viewportHeight) - categoryButtonHeight;
 
-        for (std::size_t index = 0; index < bottomButtons_.size(); ++index)
+        for (std::size_t index = 0; index < visibleCategoryCount(); ++index)
         {
             bottomButtons_[index].setBounds(
                 {rowX + static_cast<float>(index) * categoryButtonWidth,
@@ -342,8 +342,10 @@ namespace Paladin
             button.pointerMoved(x, y);
         }
 
-        for (UiButton& button : bottomButtons_)
+        for (std::size_t category = 0; category < visibleCategoryCount();
+             ++category)
         {
+            UiButton& button = bottomButtons_[category];
             button.pointerMoved(x, y);
         }
 
@@ -401,8 +403,10 @@ namespace Paladin
             captured = button.pointerPressed(x, y) || captured;
         }
 
-        for (UiButton& button : bottomButtons_)
+        for (std::size_t category = 0; category < visibleCategoryCount();
+             ++category)
         {
+            UiButton& button = bottomButtons_[category];
             captured = button.pointerPressed(x, y) || captured;
         }
 
@@ -458,8 +462,10 @@ namespace Paladin
             return true;
         }
 
-        for (const UiButton& button : bottomButtons_)
+        for (std::size_t category = 0; category < visibleCategoryCount();
+             ++category)
         {
+            const UiButton& button = bottomButtons_[category];
             if (button.containsPoint(x, y))
             {
                 return true;
@@ -528,7 +534,7 @@ namespace Paladin
         {
             return topAction;
         }
-        for (std::size_t index = 0; index < bottomButtons_.size(); ++index)
+        for (std::size_t index = 0; index < visibleCategoryCount(); ++index)
         {
             if (bottomButtons_[index].pointerReleased(x, y))
             {
@@ -948,8 +954,10 @@ namespace Paladin
             }
         }
 
-        for (const UiButton& button : bottomButtons_)
+        for (std::size_t category = 0; category < visibleCategoryCount();
+             ++category)
         {
+            const UiButton& button = bottomButtons_[category];
             button.render(renderer, uiRenderer);
         }
 
@@ -1080,6 +1088,7 @@ namespace Paladin
     bool CityHud::optionIsVisible(std::size_t optionIndex) const noexcept
     {
         return optionIndex < menuOptions.size() &&
+               menuOptions[optionIndex].category < visibleCategoryCount() &&
                menuOptions[optionIndex].category == openCategory_;
     }
 
@@ -1087,8 +1096,9 @@ namespace Paladin
     {
         openCategory_ = CategoryCount;
 
-        for (UiButton& button : bottomButtons_)
+        for (std::size_t category = 0; category < CategoryCount; ++category)
         {
+            UiButton& button = bottomButtons_[category];
             button.setSelected(false);
         }
 

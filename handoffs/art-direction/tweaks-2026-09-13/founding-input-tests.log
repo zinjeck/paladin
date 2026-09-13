@@ -1,0 +1,7 @@
+world pan/zoom mean_ms=12.6077 worst_ms=33.4397
+Founded player settlement 2.
+Founded player settlement 3.
+Realm founding, name reload and fortress chooser checks passed
+UI-only check: placeholder rendering excluded.
+Fortress creation and AI map isolation routing passed
+Application routing smoke test passed.

@@ -1,5 +1,6 @@
 #include "rendering/CityRenderer.h"
 #include "rendering/BuildingView.h"
+#include "rendering/CityPixelView.h"
 #include "rendering/GrassPresentation.h"
 #include "rendering/WorldPixelGrid.h"
 #include "ui/UiTypes.h"
@@ -116,8 +117,8 @@ namespace Paladin
     void CityRenderer::render(
         Renderer& renderer,
         const SettlementMap& settlementMap,
-        const Camera2D& camera,
-        const TileRenderMetrics& metrics,
+        const Camera2D& authoritativeCamera,
+        const TileRenderMetrics& authoritativeMetrics,
         const SettlementObjectPlacementController& placementController,
         const SettlementCommandController& commandController,
         const SettlementCitizenState& citizens,
@@ -137,9 +138,23 @@ namespace Paladin
         }
         sprites_.load(renderer, artRoot);
         sprites_.setShadowsEnabled(presentation.shadowsVisible);
+        const CityPixelView view(
+            authoritativeCamera,
+            authoritativeMetrics.scaledTilePixels(authoritativeCamera.zoom()),
+            renderer.outputWidth(),
+            renderer.outputHeight()
+        );
+        const Camera2D& camera = view.source;
+        TileRenderMetrics metrics = authoritativeMetrics;
+        metrics.tilePixels /= view.scale;
         WorldPixelScene pixelScene(
             renderer,
-            metrics.scaledTilePixels(camera.zoom())
+            metrics.scaledTilePixels(camera.zoom()),
+            255,
+            0,
+            view.scale,
+            view.offsetX,
+            view.offsetY
         );
         sprites_.setTime(
             animationTimeOverride >= 0 ? animationTimeOverride

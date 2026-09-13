@@ -147,6 +147,11 @@ namespace Paladin
         double visualY() const noexcept;
     };
 
+    struct CitizenAncestry
+    {
+        CitizenId id, father, mother;
+    };
+
     struct PopulationSample
     {
         double gameMinute = 0;
@@ -158,6 +163,14 @@ namespace Paladin
         friend class SettlementCommerce;
 
     public:
+        static std::string_view maleName(std::uint64_t index) noexcept;
+        bool chooseFoundingRulerName(std::string_view name);
+        const std::vector<CitizenAncestry>& ancestors() const noexcept
+        {
+            return ancestors_;
+        }
+        void rememberAncestry(const SettlementCitizen& person);
+
         [[nodiscard]]
         bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);
 
@@ -237,6 +250,7 @@ namespace Paladin
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;
         std::vector<SettlementCitizen> citizens_;
+        std::vector<CitizenAncestry> ancestors_;
         IdGenerator<CitizenId> citizenIds_;
         std::uint64_t version_ = 0;
     };

@@ -163,6 +163,16 @@ namespace Paladin
                 );
                 c.ageMinutes = std::fmod(c.ageMinutes, policy.adultYearMinutes);
             }
+            const auto lifespan =
+                60 + GenerationNoise::mix(
+                         citizens.behaviorSeed_ ^ c.id.value() ^ 0xD1EULL
+                     ) % 31;
+            if (!c.child && c.ageYears >= lifespan)
+            {
+                c.health = 0;
+                index.erase(c.id);
+                changed = true;
+            }
             if (c.spouseId && !index.contains(c.spouseId))
             {
                 c.spouseId = {};

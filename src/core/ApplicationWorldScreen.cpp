@@ -5,10 +5,12 @@
 #include "rendering/Renderer.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
+#include "ui/BitmapFontRenderer.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
+#include "ui/GrayUiRenderer.h"
 #include "ui/SimulationSpeedControls.h"
 #include "ui/WorldHud.h"
 #include "world/World.h"
@@ -188,7 +190,100 @@ namespace Paladin
             simulationSpeedControls_->render(*renderer_, *grayUiRenderer_);
         }
 
+        if (!foundingPanel_->isOpen() &&
+            !settlementPlacementController_->isActive())
+        {
+            renderWorldRealmInspection();
+        }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
+    }
+
+    void Application::renderWorldRealmInspection()
+    {
+        const auto& world = simulation_->world();
+        const auto* city = world.settlement(inspectedWorldSettlementId_);
+        const auto* realm = city ? world.realm(city->ownerRealmId()) : nullptr;
+        if (!city || !realm || employmentPanel_->isOpen())
+        {
+            return;
+        }
+        const UiRectangle box{16, 182, 426, 360};
+        grayUiRenderer_->drawPanel(*renderer_, box);
+        float y = box.y + 16;
+        const auto line = [&](const std::string& text, float size = 2.0F)
+        {
+            const float measured =
+                BitmapFontRenderer{}.measureWidth(text, size);
+            const float fitted = measured > box.width - 28
+                                     ? size * (box.width - 28) / measured
+                                     : size;
+            grayUiRenderer_->drawLabel(*renderer_, text, box.x + 14, y, fitted);
+            y += 26;
+        };
+        line(std::string(realm->name()));
+        line(
+            std::string(city->name()) + " - " +
+                std::string(settlementKindName(city->kind())),
+            1.7F
+        );
+        line("Population " + std::to_string(city->population()), 1.8F);
+        const auto& ruler = realm->ruler;
+        line(
+            ruler.vacant ? "Ruler: vacant"
+                         : "Ruler: " + ruler.name + " (" +
+                               std::to_string(int(ruler.age)) + ")",
+            1.8F
+        );
+        line(
+            "Dynasty " + std::to_string(ruler.dynasty) + " / Reign " +
+                std::to_string(ruler.reign),
+            1.7F
+        );
+        const auto axis =
+            [&](const char* first, const char* second, const RulerAxis& value)
+        {
+            const float left = box.x + 14, width = box.width - 28;
+            constexpr float size = 1.4F;
+            grayUiRenderer_->drawLabel(*renderer_, first, left, y, size);
+            grayUiRenderer_->drawLabel(
+                *renderer_,
+                second,
+                left + width - BitmapFontRenderer{}.measureWidth(second, size),
+                y,
+                size
+            );
+            renderer_->fillRectangle(left, y + 17, width, 5, {48, 54, 65, 255});
+            renderer_->fillRectangle(
+                left + width * .5F,
+                y + 15,
+                1,
+                9,
+                {131, 140, 150, 255}
+            );
+            // The first pole is on the left: a larger first() value moves left.
+            if (!ruler.vacant)
+            {
+                const float marker =
+                    left + float(value.opposite()) * (width - 6);
+                renderer_->fillRectangle(
+                    marker,
+                    y + 13,
+                    6,
+                    13,
+                    {255, 215, 131, 255}
+                );
+            }
+            y += 43;
+        };
+        axis("Militarism", "Pacifism", ruler.personality.militarism);
+        axis("Isolationism", "Mercantilism", ruler.personality.isolationism);
+        axis(
+            "Authoritarianism",
+            "Libertarianism",
+            ruler.personality.authoritarianism
+        );
+        axis("Elitism", "Egalitarianism", ruler.personality.elitism);
+        line("Click elsewhere or Esc to close", 1.4F);
     }
 
     void Application::renderWorldManagement()

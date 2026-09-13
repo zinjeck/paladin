@@ -279,10 +279,10 @@ namespace Paladin
             }
 
             // The sun is deliberately composited only after both pixel-scene
-            // scopes have ended, at native output resolution. It is analytically
-            // clipped against the globe/atmosphere silhouette, so painter order
-            // cannot place it over the planet even though this pass escapes the
-            // nearest-neighbor world lattice. Fade it out before the local
+            // scopes have ended, at native output resolution. It is
+            // analytically clipped at the solid globe; camera bloom may spill
+            // over the edge. Optical effects remain outside the
+            // nearest-neighbor world lattice. Fade them out before the local
             // tangent presentation becomes dominant.
             const float celestialWeight = std::clamp(
                 (.55F - localWeight) / .45F,

@@ -1,0 +1,3 @@
+Actual game camera benchmark: renderer=direct3d11 local_map=576x576 realms=44 settlements=150
+continuous_zoom frames=120 mean_ms=4.01 p95_ms=7.049 worst_ms=174.56
+fast_scroll frames=120 mean_ms=2.82284 p95_ms=5.517 worst_ms=5.8093

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include "world/SettlementKind.h"
 #include "world/WorldTilePosition.h"
 
 #include <optional>
@@ -14,7 +15,8 @@ namespace Paladin
     public:
         void beginSelection(
             RealmId ownerRealmId = {},
-            bool additional = false
+            bool additional = false,
+            SettlementKind kind = SettlementKind::City
         ) noexcept;
         void cancelSelection() noexcept;
 
@@ -44,6 +46,7 @@ namespace Paladin
         std::optional<WorldTilePosition> lockedPosition() const noexcept;
 
     private:
+        SettlementKind kind_ = SettlementKind::City;
         bool selecting_ = false;
         bool additional_ = false;
         std::optional<WorldTilePosition> hoveredPosition_;

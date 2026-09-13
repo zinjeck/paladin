@@ -2,6 +2,7 @@
 
 #include "rendering/Renderer.h"
 #include "ui/GrayUiRenderer.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,6 +40,16 @@ namespace Paladin
         selectedOriginIndex_.reset();
         colorPickerTarget_ = ColorPickerTarget::None;
         showRealmStep();
+    }
+
+    void FoundingPanel::openSettlementChoice()
+    {
+        openForSettlement();
+        step_ = FoundingPanelStep::SettlementType;
+        settlementKind_ = SettlementKind::City;
+        capitalNameField_.setFocused(false);
+        rightButton_.setText("Select region");
+        refreshButtonState();
     }
 
     void FoundingPanel::openForSettlement()
@@ -93,6 +104,7 @@ namespace Paladin
         leftButton_.cancelPress();
         rightButton_.cancelPress();
         pickerDoneButton_.cancelPress();
+        rulerReloadButton_.cancelPress();
         flagStrokeActive_ = false;
     }
 
@@ -119,7 +131,8 @@ namespace Paladin
         const float panelHeight =
             realmStep
                 ? std::min(680.0F, static_cast<float>(viewportHeight) - 24.0F)
-                : 300.0F;
+                : (step_ == FoundingPanelStep::SettlementType ? 380.0F
+                                                              : 300.0F);
 
         panelBounds_ = {
             (static_cast<float>(viewportWidth) - panelWidth) * 0.5F,
@@ -162,21 +175,31 @@ namespace Paladin
         flagColorBounds_ =
             {flagX + 148.0F, panelBounds_.y + 508.0F, 44.0F, 44.0F};
 
-        constexpr float originGap = 18.0F;
         const float originX = panelBounds_.x + 224.0F;
-        const float originAreaWidth = panelBounds_.width - 256.0F;
-        const float originWidth =
-            (originAreaWidth -
-             originGap * static_cast<float>(originCount - 1)) /
-            static_cast<float>(originCount);
-
+        const float originWidth = (panelBounds_.width - 280.0F) * .53F;
         for (std::size_t index = 0; index < originCount; ++index)
-        {
             originBounds_[index] = {
-                originX + static_cast<float>(index) * (originWidth + originGap),
-                panelBounds_.y + 304.0F,
+                originX,
+                panelBounds_.y + 304 + float(index) * 86,
                 originWidth,
-                190.0F
+                72
+            };
+        rulerBounds_ = {
+            originX + originWidth + 22,
+            panelBounds_.y + 304,
+            panelBounds_.width - 256 - originWidth - 22,
+            72
+        };
+        rulerReloadButton_.setBounds(
+            {rulerBounds_.x, rulerBounds_.y + 88, rulerBounds_.width, 44}
+        );
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            settlementKindBounds_[i] = {
+                panelBounds_.x + 32 + float(i) * (panelWidth - 48) / 2,
+                panelBounds_.y + 100,
+                (panelWidth - 80) / 2,
+                100
             };
         }
 
@@ -232,6 +255,11 @@ namespace Paladin
 
         leftButton_.pointerMoved(x, y);
         rightButton_.pointerMoved(x, y);
+        if (mode_ == FoundingPanelMode::Founding &&
+            step_ == FoundingPanelStep::Realm)
+        {
+            rulerReloadButton_.pointerMoved(x, y);
+        }
         hoveredOriginIndex_.reset();
         hoveredFlagCell_.reset();
         mapColorHovered_ = mapColorBounds_.contains(x, y);
@@ -331,6 +359,22 @@ namespace Paladin
             cultureNameField_.setFocused(false);
         }
 
+        if (mode_ == FoundingPanelMode::Founding &&
+            step_ == FoundingPanelStep::Realm)
+        {
+            static_cast<void>(rulerReloadButton_.pointerPressed(x, y));
+        }
+        if (step_ == FoundingPanelStep::SettlementType)
+        {
+            for (std::size_t i = 0; i < 2; ++i)
+            {
+                if (settlementKindBounds_[i].contains(x, y))
+                {
+                    settlementKind_ = i == 0 ? SettlementKind::City
+                                             : SettlementKind::Fortress;
+                }
+            }
+        }
         static_cast<void>(leftButton_.pointerPressed(x, y));
         static_cast<void>(rightButton_.pointerPressed(x, y));
         refreshButtonState();
@@ -350,6 +394,12 @@ namespace Paladin
             return FoundingPanelAction::None;
         }
 
+        if (mode_ == FoundingPanelMode::Founding &&
+            step_ == FoundingPanelStep::Realm &&
+            rulerReloadButton_.pointerReleased(x, y))
+        {
+            rulerNameIndex_ = (rulerNameIndex_ + 1) % 100;
+        }
         pressedOriginIndex_.reset();
         const bool leftClicked = leftButton_.pointerReleased(x, y);
         const bool rightClicked = rightButton_.pointerReleased(x, y);
@@ -386,6 +436,10 @@ namespace Paladin
             return FoundingPanelAction::None;
         }
 
+        if (step_ == FoundingPanelStep::SettlementType)
+        {
+            return FoundingPanelAction::SelectRegion;
+        }
         return canConfirm() ? FoundingPanelAction::Confirm
                             : FoundingPanelAction::None;
     }
@@ -399,6 +453,7 @@ namespace Paladin
         colorPickerTarget_ = ColorPickerTarget::None;
         draggedColorChannel_.reset();
         pickerDoneButton_.cancelPress();
+        rulerReloadButton_.cancelPress();
         return true;
     }
 
@@ -477,7 +532,8 @@ namespace Paladin
             trimFoundingName(capitalNameField_.text()),
             selectedMapColor_,
             std::string(originId),
-            flag_
+            flag_,
+            std::string(SettlementCitizenState::maleName(rulerNameIndex_))
         };
     }
 
@@ -605,7 +661,7 @@ namespace Paladin
 
             uiRenderer.drawLabel(
                 renderer,
-                "CHOOSE A STARTING FORM",
+                "STARTING FORM",
                 panelBounds_.x + 224.0F,
                 panelBounds_.y + 272.0F,
                 2.5F,
@@ -623,6 +679,26 @@ namespace Paladin
                 );
             }
 
+            if (mode_ == FoundingPanelMode::Founding)
+            {
+                uiRenderer.drawLabel(
+                    renderer,
+                    "RULER",
+                    rulerBounds_.x,
+                    panelBounds_.y + 272,
+                    2.5F
+                );
+                uiRenderer.drawChoiceCard(
+                    renderer,
+                    rulerBounds_,
+                    SettlementCitizenState::maleName(rulerNameIndex_),
+                    false,
+                    false,
+                    true
+                );
+                rulerReloadButton_.render(renderer, uiRenderer);
+            }
+
             if (!canContinueFromRealm())
             {
                 uiRenderer.drawLabel(
@@ -632,6 +708,41 @@ namespace Paladin
                     panelBounds_.y + 565.0F,
                     2.0F,
                     {190, 190, 196, 255}
+                );
+            }
+        }
+        else if (step_ == FoundingPanelStep::SettlementType)
+        {
+            heading("FOUND A NEW SETTLEMENT", panelBounds_, 3.5F);
+            for (std::size_t i = 0; i < 2; ++i)
+            {
+                uiRenderer.drawChoiceCard(
+                    renderer,
+                    settlementKindBounds_[i],
+                    i == 0 ? "City" : "Fortress",
+                    false,
+                    false,
+                    settlementKind_ == (i == 0 ? SettlementKind::City
+                                               : SettlementKind::Fortress)
+                );
+            }
+            uiRenderer.drawLabel(
+                renderer,
+                settlementKind_ == SettlementKind::Fortress
+                    ? "COMPACT MAP, STRONGER TERRITORIAL CONTROL"
+                    : "FULL CITY MAP AND CONSTRUCTION OPTIONS",
+                panelBounds_.x + 32,
+                panelBounds_.y + 220,
+                2.0F
+            );
+            if (settlementKind_ == SettlementKind::Fortress)
+            {
+                uiRenderer.drawLabel(
+                    renderer,
+                    "FINITE STARTING SUPPLIES",
+                    panelBounds_.x + 32,
+                    panelBounds_.y + 248,
+                    2.0F
                 );
             }
         }
@@ -658,7 +769,10 @@ namespace Paladin
             );
             uiRenderer.drawLabel(
                 renderer,
-                "CITY NAME",
+                mode_ == FoundingPanelMode::NewSettlement &&
+                        settlementKind_ == SettlementKind::Fortress
+                    ? "FORTRESS NAME"
+                    : "CITY NAME",
                 panelBounds_.x + 32.0F,
                 panelBounds_.y + 123.0F
             );
@@ -778,7 +892,8 @@ namespace Paladin
     void FoundingPanel::refreshButtonState()
     {
         rightButton_.setEnabled(
-            mode_ == FoundingPanelMode::Founding &&
+            step_ == FoundingPanelStep::SettlementType ? true
+            : mode_ == FoundingPanelMode::Founding &&
                     step_ == FoundingPanelStep::Realm
                 ? canContinueFromRealm()
                 : canConfirm()

@@ -2,6 +2,7 @@
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
+#include "world/RealmRuler.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <algorithm>
@@ -14,6 +15,9 @@ namespace Paladin
     class Realm
     {
     public:
+        bool aiControlled = false;
+        RealmScale scale = RealmScale::Small;
+        RealmRuler ruler;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
         explicit Realm(RealmId id) noexcept : id_(id) {}
 

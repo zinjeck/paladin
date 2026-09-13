@@ -113,5 +113,6 @@ namespace Paladin
         MapColor mapColor;
         std::string realmOriginId;
         RealmFlag flag;
+        std::string rulerName;
     };
 } // namespace Paladin

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/SettlementKind.h"
 #include "world/settlements/ResourceStockpile.h"
 #include "world/settlements/SettlementEconomy.h"
 #include "world/settlements/SettlementPopulation.h"
@@ -12,6 +13,7 @@ namespace Paladin
 {
     struct SettlementFoundationProfile
     {
+        SettlementKind kind = SettlementKind::City;
         std::uint64_t initialPopulation = 100;
         std::uint64_t citizenSeed = 0;
         std::uint64_t initialDetailedCitizenCount = 8;

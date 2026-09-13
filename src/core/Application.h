@@ -53,6 +53,8 @@ namespace Paladin
         Application& operator=(const Application&) = delete;
 
         int run();
+        // Opt-in, bounded diagnostic in the actual game executable.
+        int runCameraBenchmark();
 
     private:
         friend struct ApplicationSmokeTest;
@@ -131,6 +133,7 @@ namespace Paladin
 
         void cancelFoundingFlow();
         void confirmFoundingFlow();
+        void beginAdditionalSettlementSelection();
 
         void updateCameraMovement(double frameDeltaSeconds);
         void updateCameraZoom(double frameDeltaSeconds);
@@ -195,6 +198,8 @@ namespace Paladin
         void renderWorldManagement();
         std::unique_ptr<Camera2D> savedWorldCamera_;
         SettlementId activeCitySettlementId_;
+        SettlementId inspectedWorldSettlementId_;
+        void renderWorldRealmInspection();
         bool cityHudCapturedPointer_ = false;
         bool globePointerDown_ = false, globeDragging_ = false;
         int worldNavigatorPress_ = 0;
