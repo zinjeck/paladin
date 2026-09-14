@@ -29,22 +29,6 @@ jobs:
           -A x64
           -DPALADIN_BUILD_APPLICATION_SMOKE_TESTS=OFF
 
-      # Temporary continuation diagnostic; removed before the feature is ready.
-      - name: Capture reproducible baseline
-        shell: pwsh
-        run: |
-          git archive --format=tar --output=paladin-source.tar HEAD
-          tar -cf paladin-dependencies.tar --exclude=.git -C build/_deps sdl3-src sdl3_ttf-src sdl3_image-src
-
-      - name: Upload continuation baseline
-        uses: actions/upload-artifact@v4
-        with:
-          name: paladin-continuation-baseline
-          path: |
-            paladin-source.tar
-            paladin-dependencies.tar
-          retention-days: 1
-
       - name: Build Paladin and tests
         run: >-
           cmake --build build
@@ -86,7 +70,7 @@ jobs:
       - name: Require focused world regression evidence
         shell: pwsh
         run: |
-          $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv")
+          $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv", "pr26-military-panel.png", "pr26-world-city.png", "pr26-world-marching.png", "pr26-walk-0.png", "pr26-gather-2.png", "pr26-sleep-close.png", "pr26-sleep-normal.png", "pr26-ui-states.png")
           foreach ($file in $required) {
             if (-not (Test-Path "art-review/$file")) { throw "Missing mandatory render evidence: $file" }
           }

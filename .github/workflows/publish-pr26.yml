@@ -1,0 +1,29 @@
+name: PR26 exact-source publication (temporary)
+on:
+  pull_request:
+    branches: [main]
+    paths: ['tools/pr26-publication/**']
+permissions:
+  contents: write
+concurrency:
+  group: paladin-pr26-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event.pull_request.number == 26 && github.event.pull_request.head.ref == 'feat/complete-ui-military-food-chain' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Preserve repository bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pixel authoring dependency
+        run: python -m pip install Pillow
+      - name: Verify and publish exact implementation to the same PR
+        run: python tools/pr26-publication/publish.py
