@@ -92,6 +92,7 @@ namespace Paladin
     struct SettlementIdTag;
     struct RealmIdTag;
     struct ArmyIdTag;
+    struct SoldierIdTag;
     struct WorldRoadIdTag;
     struct EntityIdTag;
     struct CultureIdTag;
@@ -103,6 +104,7 @@ namespace Paladin
     using SettlementId = StrongId<SettlementIdTag>;
     using RealmId = StrongId<RealmIdTag>;
     using ArmyId = StrongId<ArmyIdTag>;
+    using SoldierId = StrongId<SoldierIdTag>;
     using WorldRoadId = StrongId<WorldRoadIdTag>;
     using EntityId = StrongId<EntityIdTag>;
     using CitizenId = EntityId;
