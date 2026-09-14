@@ -22,6 +22,9 @@ namespace Paladin
         constexpr std::array<SettlementConstructionResourceCost, 1>
             stockpileTileCosts{{{SettlementResourceTypes::Lumber, 1}}};
         constexpr std::array<SettlementConstructionResourceCost, 2>
+            grainFarmCosts{{{SettlementResourceTypes::Lumber, 4},
+                            {SettlementResourceTypes::Wheat, 2}}};
+        constexpr std::array<SettlementConstructionResourceCost, 2>
             marketTileCosts{
                 {{SettlementResourceTypes::Lumber, 1},
                  {SettlementResourceTypes::Stone, 1, 12}}
@@ -40,7 +43,7 @@ namespace Paladin
             d.visual.iconHeight = float(d.previewHeight);
             return d;
         }
-        constexpr std::array<SettlementObjectDefinition, 10>
+        constexpr std::array<SettlementObjectDefinition, 12>
             rawObjectDefinitions{
                 {enclosed(
                      {SettlementObjectTypes::CityKeep,
@@ -164,8 +167,8 @@ namespace Paladin
                   false,
                   false,
                   SettlementObjectPlacementLayer::Structure,
-                  {{115, 87, 15}, {214, 176, 46}, 2.0F, 2.0F},
-                  initialConstructionResourceCosts,
+                 {{115, 87, 15}, {214, 176, 46}, 2.0F, 2.0F},
+                  grainFarmCosts,
                   false},
                  {SettlementObjectTypes::Pastureland,
                   "Pastureland",
@@ -219,7 +222,21 @@ namespace Paladin
                   SettlementObjectPlacementLayer::Structure,
                   {{99, 62, 75}, {189, 134, 76}, 4.0F, 4.0F},
                   initialConstructionResourceCosts,
-                  false}}
+                  false},
+                 enclosed({SettlementObjectTypes::Barracks, "Barracks",
+                      SettlementObjectCategory::Rule, 1,
+                      SettlementFootprintSelectionMode::DragRectangle,
+                      3, 3, 3, 3, false, false, false, false,
+                      SettlementObjectPlacementLayer::Structure,
+                      {{57,70,88}, {215,224,227}, 3.0F, 3.0F},
+                      houseConstructionResourceCosts}),
+                 enclosed({SettlementObjectTypes::ArmySupplyDepot, "Army Supply Depot",
+                      SettlementObjectCategory::Logistics, 2,
+                      SettlementFootprintSelectionMode::DragRectangle,
+                      3, 3, 3, 3, false, false, false, false,
+                      SettlementObjectPlacementLayer::Structure,
+                      {{57,70,88}, {215,224,227}, 3.0F, 3.0F},
+                      houseConstructionResourceCosts})}
             };
         constexpr auto objectDefinitions = []
         {

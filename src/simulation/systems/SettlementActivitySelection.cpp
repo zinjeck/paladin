@@ -508,7 +508,7 @@ namespace Paladin
             {
                 const auto* definition =
                     SettlementResourceCatalog::definition(goods.resource);
-                if (definition && definition->edible &&
+                if (definition && map.logistics.canEat(goods.resource) &&
                     map.logistics.available(inventory.id, goods.resource) > 0)
                 {
                     foods.push_back(

@@ -109,13 +109,15 @@ namespace Paladin
         }
         else if (
             definition->targetKind == CommandTargetKind::Tree ||
-            definition->targetKind == CommandTargetKind::Rock
+            definition->targetKind == CommandTargetKind::Rock ||
+            definition->targetKind == CommandTargetKind::Gatherable
         )
         {
             const auto expected =
                 definition->targetKind == CommandTargetKind::Tree
                     ? NaturalFeatureKind::Tree
-                    : NaturalFeatureKind::Rock;
+                    : definition->targetKind == CommandTargetKind::Gatherable
+                        ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
             for (int y = area.topLeft.y; y < area.topLeft.y + area.height; ++y)
             {
                 for (int x = area.topLeft.x; x < area.topLeft.x + area.width;
@@ -264,7 +266,8 @@ namespace Paladin
                     }
                     const auto expected = kind == CommandTargetKind::Tree
                                               ? NaturalFeatureKind::Tree
-                                              : NaturalFeatureKind::Rock;
+                                              : kind == CommandTargetKind::Gatherable
+                                                  ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
                     return map.naturalFeatures()
                                .at(target.footprint.topLeft)
                                .kind != expected;
@@ -342,7 +345,8 @@ namespace Paladin
             const auto expected =
                 command.commandTypeId == SettlementCommandTypes::ChopTree
                     ? NaturalFeatureKind::Tree
-                    : NaturalFeatureKind::Rock;
+                    : command.commandTypeId == SettlementCommandTypes::Gather
+                        ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
             return map.naturalFeatures().at(tile).kind == expected;
         }
         return false;

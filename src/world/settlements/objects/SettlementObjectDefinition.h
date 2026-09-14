@@ -83,6 +83,8 @@ namespace Paladin
         inline constexpr std::string_view Pastureland = "pastureland";
         inline constexpr std::string_view Bakery = "bakery";
         inline constexpr std::string_view LoggingGrounds = "logging_grounds";
+        inline constexpr std::string_view Barracks = "barracks";
+        inline constexpr std::string_view ArmySupplyDepot = "army_supply_depot";
     } // namespace SettlementObjectTypes
 
     class SettlementObjectCatalog

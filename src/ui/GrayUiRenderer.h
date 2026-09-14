@@ -55,7 +55,7 @@ namespace Paladin
             float x,
             float y,
             float pixelSize = 3.0F,
-            RenderColor color = {242, 242, 244, 255}
+            RenderColor color = {239, 226, 207, 255}
         ) const;
 
         void drawTextField(

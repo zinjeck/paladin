@@ -8,6 +8,21 @@
 
 namespace Paladin
 {
+    bool SettlementLogistics::canEat(std::string_view resource) const
+    {
+        const auto* type = SettlementResourceCatalog::definition(resource);
+        if (!type || !type->edible) return false;
+        if (!type->emergencyOnly) return true;
+        for (const auto& inventory : inventories_)
+            if (inventory.kind != InventoryKind::Construction)
+                for (const auto& goods : inventory.goods)
+                {
+                    const auto* food = SettlementResourceCatalog::definition(goods.resource);
+                    if (goods.amount > 0 && food && food->edible && !food->emergencyOnly)
+                        return false;
+                }
+        return true;
+    }
     int SettlementInventory::amount(std::string_view resource) const
     {
         for (const auto& entry : goods)

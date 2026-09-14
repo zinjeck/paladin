@@ -45,6 +45,7 @@ namespace Paladin
             SettlementTilePosition tile;
             int frame;
             bool tree;
+            bool wheat = false;
         };
         struct Chunk
         {

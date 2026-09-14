@@ -1,4 +1,5 @@
 #include "simulation/systems/SettlementActivitySystem.h"
+#include "world/settlements/SettlementIndustry.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementHomeBeds.h"
 #include "world/settlements/SettlementMap.h"
@@ -268,7 +269,7 @@ namespace Paladin
                 SettlementResourceCatalog::definition(c.carriedResource);
             if (c.health > 0 && c.hunger >= c.foodSeekHunger &&
                 c.carriedAmount > 0 && cargoDefinition &&
-                cargoDefinition->edible &&
+                map.logistics.canEat(c.carriedResource) &&
                 map.logistics.consumeCarriedUnit(c.id))
             {
                 map.commerce.recordConsumption(c.carriedResource, 1);
@@ -969,14 +970,16 @@ namespace Paladin
                         c.task.workTile,
                         feature.kind == NaturalFeatureKind::Tree
                             ? SettlementResourceTypes::Lumber
-                            : SettlementResourceTypes::Stone,
+                            : feature.kind == NaturalFeatureKind::Wheat
+                                ? SettlementResourceTypes::Wheat : SettlementResourceTypes::Stone,
                         4,
                         minute
                     );
                     map.commerce.recordProduction(
                         feature.kind == NaturalFeatureKind::Tree
                             ? SettlementResourceTypes::Lumber
-                            : SettlementResourceTypes::Stone,
+                            : feature.kind == NaturalFeatureKind::Wheat
+                                ? SettlementResourceTypes::Wheat : SettlementResourceTypes::Stone,
                         4
                     );
                     map.naturalFeatures().harvest(c.task.workTile, minute);
@@ -1416,6 +1419,7 @@ namespace Paladin
         }
         for (const auto& [objectId, workers] : attendance)
         {
+            if (produceIndustry(map, objectId, workers, minute, elapsed)) continue;
             const auto* object = map.objectState().completedObject(objectId);
             if (object &&
                 object->objectTypeId == SettlementObjectTypes::Pastureland)

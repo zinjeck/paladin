@@ -12,7 +12,8 @@ namespace Paladin
     {
         None,
         Tree,
-        Rock
+        Rock,
+        Wheat
     };
     struct NaturalFeature
     {
@@ -55,7 +56,7 @@ namespace Paladin
     public:
         static constexpr int ChunkSide = 32;
         static constexpr int OverviewSide = 4;
-        std::array<std::uint8_t, 2> overview(
+        std::array<std::uint8_t, 3> overview(
             SettlementTilePosition p
         ) const noexcept
         {
@@ -106,7 +107,7 @@ namespace Paladin
         std::vector<NaturalFeature> features_;
         std::multimap<double, SettlementTilePosition> regrowth_;
         std::vector<int> chunkCounts_;
-        std::vector<std::array<std::uint8_t, 2>> overviewCounts_;
+        std::vector<std::array<std::uint8_t, 3>> overviewCounts_;
         std::vector<std::uint64_t> versions_;
         bool valid(SettlementTilePosition p) const noexcept;
         void changed(SettlementTilePosition p);

@@ -258,6 +258,20 @@ namespace Paladin
                         }
                     }
                 }
+                if (kind == NaturalFeatureKind::None && tile.terrain == TerrainType::Land &&
+                    (tile.biome == BiomeType::Plain || tile.biome == BiomeType::Forest || tile.biome == BiomeType::Hills) &&
+                    tile.temperature.value() > .3 && tile.temperature.value() < .8 &&
+                    grid.cityTileType({x,y}) != CityTileType::Beach)
+                {
+                    // Stable sparse 2–4 tile clumps, not independent noise per tile.
+                    const int cellX=x/16, cellY=y/16;
+                    const auto patch=GenerationNoise::mix(seed ^ (std::uint64_t(cellX)<<32) ^
+                                                         std::uint32_t(cellY) ^ 0x7768656174ULL);
+                    const int px=3+int((patch>>8)%10), py=3+int((patch>>16)%10);
+                    const int dx=x%16-px, dy=y%16-py;
+                    if (patch%7==0 && dx*dx+dy*dy<=4 && roll(seed,x,y,917)<.75)
+                        kind=NaturalFeatureKind::Wheat;
+                }
                 set({x, y}, kind);
             }
         }

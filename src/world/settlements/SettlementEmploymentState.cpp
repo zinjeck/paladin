@@ -20,14 +20,16 @@ namespace Paladin
     namespace
     {
         // Reference-area capacities follow Godot; stockpile staffing is new.
-        constexpr std::array<WorkplaceDefinition, 7> definitions{
+        constexpr std::array<WorkplaceDefinition, 9> definitions{
             MarketWorkplace,
             StockpileWorkplace,
             FisheryWorkplace,
             WheatFarmWorkplace,
             PasturelandWorkplace,
             BakeryWorkplace,
-            LoggingGroundsWorkplace
+            LoggingGroundsWorkplace,
+            WorkplaceDefinition{SettlementObjectTypes::Barracks, 1, 4, 9, 100},
+            WorkplaceDefinition{SettlementObjectTypes::ArmySupplyDepot, 1, 1, 9, 150}
         };
     } // namespace
     std::span<const WorkplaceDefinition> workplaceDefinitions() noexcept

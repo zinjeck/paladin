@@ -118,6 +118,7 @@ namespace Paladin
         void consumeSite(ConstructionSiteId id);
         double total(std::string_view resource) const;
         double storedTotal(std::string_view resource) const;
+        bool canEat(std::string_view resource) const;
         std::uint64_t version() const
         {
             return version_;

@@ -1131,7 +1131,8 @@ namespace Paladin
                                      (variant * shades + int(variation % 17)) *
                                              2 +
                                          int(f.marked),
-                                     tree}
+                                     tree,
+                                     f.kind == NaturalFeatureKind::Wheat}
                                 );
                             }
                         }
@@ -1170,6 +1171,11 @@ namespace Paladin
                          << 3) |
                         4;
                     double treeScale = double(stride);
+                    if (f.wheat)
+                    {
+                        sprites.submit(queue, projection, "wheat_farm.crop", x, y, id, .75);
+                        continue;
+                    }
                     const double rockScale =
                         .68 +
                         (GenerationNoise::mix(id ^ map.generationSeed()) % 5) *

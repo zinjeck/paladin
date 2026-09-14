@@ -1,4 +1,5 @@
 #include "ui/GrayUiRenderer.h"
+#include "ui/PaladinUiStyle.h"
 
 #include <algorithm>
 
@@ -52,25 +53,25 @@ namespace Paladin
         std::string_view skinId
     ) const
     {
-        RenderColor fillColor{78, 78, 82, 255};
+        RenderColor fillColor{32, 44, 67, 255};
 
         if (!enabled)
         {
-            fillColor = {56, 56, 59, 85};
+            fillColor = {53, 56, 62, 255};
         }
         else if (selected)
         {
-            fillColor = {92, 102, 112, 255};
+            fillColor = {48, 69, 93, 255};
         }
 
         if (enabled && hovered)
         {
-            fillColor = {104, 104, 110, 255};
+            fillColor = {70, 98, 125, 255};
         }
 
         if (enabled && pressed)
         {
-            fillColor = {58, 58, 62, 255};
+            fillColor = {8, 15, 27, 255};
         }
 
         if (!drawButtonSprite(
@@ -83,21 +84,8 @@ namespace Paladin
                 enabled
             ))
         {
-            renderer.fillRectangle(
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height,
-                {150, 150, 156, static_cast<std::uint8_t>(enabled ? 255 : 100)}
-            );
-
-            renderer.fillRectangle(
-                bounds.x + 2.0F,
-                bounds.y + 2.0F,
-                bounds.width - 4.0F,
-                bounds.height - 4.0F,
-                fillColor
-            );
+            paladinFrame(renderer, bounds, fillColor,
+                         enabled && (selected || hovered), pressed);
         }
 
         constexpr float preferredTextPixelSize = 3.0F;
@@ -126,8 +114,8 @@ namespace Paladin
             bounds.x + (bounds.width - textWidth) * 0.5F,
             bounds.y + (bounds.height - textHeight) * 0.5F,
             textPixelSize,
-            enabled ? RenderColor{242, 242, 244, 255}
-                    : RenderColor{142, 142, 146, 255}
+            enabled ? RenderColor{239, 226, 207, 255}
+                    : RenderColor{154, 167, 175, 255}
         );
     }
 
@@ -147,21 +135,7 @@ namespace Paladin
         const UiRectangle& bounds
     ) const
     {
-        renderer.fillRectangle(
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
-            {166, 166, 172, 255}
-        );
-
-        renderer.fillRectangle(
-            bounds.x + 3.0F,
-            bounds.y + 3.0F,
-            bounds.width - 6.0F,
-            bounds.height - 6.0F,
-            {64, 64, 69, 248}
-        );
+        paladinFrame(renderer, bounds, {8,15,27,255});
     }
 
     void GrayUiRenderer::drawLabel(

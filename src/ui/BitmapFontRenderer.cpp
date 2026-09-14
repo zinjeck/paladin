@@ -13,13 +13,36 @@ namespace Paladin
 
         GlyphRows glyphRows(char character) noexcept
         {
-            if (character >= 'a' && character <= 'z')
-            {
-                character = static_cast<char>(character - 'a' + 'A');
-            }
-
             switch (character)
             {
+            // Open counters and modest terminals: everyday medieval lettering,
+            // not blackletter. Lowercase remains distinct from capitals.
+            case 'a': return {0,0,14,1,15,17,15};
+            case 'b': return {24,8,14,9,9,9,30};
+            case 'c': return {0,0,15,16,16,16,15};
+            case 'd': return {3,2,14,18,18,18,15};
+            case 'e': return {0,0,14,17,31,16,15};
+            case 'f': return {6,9,8,28,8,8,28};
+            case 'g': return {0,14,17,17,15,1,14};
+            case 'h': return {24,8,14,9,9,9,27};
+            case 'i': return {4,0,12,4,4,4,14};
+            case 'j': return {2,0,6,2,2,18,12};
+            case 'k': return {24,8,9,10,12,10,27};
+            case 'l': return {12,4,4,4,4,4,14};
+            case 'm': return {0,0,26,21,21,21,21};
+            case 'n': return {0,0,30,9,9,9,27};
+            case 'o': return {0,0,14,17,17,17,14};
+            case 'p': return {0,30,9,9,14,8,28};
+            case 'q': return {0,15,18,18,14,2,7};
+            case 'r': return {0,0,22,9,8,8,28};
+            case 's': return {0,0,15,16,14,1,30};
+            case 't': return {8,8,28,8,8,9,6};
+            case 'u': return {0,0,18,18,18,18,15};
+            case 'v': return {0,0,17,17,17,10,4};
+            case 'w': return {0,0,17,17,21,21,10};
+            case 'x': return {0,0,17,10,4,10,17};
+            case 'y': return {0,17,17,17,15,1,14};
+            case 'z': return {0,0,31,2,4,8,31};
             case 'A':
                 return {14, 17, 17, 31, 17, 17, 17};
             case 'B':
@@ -59,7 +82,7 @@ namespace Paladin
             case 'S':
                 return {15, 16, 16, 14, 1, 1, 30};
             case 'T':
-                return {31, 4, 4, 4, 4, 4, 4};
+                return {31, 21, 4, 4, 4, 4, 14};
             case 'U':
                 return {17, 17, 17, 17, 17, 17, 14};
             case 'V':

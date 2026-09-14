@@ -10,6 +10,7 @@ namespace Paladin
         std::string_view id;
         std::string_view displayName;
         bool edible = false;
+        bool emergencyOnly = false;
     };
 
     namespace SettlementResourceTypes
@@ -20,6 +21,9 @@ namespace Paladin
         inline constexpr std::string_view Materials = "materials";
         inline constexpr std::string_view Stone = "stone";
         inline constexpr std::string_view Lumber = "lumber";
+        inline constexpr std::string_view Wheat = "wheat";
+        inline constexpr std::string_view Bread = "bread";
+        inline constexpr std::string_view Rations = "rations";
     } // namespace SettlementResourceTypes
 
     class SettlementResourceCatalog
