@@ -1,4 +1,5 @@
 #include "ui/BitmapFontRenderer.h"
+#include "ui/UiSerifGlyphs.h"
 
 #include <array>
 #include <cmath>
@@ -167,7 +168,16 @@ namespace Paladin
             return 0.0F;
         }
 
-        return (static_cast<float>(text.size()) * 6.0F - 1.0F) * pixelSize;
+        if (pixelSize < 2.F)
+            return (static_cast<float>(text.size()) * 6.0F - 1.0F) * pixelSize;
+        float width=0;
+        for (const char c : text)
+        {
+            if (const auto* serif=UiDetail::serifGlyph(c))
+                width += (UiDetail::serifSpan(*serif).second + 2) * pixelSize * .5F;
+            else width += (c==' ' ? 3.F : 6.F) * pixelSize;
+        }
+        return width-pixelSize;
     }
 
     void BitmapFontRenderer::drawText(
@@ -186,15 +196,20 @@ namespace Paladin
         for (const char character : text)
         {
             const GlyphRows rows = glyphRows(character);
+            const auto* serif = pixelSize >= 2.F && renderer.currentPixelPitch() <= 1.0
+                ? UiDetail::serifGlyph(character) : nullptr;
+            const std::size_t rowCount = serif ? serif->size() : rows.size();
+            const std::size_t columnCount = serif ? 9 : 5;
+            const float stroke = serif ? pixelSize * .5F : pixelSize;
+            const auto span = serif ? UiDetail::serifSpan(*serif) : std::pair<int,int>{0,5};
 
-            for (std::size_t row = 0; row < rows.size(); ++row)
+            for (std::size_t row = 0; row < rowCount; ++row)
             {
-                for (std::size_t column = 0; column < 5; ++column)
+                for (std::size_t column = 0; column < columnCount; ++column)
                 {
-                    const std::uint8_t bit =
-                        static_cast<std::uint8_t>(1U << (4U - column));
+                    const std::uint16_t bit = std::uint16_t(1U << (columnCount - 1 - column));
 
-                    if ((rows[row] & bit) == 0)
+                    if (((serif ? (*serif)[row] : rows[row]) & bit) == 0)
                     {
                         continue;
                     }
@@ -202,22 +217,23 @@ namespace Paladin
                     // Shared rounded edges avoid gaps between adjacent
                     // bitmap pixels when a label uses a fractional scale.
                     const float left = std::round(
-                        cursorX + static_cast<float>(column) * pixelSize
+                        cursorX + (static_cast<float>(column)-span.first) * stroke
                     );
                     const float top =
-                        std::round(y + static_cast<float>(row) * pixelSize);
+                        std::round(y + static_cast<float>(row) * stroke);
                     const float right = std::round(
-                        cursorX + static_cast<float>(column + 1) * pixelSize
+                        cursorX + (static_cast<float>(column + 1)-span.first) * stroke
                     );
                     const float bottom =
-                        std::round(y + static_cast<float>(row + 1) * pixelSize);
+                        std::round(y + static_cast<float>(row + 1) * stroke);
                     rectangles.push_back(
                         {left, top, right - left, bottom - top}
                     );
                 }
             }
 
-            cursorX += 6.0F * pixelSize;
+            cursorX += serif ? (span.second+2)*stroke
+                : character==' ' && pixelSize>=2.F ? 3.F*pixelSize : 6.F*pixelSize;
         }
 
         renderer.fillRectangles(rectangles, color);

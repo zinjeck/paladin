@@ -569,7 +569,8 @@ namespace Paladin
         double x,
         double y,
         std::uint64_t stableId,
-        double scale
+        double scale,
+        int pose
     ) const
     {
         const auto* s = find(id);
@@ -611,7 +612,9 @@ namespace Paladin
                  0,
                  0,
                  s->texture.get(),
-                 frame(*s, projection.tilePixels >= AnimationDetailPixels)}
+                 pose >= 0 ? RenderRectangle{float((pose % s->frames) * (s->texture->width() / s->frames)), 0,
+                     float(s->texture->width() / s->frames), float(s->texture->height())}
+                     : frame(*s, projection.tilePixels >= AnimationDetailPixels)}
             );
         }
         return true;

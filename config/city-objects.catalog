@@ -21,7 +21,10 @@ bakery enclosed bakery.floor wall.adobe roof.thatch - 3 3 .75 1 30 65 32 65 0 db
 market modules market.floor - - market.stall 3 4 .65 .12 30 65 32 65 1 ca7e48 683724 .6 .45
 stockpile ground stockpile.floor - - - 2 2 .35 .12 30 65 32 50 1 d1a352 754d1f .6 .45
 fishing_grounds modules fishing_grounds.floor - - fishing_grounds.station 4 4 .3 .12 30 65 32 45 1 bd864c 633e4b .6 .45
-wheat_farm modules wheat_farm.floor - - wheat_farm.crop 2 2 .18 .08 20 35 24 30 1 d6b02e 73570f .6 .45
+wheat_farm modules wheat_farm.floor - - wheat_farm.crop 1 1 .18 .08 0 0 0 0 0 d6b02e 73570f .6 .45
 pastureland ground pastureland.floor - - - 1 1 0 .08 20 35 24 30 1 73b047 38611f .6 .45
 road ground road.floor - - - 1 1 0 .04 0 0 0 0 0 8f401a 4a1c0b .6 .45
 logging_grounds ground logging_grounds.floor - - logging_grounds.stack 3 3 0 .08 0 0 0 40 0 337a58 633e4b .6 .45
+
+barracks enclosed city_keep.floor wall.adobe roof.thatch - 3 5 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+army_supply_depot enclosed stockpile.floor wall.adobe roof.thatch - 3 3 .75 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal

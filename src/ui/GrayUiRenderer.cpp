@@ -2,6 +2,7 @@
 #include "ui/PaladinUiStyle.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace Paladin
 {
@@ -12,7 +13,7 @@ namespace Paladin
             0.0F,
             static_cast<float>(renderer.outputWidth()),
             static_cast<float>(renderer.outputHeight()),
-            {4, 9, 28, 255}
+            {8, 15, 27, 255}
         );
     }
 
@@ -39,7 +40,7 @@ namespace Paladin
         );
 
         fontRenderer_
-            .drawText(renderer, text, x, y, pixelSize, {245, 245, 245, 255});
+            .drawText(renderer, text, x, y, pixelSize, {239, 226, 207, 255});
     }
 
     void GrayUiRenderer::drawButton(
@@ -98,11 +99,9 @@ namespace Paladin
         const float availableTextWidth =
             std::max(1.0F, bounds.width - horizontalTextPadding);
 
-        const float textPixelSize =
-            textWidthAtPreferredSize > availableTextWidth
-                ? preferredTextPixelSize * availableTextWidth /
-                      textWidthAtPreferredSize
-                : preferredTextPixelSize;
+        const float textPixelSize = std::max(1.0F, std::floor(std::min({
+            preferredTextPixelSize, availableTextWidth / std::max(1.0F,fontRenderer_.measureWidth(text,1)),
+            std::max(1.0F,(bounds.height-10.0F)/7.0F)})));
 
         const float textWidth = fontRenderer_.measureWidth(text, textPixelSize);
 
@@ -135,7 +134,7 @@ namespace Paladin
         const UiRectangle& bounds
     ) const
     {
-        paladinFrame(renderer, bounds, {8,15,27,255});
+        paladinFrame(renderer, bounds, {32,44,67,255});
     }
 
     void GrayUiRenderer::drawLabel(
@@ -158,22 +157,7 @@ namespace Paladin
         bool focused
     ) const
     {
-        renderer.fillRectangle(
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
-            focused ? RenderColor{222, 222, 226, 255}
-                    : RenderColor{132, 132, 138, 255}
-        );
-
-        renderer.fillRectangle(
-            bounds.x + 2.0F,
-            bounds.y + 2.0F,
-            bounds.width - 4.0F,
-            bounds.height - 4.0F,
-            {43, 43, 47, 255}
-        );
+        paladinFrame(renderer,bounds,{8,15,27,255},focused,true);
 
         const std::string_view displayedText =
             text.empty() ? placeholder : text;
@@ -187,10 +171,9 @@ namespace Paladin
         const float availableWidth =
             std::max(1.0F, bounds.width - horizontalPadding);
 
-        const float pixelSize =
-            widthAtPreferredSize > availableWidth
-                ? preferredPixelSize * availableWidth / widthAtPreferredSize
-                : preferredPixelSize;
+        const float pixelSize = std::max(1.0F, std::floor(std::min({preferredPixelSize,
+            availableWidth / std::max(1.0F,fontRenderer_.measureWidth(displayedText,1)),
+            std::max(1.0F,(bounds.height-10)/7)})));
 
         const float textY =
             bounds.y + (bounds.height - 7.0F * pixelSize) * 0.5F;
@@ -201,8 +184,8 @@ namespace Paladin
             bounds.x + 10.0F,
             textY,
             pixelSize,
-            text.empty() ? RenderColor{142, 142, 148, 255}
-                         : RenderColor{244, 244, 246, 255}
+            text.empty() ? RenderColor{154, 167, 175, 255}
+                         : RenderColor{239, 226, 207, 255}
         );
 
         if (focused && !text.empty())
@@ -216,7 +199,7 @@ namespace Paladin
                 textY,
                 2.0F,
                 7.0F * pixelSize,
-                {244, 244, 246, 255}
+                {239, 226, 207, 255}
             );
         }
     }
@@ -230,9 +213,9 @@ namespace Paladin
     ) const
     {
         const RenderColor borderColor =
-            selected  ? RenderColor{250, 250, 252, 255}
-            : hovered ? RenderColor{194, 194, 200, 255}
-                      : RenderColor{112, 112, 118, 255};
+            selected  ? RenderColor{239, 226, 207, 255}
+            : hovered ? RenderColor{154, 167, 175, 255}
+                      : RenderColor{89, 102, 121, 255};
 
         const float borderWidth = selected ? 4.0F : 2.0F;
 
@@ -271,53 +254,11 @@ namespace Paladin
         bool selected
     ) const
     {
-        RenderColor borderColor{132, 132, 138, 255};
-        RenderColor fillColor{72, 72, 77, 255};
-
-        if (selected)
-        {
-            borderColor = {238, 238, 242, 255};
-            fillColor = {91, 91, 98, 255};
-        }
-        else if (hovered)
-        {
-            borderColor = {190, 190, 196, 255};
-            fillColor = {84, 84, 90, 255};
-        }
-
-        if (pressed)
-        {
-            fillColor = {55, 55, 60, 255};
-        }
-
-        const float borderWidth = selected ? 4.0F : 2.0F;
-
-        if (!drawButtonSprite(
-                renderer,
-                bounds,
-                "choice-card",
-                hovered,
-                pressed,
-                selected,
-                true
-            ))
-        {
-            renderer.fillRectangle(
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height,
-                borderColor
-            );
-
-            renderer.fillRectangle(
-                bounds.x + borderWidth,
-                bounds.y + borderWidth,
-                bounds.width - borderWidth * 2.0F,
-                bounds.height - borderWidth * 2.0F,
-                fillColor
-            );
-        }
+        const RenderColor body = pressed ? RenderColor{8,15,27,255} :
+            hovered ? RenderColor{70,98,125,255} : RenderColor{32,44,67,255};
+        constexpr float borderWidth = 2;
+        if (!drawButtonSprite(renderer, bounds, "choice-card", hovered, pressed, selected, true))
+            paladinFrame(renderer, bounds, body, selected || hovered, pressed);
         constexpr float labelAreaHeight = 46.0F;
 
         renderer.fillRectangle(
@@ -325,7 +266,7 @@ namespace Paladin
             bounds.y + bounds.height - labelAreaHeight - borderWidth,
             bounds.width - borderWidth * 2.0F,
             labelAreaHeight,
-            {48, 48, 53, 220}
+            {8, 15, 27, 220}
         );
 
         constexpr float preferredPixelSize = 3.0F;
@@ -338,7 +279,7 @@ namespace Paladin
             bounds.x + (bounds.width - textWidth) * 0.5F,
             bounds.y + bounds.height - labelAreaHeight + 12.0F,
             preferredPixelSize,
-            {244, 244, 246, 255}
+            {239, 226, 207, 255}
         );
     }
 } // namespace Paladin

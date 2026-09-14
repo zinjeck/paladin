@@ -38,6 +38,8 @@ namespace Paladin
         std::vector<SettlementTilePosition> productionWater;
         double productionProgress = 0;
         std::optional<SettlementTilePosition> door;
+        double cropReadyMinute = -1;
+        int grainRemaining = 0;
         int homeLevel = 1; // Reserved for future upgrades; no effects yet.
     };
 
@@ -179,6 +181,8 @@ namespace Paladin
         );
         bool demolish(SettlementObjectId, SettlementTilePosition tile);
         double accrueProduction(SettlementObjectId, double amount);
+        int prepareGrainHarvest(SettlementObjectId, double minute);
+        void takeGrainHarvest(SettlementObjectId, int amount, double minute);
         void rebuildOccupancy();
         std::size_t cancelConstructionWithin(
             const SettlementObjectFootprint& area

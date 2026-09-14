@@ -8,6 +8,7 @@
 #include "ui/CityHud.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/LedgerPanel.h"
+#include "ui/MilitaryPanel.h"
 #include "ui/SettlementInspectionPanel.h"
 #include <SDL3/SDL.h>
 namespace Paladin
@@ -26,6 +27,19 @@ namespace Paladin
     }
     bool Application::handleReportAction(CityHudAction action)
     {
+        if (action == CityHudAction::Military)
+        {
+            employmentPanel_->close(); ledgerPanel_->close();
+            settlementInspectionController_->clear();
+            settlementInspectionPanel_->clearLayout();
+            settlementObjectPlacementController_->cancelPlacement();
+            settlementCommandController_->cancel();
+            SDL_StopTextInput(window_->nativeHandle());
+            militaryPanel_->toggle(screen_ == Screen::City ? activeCitySettlementId_ : simulation_->presentedSettlementId());
+            militaryPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), simulation_->world(), simulation_->playerRealmId());
+            return true;
+        }
+        if (action != CityHudAction::None) militaryPanel_->close();
         if (action != CityHudAction::Ledger && action != CityHudAction::Events)
         {
             return false;

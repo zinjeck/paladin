@@ -17,7 +17,7 @@ namespace Paladin
         double minute
     ) const
     {
-        if (citizen.child || citizen.health <= 0 ||
+        if (citizen.child || citizen.militaryDeployed || citizen.health <= 0 ||
             citizen.youngDependents <= 0 || !citizen.insideHome ||
             citizen.task.kind != CitizenTaskKind::Care ||
             !policy.isWorkTime(minute))
@@ -50,7 +50,7 @@ namespace Paladin
         for (std::size_t i = 0; i < citizens_.size(); ++i)
         {
             auto& person = citizens_[i];
-            if (person.child || person.spouseId || person.health <= 0)
+            if (person.child || person.militaryDeployed || person.spouseId || person.health <= 0)
             {
                 continue;
             }
@@ -207,7 +207,7 @@ namespace Paladin
             const auto eligible = [&](const auto parent)
             {
                 return parent != index.end() && !people[parent->second].child &&
-                       people[parent->second].homeId == c.homeId;
+                       !people[parent->second].militaryDeployed && people[parent->second].homeId == c.homeId;
             };
             auto guardian = eligible(mother) ? mother : father;
             // Mother is always primary; father covers an essential absence
@@ -247,7 +247,7 @@ namespace Paladin
                     return false;
                 }
                 const auto& adult = people[parent->second];
-                return !adult.child && adult.homeId &&
+                return !adult.child && !adult.militaryDeployed && adult.homeId &&
                        adult.homeId == c.homeId && adult.insideHome &&
                        c.insideHome &&
                        (adult.task.kind == CitizenTaskKind::Care ||
@@ -384,7 +384,7 @@ namespace Paladin
                                   : -std::log1p(-chance) / 1440;
         for (auto& mother : people)
         {
-            if (mother.child || mother.sex != CitizenSex::Female ||
+            if (mother.child || mother.militaryDeployed || mother.sex != CitizenSex::Female ||
                 mother.ageYears >= policy.fertilityEndAge ||
                 mother.health <= policy.parentHealthThreshold || !mother.homeId)
             {
@@ -396,7 +396,7 @@ namespace Paladin
                 continue;
             }
             const auto& father = people[partner->second];
-            if (father.child || father.sex != CitizenSex::Male ||
+            if (father.child || father.militaryDeployed || father.sex != CitizenSex::Male ||
                 father.spouseId != mother.id ||
                 father.homeId != mother.homeId ||
                 father.health <= policy.parentHealthThreshold)

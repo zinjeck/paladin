@@ -818,6 +818,7 @@ namespace Paladin
                 }
                 for (const auto& goods : source.goods)
                 {
+                    if (!map.logistics.mayExport(map.objectState(), source, goods.resource)) continue;
                     const auto* resource =
                         SettlementResourceCatalog::definition(goods.resource);
                     if (market && (!resource || !resource->edible))

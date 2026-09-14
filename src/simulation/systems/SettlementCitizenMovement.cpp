@@ -70,7 +70,7 @@ namespace Paladin
             {
                 continue;
             }
-            if (citizen.child)
+            if (citizen.child || citizen.militaryDeployed)
             {
                 return false;
             }
@@ -121,7 +121,7 @@ namespace Paladin
         std::size_t requests = 0;
         for (auto& citizen : citizens_)
         {
-            if (!map.grid().isValidPosition(citizen.tilePosition))
+            if (citizen.militaryDeployed || !map.grid().isValidPosition(citizen.tilePosition))
             {
                 continue;
             }
@@ -178,6 +178,8 @@ namespace Paladin
                     travel,
                     citizen.stepDuration - citizen.stepProgress
                 );
+                citizen.walkDistance += used / std::max(1e-9, citizen.stepDuration) *
+                    std::hypot(double(next.x - citizen.tilePosition.x), double(next.y - citizen.tilePosition.y));
                 citizen.stepProgress += used;
                 travel -= used;
                 if (citizen.stepProgress + 1e-10 < citizen.stepDuration)

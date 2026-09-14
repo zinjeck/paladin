@@ -11,6 +11,7 @@
 
 #include "ui/BitmapFontRenderer.h"
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace Paladin
@@ -42,6 +43,7 @@ namespace Paladin
             renderer.outputWidth(),
             renderer.outputHeight()
         };
+        animationSeconds_ = sprites ? sprites->time() : 0;
         auto& sleeping = sleeping_;
         sleeping.clear();
         auto& fishing = fishing_;
@@ -49,6 +51,7 @@ namespace Paladin
 
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
+            if (citizen.militaryDeployed) continue;
             const double sleepOffset =
                 citizen.activity == CitizenActivity::Sleeping &&
                         citizen.insideHome
@@ -89,16 +92,29 @@ namespace Paladin
                     else if (type == "bakery") role = "baker";
                     else if (type == "market") role = "merchant";
                     else if (type == "stockpile") role = "porter";
+                    else if (type == "barracks") role = "militia";
+                    else if (type == "army_supply_depot") role = "porter";
                 }
             }
             if (!citizen.child && citizen.activity == CitizenActivity::Constructing)
                 role = "builder";
+            if (!citizen.child && citizen.task.kind == CitizenTaskKind::Gather) role = "logger";
+            if (citizen.soldierId) role = "militia";
             bool north = false;
             if (citizen.pathIndex < citizen.path.size())
                 north = citizen.path[citizen.pathIndex].y < citizen.visualY();
-            const std::string spriteId = std::string("citizen.") + role +
+            std::string spriteId = std::string("citizen.") + role +
                 (citizen.sex == CitizenSex::Female ? ".female." : ".male.") +
                 (north ? "back" : "front");
+            const bool walking = citizen.pathIndex < citizen.path.size();
+            const bool gathering = citizen.task.kind == CitizenTaskKind::Gather && !walking;
+            const bool working = !walking && (gathering || citizen.task.kind == CitizenTaskKind::Build);
+            const int pose = walking ? int(std::fmod(citizen.walkDistance, 1.0) * 4.0)
+                : working ? int(std::fmod(citizen.workAnimationMinutes, 8.0) * .5) : 0;
+            if ((walking || working) && sprites && sprites->find(spriteId + ".walk")) spriteId += ".walk";
+            const std::uint64_t actorKey = citizen.soldierId
+                ? (std::uint64_t(3) << 61) | citizen.soldierId.value()
+                : (std::uint64_t(1) << 62) | citizen.id.value();
             const bool custom =
                 tilePixels >= StaticDetailPixels && sprites &&
                 sprites->submit(
@@ -108,9 +124,34 @@ namespace Paladin
                     citizen.renderX(citizen.visualX(), interpolationAlpha) +
                         sleepOffset + .5,
                     citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
-                    (std::uint64_t(1) << 62) | citizen.id.value(),
-                    citizen.child ? .5 : 1
+                    actorKey,
+                    citizen.child ? .5 : 1,
+                    pose
                 );
+            if (working && tilePixels >= AnimationDetailPixels)
+            {
+                // Tools and impact flecks share the 16-art-pixel city raster.
+                // Quantized poses follow actual work time; pause freezes them.
+                const float p = float(tilePixels / 16.0);
+                const float x = float(centerX), y = float(centerY);
+                const int tipX[4]={6,9,9,7}, tipY[4]={-9,-6,-1,-4};
+                const auto pixel=[&](float px,float py,int w,int h,RenderColor color,int part)
+                { queue.submit({{x+px*p,y+py*p,w*p,h*p},color,
+                    citizen.renderY(citizen.visualY(),interpolationAlpha)+.5,actorKey,0,part}); };
+                const int tx=tipX[pose],ty=tipY[pose];
+                const int steps=std::max(std::abs(tx-3),std::abs(ty+3));
+                for(int i=0;i<=steps;++i)
+                    pixel(std::round(3+(tx-3)*float(i)/std::max(1,steps)),
+                          std::round(-3+(ty+3)*float(i)/std::max(1,steps)),1,1,{136,96,68,255},2);
+                pixel(float(tx-1),float(ty-1),3,2,{154,167,175,255},3);
+                pixel(float(tx-1),float(ty-1),2,1,{215,224,227,255},4);
+                if (pose==2)
+                {
+                    pixel(10,0,1,1,{213,164,84,255},5);
+                    pixel(12,-2,1,1,{167,141,114,255},5);
+                    pixel(10,-4,1,1,{235,196,107,255},5);
+                }
+            }
             if (tilePixels >= AnimationDetailPixels &&
                 citizen.activity == CitizenActivity::Sleeping)
             {
@@ -153,7 +194,7 @@ namespace Paladin
                       static_cast<float>(centerY) - markerSize * 0.5F,
                       markerSize,
                       markerSize},
-                     {210, 180, 140, 255},
+                     CitizenPlaceholderColor,
                      citizen.renderY(citizen.visualY(), interpolationAlpha) +
                          .5,
                      (std::uint64_t(1) << 62) | citizen.id.value()}
@@ -316,36 +357,34 @@ namespace Paladin
                 line.y,
                 line.x + line.dx * .7F,
                 line.y + line.dy * .7F - adultMarkerSize,
-                {123, 88, 54, 255}
+                {136, 96, 68, 255}
             );
             renderer.drawLine(
                 line.x + line.dx * .7F,
                 line.y + line.dy * .7F - adultMarkerSize,
                 line.x + line.dx,
                 line.y + line.dy,
-                {209, 216, 222, 255}
+                {215, 224, 227, 255}
             );
         }
-        const BitmapFontRenderer font;
-        const float scale = std::clamp(float(tilePixels) / 24, 1.0F, 2.0F);
-        for (const auto& [x, y] : sleeping_)
+        // Three authored 3x5 Zs, all one city-art-texel strokes. No font
+        // resampling or native-screen bypass. The silhouette stays readable at
+        // the closest zoom and rises in whole-art-pixel steps with world time.
+        const float p = float(tilePixels / 16.0);
+        constexpr unsigned glyph[5]={7,1,2,4,7};
+        for (const auto& [x,y] : sleeping_)
         {
-            font.drawText(
-                renderer,
-                "z",
-                x - 17 * scale,
-                y - 7 * scale,
-                scale * .75F,
-                {103, 185, 248, 255}
-            );
-            font.drawText(
-                renderer,
-                "ZZ",
-                x - 12 * scale,
-                y - 10 * scale,
-                scale,
-                {103, 185, 248, 255}
-            );
+            for (int z=0;z<3;++z)
+            {
+                const int lift=(int(std::fmod(animationSeconds_, 4.0)*.75)+z)%3;
+                const float ox=x+float(z*5-3)*p, oy=y-float(7+z*3+lift)*p;
+                for(int row=0;row<5;++row) for(int col=0;col<3;++col)
+                    if (glyph[row] & (1u<<(2-col)))
+                        renderer.fillRectangle(ox+(col+1)*p,oy+(row+1)*p,p,p,{8,15,27,255});
+                for(int row=0;row<5;++row) for(int col=0;col<3;++col)
+                    if (glyph[row] & (1u<<(2-col)))
+                        renderer.fillRectangle(ox+col*p,oy+row*p,p,p,{175,201,214,255});
+            }
         }
     }
 } // namespace Paladin

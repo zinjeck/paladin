@@ -89,6 +89,12 @@ namespace Paladin
             double minute = 0
         );
         bool consumeCarriedUnit(CitizenId citizen);
+        int convert(InventoryId id, std::string_view input,
+                    std::string_view output, int requested, double minute);
+        // Ingredients and military packs are not ordinary wholesale outputs.
+        bool mayExport(const SettlementObjectState&, const SettlementInventory&,
+                       std::string_view resource) const;
+
         bool consumeAvailable(
             InventoryId,
             std::string_view resource,

@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/MilitaryPanel.h"
 #include "core/SimulationClock.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementCommandController.h"
@@ -31,6 +32,8 @@ namespace Paladin
 {
     void Application::startWorldSession()
     {
+        militaryPanel_->close();
+        selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         simulation_ = std::make_unique<Simulation>();
 
@@ -77,6 +80,8 @@ namespace Paladin
 
     void Application::endWorldSession()
     {
+        militaryPanel_->close();
+        selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         debugConsole_->reset();
         cachedStats_.clear();
@@ -114,6 +119,8 @@ namespace Paladin
 
     void Application::enterPresentedSettlement()
     {
+        militaryPanel_->close();
+        selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         if (screen_ != Screen::World || !simulation_ || !camera_ ||
             !tileRenderMetrics_)
@@ -205,6 +212,8 @@ namespace Paladin
 
     void Application::returnToWorldFromSettlement()
     {
+        militaryPanel_->close();
+        selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         employmentPanel_->close();
         SDL_StopTextInput(window_->nativeHandle());

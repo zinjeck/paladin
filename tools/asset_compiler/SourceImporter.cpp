@@ -7,6 +7,14 @@
 namespace Paladin
 {
     using RenderColor = AssetPixel;
+    namespace
+    {
+        bool ignoredCatalogLine(const std::string& line)
+        {
+            const auto first = line.find_first_not_of(" \t\r\n");
+            return first == std::string::npos || line[first] == '#';
+        }
+    }
     void SourceImporter::load(ImportImages& renderer, const std::string& root)
     {
         if (loaded_)
@@ -42,7 +50,7 @@ namespace Paladin
         std::string rule;
         while (std::getline(colorRules, rule))
         {
-            if (rule.empty() || rule[0] == '#')
+            if (ignoredCatalogLine(rule))
             {
                 continue;
             }
@@ -63,7 +71,7 @@ namespace Paladin
         std::string lightLine;
         while (std::getline(lights, lightLine))
         {
-            if (lightLine.empty() || lightLine[0] == '#')
+            if (ignoredCatalogLine(lightLine))
             {
                 continue;
             }
@@ -94,7 +102,7 @@ namespace Paladin
         std::string partLine;
         while (std::getline(parts, partLine))
         {
-            if (partLine.empty() || partLine[0] == '#')
+            if (ignoredCatalogLine(partLine))
             {
                 continue;
             }
@@ -129,7 +137,7 @@ namespace Paladin
         std::string styleLine;
         while (std::getline(styles, styleLine))
         {
-            if (styleLine.empty() || styleLine[0] == '#')
+            if (ignoredCatalogLine(styleLine))
             {
                 continue;
             }
@@ -188,7 +196,7 @@ namespace Paladin
         while (std::getline(input, line))
         {
             ++number;
-            if (line.empty() || line[0] == '#')
+            if (ignoredCatalogLine(line))
             {
                 continue;
             }

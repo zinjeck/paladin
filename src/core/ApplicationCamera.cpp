@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/MilitaryPanel.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
@@ -482,6 +483,9 @@ namespace Paladin
 
     bool Application::activeHudContainsPoint(float x, float y) const noexcept
     {
+        if (militaryPanel_ && militaryPanel_->contains(x,y)) return true;
+        if (screen_ == Screen::World && selectedWorldArmy_ && militaryPanel_ && !militaryPanel_->isOpen() &&
+            UiRectangle{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70}.contains(x,y)) return true;
         if (ledgerPanel_->containsPoint(x, y))
         {
             return true;

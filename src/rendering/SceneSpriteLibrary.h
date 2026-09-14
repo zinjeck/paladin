@@ -94,7 +94,8 @@ namespace Paladin
             double x,
             double y,
             std::uint64_t stableId,
-            double scale = 1
+            double scale = 1,
+            int pose = -1
         ) const;
         // Repeated modules, never stretch one roof across an arbitrary
         // footprint.
