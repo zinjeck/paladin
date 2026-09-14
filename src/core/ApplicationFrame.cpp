@@ -188,6 +188,7 @@ namespace Paladin
         if (screen_ != Screen::MainMenu && simulation_)
         {
             ledgerPanel_->render(*renderer_, *grayUiRenderer_);
+            renderMilitary();
             renderDebug();
         }
         renderer_->endFrame();
@@ -225,6 +226,10 @@ namespace Paladin
             return handleMainMenuEvent(event);
         }
         if (controlsVisible && handleSimulationControlEvent(event))
+        {
+            return true;
+        }
+        if (handleMilitaryEvent(event))
         {
             return true;
         }

@@ -5,6 +5,7 @@
 
 namespace Paladin
 {
+    inline constexpr RenderColor CitizenPlaceholderColor{217,199,159,255};
     class SettlementAnimals;
     class Camera2D;
     class Renderer;
@@ -37,6 +38,7 @@ namespace Paladin
         };
         mutable std::vector<FishingLine> fishing_;
         mutable std::vector<std::pair<float, float>> sleeping_;
+        mutable double animationSeconds_ = 0;
         mutable SceneDrawQueue drawQueue_;
     };
 } // namespace Paladin

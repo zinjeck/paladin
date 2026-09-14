@@ -489,7 +489,7 @@ namespace Paladin
             capture(app, "presentation-interior.bmp");
             const auto uncovered =
                 pixel(renderer.outputWidth() / 2, renderer.outputHeight() / 2);
-            PALADIN_CHECK(uncovered.red == 210 && uncovered.green == 180);
+            PALADIN_CHECK(uncovered.red == CitizenPlaceholderColor.red && uncovered.green == CitizenPlaceholderColor.green);
             // Real indoor state, including front/corner tiles previously
             // covered by the full-height south wall.
             for (int y = 13; y < 16; ++y)
@@ -508,14 +508,14 @@ namespace Paladin
                         int(renderer.outputHeight() * .5 +
                             (y + .5 - camera.tileY()) * 64)
                     );
-                    if (occupant.red != 210 || occupant.green != 180)
+                    if (occupant.red != CitizenPlaceholderColor.red || occupant.green != CitizenPlaceholderColor.green)
                     {
                         std::cerr << "Hidden interior tile " << x << "," << y
                                   << " pixel " << int(occupant.red) << ","
                                   << int(occupant.green) << "\n";
                         capture(app, "presentation-interior-failure.bmp");
                     }
-                    PALADIN_CHECK(occupant.red == 210 && occupant.green == 180);
+                    PALADIN_CHECK(occupant.red == CitizenPlaceholderColor.red && occupant.green == CitizenPlaceholderColor.green);
                 }
             }
             capture(app, "presentation-interior-cutaway.bmp");
@@ -535,12 +535,12 @@ namespace Paladin
                 int(renderer.outputHeight() * .5 +
                     (11.5 - camera.tileY()) * 64);
             const auto behind = pixel(treeX, behindY);
-            PALADIN_CHECK(!(behind.red == 210 && behind.green == 180));
+            PALADIN_CHECK(!(behind.red == CitizenPlaceholderColor.red && behind.green == CitizenPlaceholderColor.green));
             SettlementActivityTestFixture::setRenderPerson(people, {10, 12});
             draw(12);
             const int frontY = behindY + 64;
             const auto front = pixel(treeX, frontY);
-            PALADIN_CHECK(front.red == 210 && front.green == 180);
+            PALADIN_CHECK(front.red == CitizenPlaceholderColor.red && front.green == CitizenPlaceholderColor.green);
             capture(app, "presentation-overlap.bmp");
             city.presentation.roofsVisible = true;
             draw(0);
@@ -2397,10 +2397,14 @@ namespace Paladin
                         << "render tile_px=" << tp << " cold_ms=" << coldMs
                         << " warm_ms=" << double(SDL_GetTicksNS() - start) / 2e6
                         << " items=" << city.submittedItems() << std::endl;
-                    if (tp <= 16)
+                    // The current art policy enables raised detail at ten
+                    // pixels per tile. The old <=16 assertion contradicted
+                    // SceneDetail.h and rejected intentional visible grass.
+                    if (tp < StaticDetailPixels)
                     {
                         PALADIN_CHECK(city.submittedItems() == 0);
                     }
+                    PALADIN_CHECK(city.submittedItems() < 20000);
                     PALADIN_CHECK(
                         tp >= StaticDetailPixels || city.submittedItems() < 2000
                     );

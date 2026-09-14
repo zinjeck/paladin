@@ -76,6 +76,7 @@ add_executable(Paladin
     src/core/ApplicationCityScreen.cpp
     src/core/ApplicationFrame.cpp
     src/core/ApplicationReports.cpp
+    src/core/ApplicationMilitary.cpp
     src/core/ApplicationCityInput.cpp
     src/core/ApplicationWorldInput.cpp
     src/core/ApplicationSession.cpp
@@ -116,6 +117,7 @@ add_executable(Paladin
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
+    src/simulation/MilitarySystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
@@ -145,6 +147,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementJobBoard.cpp
     src/world/settlements/SettlementLogistics.cpp
     src/world/settlements/SettlementCommerce.cpp
+    src/world/settlements/SettlementIndustry.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
     src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp
@@ -168,6 +171,7 @@ add_executable(Paladin
     src/ui/BitmapFontRenderer.cpp
     src/ui/CityHud.cpp
     src/ui/LedgerPanel.cpp
+    src/ui/MilitaryPanel.cpp
     src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
     src/ui/EmploymentPopulation.cpp
@@ -211,6 +215,8 @@ add_custom_command(
 enable_testing()
 
 add_executable(PaladinTests
+    tests/MilitaryIndustryTests.cpp
+    src/simulation/Simulation.cpp
     tests/TestMain.cpp
     tests/RealmFeatureTests.cpp
     tests/EntityAttributeTests.cpp
@@ -223,6 +229,7 @@ add_executable(PaladinTests
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
 
+    src/simulation/MilitarySystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
@@ -252,6 +259,7 @@ add_executable(PaladinTests
     src/simulation/systems/SettlementJobBoard.cpp
     src/world/settlements/SettlementLogistics.cpp
     src/world/settlements/SettlementCommerce.cpp
+    src/world/settlements/SettlementIndustry.cpp
     src/world/settlements/objects/jobs/fishery/FisheryJob.cpp
     src/world/settlements/objects/SettlementObjectLifecycle.cpp
     src/world/settlements/SettlementEconomy.cpp
@@ -316,6 +324,12 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
     target_compile_definitions(PaladinSmokeCore PUBLIC PALADIN_SOURCE_ART PALADIN_TEST_SOURCE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
     add_executable(PaladinApplicationSmokeTests tests/ApplicationSmokeTests.cpp)
     target_link_libraries(PaladinApplicationSmokeTests PRIVATE PaladinSmokeCore)
+    add_executable(PaladinMilitaryUiArtTests tests/MilitaryUiArtTests.cpp)
+    target_link_libraries(PaladinMilitaryUiArtTests PRIVATE PaladinSmokeCore)
+    add_dependencies(PaladinMilitaryUiArtTests Paladin)
+    add_test(NAME PaladinMilitaryUiArtTests COMMAND PaladinMilitaryUiArtTests)
+    set_tests_properties(PaladinMilitaryUiArtTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software" TIMEOUT 120)
     add_executable(PaladinWorldSurfaceTests tests/WorldSurfaceRenderTests.cpp)
     target_link_libraries(PaladinWorldSurfaceTests PRIVATE PaladinSmokeCore)
     # Reuse the game's runtime DLL/font packaging even when building only tests.
@@ -331,7 +345,9 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
             $<TARGET_FILE:PaladinWorldSurfaceTests>
         COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
             $<TARGET_FILE:PaladinApplicationSmokeTests>
-        DEPENDS PaladinApplicationSmokeTests PaladinWorldSurfaceTests
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinMilitaryUiArtTests>
+        DEPENDS PaladinApplicationSmokeTests PaladinWorldSurfaceTests PaladinMilitaryUiArtTests
         COMMENT "Verify coast alignment, native marker motion, solar optics and day/night art"
         VERBATIM
     )

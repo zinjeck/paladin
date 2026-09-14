@@ -21,7 +21,56 @@ namespace Paladin
                     if (goods.amount > 0 && food && food->edible && !food->emergencyOnly)
                         return false;
                 }
+        for (const auto& claim : reservations_)
+        {
+            const auto* food = SettlementResourceCatalog::definition(claim.resource);
+            if (claim.pickedUp && claim.amount > 0 && food && food->edible && !food->emergencyOnly)
+                return false;
+        }
         return true;
+    }
+    bool SettlementLogistics::mayExport(const SettlementObjectState& objects,
+        const SettlementInventory& inventory, std::string_view resource) const
+    {
+        const auto* object = objects.completedObject(inventory.objectId);
+        if (!object) return true;
+        // Retain real recipe inputs, not every incidental good in a building.
+        // A bakery may still sell a stocked fish; only its wheat is committed.
+        if (object->objectTypeId == SettlementObjectTypes::Barracks)
+            return resource != SettlementResourceTypes::Rations;
+        if (object->objectTypeId == SettlementObjectTypes::ArmySupplyDepot)
+        {
+            const auto* food = SettlementResourceCatalog::definition(resource);
+            return !food || !food->edible || food->emergencyOnly;
+        }
+        if (object->objectTypeId == SettlementObjectTypes::Bakery)
+            return resource != SettlementResourceTypes::Wheat;
+        return true;
+    }
+    int SettlementLogistics::convert(InventoryId id, std::string_view input,
+        std::string_view output, int requested, double minute)
+    {
+        const auto* result = SettlementResourceCatalog::definition(output);
+        auto* entry = edit(id);
+        if (!entry || !result || input == output || requested <= 0) return 0;
+        int amount = std::min(requested, available(id, input));
+        if (!entry->resourceLimits.empty())
+        {
+            const auto limit = std::find_if(entry->resourceLimits.begin(),
+                entry->resourceLimits.end(), [&](const auto& l) { return l.resource == output; });
+            if (limit == entry->resourceLimits.end()) return 0;
+            int reserved = 0;
+            for (const auto& claim : reservations_)
+                if (claim.destination == id && claim.resource == output) reserved += claim.amount;
+            amount = std::min(amount, limit->amount - entry->amount(output) - reserved);
+        }
+        if (amount <= 0) return 0;
+        // Input and output have the same bulk. Conversion creates exactly the
+        // slots it needs, including when freeSpace() is zero.
+        change(*entry, input, -amount);
+        change(*entry, output, amount);
+        entry->createdMinute = minute;
+        return amount;
     }
     int SettlementInventory::amount(std::string_view resource) const
     {

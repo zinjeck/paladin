@@ -1,6 +1,7 @@
 #include "core/Application.h"
 #include "ui/DebugConsole.h"
 #include "ui/LedgerPanel.h"
+#include "ui/MilitaryPanel.h"
 
 #include "core/SimulationClock.h"
 #include "interaction/SettlementCommandController.h"
@@ -69,6 +70,7 @@ namespace Paladin
         debugConsole_ = std::make_unique<DebugConsole>();
         cityHud_ = std::make_unique<CityHud>();
         ledgerPanel_ = std::make_unique<LedgerPanel>();
+        militaryPanel_ = std::make_unique<MilitaryPanel>();
 
         simulationSpeedControls_ = std::make_unique<SimulationSpeedControls>();
 
@@ -103,6 +105,7 @@ namespace Paladin
         worldHud_.reset();
         debugConsole_.reset();
         employmentPanel_.reset();
+        militaryPanel_.reset();
         ledgerPanel_.reset();
         cityHud_.reset();
         simulationSpeedControls_.reset();

@@ -5,6 +5,5 @@ namespace Paladin
 {
     inline constexpr WorkplaceDefinition
         WheatFarmWorkplace{SettlementObjectTypes::WheatFarm, 1, 1, 25, 50};
-    // Production behavior is reserved for a later pass; staffing and storage
-    // are active.
+    // Production and physical input/output processing live in SettlementIndustry.
 } // namespace Paladin

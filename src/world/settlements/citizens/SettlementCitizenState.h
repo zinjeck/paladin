@@ -64,6 +64,11 @@ namespace Paladin
     };
     struct SettlementCitizen : EntityState
     {
+        // A single personnel record underlies both civil life and enlistment.
+        // Deployed people do not also work, eat or appear in their home city.
+        SoldierId soldierId;
+        ArmyId militaryUnitId;
+        bool militaryDeployed = false;
         // Sparse relationships: only citizens who have actually conversed.
         std::unordered_map<CitizenId, double, StrongIdHash> familiarities;
         double familiarityWith(CitizenId other) const
@@ -105,6 +110,8 @@ namespace Paladin
         std::size_t pathIndex = 0;
         double stepProgress = 0;
         double stepDuration = 1;
+        double walkDistance = 0;
+        double workAnimationMinutes = 0;
         double idleWait = -1;
         std::uint64_t choiceSequence = 0;
         bool explicitMovement = false;
@@ -237,6 +244,7 @@ namespace Paladin
         CitizenIdlePolicy idlePolicy;
 
     private:
+        friend class MilitarySystem;
         friend class SettlementEmploymentState;
         friend class SettlementActivitySystem;
         friend class SettlementFamilySystem;

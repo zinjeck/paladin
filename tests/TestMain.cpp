@@ -8,6 +8,7 @@
 #include "Pr16Regression.h"
 #include "TribalInfluenceChecks.h"
 
+void runMilitaryIndustryTests();
 void runRealmFeatureTests();
 void runEntityAttributeTests();
 void runWorldReliefTests();
@@ -22,6 +23,7 @@ int main()
 {
     try
     {
+        runMilitaryIndustryTests();
         runRealmFeatureTests();
         Paladin::Test::runCityResourceFlowChecks();
         runEntityAttributeTests();

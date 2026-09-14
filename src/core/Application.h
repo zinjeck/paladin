@@ -19,6 +19,7 @@ namespace Paladin
     class Camera2D;
     class CityHud;
     class LedgerPanel;
+    class MilitaryPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -91,6 +92,8 @@ namespace Paladin
         void updateCityHud();
         void updateReports();
         bool handleReportEvent(const SDL_Event&);
+        bool handleMilitaryEvent(const SDL_Event&);
+        void renderMilitary();
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
@@ -165,6 +168,10 @@ namespace Paladin
         std::unique_ptr<WorldHud> worldHud_;
         std::unique_ptr<CityHud> cityHud_;
         std::unique_ptr<LedgerPanel> ledgerPanel_;
+        std::unique_ptr<MilitaryPanel> militaryPanel_;
+        ArmyId selectedWorldArmy_;
+        bool militaryPointerCaptured_ = false;
+        std::string militaryOrderMessage_;
         std::unique_ptr<EmploymentPanel> employmentPanel_;
         std::unique_ptr<DebugConsole> debugConsole_;
         std::vector<std::pair<SettlementId, std::unique_ptr<Camera2D>>>

@@ -227,6 +227,7 @@ namespace Paladin
                 handleDeath(c);
                 continue;
             }
+            if (c.militaryDeployed) continue;
             if (c.foodSeekHunger < policy.foodSeekThreshold)
             {
                 planMeal(c, map);
@@ -449,7 +450,7 @@ namespace Paladin
             auto& c =
                 citizens
                     .citizens_[decisionCursor_++ % citizens.citizens_.size()];
-            if (!map.grid().isValidPosition(c.tilePosition))
+            if (c.militaryDeployed || !map.grid().isValidPosition(c.tilePosition))
             {
                 continue;
             }
@@ -573,7 +574,13 @@ namespace Paladin
         map.animals.tick(map, citizens, minute, elapsed);
         for (auto& c : citizens.citizens_)
         {
-            execute(map, citizens, c, minute, elapsed);
+            if (!c.militaryDeployed)
+            {
+                if (c.path.empty() && (c.task.kind == CitizenTaskKind::Gather ||
+                    c.task.kind == CitizenTaskKind::Build || c.task.kind == CitizenTaskKind::Work))
+                    c.workAnimationMinutes += elapsed;
+                execute(map, citizens, c, minute, elapsed);
+            }
         }
         assignHomes(map, citizens);
         produce(map, citizens, minute, elapsed);
@@ -779,6 +786,14 @@ namespace Paladin
             const auto* mealReservation = map.logistics.reservation(c.id);
             const std::string mealResource =
                 mealReservation ? mealReservation->resource : "";
+            // Recheck at the actual meal, not only when the route was planned:
+            // fresh ordinary food may have arrived while this person walked.
+            if (!map.logistics.canEat(mealResource))
+            {
+                finish(map, c, minute);
+                c.nextWorkCheckMinutes = minute;
+                return;
+            }
             if (map.logistics.pickUp(c.id))
             {
                 map.commerce
@@ -1385,6 +1400,7 @@ namespace Paladin
         std::unordered_map<SettlementObjectId, int, StrongIdHash> attendance;
         for (const auto& c : citizens.citizens())
         {
+            if (c.militaryDeployed) continue;
             if (caregivingAtWorkTime(map, c, minute))
             {
                 const auto* workplace =

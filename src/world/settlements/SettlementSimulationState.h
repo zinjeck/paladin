@@ -140,6 +140,7 @@ namespace Paladin
     private:
         friend class WorldSimulationPipeline;
         friend class Simulation;
+        friend class MilitarySystem;
 
         void setSimulationTier(SettlementSimulationTier tier) noexcept;
 

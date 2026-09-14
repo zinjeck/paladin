@@ -357,7 +357,7 @@ void runSettlementActivityTests()
     auto same = makeMap(96);
     map.naturalFeatures().generate(map.grid(), 789);
     same.naturalFeatures().generate(same.grid(), 789);
-    std::size_t trees = 0, rocks = 0;
+    std::size_t trees = 0, rocks = 0, wheat = 0;
     for (int y = 0; y < 96; ++y)
     {
         for (int x = 0; x < 96; ++x)
@@ -366,11 +366,12 @@ void runSettlementActivityTests()
             PALADIN_CHECK(kind == same.naturalFeatures().at({x, y}).kind);
             trees += kind == NaturalFeatureKind::Tree;
             rocks += kind == NaturalFeatureKind::Rock;
+            wheat += kind == NaturalFeatureKind::Wheat;
         }
     }
     PALADIN_CHECK(trees > 100 && rocks > 0);
     PALADIN_CHECK(
-        map.naturalFeatures().countIn({{0, 0}, 96, 96}) == trees + rocks
+        map.naturalFeatures().countIn({{0, 0}, 96, 96}) == trees + rocks + wheat
     );
     {
         SettlementNaturalFeatures sparse(1024, 1024);

@@ -187,6 +187,7 @@ namespace Paladin
         }
 
     private:
+        friend class MilitarySystem;
         void retireCitizen(
             SettlementMap&,
             SettlementCitizenState&,

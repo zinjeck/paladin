@@ -245,6 +245,34 @@ namespace Paladin
         ++presentationVersion_;
         return true;
     }
+    int SettlementObjectState::prepareGrainHarvest(SettlementObjectId id, double minute)
+    {
+        for (auto& object : completedObjects_)
+        {
+            if (object.id != id || object.objectTypeId != SettlementObjectTypes::WheatFarm) continue;
+            if (object.cropReadyMinute < 0)
+            {
+                object.cropReadyMinute = minute + 3 * 1440.0;
+                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height);
+            }
+            return minute >= object.cropReadyMinute ? object.grainRemaining : 0;
+        }
+        return 0;
+    }
+    void SettlementObjectState::takeGrainHarvest(SettlementObjectId id, int amount, double minute)
+    {
+        for (auto& object : completedObjects_)
+        {
+            if (object.id != id || object.objectTypeId != SettlementObjectTypes::WheatFarm || amount <= 0) continue;
+            object.grainRemaining = std::max(0, object.grainRemaining - amount);
+            if (object.grainRemaining == 0)
+            {
+                object.cropReadyMinute = minute + 3 * 1440.0;
+                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height);
+            }
+            return;
+        }
+    }
     double SettlementObjectState::accrueProduction(
         SettlementObjectId id,
         double amount

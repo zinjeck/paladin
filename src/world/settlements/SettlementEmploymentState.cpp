@@ -211,11 +211,15 @@ namespace Paladin
                 ++citizens.version_;
             }
         }
-        for (const auto& w : workplaces_)
+        for (auto& w : workplaces_)
         {
             while (employed(w.id, citizens) > w.capacity)
             {
-                adjust(w.id, -1, citizens);
+                if (!adjust(w.id, -1, citizens))
+                {
+                    w.capacity = std::uint32_t(employed(w.id, citizens));
+                    break;
+                }
             }
         }
     }
@@ -278,8 +282,9 @@ namespace Paladin
         }
         for (auto& citizen : citizens.citizens_)
         {
-            if (delta > 0 ? (citizen.child || bool(citizen.workplaceId))
-                          : citizen.workplaceId != id)
+            if (delta > 0 ? (citizen.child || citizen.health <= 0 || bool(citizen.workplaceId))
+                          : (citizen.workplaceId != id || citizen.militaryUnitId ||
+                             citizen.militaryDeployed))
             {
                 continue;
             }

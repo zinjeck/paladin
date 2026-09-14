@@ -14,6 +14,7 @@ namespace Paladin
     class Camera2D;
     class Renderer;
     class World;
+    class SceneSpriteLibrary;
 
     // Strategic objects intentionally sit above the 16-pixel terrain scene.
     // World roads and sprites share the 32-pixel object lattice. Screen-sized
@@ -31,7 +32,8 @@ namespace Paladin
             bool stabilizePixelPhase,
             std::span<const SpriteRenderItem> fallbackSprites = {},
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt,
-            WorldSurface::Point3 rigidResidual = {}
+            WorldSurface::Point3 rigidResidual = {},
+            const SceneSpriteLibrary* artwork = nullptr
         ) const;
 
     private:

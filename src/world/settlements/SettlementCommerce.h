@@ -89,6 +89,9 @@ namespace Paladin
         // transfers, reservations and refunded construction goods are not flows.
         void recordProduction(std::string_view resource, int amount);
         void recordConsumption(std::string_view resource, int amount);
+        // Industrial ingredients and field rations are real depletion, but not
+        // meals when estimating the diet of civilians still in this settlement.
+        void recordNonMealConsumption(std::string_view resource, int amount);
         const std::unordered_map<std::string, ResourceDailyRates>& dailyResourceReport(
             const SettlementMap&, const SettlementCitizenState&, double minute
         ) const;
@@ -213,6 +216,7 @@ namespace Paladin
     private:
         std::unordered_map<std::string, ResourceTotals> resourceTotals_;
         ResourceFlowHistory resourceFlows_;
+        ResourceFlowHistory nonMealFlows_;
         mutable double reportMinute_ = -1;
         mutable std::size_t reportPopulation_ = 0;
         mutable std::unordered_map<std::string, ResourceDailyRates> dailyReport_;

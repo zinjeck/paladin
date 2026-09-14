@@ -1,4 +1,5 @@
 #include "world/settlements/SettlementCommerce.h"
+#include "world/settlements/SettlementIndustry.h"
 #include "world/settlements/SettlementFoodDemand.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/SettlementMap.h"
@@ -22,6 +23,13 @@ namespace Paladin
         if (amount <= 0) { return; }
         resourceTotals_[std::string(resource)].consumed += amount;
         resourceFlows_.record(resource, currentMinute_, 0, amount);
+    }
+
+    void SettlementCommerce::recordNonMealConsumption(std::string_view resource, int amount)
+    {
+        if (amount <= 0) return;
+        recordConsumption(resource, amount);
+        nonMealFlows_.record(resource, currentMinute_, 0, amount);
     }
 
     const std::unordered_map<std::string, ResourceDailyRates>&
@@ -52,7 +60,8 @@ namespace Paladin
             for (const auto& goods : inventory.goods)
             {
                 const auto* definition = SettlementResourceCatalog::definition(goods.resource);
-                if (definition && definition->edible && goods.amount > 0)
+                if (definition && definition->edible && goods.amount > 0 &&
+                    map.logistics.canEat(goods.resource))
                 {
                     foodStocks[goods.resource] += goods.amount;
                     available += goods.amount;
@@ -62,7 +71,8 @@ namespace Paladin
         for (const auto& definition : SettlementResourceCatalog::definitions())
         {
             auto rates = resourceFlows_.lastDay(definition.id, now);
-            if (definition.edible) { eaten += rates.depletion; }
+            if (definition.edible)
+                eaten += std::max(0.0, rates.depletion - nonMealFlows_.lastDay(definition.id, now).depletion);
             dailyReport_[std::string(definition.id)] = rates;
         }
         for (const auto& definition : SettlementResourceCatalog::definitions())
@@ -72,10 +82,11 @@ namespace Paladin
             // Observed meal mix includes public/market meals and food eaten
             // while carrying. Before the first meal use available food shares.
             // Shares sum to ONE city demand, never one full demand per food.
-            const double share = eaten > 0 ? rates.depletion / eaten
+            const double inputs = nonMealFlows_.lastDay(definition.id, now).depletion;
+            const double share = eaten > 0 ? std::max(0.0, rates.depletion - inputs) / eaten
                 : available > 0 ? foodStocks[std::string(definition.id)] / available
                                 : 0;
-            rates.depletion = demand * share;
+            rates.depletion = demand * share + inputs;
             rates.foodEstimate = true;
         }
         return dailyReport_;
@@ -198,6 +209,7 @@ namespace Paladin
             captureInactive(map, people);
         }
         update(map, people, minute, elapsed);
+        advanceInactiveIndustry(map, people, minute, elapsed);
         for (auto& flow : frozenFlows_)
         {
             flow.accrued += flow.rate * elapsed;
@@ -210,6 +222,11 @@ namespace Paladin
             flow.accrued -= requested;
             const auto* from = map.logistics.inventory(flow.source);
             const auto* to = map.logistics.inventory(flow.destination);
+            const auto* processor = to ? map.objectState().completedObject(to->objectId) : nullptr;
+            // Recipes run above. Never replay their observed output as free
+            // production or purchase the same processor's inputs a second time.
+            if (processor && isIndustry(processor->objectTypeId)) continue;
+            if (from && !map.logistics.mayExport(map.objectState(), *from, flow.resource) && flow.destination) continue;
             if (!flow.source && to)
             {
                 const int amount =
@@ -254,7 +271,8 @@ namespace Paladin
                     people.citizens_.end(),
                     [&](const auto& c) { return c.id == flow.consumer; }
                 );
-                if (person == people.citizens_.end())
+                if (person == people.citizens_.end() || person->militaryDeployed ||
+                    !map.logistics.canEat(flow.resource))
                 {
                     continue;
                 }
@@ -270,6 +288,7 @@ namespace Paladin
                 );
                 for (int meal = 0; meal < meals; ++meal)
                 {
+                    if (!map.logistics.canEat(flow.resource)) break;
                     if (price > 0 &&
                         !buyMeal(source.objectId, *person, people, price))
                     {
@@ -300,6 +319,13 @@ namespace Paladin
                        : (source.kind == InventoryKind::Stockpile
                               ? policy.wholesaleFoodPrice
                               : 0);
+        }
+        if (destination.kind == InventoryKind::Workplace)
+        {
+            // Processors and barracks buy inputs from existing owners. The
+            // destination used to fall through to a zero-price transfer.
+            return source.kind == InventoryKind::Workplace
+                       ? policy.productionPrice : policy.wholesaleFoodPrice;
         }
         if (destination.kind == InventoryKind::Stockpile)
         {
@@ -596,7 +622,7 @@ namespace Paladin
                     std::min(treasury->balance, policy.startingSavings)
                 );
             }
-            const bool working =
+            const bool working = c.militaryDeployed ||
                 map.activities.caregivingAtWorkTime(map, c, minute) ||
                 c.task.kind == CitizenTaskKind::AnimalWork ||
                 c.task.kind == CitizenTaskKind::Work ||
@@ -615,6 +641,7 @@ namespace Paladin
             // reserves. An empty-pasture employee doing the same civic work as
             // an unemployed citizen is treasury-paid for that work instead.
             const double rate = !monetary   ? 0
+                                : c.militaryDeployed ? policy.dailyWage / 1440.0
                                 : inactive_ ? frozenPayRates_[c.id]
                                 : !c.child && working
                                     ? policy.dailyWage / 720.0

@@ -474,7 +474,7 @@ namespace Paladin
             citizens_.rend(),
             [position](const SettlementCitizen& citizen)
             {
-                return SettlementTilePosition{
+                return !citizen.militaryDeployed && SettlementTilePosition{
                            int(std::floor(citizen.visualX() + .5)),
                            int(std::floor(citizen.visualY() + .5))
                        } == position;

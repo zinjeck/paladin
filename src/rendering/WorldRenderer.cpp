@@ -343,7 +343,7 @@ namespace Paladin
                 pixelStabilityActive_,
                 sprites,
                 placementMarker,
-                objectResidual
+                objectResidual, &artwork_
             );
             stage(7);
             return;
@@ -417,7 +417,7 @@ namespace Paladin
             pixelStabilityActive_,
             sprites,
             placementMarker,
-            {flatResidualX, flatResidualY, 0}
+            {flatResidualX, flatResidualY, 0}, &artwork_
         );
     }
 

@@ -41,6 +41,7 @@ namespace Paladin
             return false;
         }
         pruneInvalid(map, citizens);
+        bool animalsChanged = false;
         if (type == SettlementCommandTypes::Gather ||
             type == SettlementCommandTypes::Hunt)
         {
@@ -54,7 +55,8 @@ namespace Paladin
                 ++version_;
                 ++selectionVersion_;
             }
-            return changed > 0;
+            animalsChanged = changed > 0;
+            if (type == SettlementCommandTypes::Hunt) return animalsChanged;
         }
         SettlementCommand command;
         command.commandTypeId = type;
@@ -133,7 +135,7 @@ namespace Paladin
         // Gather and Hunt require actual gatherable/animal entities.
         if (command.targets.empty())
         {
-            return false;
+            return animalsChanged;
         }
         command.id = commandIds_.generate();
         for (const auto& target : command.targets)

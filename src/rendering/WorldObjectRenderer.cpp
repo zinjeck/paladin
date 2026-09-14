@@ -3,6 +3,7 @@
 #include "rendering/GlobeView.h"
 #include "rendering/LocalTangentWorldView.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "rendering/Texture.h"
 #include "world/Army.h"
 #include "world/Realm.h"
@@ -75,7 +76,8 @@ namespace Paladin
         bool stabilizePixelPhase,
         std::span<const SpriteRenderItem> fallbackSprites,
         std::optional<WorldPlacementMarker> placementMarker,
-        WorldSurface::Point3 rigidResidual
+        WorldSurface::Point3 rigidResidual,
+        const SceneSpriteLibrary* artwork
     ) const
     {
         if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0 ||
@@ -293,6 +295,71 @@ namespace Paladin
             }
         }
 
+        if (artwork && worldObjectVisibility > .001F)
+        {
+            struct ArtItem
+            {
+                const SceneSprite* sprite;
+                ProjectedWorldObject point;
+                double scale;
+                int pose;
+            };
+            std::vector<ArtItem> items;
+            const auto append = [&](const char* id, double x, double y,
+                                    double scale, int pose = 0)
+            {
+                const auto* sprite = artwork->find(id);
+                const auto point = geometryProject(x, y);
+                if (sprite && sprite->texture && point && !outside(*point, renderer, 256))
+                    items.push_back({sprite, *point, scale, pose});
+            };
+            // These are presentation thresholds, not new settlement entity types.
+            for (const auto& settlement : world.settlements())
+            {
+                const char* stage = settlement.isFortress() ? "world.fortress" :
+                    settlement.population() >= 1024 ? "world.city" :
+                    settlement.population() >= 128 ? "world.town" : "world.settlement";
+                const auto p = settlement.position();
+                append(stage, p.x + .5, p.y + .5, 1.0);
+            }
+            for (const auto& army : world.armies())
+            {
+                // Bounded formation art represents real roster entries. It is
+                // not another population and never adds soldiers to simulation.
+                const int count = int(std::min<std::size_t>(army.soldierCount(), 6));
+                const bool north = army.facingNorth();
+                const int pose = army.moving() ? int(std::fmod(army.marchDistance(), 1.0) * 4.0) : 0;
+                for (int i = 0; i < count; ++i)
+                {
+                    const auto* soldier = world.soldier(army.soldiers()[i]);
+                    const auto* home = soldier ? world.settlement(soldier->homeSettlementId()) : nullptr;
+                    const auto* person = home ? home->simulationState().citizens().citizen(soldier->sourceCitizenId()) : nullptr;
+                    const bool female = person && person->sex == CitizenSex::Female;
+                    append(north ? (female ? "citizen.militia.female.back.walk" : "citizen.militia.male.back.walk") :
+                                   (female ? "citizen.militia.female.front.walk" : "citizen.militia.male.front.walk"),
+                        army.visualX() + .5 + ((i % 3) - 1) * .40,
+                        army.visualY() + .5 + (i / 3) * .32,
+                        .50, pose);
+                }
+            }
+            std::stable_sort(items.begin(), items.end(), [](const auto& a, const auto& b)
+            { return a.point.y < b.point.y; });
+            // Atlas frames retain nearest filtering and one common 32-texel
+            // strategic lattice. Source-camera rotation/residual happens once.
+            const float detail = std::clamp(float((effectiveTilePixels - 5) / 11), 0.F, 1.F);
+            for (const auto& item : items)
+            {
+                auto source = artwork->frame(*item.sprite, false);
+                source.x += float(item.pose % std::max(1, item.sprite->frames)) * source.width;
+                const float w = float(item.sprite->width * item.scale * geometryPixels);
+                const float h = float(item.sprite->height * item.scale * geometryPixels);
+                renderer.drawTexture(*item.sprite->texture, source.x, source.y, source.width, source.height,
+                    item.point.x - w * float(item.sprite->pivotX),
+                    item.point.y - h * float(item.sprite->pivotY), w, h,
+                    visibleColor({255,255,255,255}, detail * worldObjectVisibility * item.point.visibility).alpha);
+            }
+        }
+
         }
 
         // Native-resolution cartography is not squeezed through the world art
@@ -356,17 +423,18 @@ namespace Paladin
 
             for (const Army& army : world.armies())
             {
-                const auto position = army.position();
                 const auto point = annotationProject(
-                    double(position.x) + 0.5,
-                    double(position.y) + 0.5
+                    army.visualX() + 0.5,
+                    army.visualY() + 0.5
                 );
                 if (!point || outside(*point, renderer, 64.0F))
                 {
                     continue;
                 }
+                const float symbolWeight = artwork && army.soldierCount() > 0
+                    ? 1.F - std::clamp(float((effectiveTilePixels - 10) / 18), 0.F, 1.F) : 1.F;
                 const float visibility =
-                    worldObjectVisibility * point->visibility;
+                    worldObjectVisibility * point->visibility * symbolWeight;
                 const float radius = std::clamp(
                     float(effectiveTilePixels * 0.22),
                     5.0F,
