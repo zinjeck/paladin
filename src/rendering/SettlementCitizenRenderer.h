@@ -9,6 +9,7 @@ namespace Paladin
     class Camera2D;
     class Renderer;
     class SettlementCitizenState;
+    class SettlementEmploymentState;
     struct TileRenderMetrics;
 
     class SettlementCitizenRenderer
@@ -23,7 +24,8 @@ namespace Paladin
             double interpolationAlpha = 1,
             SceneDrawQueue* shared = nullptr,
             const SceneSpriteLibrary* sprites = nullptr,
-            const CityPresentation* policy = nullptr
+            const CityPresentation* policy = nullptr,
+            const SettlementEmploymentState* employment = nullptr
         ) const;
 
         void renderAnnotations(Renderer&, double tilePixels) const;

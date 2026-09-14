@@ -1,5 +1,7 @@
 # Paladin art and rendering requirements
 
+- Citizen and soldier art follows the user-approved compact overhead style in `handoffs/art-direction/characters-v1/STYLE.md`. Use its palette-constrained exports as scale and silhouette references; keep male/female equipment equivalent and distinguish variants with restrained hair details.
+
 - Every world sprite must share the same final pixel size. The canonical grid is 16 art pixels per logical tile (`WorldPixelGrid.h`). City and world scenes must pass through `WorldPixelScene`, including terrain, fitted roofs, attachments, entities, animation and lighting. Never bypass this with a separately drawn high-resolution world sprite. HUD icons use native pixels without arbitrary rescaling.
 - Before delivering rendering or artwork changes, build and pass the `PaladinArtCheck` target. It checks actual day/night output pixel blocks, sprite integration, and resource cutout contamination. Inspect close-up and normal-view screenshots as well; file dimensions and palette checks alone are insufficient.
 - Use the approved palette in `config/art-palette.hex` for source sprites. Runtime lighting is separate. Day should be vivid and luminous with colored shadows; night cool and dark with distinct warm local lights. Reference direction: No Game No Life by day, Death Note by night.

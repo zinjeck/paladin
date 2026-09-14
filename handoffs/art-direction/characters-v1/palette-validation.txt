@@ -1,0 +1,1 @@
+PASS: 72 sprites, 6065 opaque pixels; all exact palette; binary alpha; 16x20.

@@ -1,0 +1,1010 @@
+[
+  {
+    "sha256": "8BB60E935AAEA3026F2EA21B249603BCB0300BC99E0DE31167EA33F235B8F390",
+    "source": "citizens-a.png",
+    "crop": [
+      91,
+      125,
+      222,
+      281
+    ],
+    "name": "citizen.male.front",
+    "width": 9,
+    "pixels": 68,
+    "height": 11
+  },
+  {
+    "sha256": "63619BE03617BE7B7FFD1CFA46879C9825C2D27650591FB74429DE95B57027F8",
+    "source": "citizens-a.png",
+    "crop": [
+      333,
+      124,
+      460,
+      280
+    ],
+    "name": "citizen.male.back",
+    "width": 9,
+    "pixels": 69,
+    "height": 11
+  },
+  {
+    "sha256": "307B16FDF5AE8B48C472D00AC141A5D34E678B1247FA4115A85926F487C5DA95",
+    "source": "citizens-a.png",
+    "crop": [
+      566,
+      122,
+      693,
+      280
+    ],
+    "name": "citizen.female.front",
+    "width": 9,
+    "pixels": 72,
+    "height": 11
+  },
+  {
+    "sha256": "B308EAABAB09655451CFD080A2E8E2998DCB1D114B82A23D38075DBE5FC2AAEF",
+    "source": "citizens-a.png",
+    "crop": [
+      803,
+      124,
+      930,
+      280
+    ],
+    "name": "citizen.female.back",
+    "width": 9,
+    "pixels": 70,
+    "height": 11
+  },
+  {
+    "sha256": "E0897526B139EA88357E505C61324BF019712ECE421ECF2393ACE719E82D7425",
+    "source": "citizens-a.png",
+    "crop": [
+      81,
+      346,
+      232,
+      509
+    ],
+    "name": "farmer.male.front",
+    "width": 11,
+    "pixels": 87,
+    "height": 12
+  },
+  {
+    "sha256": "90798C75B7D799FAA71CAFC9FEFF0F3F717DAF9ACF48F2E20D17BC75CB42F9D6",
+    "source": "citizens-a.png",
+    "crop": [
+      334,
+      346,
+      457,
+      509
+    ],
+    "name": "farmer.male.back",
+    "width": 9,
+    "pixels": 81,
+    "height": 12
+  },
+  {
+    "sha256": "9536D45EB5FA76A3016DF9EC5A87C060C31EDFC4A25B942657DE04A0361E7802",
+    "source": "citizens-a.png",
+    "crop": [
+      565,
+      344,
+      710,
+      509
+    ],
+    "name": "farmer.female.front",
+    "width": 11,
+    "pixels": 89,
+    "height": 12
+  },
+  {
+    "sha256": "0B2FE92717546D0567EC8920A2B9B3548613D16809D7804E27236809E0B214C2",
+    "source": "citizens-a.png",
+    "crop": [
+      807,
+      345,
+      953,
+      509
+    ],
+    "name": "farmer.female.back",
+    "width": 11,
+    "pixels": 88,
+    "height": 12
+  },
+  {
+    "sha256": "5D5F8F37D4D4E0D0102B64FA548DD81BAA1E272FE3A872080878D48496543EB3",
+    "source": "citizens-a.png",
+    "crop": [
+      80,
+      573,
+      219,
+      740
+    ],
+    "name": "fisher.male.front",
+    "width": 11,
+    "pixels": 92,
+    "height": 13
+  },
+  {
+    "sha256": "22A54F3CFA59F5FBB4B93DC038E96505B7196403B94D90B37D27617EF2D6D1AA",
+    "source": "citizens-a.png",
+    "crop": [
+      328,
+      573,
+      466,
+      740
+    ],
+    "name": "fisher.male.back",
+    "width": 11,
+    "pixels": 94,
+    "height": 13
+  },
+  {
+    "sha256": "F4B3763C53E35EF73777D03A1A47412CBB1F6E057E585A42849370B859B49618",
+    "source": "citizens-a.png",
+    "crop": [
+      558,
+      572,
+      694,
+      740
+    ],
+    "name": "fisher.female.front",
+    "width": 11,
+    "pixels": 96,
+    "height": 13
+  },
+  {
+    "sha256": "3465D1A3892671FD6AB425ABEDD611EFC7DA03BEA29DB183324D15EF58F48F11",
+    "source": "citizens-a.png",
+    "crop": [
+      804,
+      573,
+      941,
+      740
+    ],
+    "name": "fisher.female.back",
+    "width": 11,
+    "pixels": 93,
+    "height": 13
+  },
+  {
+    "sha256": "BFF8084119BB46B8CDA7F25E1610F7E2141B2B95BF7FE5F9D621A847AE1CE192",
+    "source": "citizens-a.png",
+    "crop": [
+      59,
+      820,
+      216,
+      968
+    ],
+    "name": "logger.male.front",
+    "width": 12,
+    "pixels": 89,
+    "height": 11
+  },
+  {
+    "sha256": "C922CB7090AE9C5E8EF98F38CC4619EA7677165C5550E7E20511C52557EC8CA4",
+    "source": "citizens-a.png",
+    "crop": [
+      327,
+      820,
+      478,
+      968
+    ],
+    "name": "logger.male.back",
+    "width": 11,
+    "pixels": 83,
+    "height": 11
+  },
+  {
+    "sha256": "C1A34B0B5FD9028AC9A28F7206400EB7053AA2B6A26B55FF2E99FE34994723B8",
+    "source": "citizens-a.png",
+    "crop": [
+      560,
+      818,
+      693,
+      968
+    ],
+    "name": "logger.female.front",
+    "width": 10,
+    "pixels": 79,
+    "height": 11
+  },
+  {
+    "sha256": "DCBBA7C0FD56F163D9D41B085F5D1E98DE96D9CFB0D637471DCEAAD56BED4919",
+    "source": "citizens-a.png",
+    "crop": [
+      802,
+      819,
+      955,
+      968
+    ],
+    "name": "logger.female.back",
+    "width": 11,
+    "pixels": 82,
+    "height": 11
+  },
+  {
+    "sha256": "844BB25BA66AA73023FB2ECAEDB19BEFC1535E3065850680A452016BE14AFF55",
+    "source": "citizens-a.png",
+    "crop": [
+      67,
+      1051,
+      219,
+      1206
+    ],
+    "name": "herder.male.front",
+    "width": 12,
+    "pixels": 96,
+    "height": 12
+  },
+  {
+    "sha256": "E6434876BC163B2855064123BD1772733E3A517A19AD44EFFF67BF7302E1AACA",
+    "source": "citizens-a.png",
+    "crop": [
+      328,
+      1051,
+      475,
+      1206
+    ],
+    "name": "herder.male.back",
+    "width": 11,
+    "pixels": 93,
+    "height": 12
+  },
+  {
+    "sha256": "C5579C64DF3FFA19026F1DDDD5CA4573263E17069E8A6D40086EEF417AD5B724",
+    "source": "citizens-a.png",
+    "crop": [
+      544,
+      1050,
+      694,
+      1206
+    ],
+    "name": "herder.female.front",
+    "width": 12,
+    "pixels": 96,
+    "height": 12
+  },
+  {
+    "sha256": "B012BD33E7DF3A31AA81A9C8D9314715761700B0EDD6650906A008DC1E975868",
+    "source": "citizens-a.png",
+    "crop": [
+      804,
+      1051,
+      952,
+      1206
+    ],
+    "name": "herder.female.back",
+    "width": 11,
+    "pixels": 95,
+    "height": 12
+  },
+  {
+    "sha256": "4EF3A9DCA35CB0EF755A7FE60DF890CEC28454B9B83463D16C880B9328466FD0",
+    "source": "citizens-a.png",
+    "crop": [
+      83,
+      1271,
+      215,
+      1425
+    ],
+    "name": "baker.male.front",
+    "width": 9,
+    "pixels": 70,
+    "height": 11
+  },
+  {
+    "sha256": "155E027406A3263A1B6C3842FC84D238735ACC0BB6F69BE7FB20104C0208279C",
+    "source": "citizens-a.png",
+    "crop": [
+      330,
+      1271,
+      459,
+      1425
+    ],
+    "name": "baker.male.back",
+    "width": 9,
+    "pixels": 73,
+    "height": 11
+  },
+  {
+    "sha256": "CB22B35E4167889124C1C78CBCF9597FC0F7C580B34EF0A6B40E1DBE185894CE",
+    "source": "citizens-a.png",
+    "crop": [
+      565,
+      1271,
+      694,
+      1425
+    ],
+    "name": "baker.female.front",
+    "width": 9,
+    "pixels": 74,
+    "height": 11
+  },
+  {
+    "sha256": "FE35774D266FF373FFFB289190CA043B90DAAE557395ABA82D0BEAED43CEE132",
+    "source": "citizens-a.png",
+    "crop": [
+      805,
+      1271,
+      931,
+      1425
+    ],
+    "name": "baker.female.back",
+    "width": 9,
+    "pixels": 76,
+    "height": 11
+  },
+  {
+    "sha256": "96A0AF0E355B44992EDF87D07DBDC88E4E5C6174B7463AACB9911B1DD1E9C888",
+    "source": "citizens-b.png",
+    "crop": [
+      127,
+      46,
+      240,
+      168
+    ],
+    "name": "merchant.male.front",
+    "width": 10,
+    "pixels": 80,
+    "height": 11
+  },
+  {
+    "sha256": "BA09CF2D17D95DD542B6D06028ABCDC0320520C8A7F3978A45FAB0730F4B63BE",
+    "source": "citizens-b.png",
+    "crop": [
+      489,
+      46,
+      595,
+      167
+    ],
+    "name": "merchant.male.back",
+    "width": 10,
+    "pixels": 77,
+    "height": 11
+  },
+  {
+    "sha256": "EEEC15D47FBCEDE0926793F1C91084DA9A5B8DD2D4DB301DC087825B9176221F",
+    "source": "citizens-b.png",
+    "crop": [
+      851,
+      45,
+      960,
+      168
+    ],
+    "name": "merchant.female.front",
+    "width": 10,
+    "pixels": 80,
+    "height": 11
+  },
+  {
+    "sha256": "0137A2DF76055FBEEDF1A525EA5457688C1849FEF3B41B6AB61DCC4B4BFEB419",
+    "source": "citizens-b.png",
+    "crop": [
+      1212,
+      45,
+      1322,
+      168
+    ],
+    "name": "merchant.female.back",
+    "width": 10,
+    "pixels": 77,
+    "height": 11
+  },
+  {
+    "sha256": "7311F078A9E707224B42B4BD44F89A87D5957450A110BB0507BE8D4804504A65",
+    "source": "citizens-b.png",
+    "crop": [
+      130,
+      199,
+      230,
+      326
+    ],
+    "name": "porter.male.front",
+    "width": 9,
+    "pixels": 71,
+    "height": 11
+  },
+  {
+    "sha256": "99998427BDBB527B79E1973A6427B96A8B36255FBA128CABD7445D1E02E6255D",
+    "source": "citizens-b.png",
+    "crop": [
+      493,
+      199,
+      593,
+      326
+    ],
+    "name": "porter.male.back",
+    "width": 9,
+    "pixels": 69,
+    "height": 11
+  },
+  {
+    "sha256": "6AD5D1C96BE12322D868CAC9BDBB06A3EAA794E5349DEBE8BF248D44C2AA0467",
+    "source": "citizens-b.png",
+    "crop": [
+      857,
+      199,
+      952,
+      326
+    ],
+    "name": "porter.female.front",
+    "width": 8,
+    "pixels": 68,
+    "height": 11
+  },
+  {
+    "sha256": "D351C5CFC88A7888C3341BCCEC8BBFEECEC10E3EAE66EDE63505A6F819FFBD6C",
+    "source": "citizens-b.png",
+    "crop": [
+      1216,
+      199,
+      1314,
+      326
+    ],
+    "name": "porter.female.back",
+    "width": 8,
+    "pixels": 67,
+    "height": 11
+  },
+  {
+    "sha256": "A1FF0ED22037FFC7675A83474612F5559E245C7D1ECBA7EA365A7F25DFBA7649",
+    "source": "citizens-b.png",
+    "crop": [
+      116,
+      362,
+      234,
+      494
+    ],
+    "name": "builder.male.front",
+    "width": 11,
+    "pixels": 89,
+    "height": 12
+  },
+  {
+    "sha256": "E0A0EA717ECD4A508D2E211D7CD6C3397DA59C5821159B40DD23FBFE7A33A360",
+    "source": "citizens-b.png",
+    "crop": [
+      488,
+      362,
+      605,
+      494
+    ],
+    "name": "builder.male.back",
+    "width": 11,
+    "pixels": 86,
+    "height": 12
+  },
+  {
+    "sha256": "6CDB1A3C335CEAE458E9A0C44B2F8C32C007E235B4F68E11791788A44BC5617C",
+    "source": "citizens-b.png",
+    "crop": [
+      837,
+      360,
+      952,
+      494
+    ],
+    "name": "builder.female.front",
+    "width": 10,
+    "pixels": 82,
+    "height": 12
+  },
+  {
+    "sha256": "7E64819C5B4D9823FCBA86833D99F1DA2C141F4B7E6A347244B5985751E68C10",
+    "source": "citizens-b.png",
+    "crop": [
+      1215,
+      361,
+      1330,
+      494
+    ],
+    "name": "builder.female.back",
+    "width": 10,
+    "pixels": 81,
+    "height": 12
+  },
+  {
+    "sha256": "76400B28D562D80B2B7F8331FDA74B17B5DCE600F585FF7410BEEED226626F2A",
+    "source": "citizens-b.png",
+    "crop": [
+      110,
+      533,
+      233,
+      655
+    ],
+    "name": "smith.male.front",
+    "width": 11,
+    "pixels": 79,
+    "height": 11
+  },
+  {
+    "sha256": "DB37918FF08BA6CC0D78B9F0AE6CD67EB63676A8D26852263877EDE6189AFFD2",
+    "source": "citizens-b.png",
+    "crop": [
+      489,
+      532,
+      614,
+      655
+    ],
+    "name": "smith.male.back",
+    "width": 11,
+    "pixels": 80,
+    "height": 11
+  },
+  {
+    "sha256": "BC0B303B902499DAF3B54C40985C0084390270B33D548F2CB305A0154DD2669C",
+    "source": "citizens-b.png",
+    "crop": [
+      835,
+      532,
+      952,
+      655
+    ],
+    "name": "smith.female.front",
+    "width": 10,
+    "pixels": 74,
+    "height": 11
+  },
+  {
+    "sha256": "F884844F84BA4DD6C8D2FB30343CDFFF0A535697B1017D20E4810C6507B3557C",
+    "source": "citizens-b.png",
+    "crop": [
+      1215,
+      531,
+      1335,
+      655
+    ],
+    "name": "smith.female.back",
+    "width": 11,
+    "pixels": 81,
+    "height": 11
+  },
+  {
+    "sha256": "A619059C116580AE2AA1DF7CA8A5CB8C806B5808808DD266DADDB80153AB4759",
+    "source": "citizens-b.png",
+    "crop": [
+      132,
+      700,
+      255,
+      825
+    ],
+    "name": "herbalist.male.front",
+    "width": 11,
+    "pixels": 84,
+    "height": 11
+  },
+  {
+    "sha256": "B55E915358620F582015526BCF5696D87D31D6E285E1D2E3447040D9796184E9",
+    "source": "citizens-b.png",
+    "crop": [
+      489,
+      700,
+      615,
+      825
+    ],
+    "name": "herbalist.male.back",
+    "width": 11,
+    "pixels": 80,
+    "height": 11
+  },
+  {
+    "sha256": "7F2E2F86EF56ED036F67AEF01E3D8FE9B7371AD50A8CBC33C36382F7F19754FE",
+    "source": "citizens-b.png",
+    "crop": [
+      855,
+      698,
+      977,
+      825
+    ],
+    "name": "herbalist.female.front",
+    "width": 11,
+    "pixels": 84,
+    "height": 11
+  },
+  {
+    "sha256": "D86FAF2EA3572620511B3EDB90F4F953D5B757112BD8534BD33C30B010A93F4D",
+    "source": "citizens-b.png",
+    "crop": [
+      1214,
+      698,
+      1336,
+      825
+    ],
+    "name": "herbalist.female.back",
+    "width": 11,
+    "pixels": 81,
+    "height": 11
+  },
+  {
+    "sha256": "4596F88132FAD2B567E072EA03B0B44A0F048768585B024DE7BC079EAF640E67",
+    "source": "citizens-b.png",
+    "crop": [
+      130,
+      868,
+      230,
+      996
+    ],
+    "name": "laborer.male.front",
+    "width": 9,
+    "pixels": 77,
+    "height": 12
+  },
+  {
+    "sha256": "60879BD3E003D31862C45E375244BEE67496F16BA235F091BB725FBDDE99499D",
+    "source": "citizens-b.png",
+    "crop": [
+      493,
+      868,
+      592,
+      996
+    ],
+    "name": "laborer.male.back",
+    "width": 9,
+    "pixels": 77,
+    "height": 12
+  },
+  {
+    "sha256": "20620D2DFC44CCBE37764ABE2BD521EBA5B60B2EB48D434A0856FB48FE224B99",
+    "source": "citizens-b.png",
+    "crop": [
+      853,
+      868,
+      952,
+      997
+    ],
+    "name": "laborer.female.front",
+    "width": 9,
+    "pixels": 81,
+    "height": 12
+  },
+  {
+    "sha256": "1726D075CD31FDD5D5B5701B8A70FBD3C11F63738C451F0FC2B4B17D89D6C4F5",
+    "source": "citizens-b.png",
+    "crop": [
+      1216,
+      868,
+      1315,
+      996
+    ],
+    "name": "laborer.female.back",
+    "width": 9,
+    "pixels": 79,
+    "height": 12
+  },
+  {
+    "sha256": "A2B5EC13CD433A583307BC8801DB02687845C9EA1F0301C7BEBF933B9AF6D6E2",
+    "source": "soldiers.png",
+    "crop": [
+      76,
+      87,
+      193,
+      222
+    ],
+    "name": "militia.male.front",
+    "width": 10,
+    "pixels": 79,
+    "height": 11
+  },
+  {
+    "sha256": "C51DF61891C721F79E5E9B8E61C0F700CA87978EDBBD0CAF0F9CBC81449D11B8",
+    "source": "soldiers.png",
+    "crop": [
+      320,
+      85,
+      436,
+      222
+    ],
+    "name": "militia.male.back",
+    "width": 9,
+    "pixels": 73,
+    "height": 11
+  },
+  {
+    "sha256": "E0305518F5DB39708CB02435A95CB36AAD809ECCA856AF0C4FAE4C37B412486B",
+    "source": "soldiers.png",
+    "crop": [
+      587,
+      87,
+      704,
+      222
+    ],
+    "name": "militia.female.front",
+    "width": 10,
+    "pixels": 77,
+    "height": 11
+  },
+  {
+    "sha256": "C99CD473D2D1F252AA28E01C449C978A9199E3F50DDDAB23DC1CD7E8E75263CE",
+    "source": "soldiers.png",
+    "crop": [
+      832,
+      85,
+      948,
+      222
+    ],
+    "name": "militia.female.back",
+    "width": 9,
+    "pixels": 73,
+    "height": 11
+  },
+  {
+    "sha256": "7772FEB8C4815D9365DFE86886E782CA4A904A1499555C862FCF29A6F8D1A5B4",
+    "source": "soldiers.png",
+    "crop": [
+      64,
+      297,
+      203,
+      464
+    ],
+    "name": "spearman.male.front",
+    "width": 12,
+    "pixels": 105,
+    "height": 14
+  },
+  {
+    "sha256": "453112617A701579DEDEFB56AB8562ABDED0C99E46F256C2968719F358AA0CC1",
+    "source": "soldiers.png",
+    "crop": [
+      310,
+      297,
+      449,
+      464
+    ],
+    "name": "spearman.male.back",
+    "width": 12,
+    "pixels": 103,
+    "height": 14
+  },
+  {
+    "sha256": "6B9DF780A768723663E1F0E38709FB7963A5CFF7AFF63DFE23AB220F55AFCD80",
+    "source": "soldiers.png",
+    "crop": [
+      575,
+      297,
+      713,
+      464
+    ],
+    "name": "spearman.female.front",
+    "width": 12,
+    "pixels": 107,
+    "height": 14
+  },
+  {
+    "sha256": "F1A1F1584FE291954226E1746336741FC5520F8925EE49A1074F346A496F1A97",
+    "source": "soldiers.png",
+    "crop": [
+      822,
+      297,
+      960,
+      464
+    ],
+    "name": "spearman.female.back",
+    "width": 12,
+    "pixels": 105,
+    "height": 14
+  },
+  {
+    "sha256": "7EC1D00706FB0546CB32B8EE068C951CDD56F4F1B871505E1DC3C01A8491F44E",
+    "source": "soldiers.png",
+    "crop": [
+      59,
+      552,
+      203,
+      701
+    ],
+    "name": "archer.male.front",
+    "width": 12,
+    "pixels": 95,
+    "height": 12
+  },
+  {
+    "sha256": "87046146E4394BEA0344906C7DEFF421F318BDEAC966CE2AB10006DAC776312B",
+    "source": "soldiers.png",
+    "crop": [
+      316,
+      550,
+      449,
+      701
+    ],
+    "name": "archer.male.back",
+    "width": 11,
+    "pixels": 91,
+    "height": 12
+  },
+  {
+    "sha256": "D9D5C5E4C305C7EB4D01066F0C59BC80C2B446030B5F3804884A0F5D582D7A0E",
+    "source": "soldiers.png",
+    "crop": [
+      571,
+      552,
+      713,
+      701
+    ],
+    "name": "archer.female.front",
+    "width": 11,
+    "pixels": 89,
+    "height": 12
+  },
+  {
+    "sha256": "83BE0958EC0A9BDCED5969E9EC02A40B953D3C9296F5AD896CA5CE6FBABA8FC1",
+    "source": "soldiers.png",
+    "crop": [
+      827,
+      550,
+      960,
+      701
+    ],
+    "name": "archer.female.back",
+    "width": 11,
+    "pixels": 91,
+    "height": 12
+  },
+  {
+    "sha256": "0C00A5CB687BB0D7D86233C77378AD3AD539BCFB5D8139DB1D421059D6750203",
+    "source": "soldiers.png",
+    "crop": [
+      57,
+      793,
+      202,
+      949
+    ],
+    "name": "swordsman.male.front",
+    "width": 12,
+    "pixels": 101,
+    "height": 13
+  },
+  {
+    "sha256": "82B21411FF748FA292AB53CFE67E2D6A5672A036D3CE8618BD6A53C88DCEB4A0",
+    "source": "soldiers.png",
+    "crop": [
+      310,
+      793,
+      448,
+      949
+    ],
+    "name": "swordsman.male.back",
+    "width": 12,
+    "pixels": 100,
+    "height": 13
+  },
+  {
+    "sha256": "40A352137F5AB8E749460BF006971D50F10D16DEA599C230C2C226F0EA2D86BB",
+    "source": "soldiers.png",
+    "crop": [
+      569,
+      793,
+      713,
+      949
+    ],
+    "name": "swordsman.female.front",
+    "width": 12,
+    "pixels": 103,
+    "height": 13
+  },
+  {
+    "sha256": "6882156AE71E3379CC5F8091CE0B449C883F016EC5C18AB5B2D9B1D7AB529421",
+    "source": "soldiers.png",
+    "crop": [
+      822,
+      793,
+      960,
+      949
+    ],
+    "name": "swordsman.female.back",
+    "width": 12,
+    "pixels": 101,
+    "height": 13
+  },
+  {
+    "sha256": "9BC9A514C500F2100727ECC6D2096B6FB91E7BFC70372C7B40D8C2ABAA058C94",
+    "source": "soldiers.png",
+    "crop": [
+      75,
+      1026,
+      202,
+      1171
+    ],
+    "name": "crossbowman.male.front",
+    "width": 11,
+    "pixels": 90,
+    "height": 12
+  },
+  {
+    "sha256": "DBEDE46FC5184BD3221C9098372D9538FD79BC977EF75D6E245200B0E893301F",
+    "source": "soldiers.png",
+    "crop": [
+      307,
+      1025,
+      440,
+      1170
+    ],
+    "name": "crossbowman.male.back",
+    "width": 11,
+    "pixels": 78,
+    "height": 12
+  },
+  {
+    "sha256": "893240E40721A706FE9B6141DD8747B5A299A9599BFFB6B41B53276AAA041D2D",
+    "source": "soldiers.png",
+    "crop": [
+      586,
+      1026,
+      713,
+      1171
+    ],
+    "name": "crossbowman.female.front",
+    "width": 11,
+    "pixels": 90,
+    "height": 12
+  },
+  {
+    "sha256": "75C8D0A22BBE5CAED2A47A3F468DB0227980981E8E0CDCB8B95023ED265978D4",
+    "source": "soldiers.png",
+    "crop": [
+      818,
+      1025,
+      951,
+      1170
+    ],
+    "name": "crossbowman.female.back",
+    "width": 11,
+    "pixels": 79,
+    "height": 12
+  },
+  {
+    "sha256": "BB01180DB95994D0424D90EE166DFE7D0A87FAC7994387F31D0BDEB8BA808F6D",
+    "source": "soldiers.png",
+    "crop": [
+      65,
+      1247,
+      195,
+      1441
+    ],
+    "name": "captain.male.front",
+    "width": 9,
+    "pixels": 88,
+    "height": 14
+  },
+  {
+    "sha256": "99A1291BB541A26215616D84E6C41EBCC528C998B68A625D0F4460BBD1A44224",
+    "source": "soldiers.png",
+    "crop": [
+      315,
+      1248,
+      443,
+      1441
+    ],
+    "name": "captain.male.back",
+    "width": 9,
+    "pixels": 85,
+    "height": 14
+  },
+  {
+    "sha256": "4F895890024813363A2488CE2C5CC5EEF03742E5F3741F8FCAB95AD2794510A3",
+    "source": "soldiers.png",
+    "crop": [
+      576,
+      1248,
+      706,
+      1441
+    ],
+    "name": "captain.female.front",
+    "width": 9,
+    "pixels": 88,
+    "height": 14
+  },
+  {
+    "sha256": "2E7A1AC9F5068A543F383D488F3C1B14238DCB8C5831F8124BE52EF21ACF1E36",
+    "source": "soldiers.png",
+    "crop": [
+      827,
+      1248,
+      954,
+      1441
+    ],
+    "name": "captain.female.back",
+    "width": 9,
+    "pixels": 85,
+    "height": 14
+  }
+]

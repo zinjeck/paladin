@@ -86,6 +86,11 @@ namespace Paladin
             state.citizens_[1].tilePosition =
                 state.citizens_[1].destination = {15, 10};
         }
+        static void setCharacterReview(SettlementCitizenState& state, bool female)
+        {
+            setRenderPerson(state, {13, 17});
+            state.citizens_[0].sex = female ? CitizenSex::Female : CitizenSex::Male;
+        }
         static void setNeeds(
             SettlementCitizenState& people,
             double hunger,
@@ -1742,6 +1747,35 @@ namespace Paladin
             PALADIN_CHECK(warmedPixels > 400);
             renderer.endFrame();
             const auto closeReviewZoom = camera.zoom();
+            // Inspect real character exports under the same city lighting and
+            // pixel-scene path as buildings, at both review scales.
+            const auto savedPeople = people;
+            for (const char* role : {"citizen", "farmer", "fisher", "logger",
+                                    "herder", "baker", "merchant", "porter",
+                                    "builder", "smith", "herbalist", "laborer",
+                                    "militia", "spearman", "archer", "swordsman",
+                                    "crossbowman", "captain"})
+                for (const char* sex : {"male", "female"})
+                    for (const char* facing : {"front", "back"})
+                        PALADIN_CHECK(installed.find(std::string("citizen.") +
+                            role + "." + sex + "." + facing));
+            SettlementActivityTestFixture::setCharacterReview(people, true);
+            camera.setPosition(13.5, 16.5);
+            draw(12);
+            capture(app, "characters-close-day.bmp");
+            renderer.endFrame();
+            draw(0);
+            capture(app, "characters-close-night.bmp");
+            renderer.endFrame();
+            camera.setZoom(8);
+            draw(12);
+            capture(app, "characters-normal-day.bmp");
+            renderer.endFrame();
+            draw(0);
+            capture(app, "characters-normal-night.bmp");
+            renderer.endFrame();
+            people = savedPeople;
+            camera.setPosition(13.5, 13.5);
             camera.setZoom(8);
             draw(12);
             capture(app, "realm-city-normal-day.bmp");

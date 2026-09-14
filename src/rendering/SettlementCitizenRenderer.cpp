@@ -7,6 +7,7 @@
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
+#include "world/settlements/SettlementEmploymentState.h"
 
 #include "ui/BitmapFontRenderer.h"
 #include <algorithm>
@@ -23,7 +24,8 @@ namespace Paladin
         double interpolationAlpha,
         SceneDrawQueue* shared,
         const SceneSpriteLibrary* sprites,
-        const CityPresentation* policy
+        const CityPresentation* policy,
+        const SettlementEmploymentState* employment
     ) const
     {
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
@@ -72,12 +74,37 @@ namespace Paladin
                 continue;
             }
 
+            // Presentation follows employment without changing citizen simulation.
+            const char* role = "citizen";
+            if (!citizen.child && employment)
+            {
+                if (const auto* work = employment->workplace(citizen.workplaceId))
+                {
+                    const auto& type = work->objectTypeId;
+                    if (work->constructionId) role = "builder";
+                    else if (type == "wheat_farm") role = "farmer";
+                    else if (type == "fishing_grounds") role = "fisher";
+                    else if (type == "logging_grounds") role = "logger";
+                    else if (type == "pastureland") role = "herder";
+                    else if (type == "bakery") role = "baker";
+                    else if (type == "market") role = "merchant";
+                    else if (type == "stockpile") role = "porter";
+                }
+            }
+            if (!citizen.child && citizen.activity == CitizenActivity::Constructing)
+                role = "builder";
+            bool north = false;
+            if (citizen.pathIndex < citizen.path.size())
+                north = citizen.path[citizen.pathIndex].y < citizen.visualY();
+            const std::string spriteId = std::string("citizen.") + role +
+                (citizen.sex == CitizenSex::Female ? ".female." : ".male.") +
+                (north ? "back" : "front");
             const bool custom =
                 tilePixels >= StaticDetailPixels && sprites &&
                 sprites->submit(
                     queue,
                     projection,
-                    "citizen",
+                    sprites->find(spriteId) ? spriteId : "citizen",
                     citizen.renderX(citizen.visualX(), interpolationAlpha) +
                         sleepOffset + .5,
                     citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,

@@ -289,7 +289,8 @@ namespace Paladin
             interpolationAlpha,
             &raised_,
             &sprites_,
-            &presentation
+            &presentation,
+            &settlementMap.employment()
         );
         const auto drawStart = SDL_GetTicksNS();
         raised_.render(renderer, -3, -1);
