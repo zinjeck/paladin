@@ -143,6 +143,8 @@ namespace Paladin
         Money businessTotal() const;
         Money householdTotal() const;
         Money savings(CitizenId id) const;
+        // Field service is realm-paid, never billed to a captured former city.
+        void payFieldSoldier(CitizenId, Treasury& payer, double elapsed);
         Money spendingBalance(
             const SettlementCitizen&,
             const SettlementCitizenState&

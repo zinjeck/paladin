@@ -6,6 +6,20 @@
 
 namespace Paladin
 {
+    inline void paladinSelectionOutline(Renderer& renderer, UiRectangle bounds)
+    {
+        const float x = std::round(bounds.x), y = std::round(bounds.y);
+        const float w = std::round(bounds.width), h = std::round(bounds.height);
+        if (w < 4 || h < 4) return;
+        const float edge = w < 36 || h < 28 ? 1.F : 2.F;
+        const RenderColor gold{235,196,107,255};
+        // Inside the hit rectangle, after every skin/bevel/label-area overlay.
+        renderer.fillRectangle(x, y, w, edge, gold);
+        renderer.fillRectangle(x, y+h-edge, w, edge, gold);
+        renderer.fillRectangle(x, y+edge, edge, h-2*edge, gold);
+        renderer.fillRectangle(x+w-edge, y+edge, edge, h-2*edge, gold);
+    }
+
     // Native-screen chrome. Authored colors belong to art-palette.hex.
     // Camera zoom never changes these strokes or a control's hit rectangle.
     inline void paladinFrame(Renderer& renderer, UiRectangle bounds,

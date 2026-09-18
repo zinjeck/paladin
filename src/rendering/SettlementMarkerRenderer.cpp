@@ -35,7 +35,9 @@ namespace Paladin
         const Settlement& settlement,
         float centerX,
         float centerY,
-        float visibility
+        float visibility,
+        float labelClearance,
+        bool showSymbol
     ) const
     {
         if (visibility <= 0.0F)
@@ -77,6 +79,8 @@ namespace Paladin
         const float towerHeight = std::round(size * 0.38F);
         const float bodyLeft = std::round(centerX - size * 0.5F);
 
+        if (showSymbol)
+        {
         renderer.fillRectangle(
             bodyLeft - 1.0F,
             bodyTop + 1.0F,
@@ -144,6 +148,8 @@ namespace Paladin
             }
         }
 
+        } // A stationed army takes precedence over the small map symbol.
+
         if (settlement.name().empty())
         {
             return;
@@ -162,7 +168,7 @@ namespace Paladin
         const float labelWidth =
             fontRenderer_.measureWidth(settlement.name(), pixelSize);
         const float labelX = std::round(centerX - labelWidth * 0.5F);
-        const float labelY = std::round(top - 7.0F * pixelSize - 5.0F);
+        const float labelY = std::round(std::min(top,centerY-labelClearance) - 7.0F * pixelSize - 5.0F);
 
         fontRenderer_.drawText(
             renderer,

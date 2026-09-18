@@ -55,6 +55,7 @@ namespace Paladin
         }
 
     private:
+        friend class MilitarySystem;
         std::vector<Workplace> workplaces_;
         IdGenerator<WorkplaceId> ids_;
         std::uint64_t objectVersion_ = ~std::uint64_t(0);

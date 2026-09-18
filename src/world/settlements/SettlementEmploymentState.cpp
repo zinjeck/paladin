@@ -245,7 +245,7 @@ namespace Paladin
         return std::count_if(
             citizens.citizens().begin(),
             citizens.citizens().end(),
-            [](const auto& c) { return !c.child && !c.workplaceId; }
+            [](const auto& c) { return !c.child && !c.militaryDeployed && c.health > 0 && !c.workplaceId; }
         );
     }
     void SettlementEmploymentState::citizenDeparted(WorkplaceId id)
@@ -282,7 +282,7 @@ namespace Paladin
         }
         for (auto& citizen : citizens.citizens_)
         {
-            if (delta > 0 ? (citizen.child || citizen.health <= 0 || bool(citizen.workplaceId))
+            if (delta > 0 ? (citizen.child || citizen.militaryDeployed || citizen.health <= 0 || bool(citizen.workplaceId))
                           : (citizen.workplaceId != id || citizen.militaryUnitId ||
                              citizen.militaryDeployed))
             {
@@ -359,7 +359,7 @@ namespace Paladin
         const auto adults = std::count_if(
             citizens.citizens().begin(),
             citizens.citizens().end(),
-            [](const auto& c) { return !c.child; }
+            [](const auto& c) { return !c.child && !c.militaryDeployed && c.health > 0; }
         );
         const double percent =
             adults ? 100.0 * unemployed(citizens) / adults : 0;

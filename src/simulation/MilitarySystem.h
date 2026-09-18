@@ -13,7 +13,7 @@ namespace Paladin
     enum class MilitaryResult
     {
         Success, InvalidUnit, NotOwned, NoBarracksEmployee, ReturnHome,
-        EmptyUnit, InvalidDestination, NoLandRoute, UnitLimit
+        EmptyUnit, InvalidDestination, NoLandRoute, UnitLimit, PersonnelOrigin
     };
     const char* militaryResultText(MilitaryResult result) noexcept;
 
@@ -31,6 +31,8 @@ namespace Paladin
         static std::size_t available(const World&, SettlementId) noexcept;
         static bool presentAt(const World&, const Army&, SettlementId) noexcept;
         static bool canOrganize(const World&, const Army&) noexcept;
+        static SettlementId stationAt(const World&, const Army&) noexcept;
+        static std::size_t releasable(const World&, const Army&) noexcept;
         static constexpr int RationsPerSoldier = 6; // three nominal days
         static constexpr std::size_t MaximumUnitsPerRealm = 256;
     private:
@@ -40,5 +42,6 @@ namespace Paladin
         static void setDeployed(World&, Army&, bool, double minute, const PersonnelIndex* = nullptr);
         static void resupply(World&, Army&, double minute);
         static void returnSurplus(World&, Army&, double minute);
+        static bool restoreEmployment(World&, const class Soldier&);
     };
 }

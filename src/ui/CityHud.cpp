@@ -38,8 +38,10 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 16> menuOptions{
+        constexpr std::array<MenuOptionDefinition, 18> menuOptions{
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
+             {0, SettlementObjectTypes::Barracks, "", "", "Barracks", ""},
+             {0, SettlementObjectTypes::ArmySupplyDepot, "", "", "Army Supply", "Depot"},
              {1, SettlementObjectTypes::Road, "", "", "Road", ""},
              {2, SettlementObjectTypes::House, "", "", "House", ""},
              {3,
@@ -310,6 +312,8 @@ namespace Paladin
         {
             bottomButtons_[i].setEnabled(i == 0 || hasKeep_);
         }
+        for (std::size_t i=0;i<optionButtons_.size();++i)
+            optionButtons_[i].setEnabled(hasKeep_ || menuOptions[i].objectTypeId == SettlementObjectTypes::CityKeep);
     }
 
     void CityHud::setCityInformation(

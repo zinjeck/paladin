@@ -48,7 +48,9 @@ namespace Paladin
             const Settlement& settlement,
             float centerX,
             float centerY,
-            float visibility = 1.0F
+            float visibility = 1.0F,
+            float labelClearance = 0.0F,
+            bool showSymbol = true
         ) const
         {
             drawMarker(
@@ -57,7 +59,9 @@ namespace Paladin
                 settlement,
                 centerX,
                 centerY,
-                visibility
+                visibility,
+                labelClearance,
+                showSymbol
             );
         }
 
@@ -68,7 +72,9 @@ namespace Paladin
             const Settlement& settlement,
             float centerX,
             float centerY,
-            float visibility = 1.0F
+            float visibility = 1.0F,
+            float labelClearance = 0.0F,
+            bool showSymbol = true
         ) const;
 
         SettlementWorldPresentationPolicy policy_;

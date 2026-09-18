@@ -89,6 +89,8 @@ namespace Paladin
                          enabled && (selected || hovered), pressed);
         }
 
+        if (enabled && selected) paladinSelectionOutline(renderer, bounds);
+
         constexpr float preferredTextPixelSize = 3.0F;
         const float horizontalTextPadding =
             std::min(text.size() == 1 ? 8.0F : 20.0F, bounds.width * 0.2F);
@@ -268,6 +270,8 @@ namespace Paladin
             labelAreaHeight,
             {8, 15, 27, 220}
         );
+
+        if (selected) paladinSelectionOutline(renderer, bounds);
 
         constexpr float preferredPixelSize = 3.0F;
         const float textWidth =

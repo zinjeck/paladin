@@ -26,6 +26,10 @@
 #include "rendering/WorldCartography.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/RealmRulerSystem.h"
+#include "simulation/MilitarySystem.h"
+#include "rendering/WorldArmyPresentation.h"
+#include "rendering/WorldMapNavigation.h"
+#include "ui/MilitaryPanel.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -206,6 +210,99 @@ namespace Paladin
             app.layoutFrame();
             app.updateFrame();
             app.renderFrame();
+        }
+
+        static void militaryRoutingChecks(Application& app)
+        {
+            auto& sim=*app.simulation_; auto& world=sim.world();
+            const auto city=sim.presentedSettlementId();
+            PALADIN_CHECK(city && world.settlement(city)->ownerRealmId()==sim.playerRealmId());
+            auto& map=*sim.settlementMap(city);
+            for (int y=0;y<map.grid().height();++y) for (int x=0;x<map.grid().width();++x)
+                map.grid().tile({x,y})->terrain=TerrainType::Land;
+            for (const auto type : {SettlementObjectTypes::CityKeep,SettlementObjectTypes::Barracks})
+            {
+                auto definition=*SettlementObjectCatalog::definition(type); definition.bypassesConstruction=true;
+                const SettlementObjectFootprint footprint=type==SettlementObjectTypes::CityKeep
+                    ? SettlementObjectFootprint{{2,2},5,7}:SettlementObjectFootprint{{11,2},5,5};
+                PALADIN_CHECK(map.objectState().placeCompletedObject(map.grid(),definition,footprint));
+                map.naturalFeatures().clear(footprint);
+            }
+            map.logistics.synchronize(map.objectState(),double(world.time().totalGameMinutes()));
+            world.settlement(city)->simulationState().citizens().placeUnpositionedCitizens(map);
+            app.inspectedWorldSettlementId_={};
+            app.settlementPlacementController_->cancelSelection();
+            app.foundingPanel_->close();
+            app.settlementInspectionController_->clear();
+            app.settlementInspectionPanel_->clearLayout();
+            app.simulationClock_->setPaused(true); sim.setSpeed(SimulationSpeed::Paused);
+            PALADIN_CHECK(sim.setPresentedSettlement(city));
+            PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
+            frame(app);
+            using A=MilitaryPanel::Action;
+            const auto button=[&](A action,ArmyId id=ArmyId{})
+            {
+                const auto b=app.militaryPanel_->controlBounds(action,id); PALADIN_CHECK(b);
+                PALADIN_CHECK(click(app,b->x+b->width*.5F,b->y+b->height*.5F));
+            };
+            button(A::Hire); button(A::Hire); button(A::New);
+            const auto first=app.militaryPanel_->selection(); PALADIN_CHECK(first);
+            button(A::New); const auto second=app.militaryPanel_->selection(); PALADIN_CHECK(second && first!=second);
+            button(A::Row,first); button(A::Focus);
+            PALADIN_CHECK(app.screen_==Application::Screen::World && app.selectedWorldArmy_==first);
+            const auto cityPosition=world.settlement(city)->position();
+            const float width=float(app.renderer_->outputWidth()),height=float(app.renderer_->outputHeight());
+            constexpr double pixels=256, pi=3.14159265358979323846;
+            for (const bool globe : {false,true})
+            {
+                app.worldRenderer_->globeEnabled=globe;
+                app.camera_->setPosition(cityPosition.x+.5,cityPosition.y+.5);
+                app.camera_->setWorldZoom(globe?pixels*world.grid().width()/(height*.4*2*pi):pixels/app.tileRenderMetrics_->tilePixels);
+                if (globe) app.camera_->setPlanetRotation(GlobeView::orientationAt(
+                    {(cityPosition.x+.5)/world.grid().width(),(cityPosition.y+.5)/world.grid().height()},pi),
+                    world.grid().width(),world.grid().height());
+                frame(app);
+                const auto pos=WorldMapNavigation::annotationPosition(*app.camera_,world.grid(),int(width),int(height),pixels,globe,
+                    cityPosition.x+.5,cityPosition.y+.5); PALADIN_CHECK(pos);
+                const auto* sprite=worldArmySprite(app.worldRenderer_->artwork(),world,*world.army(first));
+                const auto body=worldArmySpriteBounds(pos->x,pos->y,pixels,sprite);
+                PALADIN_CHECK(pos->y-(body.y+8)>22);
+                app.selectedWorldArmy_={};
+                PALADIN_CHECK(click(app,body.x+body.width*.5F,body.y+8));
+                PALADIN_CHECK(app.selectedWorldArmy_==first);
+                PALADIN_CHECK(click(app,body.x+body.width*.5F,body.y+8));
+                PALADIN_CHECK(app.selectedWorldArmy_==second); // overlap cycling
+                const auto count=worldArmyCountBounds(pos->x,pos->y,1);
+                PALADIN_CHECK(click(app,count.x+count.width*.5F,count.y+count.height*.5F));
+                PALADIN_CHECK(app.selectedWorldArmy_==first);
+                frame(app); capture(app,globe?"pr27-army-globe-selected.bmp":"pr27-army-flat-selected.bmp");
+            }
+            SDL_Event right{}; right.type=SDL_EVENT_MOUSE_BUTTON_DOWN; right.button.button=SDL_BUTTON_RIGHT;
+            right.button.x=30; right.button.y=90;
+            PALADIN_CHECK(send(app,right)); // status panel is not a movement target
+            PALADIN_CHECK(!world.army(first)->moving());
+            const WorldTilePosition destination{cityPosition.x+1,cityPosition.y};
+            world.grid().tile(destination)->terrain=TerrainType::Land;
+            const auto point=WorldMapNavigation::annotationPosition(*app.camera_,world.grid(),int(width),int(height),pixels,true,
+                destination.x+.5,destination.y+.5); PALADIN_CHECK(point);
+            right.button.x=float(point->x); right.button.y=float(point->y);
+            PALADIN_CHECK(send(app,right));
+            PALADIN_CHECK(world.army(first)->moving());
+            PALADIN_CHECK(!MilitarySystem::presentAt(world,*world.army(first),city));
+            PALADIN_CHECK(!world.army(first)->stationedSettlementId());
+            const auto initial=world.army(first)->visualX();
+            sim.tick(1); PALADIN_CHECK(world.army(first)->visualX()==initial);
+            MilitarySystem::tick(world,double(world.time().totalGameMinutes()),15);
+            PALADIN_CHECK(std::abs(world.army(first)->visualX()-(initial+.5))<1.e-8);
+            frame(app); capture(app,"pr27-army-half-tile-march.bmp");
+            PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
+            frame(app); button(A::Local);
+            PALADIN_CHECK(!app.militaryPanel_->controlBounds(A::Row,first));
+            PALADIN_CHECK(app.militaryPanel_->controlBounds(A::Row,second));
+            button(A::World); PALADIN_CHECK(app.militaryPanel_->controlBounds(A::Row,first));
+            key(app,SDL_SCANCODE_ESCAPE); key(app,SDL_SCANCODE_ESCAPE);
+            PALADIN_CHECK(!app.selectedWorldArmy_ && !app.militaryPanel_->isOpen());
+            std::cout<<"Military actual event routing: portrait creation, large sprite/head/count picking, overlap cycling, rolled-globe tile order, pause and city detachment passed\n";
         }
 
         static void realmPanelChecks(Application& app)
@@ -3101,6 +3198,12 @@ namespace Paladin
             app.camera_->setPosition(38.5, 32.5);
             app.camera_->setWorldZoom(8);
             frame(app);
+            // World input is intentionally blocked during asynchronous
+            // terrain preparation after returning from a settlement.
+            const auto returnDeadline=SDL_GetTicks()+120000;
+            while (!app.worldRenderer_->terrainDetailReady() && SDL_GetTicks()<returnDeadline)
+            { frame(app); SDL_Delay(1); }
+            PALADIN_CHECK(app.worldRenderer_->terrainDetailReady());
             PALADIN_CHECK(click(app, width * .5F, height * .5F));
             PALADIN_CHECK(
                 app.settlementPlacementController_->hasLockedSelection()
@@ -3173,6 +3276,7 @@ namespace Paladin
             capture(app, "realm-inspection.bmp");
             std::cout
                 << "Fortress creation and AI map isolation routing passed\n";
+            militaryRoutingChecks(app);
             PALADIN_CHECK(click(app, 70, height - 22)); // World Back.
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(!app.simulation_);

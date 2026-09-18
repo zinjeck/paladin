@@ -572,6 +572,21 @@ namespace Paladin
             citizens_.erase(it);
         }
     }
+    void SettlementCommerce::payFieldSoldier(CitizenId id, Treasury& payer, double elapsed)
+    {
+        if (!id || !std::isfinite(elapsed) || elapsed <= 0 || !payer.usesMoney()) return;
+        const CommercePolicy fieldPolicy;
+        auto& wallet = citizens_[id];
+        wallet.accrued += double(fieldPolicy.dailyWage) * elapsed / 1440.;
+        const Money due = Money(wallet.accrued);
+        wallet.accrued -= double(due);
+        const Money paid = std::min(payer.balance, due);
+        transfer(payer.balance, wallet.cash, paid);
+        const Money taxable = std::min(paid,std::max<Money>(0,wallet.cash-fieldPolicy.taxProtectedBalance));
+        const Money hundredths = taxable*payer.incomeTax.percent + wallet.realmTaxRemainder;
+        wallet.realmTaxRemainder = hundredths % 100;
+        transfer(wallet.cash,payer.balance,hundredths/100);
+    }
     void SettlementCommerce::update(
         SettlementMap& map,
         SettlementCitizenState& people,
@@ -613,6 +628,10 @@ namespace Paladin
             living.emplace(c.id, &c);
             auto [entry, inserted] = citizens_.try_emplace(c.id);
             auto& wallet = entry->second;
+            // The record remains for identity/family/savings continuity, but
+            // an expeditionary soldier isn't this city's employee or taxpayer.
+            // MilitarySystem pays from the unit's realm and handles field food.
+            if (c.militaryDeployed) continue;
             if (monetary && !wallet.adultFunded && !c.child)
             {
                 wallet.adultFunded = true;
@@ -622,8 +641,7 @@ namespace Paladin
                     std::min(treasury->balance, policy.startingSavings)
                 );
             }
-            const bool working = c.militaryDeployed ||
-                map.activities.caregivingAtWorkTime(map, c, minute) ||
+            const bool working = map.activities.caregivingAtWorkTime(map, c, minute) ||
                 c.task.kind == CitizenTaskKind::AnimalWork ||
                 c.task.kind == CitizenTaskKind::Work ||
                 c.task.kind == CitizenTaskKind::Build ||
@@ -641,7 +659,6 @@ namespace Paladin
             // reserves. An empty-pasture employee doing the same civic work as
             // an unemployed citizen is treasury-paid for that work instead.
             const double rate = !monetary   ? 0
-                                : c.militaryDeployed ? policy.dailyWage / 1440.0
                                 : inactive_ ? frozenPayRates_[c.id]
                                 : !c.child && working
                                     ? policy.dailyWage / 720.0

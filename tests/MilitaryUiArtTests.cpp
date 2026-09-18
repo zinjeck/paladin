@@ -6,6 +6,9 @@
 #include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldObjectRenderer.h"
+#include "rendering/WorldArmyPresentation.h"
+#include "rendering/GlobeView.h"
+#include "ui/CityHud.h"
 #include "rendering/WorldPixelGrid.h"
 #include "simulation/MilitarySystem.h"
 #include "simulation/Simulation.h"
@@ -150,29 +153,36 @@ namespace
         PALADIN_CHECK(panel.bounds().y + panel.bounds().height <= 360);
         panel.close();
         panel.toggle(city); panel.layout(960,640,world,sim.playerRealmId());
-        const auto bounds=panel.bounds();
-        const float x=bounds.x+16,inner=bounds.width-32;
-        const float tools=bounds.y+104+std::max(48.F,bounds.height-316)+8;
-        const auto click=[&](float px,float py)
+        const auto click=[&](MilitaryPanel::Action action, ArmyId id=ArmyId{})
         {
+            const auto b=panel.controlBounds(action,id); PALADIN_CHECK(b);
             SDL_Event event{}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;
-            event.button.button=SDL_BUTTON_LEFT; event.button.x=px; event.button.y=py;
+            event.button.button=SDL_BUTTON_LEFT;
+            event.button.x=b->x+b->width*.5F; event.button.y=b->y+b->height*.5F;
             PALADIN_CHECK(panel.handle(event,world,sim.playerRealmId()));
             event.type=SDL_EVENT_MOUSE_BUTTON_UP;
             PALADIN_CHECK(panel.handle(event,world,sim.playerRealmId()));
         };
-        click(x+16,tools+15); const auto unit=panel.selection(); PALADIN_CHECK(unit);
-        click(x+(inner-12)/3+22,tools+15); click(x+(inner-12)/3+22,tools+15);
-        click(x+(inner-18)/4+22,tools+93);
-        PALADIN_CHECK(world.army(unit)->soldierCount()==2);
-        renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
-        panel.render(renderer,ui,world,sim.playerRealmId());
-        capture(window,"pr26-military-panel.png"); renderer.endFrame();
-        click(x+2*((inner-18)/4+6)+16,tools+93);
+        using A=MilitaryPanel::Action;
+        click(A::New); PALADIN_CHECK(!panel.selection() && world.armies().empty());
+        click(A::Hire); click(A::Hire);
+        PALADIN_CHECK(MilitarySystem::available(world,city)==2);
+        click(A::New); const auto unit=panel.selection(); PALADIN_CHECK(unit);
         PALADIN_CHECK(world.army(unit)->soldierCount()==1);
-        click(x+inner*.5F+16,bounds.y+59); // local tab
-        click(x+16,bounds.y+59); // world tab
-        click(x+inner*.5F+16,tools+129); // show selected unit on world map
+        click(A::AddFive); PALADIN_CHECK(world.army(unit)->soldierCount()==2);
+        renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+        panel.render(renderer,ui,world,sim.playerRealmId(),&art);
+        capture(window,"pr26-military-panel.png"); renderer.endFrame();
+        click(A::RemoveOne); PALADIN_CHECK(world.army(unit)->soldierCount()==1);
+        click(A::New); const auto second=panel.selection(); PALADIN_CHECK(second && second!=unit);
+        const auto firstCard=panel.controlBounds(A::Row,unit), secondCard=panel.controlBounds(A::Row,second);
+        PALADIN_CHECK(firstCard && secondCard && firstCard->height>firstCard->width);
+        PALADIN_CHECK(firstCard->x==secondCard->x && firstCard->y+firstCard->height<secondCard->y);
+        renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+        panel.render(renderer,ui,world,sim.playerRealmId(),&art);
+        capture(window,"pr27-portrait-unit-column.png"); renderer.endFrame();
+        click(A::Disband); PALADIN_CHECK(!world.army(second));
+        click(A::Row,unit); click(A::Local); click(A::World); click(A::Focus);
         PALADIN_CHECK(panel.takeFocus()==unit && !panel.isOpen());
         // Sprite stages are presentation derived from actual population.
         WorldObjectRenderer objects; Camera2D camera(32.5,33.5); camera.setWorldZoom(16);
@@ -184,6 +194,25 @@ namespace
         };
         const auto fallback=worldFrame("pr26-world-without-art.png",nullptr);
         auto settlement=worldFrame("pr26-world-settlement.png",&art); PALADIN_CHECK(settlement!=fallback);
+        PALADIN_CHECK(MilitarySystem::resizeUnit(world,sim.playerRealmId(),unit,1)==MilitaryResult::Success);
+        const auto two=worldFrame("pr27-one-character-two-soldiers.png",&art);
+        bool labelChanged=false;
+        const auto countPlate=worldArmyCountBounds(480,256,2);
+        for (int y=0;y<640;++y) for (int x=0;x<960;++x)
+        {
+            if (countPlate.contains(float(x),float(y))) labelChanged |= two[y*960+x]!=settlement[y*960+x];
+            else PALADIN_CHECK(two[y*960+x]==settlement[y*960+x]);
+        }
+        PALADIN_CHECK(labelChanged);
+        for (const double scale : {.25,4.,16.,64.,256.})
+        {
+            const auto* sprite=worldArmySprite(art,world,*world.army(unit));
+            const auto body=worldArmySpriteBounds(480,320,scale,sprite);
+            PALADIN_CHECK(body.height>=24.F);
+            PALADIN_CHECK(worldArmyHitTest(body.x+body.width*.5,body.y+3,480,320,scale,sprite,2));
+            PALADIN_CHECK(worldArmyHitTest(480,335,480,320,scale,sprite,2));
+            PALADIN_CHECK(!worldArmyHitTest(5,5,480,320,scale,sprite,2));
+        }
         PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(120));
         auto town=worldFrame("pr26-world-town.png",&art); PALADIN_CHECK(town!=settlement);
         PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(896));
@@ -200,6 +229,103 @@ namespace
             ui.drawButton(renderer,{112.F,196.F+64*state,736,44},"Build: Housing 20 Wood",state==1,state==2,state==3,state!=4);
         capture(window,"pr26-ui-states.png"); renderer.endFrame();
     }
+    void selectionAndConstruction(Renderer& renderer, SDL_Window* window)
+    {
+        GrayUiRenderer ui;
+        const auto verify=[&](bool skin)
+        {
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
+            const UiRectangle button{70,100,252,70}, card{360,100,252,70}, pressed{70,220,252,70};
+            ui.drawButton(renderer,button,"Tribal",false,false,true,true);
+            ui.drawChoiceCard(renderer,card,"Civic",true,false,true);
+            ui.drawButton(renderer,pressed,"Selected + pressed",true,true,true,true);
+            const auto pixels=capture(window,skin?"pr27-selection-skinned.png":"pr27-selection-fallback.png");
+            renderer.endFrame();
+            for (const auto b : {button,card,pressed})
+            {
+                const auto gold=[&](int x,int y)
+                {
+                    const auto* rgb=reinterpret_cast<const Uint8*>(&pixels[y*960+x]);
+                    PALADIN_CHECK(rgb[0]==235 && rgb[1]==196 && rgb[2]==107);
+                };
+                for (int x=int(b.x);x<int(b.x+b.width);++x)
+                { gold(x,int(b.y)); gold(x,int(b.y+b.height)-1); }
+                for (int y=int(b.y);y<int(b.y+b.height);++y)
+                { gold(int(b.x),y); gold(int(b.x+b.width)-1,y); }
+            }
+        };
+        verify(false);
+        std::vector<RenderColor> skinPixels(24*24,{8,15,27,255});
+        ButtonSpriteSkin skin;
+        skin.atlas=renderer.createTextureFromPixels(24,24,skinPixels);
+        for (auto& frame:skin.frames) frame={0,0,24,24};
+        skin.sliceBorder=4;
+        ui.setButtonSkin("default",skin); verify(true);
+        CityHud hud;
+        for (const bool fortress : {false,true})
+        {
+            hud.setFortress(fortress); hud.setSettlementStatus(true,8); hud.layout(960,640);
+            const float x=(960.F-76.F*(fortress?3:7))*.5F+38;
+            const auto press=[&](float px,float py)
+            { PALADIN_CHECK(hud.pointerPressed(px,py)); return hud.pointerReleased(px,py); };
+            press(x,608);
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+            hud.render(renderer,ui);
+            capture(window,fortress?"pr27-fortress-rule-buildings.png":"pr27-rule-buildings.png"); renderer.endFrame();
+            PALADIN_CHECK(hud.containsInteractivePoint(x,468));
+            PALADIN_CHECK(press(x,468)==CityHudAction::BeginObjectPlacement);
+            PALADIN_CHECK(hud.selectedObjectTypeId()==SettlementObjectTypes::Barracks);
+            hud.closeCategoryMenus(); press(x,608);
+            PALADIN_CHECK(press(x,398)==CityHudAction::BeginObjectPlacement);
+            PALADIN_CHECK(hud.selectedObjectTypeId()==SettlementObjectTypes::ArmySupplyDepot);
+            hud.closeCategoryMenus();
+        }
+    }
+    void uprightSettlements(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
+    {
+        WorldGenerationSettings settings;
+        settings.width=settings.height=64; settings.seed=711; settings.populateAiRealms=false;
+        Simulation sim(settings); auto& world=sim.world();
+        for(int y=0;y<64;++y) for(int x=0;x<64;++x) world.grid().tile({x,y})->terrain=TerrainType::Land;
+        const auto city=sim.foundPlayerCapital({32,32},{"Roll Realm","Roll Folk","Orientation",{},"civic",{}});
+        PALADIN_CHECK(city);
+        WorldObjectRenderer objects;
+        constexpr double pi=3.14159265358979323846;
+        for (const WorldTilePosition location : {WorldTilePosition{32,32},{1,12},{62,49},{30,1},{30,62}})
+        {
+            PALADIN_CHECK(world.setSettlementPosition(city,location));
+            for (const double pixels : {16.,39.95,40.,64.,127.5,256.})
+            {
+                std::vector<std::uint32_t> reference;
+                for (const double roll : {0.,.37,pi*.5,pi,-pi+.00001})
+                {
+                    Camera2D camera(location.x+.5,location.y+.5);
+                    camera.setWorldZoom(pixels*64/(640*.40*2*pi));
+                    camera.setPlanetRotation(GlobeView::orientationAt({(location.x+.5)/64.,(location.y+.5)/64.},roll),64,64);
+                    renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+                    objects.render(renderer,world,camera,pixels,true,worldPresentationState(pixels),true,{},std::nullopt,{},&art);
+                    const auto image=capture(window,"pr27-upright-"+std::to_string(location.x)+"-"+std::to_string(location.y)+"-"+std::to_string(int(pixels))+"-"+std::to_string(roll)+".png");
+                    renderer.endFrame();
+                    if (reference.empty()) reference=image;
+                    else PALADIN_CHECK(reference==image);
+                }
+            }
+        }
+        // The former .999 local-surface switch must not rotate sprite art.
+        Camera2D camera(30.5,62.5); camera.setWorldZoom(64*64/(640*.40*2*pi));
+        camera.setPlanetRotation(GlobeView::orientationAt({30.5/64,62.5/64},pi),64,64);
+        std::vector<std::uint32_t> reference;
+        for (const float local : {.9989F,.9991F,1.F})
+        {
+            auto p=worldPresentationState(64); p.localWorldWeight=local; p.regionalWeight=1-local;
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+            objects.render(renderer,world,camera,64,true,p,true,{},std::nullopt,{},&art);
+            const auto image=capture(window,"pr27-billboard-transition-"+std::to_string(local)+".png"); renderer.endFrame();
+            if(reference.empty()) reference=image; else PALADIN_CHECK(reference==image);
+        }
+        std::cout<<"Upright world art: five geographic regions, six zooms, five rolls and former flip threshold passed.\n";
+    }
+
 }
 int main()
 {
@@ -214,6 +340,8 @@ int main()
         PALADIN_CHECK(art.find("citizen.militia.male.front.walk"));
         actors(renderer,window.nativeHandle(),art);
         militaryAndCities(renderer,window.nativeHandle(),art);
+        selectionAndConstruction(renderer,window.nativeHandle());
+        uprightSettlements(renderer,window.nativeHandle(),art);
         std::cout<<"Military UI, live city tiers, walking/gathering, sleep pixel blocks and pause checks passed.\n";
     }
     catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; result=1; }

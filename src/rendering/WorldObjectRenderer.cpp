@@ -5,6 +5,8 @@
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/Texture.h"
+#include "ui/BitmapFontRenderer.h"
+#include "rendering/WorldArmyPresentation.h"
 #include "world/Army.h"
 #include "world/Realm.h"
 #include "world/Settlement.h"
@@ -160,8 +162,8 @@ namespace Paladin
 
         // Real world geometry retains its 32 px/tile detail. At close globe
         // scale it is rasterized in the SAME unrotated source chart as terrain,
-        // then rotated and translated as one layer. The residual is not rounded
-        // independently for every road endpoint or sprite.
+        // then rotated and translated as one layer. Billboard sprites use the
+        // same projected ground anchors but never inherit terrain rotation.
         const bool planarObjects = globe && localWeight >= .999F;
         const double overscan = planarObjects
             ? tangentView.overscanScale(effectiveTilePixels / WorldPixelsPerTile + 4.0) : 1.0;
@@ -176,6 +178,7 @@ namespace Paladin
                 float(renderer.outputWidth()*.5 + dx*geometryPixels),
                 float(renderer.outputHeight()*.5 + (y-renderCamera.tileY())*geometryPixels),1,1};
         };
+        if (worldObjectVisibility > .001F && !world.worldRoads().empty())
         {
             WorldObjectPixelScene objectScene(renderer, geometryPixels,
                 planarObjects ? tangentView.rollRadians()*180.0/3.14159265358979323846 : 0.0,
@@ -247,6 +250,16 @@ namespace Paladin
             }
         }
 
+        } // Ground-locked roads end their rotated source-chart layer here.
+
+        if ((worldObjectVisibility > .001F && (artwork || !fallbackSprites.empty())) ||
+            (artwork && !world.armies().empty()))
+        {
+        // Upright billboards at every latitude, roll and projection/LOD. Only
+        // ground anchors follow the globe. Rotating this layer used to turn
+        // towns upside down, with a sudden flip at localWeight == .999.
+        WorldObjectPixelScene billboardScene(renderer, effectiveTilePixels,
+            0.0, 1.0, rigidResidual.x, rigidResidual.y);
         if (worldObjectVisibility > .001F)
         {
             for (const SpriteRenderItem& item : fallbackSprites)
@@ -255,7 +268,7 @@ namespace Paladin
                 {
                     continue;
                 }
-                const auto point = geometryProject(item.tileX, item.tileY);
+                const auto point = project(item.tileX, item.tileY);
                 if (!point || outside(*point, renderer, 256.0F))
                 {
                     continue;
@@ -269,11 +282,11 @@ namespace Paladin
                 const float width =
                     (item.displayWidthPixels > 0.0F ? item.displayWidthPixels
                                                     : sourceWidth) *
-                    float(renderCamera.zoom() / overscan);
+                    float(renderCamera.zoom());
                 const float height =
                     (item.displayHeightPixels > 0.0F ? item.displayHeightPixels
                                                      : sourceHeight) *
-                    float(renderCamera.zoom() / overscan);
+                    float(renderCamera.zoom());
                 renderer.drawTexture(
                     *item.texture,
                     item.sourceX,
@@ -295,7 +308,7 @@ namespace Paladin
             }
         }
 
-        if (artwork && worldObjectVisibility > .001F)
+        if (artwork)
         {
             struct ArtItem
             {
@@ -303,15 +316,17 @@ namespace Paladin
                 ProjectedWorldObject point;
                 double scale;
                 int pose;
+                float visibility;
             };
             std::vector<ArtItem> items;
             const auto append = [&](const char* id, double x, double y,
                                     double scale, int pose = 0)
             {
                 const auto* sprite = artwork->find(id);
-                const auto point = geometryProject(x, y);
+                const auto point = project(x, y);
                 if (sprite && sprite->texture && point && !outside(*point, renderer, 256))
-                    items.push_back({sprite, *point, scale, pose});
+                    items.push_back({sprite, *point, scale, pose,
+                        worldObjectVisibility * std::clamp(float((effectiveTilePixels-5)/11),0.F,1.F)});
             };
             // These are presentation thresholds, not new settlement entity types.
             for (const auto& settlement : world.settlements())
@@ -320,43 +335,33 @@ namespace Paladin
                     settlement.population() >= 1024 ? "world.city" :
                     settlement.population() >= 128 ? "world.town" : "world.settlement";
                 const auto p = settlement.position();
-                append(stage, p.x + .5, p.y + .5, 1.0);
+                if (worldObjectVisibility > .001F) append(stage, p.x + .5, p.y + .5, 1.0);
             }
             for (const auto& army : world.armies())
             {
-                // Bounded formation art represents real roster entries. It is
-                // not another population and never adds soldiers to simulation.
-                const int count = int(std::min<std::size_t>(army.soldierCount(), 6));
-                const bool north = army.facingNorth();
-                const int pose = army.moving() ? int(std::fmod(army.marchDistance(), 1.0) * 4.0) : 0;
-                for (int i = 0; i < count; ++i)
-                {
-                    const auto* soldier = world.soldier(army.soldiers()[i]);
-                    const auto* home = soldier ? world.settlement(soldier->homeSettlementId()) : nullptr;
-                    const auto* person = home ? home->simulationState().citizens().citizen(soldier->sourceCitizenId()) : nullptr;
-                    const bool female = person && person->sex == CitizenSex::Female;
-                    append(north ? (female ? "citizen.militia.female.back.walk" : "citizen.militia.male.back.walk") :
-                                   (female ? "citizen.militia.female.front.walk" : "citizen.militia.male.front.walk"),
-                        army.visualX() + .5 + ((i % 3) - 1) * .40,
-                        army.visualY() + .5 + (i / 3) * .32,
-                        .50, pose);
-                }
+                if (army.soldierCount() == 0) continue;
+                // One strategic representative, regardless of roster size.
+                // Actual strength is the native-screen count below the sprite.
+                const auto* sprite = worldArmySprite(*artwork,world,army);
+                const auto point = project(army.visualX()+.5,army.visualY()+.5);
+                if (sprite && sprite->texture && point && !outside(*point,renderer,256))
+                    items.push_back({sprite,*point,worldArmySpriteScale(effectiveTilePixels,sprite),
+                        army.moving()?int(std::floor(army.marchDistance()*4))%4:0,1.F});
             }
             std::stable_sort(items.begin(), items.end(), [](const auto& a, const auto& b)
             { return a.point.y < b.point.y; });
             // Atlas frames retain nearest filtering and one common 32-texel
-            // strategic lattice. Source-camera rotation/residual happens once.
-            const float detail = std::clamp(float((effectiveTilePixels - 5) / 11), 0.F, 1.F);
+            // strategic lattice. The common source-camera residual happens once.
             for (const auto& item : items)
             {
                 auto source = artwork->frame(*item.sprite, false);
                 source.x += float(item.pose % std::max(1, item.sprite->frames)) * source.width;
-                const float w = float(item.sprite->width * item.scale * geometryPixels);
-                const float h = float(item.sprite->height * item.scale * geometryPixels);
+                const float w = float(item.sprite->width * item.scale * effectiveTilePixels);
+                const float h = float(item.sprite->height * item.scale * effectiveTilePixels);
                 renderer.drawTexture(*item.sprite->texture, source.x, source.y, source.width, source.height,
                     item.point.x - w * float(item.sprite->pivotX),
                     item.point.y - h * float(item.sprite->pivotY), w, h,
-                    visibleColor({255,255,255,255}, detail * worldObjectVisibility * item.point.visibility).alpha);
+                    visibleColor({255,255,255,255}, item.visibility * item.point.visibility).alpha);
             }
         }
 
@@ -380,7 +385,6 @@ namespace Paladin
             p->y += float(rigidResidual.y);
             return p;
         };
-        if (worldObjectVisibility > 0.001F)
         {
             struct SettlementProjection
             {
@@ -391,6 +395,7 @@ namespace Paladin
             settlements.reserve(world.settlements().size());
             for (const Settlement& settlement : world.settlements())
             {
+                if (worldObjectVisibility <= .001F) continue;
                 const auto position = settlement.position();
                 auto point = annotationProject(
                     double(position.x) + 0.5,
@@ -409,20 +414,48 @@ namespace Paladin
                 [](const auto& a, const auto& b)
                 { return a.point.depth < b.point.depth; }
             );
+            struct ArmyPlate { ProjectedWorldObject point; UiRectangle body; };
+            std::vector<ArmyPlate> armyPlates;
+            armyPlates.reserve(world.armies().size());
+            if (artwork)
+                for (const auto& army : world.armies())
+                {
+                    if (!army.soldierCount()) continue;
+                    const auto point=annotationProject(army.visualX()+.5,army.visualY()+.5);
+                    const auto* sprite=worldArmySprite(*artwork,world,army);
+                    if (point && sprite && sprite->texture && !outside(*point,renderer,256))
+                        armyPlates.push_back({*point,worldArmySpriteBounds(point->x,point->y,effectiveTilePixels,sprite)});
+                }
             for (const auto& item : settlements)
             {
+                float clearance=0.F;
+                bool showSymbol=true;
+                for (const auto& army : armyPlates)
+                {
+                    // Preserve geographic anchors; move only the native text
+                    // away from the soldier rather than drawing over his head.
+                    if (std::abs(army.point.x-item.point.x)<std::max(16.F,army.body.width*.5F) &&
+                        std::abs(army.point.y-item.point.y)<24.F)
+                    {
+                        clearance=std::max(clearance,item.point.y-army.body.y+4.F);
+                        showSymbol=false;
+                    }
+                }
                 settlementMarkerRenderer_.drawAt(
                     renderer,
                     world,
                     *item.settlement,
                     item.point.x,
                     item.point.y,
-                    item.point.visibility
+                    item.point.visibility,
+                    clearance,
+                    showSymbol
                 );
             }
 
             for (const Army& army : world.armies())
             {
+                if (army.soldierCount() == 0) continue;
                 const auto point = annotationProject(
                     army.visualX() + 0.5,
                     army.visualY() + 0.5
@@ -431,10 +464,16 @@ namespace Paladin
                 {
                     continue;
                 }
-                const float symbolWeight = artwork && army.soldierCount() > 0
-                    ? 1.F - std::clamp(float((effectiveTilePixels - 10) / 18), 0.F, 1.F) : 1.F;
+                const auto label=worldArmyCountBounds(point->x,point->y,army.soldierCount());
+                const float countVisibility = point->visibility;
+                renderer.fillRectangle(label.x,label.y,label.width,label.height,
+                    visibleColor({8,15,27,235},countVisibility));
+                BitmapFontRenderer{}.drawText(renderer,std::to_string(army.soldierCount()),label.x+4,label.y+3,2.F,
+                    visibleColor({239,226,207,255},countVisibility));
+                const auto* sprite = artwork ? worldArmySprite(*artwork,world,army) : nullptr;
+                const float symbolWeight = sprite && sprite->texture ? 0.F : 1.F;
                 const float visibility =
-                    worldObjectVisibility * point->visibility * symbolWeight;
+                    point->visibility * symbolWeight;
                 const float radius = std::clamp(
                     float(effectiveTilePixels * 0.22),
                     5.0F,

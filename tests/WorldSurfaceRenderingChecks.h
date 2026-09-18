@@ -275,6 +275,34 @@ namespace Paladin::Test
         std::cout<<"political coast sea_ink="<<seaInk<<" land_ink="<<landInk<<'\n';
         PALADIN_CHECK(seaInk==0 && landInk>100);
         saveWorldReview(native,"pr25-coast-mask.png");
+        // Close borders are an independent ink layer: full-strength lines,
+        // no fill added for this regression, and still no political ink at sea.
+        weights.realmFillWeight=0;
+        weights.realmBorderWeight=worldPresentationState(256).realmBorderWeight;
+        PALADIN_CHECK(weights.realmBorderWeight==1);
+        settleMask();
+        const auto borderOnly=readWorldReview(native);
+        std::size_t borderInk=0, borderSea=0;
+        for (int y=0;y<640;y+=4) for (int x=0;x<960;x+=4)
+        {
+            const auto at=worldPoliticalSurfaceAt(world,30+(x+2-480)/64.,24+(y+2-320)/64.);
+            const auto color=reviewPixel(borderOnly.get(),x+2,y+2);
+            const bool ink=color.red||color.green||color.blue;
+            if (ink && !at.land) ++borderSea;
+            if (ink && at.land) ++borderInk;
+        }
+        PALADIN_CHECK(borderInk>0 && borderSea==0);
+        saveWorldReview(native,"pr27-close-border-only.png");
+        weights.realmBorderWeight=0; drawMask();
+        const auto noInk=readWorldReview(native);
+        for (int y=0;y<640;y+=4) for (int x=0;x<960;x+=4)
+        {
+            const auto color=reviewPixel(noInk.get(),x+2,y+2);
+            PALADIN_CHECK(!color.red && !color.green && !color.blue);
+        }
+        PALADIN_CHECK(std::abs(worldPresentationState(256).realmFillWeight-.18F)<.0001F);
+        weights.realmFillWeight=1; weights.realmBorderWeight=1;
+
         for (int i=0;i<8;++i) { camera.move(.005,0); drawMask(); }
         PALADIN_CHECK(politics.cacheBuilds()==warm);
         PALADIN_CHECK(politics.detailCacheBytes()<=32*1024*1024);
