@@ -6,6 +6,7 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldMapNavigation.h"
 #include "rendering/WorldRenderer.h"
+#include "rendering/WorldArmyPresentation.h"
 #include "simulation/Simulation.h"
 #include "simulation/MilitarySystem.h"
 #include "ui/FoundingPanel.h"
@@ -13,6 +14,9 @@
 #include "ui/MilitaryPanel.h"
 #include <SDL3/SDL.h>
 #include <cmath>
+#include <iterator>
+#include <algorithm>
+#include <vector>
 namespace Paladin
 {
     namespace
@@ -29,7 +33,7 @@ namespace Paladin
         if (!simulationControlsVisible()) return;
         auto& world=simulation_->world();
         militaryPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),world,simulation_->playerRealmId());
-        militaryPanel_->render(*renderer_,*grayUiRenderer_,world,simulation_->playerRealmId());
+        militaryPanel_->render(*renderer_,*grayUiRenderer_,world,simulation_->playerRealmId(),&worldRenderer_->artwork());
         const auto* unit=world.army(selectedWorldArmy_);
         if (screen_!=Screen::World || !unit || unit->ownerRealmId()!=simulation_->playerRealmId()) return;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
@@ -37,12 +41,17 @@ namespace Paladin
             worldRenderer_->globeEnabled,unit->visualX()+.5,unit->visualY()+.5);
         if (position)
         {
-            const float x=float(position->x), y=float(position->y);
+            const auto* sprite=worldArmySprite(worldRenderer_->artwork(),world,*unit);
+            const auto body=worldArmySpriteBounds(position->x,position->y,pixels,sprite);
+            const float left=std::min(body.x-3.F,float(position->x)-13.F);
+            const float right=std::max(body.x+body.width+3.F,float(position->x)+13.F);
+            // Keep the ground bracket above the count plate, never across its digits.
+            const float ground=std::min(body.y+body.height+3.F,float(position->y)+6.F);
             for (int i=0;i<2;++i)
             {
-                renderer_->drawLine(x-13-i,y+16+i,x+13+i,y+16+i,{235,196,107,255});
-                renderer_->drawLine(x-13-i,y+12+i,x-13-i,y+16+i,{235,196,107,255});
-                renderer_->drawLine(x+13+i,y+12+i,x+13+i,y+16+i,{235,196,107,255});
+                renderer_->drawLine(left-i,ground+i,right+i,ground+i,{235,196,107,255});
+                renderer_->drawLine(left-i,ground-5,left-i,ground+i,{235,196,107,255});
+                renderer_->drawLine(right+i,ground-5,right+i,ground+i,{235,196,107,255});
             }
         }
         if (!militaryPanel_->isOpen())
@@ -80,11 +89,21 @@ namespace Paladin
         { selectedWorldArmy_={}; militaryOrderMessage_.clear(); return true; }
         if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT && militaryPointerCaptured_)
         { militaryPointerCaptured_=false; return true; }
-        if (event.type!=SDL_EVENT_MOUSE_BUTTON_DOWN || activeHudContainsPoint(event.button.x,event.button.y)) return false;
+        if (event.type!=SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
+        if (selectedWorldArmy_ && !militaryPanel_->isOpen())
+        {
+            const UiRectangle status{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70};
+            if (status.contains(event.button.x,event.button.y))
+            {
+                if (event.button.button==SDL_BUTTON_LEFT) militaryPointerCaptured_=true;
+                return true;
+            }
+        }
+        if (activeHudContainsPoint(event.button.x,event.button.y)) return false;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
         if (event.button.button==SDL_BUTTON_LEFT)
         {
-            double best=22*22; ArmyId pick;
+            std::vector<std::pair<double,ArmyId>> hits;
             for (const auto& unit:world.armies())
             {
                 if (unit.ownerRealmId()!=simulation_->playerRealmId() || unit.soldierCount()==0) continue;
@@ -92,9 +111,20 @@ namespace Paladin
                     worldRenderer_->globeEnabled,unit.visualX()+.5,unit.visualY()+.5);
                 if (!pos) continue;
                 const double dx=pos->x-event.button.x,dy=pos->y-event.button.y,dist=dx*dx+dy*dy;
-                if (dist<best) { best=dist; pick=unit.id(); }
+                const auto* sprite=worldArmySprite(worldRenderer_->artwork(),world,unit);
+                if (worldArmyHitTest(event.button.x,event.button.y,pos->x,pos->y,pixels,sprite,unit.soldierCount()))
+                    hits.emplace_back(dist,unit.id());
             }
-            if (pick) { selectedWorldArmy_=pick; militaryPointerCaptured_=true; militaryOrderMessage_="Unit selected."; return true; }
+            std::stable_sort(hits.begin(),hits.end(),[](const auto& a,const auto& b){return a.first<b.first;});
+            if (!hits.empty())
+            {
+                auto choice=hits.begin();
+                const auto current=std::find_if(hits.begin(),hits.end(),[&](const auto& h){return h.second==selectedWorldArmy_;});
+                if (current!=hits.end()) { choice=std::next(current); if (choice==hits.end()) choice=hits.begin(); }
+                selectedWorldArmy_=choice->second; militaryPointerCaptured_=true;
+                militaryOrderMessage_=hits.size()>1?"Unit selected. Click the stack again to select another unit.":"Unit selected.";
+                return true;
+            }
         }
         if (event.button.button==SDL_BUTTON_RIGHT && selectedWorldArmy_)
         {

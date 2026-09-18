@@ -20,7 +20,8 @@ namespace Paladin
         case MilitaryResult::Success: return "Order accepted.";
         case MilitaryResult::NotOwned: return "This is not your realm's unit or city.";
         case MilitaryResult::NoBarracksEmployee: return "Hire an unassigned adult at a completed barracks first.";
-        case MilitaryResult::ReturnHome: return "Return to the home city before transferring or dismissing soldiers.";
+        case MilitaryResult::ReturnHome: return "Stop in a friendly city to organize the unit.";
+        case MilitaryResult::PersonnelOrigin: return "Discharge these soldiers in their own city with a free barracks seat.";
         case MilitaryResult::EmptyUnit: return "Assign soldiers before marching.";
         case MilitaryResult::InvalidDestination: return "Choose a land destination, not water or solid mountains.";
         case MilitaryResult::NoLandRoute: return "No passable land route was found.";
@@ -47,29 +48,94 @@ namespace Paladin
         const auto* city = world.settlement(cityId);
         return city && !unit.moving() && unit.position() == city->position();
     }
+    SettlementId MilitarySystem::stationAt(const World& world, const Army& unit) noexcept
+    {
+        if (unit.moving()) return {};
+        for (const auto& city : world.settlements())
+            if (city.ownerRealmId() == unit.ownerRealmId() && presentAt(world, unit, city.id()))
+                return city.id();
+        return {};
+    }
     bool MilitarySystem::canOrganize(const World& world, const Army& unit) noexcept
     {
-        const auto* city = world.settlement(unit.homeSettlementId());
-        return city && city->ownerRealmId() == unit.ownerRealmId() &&
-               presentAt(world, unit, city->id());
+        const auto* city = world.settlement(stationAt(world, unit));
+        return city && city->simulationState().localMap();
     }
-    std::size_t MilitarySystem::available(const World& world, SettlementId city) noexcept
+    std::size_t MilitarySystem::available(const World& world, SettlementId id) noexcept
     {
-        return std::count_if(world.soldiers().begin(), world.soldiers().end(), [&](const auto& s)
-        { return s.homeSettlementId() == city && !s.unitId(); });
+        const auto* city = world.settlement(id);
+        const auto* local = city ? city->simulationState().localMap() : nullptr;
+        if (!local) return 0;
+        // Read the actual payroll, including changes made while paused, rather
+        // than last tick's cached Soldier entities. Dead/dismissed staff aren't reserves.
+        std::size_t count = 0;
+        for (const auto& c : city->simulationState().citizens().citizens())
+        {
+            const auto* w = local->employment().workplace(c.workplaceId);
+            if (!c.child && c.health > 0 && !c.militaryDeployed && !c.militaryUnitId &&
+                w && w->operational && w->objectTypeId == SettlementObjectTypes::Barracks &&
+                local->objectState().completedObject(w->objectId)) ++count;
+        }
+        return count;
+    }
+    std::size_t MilitarySystem::releasable(const World& world, const Army& unit) noexcept
+    {
+        const auto station = stationAt(world, unit);
+        const auto* city = world.settlement(station);
+        const auto* local = city ? city->simulationState().localMap() : nullptr;
+        if (!local) return 0;
+        std::size_t freeSeats = 0, employed = 0, field = 0;
+        for (const auto& w : local->employment().workplaces())
+            if (w.operational && w.objectTypeId == SettlementObjectTypes::Barracks &&
+                local->objectState().completedObject(w.objectId))
+                freeSeats += w.maximumCapacity - std::min(w.capacity,w.maximumCapacity);
+        for (const auto id : unit.soldiers())
+        {
+            const auto* s = world.soldier(id);
+            if (!s || s->homeSettlementId() != station) continue;
+            const auto* c = city->simulationState().citizens().citizen(s->sourceCitizenId());
+            const auto* w = c ? local->employment().workplace(c->workplaceId) : nullptr;
+            if (w && w->operational && w->objectTypeId == SettlementObjectTypes::Barracks)
+                ++employed;
+            else ++field;
+        }
+        return employed + std::min(field,freeSeats);
     }
     void MilitarySystem::synchronize(World& world, double minute)
     {
         std::unordered_set<SoldierId, StrongIdHash> retained;
+        std::unordered_map<SoldierId, ArmyId, StrongIdHash> roster;
+        retained.reserve(world.soldiers().size());
+        roster.reserve(world.soldiers().size());
+        for (const auto& unit : world.armies())
+            for (const auto id : unit.soldiers()) roster.try_emplace(id,unit.id());
         for (auto& city : world.settlements())
         {
             auto* local = map(world, city.id());
-            if (!local) continue;
             auto& people = city.simulationState().citizens_;
-            local->employment().synchronize(local->objectState(), people);
+            if (local) local->employment().synchronize(local->objectState(), people);
             for (auto& c : people.citizens_)
             {
-                const auto* w = local->employment().workplace(c.workplaceId);
+                const auto* w = local ? local->employment().workplace(c.workplaceId) : nullptr;
+                auto* fieldSoldier = world.soldiers_.find(c.soldierId);
+                const auto* fieldUnit = fieldSoldier ? world.army(fieldSoldier->unitId()) : nullptr;
+                const auto membership = roster.find(c.soldierId);
+                if (c.militaryDeployed && c.health > 0 && !c.child && fieldSoldier && fieldUnit &&
+                    fieldSoldier->home_ == city.id() && fieldSoldier->person_ == c.id &&
+                    membership != roster.end() && membership->second == fieldUnit->id())
+                {
+                    // The source pair preserves the one person's family/savings
+                    // identity, NOT city membership, payroll or army allegiance.
+                    // Destroying/capturing the old barracks cannot delete field troops.
+                    c.militaryUnitId = fieldUnit->id();
+                    retained.insert(c.soldierId);
+                    continue;
+                }
+                if (!local)
+                {
+                    c.soldierId = {}; c.militaryUnitId = {}; c.militaryDeployed = false;
+                    continue;
+                }
                 if (c.militaryUnitId)
                 {
                     const auto* unit = world.army(c.militaryUnitId);
@@ -123,14 +189,15 @@ namespace Paladin
             std::erase_if(unit.soldiers_, [&](SoldierId id)
             {
                 const auto* s = world.soldier(id);
-                return !s || s->unitId() != unit.id() || s->homeSettlementId() != unit.home_;
+                return !s || s->unitId() != unit.id();
             });
             if (unit.soldiers_.empty())
             {
                 unit.route_.clear(); unit.routeIndex_ = 0; unit.stepMinutes_ = 0;
                 // Personnel losses do not conjure replacement recruits. The
-                // empty record can be reorganized at home, not remotely.
+                // empty record can only be reinforced where friendly reserves exist.
             }
+            unit.station_ = stationAt(world, unit);
         }
     }
     ArmyId MilitarySystem::createUnit(World& world, RealmId actor, SettlementId home)
@@ -140,11 +207,16 @@ namespace Paladin
         if (std::count_if(world.armies().begin(), world.armies().end(), [&](const auto& u)
             { return u.ownerRealmId() == actor; }) >= MaximumUnitsPerRealm) return {};
         synchronize(world, double(world.time().totalGameMinutes()));
+        if (available(world, home) == 0) return {};
         const auto id = world.createArmy(city->position());
         auto* unit = world.army(id);
-        unit->home_ = home;
+        unit->station_ = home;
         unit->name_ = "Unit " + std::to_string(id.value());
         world.assignArmyToRealm(id, actor);
+        // A newly created unit already has a real soldier and is immediately
+        // drawable/selectable. Never manufacture an independent headcount.
+        if (resizeUnit(world, actor, id, 1) != MilitaryResult::Success)
+        { world.armies_.erase(id); return {}; }
         return id;
     }
     void MilitarySystem::setDeployed(World& world, Army& unit, bool deployed, double minute, const PersonnelIndex* indexed)
@@ -165,6 +237,13 @@ namespace Paladin
             local->activities.finish(*local, *c, minute);
             c->path.clear(); c->pathIndex = 0; c->stepProgress = 0;
             c->explicitMovement = false;
+            if (deployed && c->workplaceId)
+            {
+                local->employment().citizenDeparted(c->workplaceId);
+                c->workplaceId = {};
+                if (auto* owner = world.settlement(soldier->homeSettlementId()))
+                    ++owner->simulationState().citizens_.version_;
+            }
             c->militaryDeployed = deployed;
             c->insideHome = false;
             c->hasVisualSnapshot = false;
@@ -175,7 +254,7 @@ namespace Paladin
     {
         const int capacity = int(unit.soldierCount()) * RationsPerSoldier;
         int excess = std::max(0, unit.rations_ - capacity);
-        auto* local = map(world, unit.home_);
+        auto* local = map(world, stationAt(world, unit));
         if (!local || !canOrganize(world, unit) || excess == 0) return;
         for (const auto& w : local->employment().workplaces())
         {
@@ -199,6 +278,29 @@ namespace Paladin
             }
         }
     }
+    bool MilitarySystem::restoreEmployment(World& world, const Soldier& soldier)
+    {
+        auto* c = person(world, soldier);
+        auto* local = map(world, soldier.homeSettlementId());
+        if (!c || !local) return false;
+        const auto* current = local->employment().workplace(c->workplaceId);
+        if (current && current->operational && current->objectTypeId == SettlementObjectTypes::Barracks)
+            return true;
+        auto& people = world.settlement(soldier.homeSettlementId())->simulationState().citizens_;
+        // Assign this exact returning person, not whichever unemployed citizen
+        // happens to come first in the generic hiring loop.
+        for (auto& w : local->employment().workplaces_)
+        {
+            if (!w.operational || w.objectTypeId != SettlementObjectTypes::Barracks ||
+                w.capacity >= w.maximumCapacity) continue;
+            c->workplaceId = w.id;
+            ++w.capacity;
+            ++people.version_;
+            if (auto* s = world.soldiers_.find(soldier.id())) s->barracks_ = w.objectId;
+            return true;
+        }
+        return false;
+    }
     MilitaryResult MilitarySystem::resizeUnit(World& world, RealmId actor, ArmyId id, int delta)
     {
         synchronize(world, double(world.time().totalGameMinutes()));
@@ -210,9 +312,10 @@ namespace Paladin
         if (delta > 0)
         {
             int remaining = delta;
+            const auto station = stationAt(world, *unit);
             for (auto& s : world.soldiers_.entities())
             {
-                if (s.home_ != unit->home_ || s.unit_) continue;
+                if (s.home_ != station || s.unit_) continue;
                 s.unit_ = id;
                 unit->soldiers_.push_back(s.id());
                 if (auto* c = person(world, s)) c->militaryUnitId = id;
@@ -225,16 +328,27 @@ namespace Paladin
             // Use a wide negation so INT_MIN cannot overflow on external input.
             const auto count = std::min<std::size_t>(unit->soldiers_.size(),
                 std::size_t(-std::int64_t(delta)));
-            for (std::size_t n = 0; n < count; ++n)
+            std::size_t removed = 0;
+            const auto station = stationAt(world, *unit);
+            for (std::size_t i = unit->soldiers_.size(); i > 0 && removed < count; --i)
             {
-                auto* s = world.soldiers_.find(unit->soldiers_.back());
-                if (s)
+                auto* s = world.soldiers_.find(unit->soldiers_[i-1]);
+                // Origin is only a personnel-record key. Cross-city civilian
+                // migration is not implemented; never teleport a discharged
+                // person to a distant city or create a duplicate reserve.
+                if (!s || s->homeSettlementId() != station || !restoreEmployment(world, *s)) continue;
+                s->unit_ = {};
+                if (auto* c = person(world, *s))
                 {
-                    s->unit_ = {};
-                    if (auto* c = person(world, *s)) c->militaryUnitId = {};
+                    c->militaryUnitId = {};
+                    c->militaryDeployed = false;
+                    c->hasVisualSnapshot = false;
+                    c->nextWorkCheckMinutes = 0;
                 }
-                unit->soldiers_.pop_back();
+                unit->soldiers_.erase(unit->soldiers_.begin() + std::ptrdiff_t(i-1));
+                ++removed;
             }
+            if (count > 0 && removed == 0) return MilitaryResult::PersonnelOrigin;
             returnSurplus(world, *unit, double(world.time().totalGameMinutes()));
         }
         return MilitaryResult::Success;
@@ -251,11 +365,14 @@ namespace Paladin
             world.armies_.erase(id);
             return MilitaryResult::Success;
         }
+        if (!canOrganize(world, *existing)) return MilitaryResult::ReturnHome;
+        if (releasable(world, *existing) != existing->soldierCount()) return MilitaryResult::PersonnelOrigin;
         const auto result = resizeUnit(world, actor, id, std::numeric_limits<int>::min());
         if (result != MilitaryResult::Success) return result;
         auto* unit = world.army(id);
         // A city without a keep may have nowhere to return its physical pack.
         // Keep that empty record instead of deleting goods.
+        if (!unit->soldiers_.empty()) return MilitaryResult::PersonnelOrigin;
         if (unit->rations_ > 0) return MilitaryResult::ReturnHome;
         world.armies_.erase(id);
         return MilitaryResult::Success;
@@ -326,7 +443,9 @@ namespace Paladin
         resupply(world, *unit, double(world.time().totalGameMinutes()));
         unit->route_ = std::move(route); unit->routeIndex_ = 0;
         unit->stepMinutes_ = continuedMinutes; unit->wrapWidth_ = width;
-        setDeployed(world, *unit, !canOrganize(world, *unit), double(world.time().totalGameMinutes()));
+        unit->station_ = stationAt(world, *unit);
+        if (unit->moving())
+            setDeployed(world, *unit, true, double(world.time().totalGameMinutes()));
         return MilitaryResult::Success;
     }
     void MilitarySystem::resupply(World& world, Army& unit, double minute)
@@ -359,24 +478,22 @@ namespace Paladin
         for (auto& city : world.settlements())
         {
             auto* local = map(world, city.id());
-            if (!local) continue;
             std::unordered_map<SettlementObjectId, int, StrongIdHash> barracksStaff;
             for (auto& c : city.simulationState().citizens_.citizens_)
                 if (c.soldierId)
                 {
                     people.emplace(c.soldierId, &c);
                     const auto* s = world.soldier(c.soldierId);
-                    if (s) ++barracksStaff[s->barracksId()];
+                    if (s && !c.militaryDeployed && c.workplaceId) ++barracksStaff[s->barracksId()];
                 }
-            // Procurement remains available while a barracks' actual paid
-            // soldiers are deployed. It does not produce rations or new people.
+            // Only soldiers actually employed here procure for this barracks.
+            // Field units draw stocked supplies when physically at a friendly city.
             for (const auto& [object, count] : barracksStaff)
-                produceIndustry(*local, object, count, minute, elapsed);
+                if (local) produceIndustry(*local, object, count, minute, elapsed);
         }
         for (auto& unit : world.armies())
         {
-            auto* home = map(world, unit.home_);
-            if (!home || unit.soldiers_.empty()) continue;
+            if (unit.soldiers_.empty()) continue;
             double remaining = elapsed;
             while (remaining > 1e-9)
             {
@@ -395,23 +512,30 @@ namespace Paladin
                     }
                     if (!unit.moving()) unit.stepMinutes_ = 0;
                 }
-                const bool deployed = !canOrganize(world, unit);
-                setDeployed(world, unit, deployed, minute + elapsed - remaining, &people);
+                unit.station_ = stationAt(world, unit);
+                if (unit.moving()) setDeployed(world, unit, true, minute + elapsed - remaining, &people);
                 resupply(world, unit, minute + elapsed - remaining);
-                if (deployed)
                 {
-                    const auto& policy = home->activities.policy;
+                    // A realm field force does not depend on its recruitment
+                    // city's existence, ownership, payroll or needs policy.
+                    const CitizenSimulationPolicy policy;
                     for (auto id : unit.soldiers_)
                     {
                         const auto it = people.find(id);
-                        if (it == people.end() || it->second->health <= 0) continue;
+                        if (it == people.end() || it->second->health <= 0 || !it->second->militaryDeployed) continue;
                         auto& c = *it->second;
+                        const auto* soldier = world.soldier(id);
+                        auto* source = soldier ? map(world, soldier->homeSettlementId()) : nullptr;
+                        auto* realm = world.realm(unit.ownerRealmId());
+                        if (source && realm && realm->treasury)
+                            source->commerce.payFieldSoldier(c.id, *realm->treasury, dt);
                         c.hunger = std::min(100.0, c.hunger + policy.hungerPerDay * dt / 1440);
                         if (c.hunger >= policy.foodSeekThreshold && unit.rations_ > 0)
                         {
                             --unit.rations_;
                             c.modifyAttributes({{AttributeEffect::Meals, -policy.mealRestoration}});
-                            home->commerce.recordNonMealConsumption("rations", 1);
+                            // Field meals consume the unit's real pack only;
+                            // they are not consumption by a remote city.
                         }
                         // A hungry army is not an infinite-food loophole. This
                         // replaces (never supplements) its absent city needs.

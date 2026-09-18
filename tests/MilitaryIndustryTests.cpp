@@ -202,6 +202,9 @@ namespace
             PALADIN_CHECK(sources.insert(soldier.sourceCitizenId().value()).second);
         }
         const auto unitId = MilitarySystem::createUnit(world, actor, city);
+        PALADIN_CHECK(world.army(unitId)->soldierCount()==1);
+        PALADIN_CHECK(world.army(unitId)->stationedSettlementId()==city);
+        PALADIN_CHECK(MilitarySystem::available(world,city)==1);
         PALADIN_CHECK(unitId);
         PALADIN_CHECK(!MilitarySystem::createUnit(world, enemy, city));
         PALADIN_CHECK(MilitarySystem::resizeUnit(world, enemy, unitId, 1) == MilitaryResult::NotOwned);
@@ -210,11 +213,21 @@ namespace
         PALADIN_CHECK(MilitarySystem::available(world, city) == 0);
         PALADIN_CHECK(MilitarySystem::recruit(world, actor, city, -1) == MilitaryResult::NoBarracksEmployee);
         PALADIN_CHECK(world.settlement(city)->population() == population);
+        PALADIN_CHECK(!MilitarySystem::createUnit(world,actor,city));
+        PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unitId,{32,32})==MilitaryResult::Success);
+        PALADIN_CHECK(world.army(unitId)->stationedSettlementId()==city);
+        PALADIN_CHECK(!world.army(unitId)->moving());
         const auto inventory = map.logistics.forObject(barracks);
         PALADIN_CHECK(map.logistics.add(inventory, "rations", 12, 360));
         for (const auto& c : people.citizens()) const_cast<SettlementCitizen&>(c).hunger = 0;
         PALADIN_CHECK(MilitarySystem::orderMove(world, actor, unitId, {33,32}) == MilitaryResult::Success);
         PALADIN_CHECK(world.army(unitId)->rations() == 12);
+        PALADIN_CHECK(!world.army(unitId)->stationedSettlementId());
+        PALADIN_CHECK(!MilitarySystem::presentAt(world,*world.army(unitId),city));
+        PALADIN_CHECK(map.employment().employed(map.employment().forObject(barracks),people)==0);
+        PALADIN_CHECK(map.employment().unemployed(people)==6);
+        for (const auto id : world.army(unitId)->soldiers())
+            PALADIN_CHECK(!people.citizen(world.soldier(id)->sourceCitizenId())->workplaceId);
         PALADIN_CHECK(map.logistics.inventory(inventory)->amount("rations") == 0);
         PALADIN_CHECK(MilitarySystem::resizeUnit(world, actor, unitId, -1) == MilitaryResult::ReturnHome);
         MilitarySystem::tick(world, 360, 15);
@@ -238,7 +251,8 @@ namespace
         PALADIN_CHECK(world.army(unitId)->rations() == 0 && MilitarySystem::available(world, city) == 2);
         PALADIN_CHECK(MilitarySystem::disbandUnit(world, actor, unitId) == MilitaryResult::Success);
         PALADIN_CHECK(!world.army(unitId));
-        const auto empty = MilitarySystem::createUnit(world, actor, city);
+        const auto empty = world.createArmy({32,32});
+        PALADIN_CHECK(world.assignArmyToRealm(empty, actor));
         PALADIN_CHECK(world.setArmyPosition(empty, {20,20}));
         PALADIN_CHECK(MilitarySystem::disbandUnit(world, enemy, empty) == MilitaryResult::NotOwned);
         PALADIN_CHECK(MilitarySystem::disbandUnit(world, actor, empty) == MilitaryResult::Success);
@@ -263,10 +277,88 @@ namespace
         PALADIN_CHECK(world.army(march)->soldierCount() == 1 && world.soldiers().size() == 1);
         std::cout << "[military/industry] actual employment, authority, pause, travel, redeployment and casualty rosters passed\n";
     }
+    void testIndependentFieldForce()
+    {
+        WorldGenerationSettings settings;
+        settings.width=settings.height=64; settings.seed=711; settings.populateAiRealms=false;
+        Simulation sim(settings); auto& world=sim.world();
+        for(int y=0;y<64;++y) for(int x=0;x<64;++x)
+        { auto& t=*world.grid().tile({x,y}); t.terrain=TerrainType::Land; t.biome=BiomeType::Plain; }
+        const auto origin=sim.foundPlayerCapital({30,32},{"Field Realm","Field Folk","Origin",{},"civic",{}});
+        const auto other=sim.foundPlayerSettlement({42,32},"Supply City");
+        PALADIN_CHECK(origin && other);
+        SettlementMapGenerationSettings settingsLocal; settingsLocal.localTilesPerWorldTile=4;
+        const auto prepare=[&](SettlementId id)
+        {
+            PALADIN_CHECK(sim.prepareSettlementMap(id,settingsLocal));
+            auto& local=*sim.settlementMap(id);
+            for(int y=0;y<local.grid().height();++y) for(int x=0;x<local.grid().width();++x)
+                local.grid().tile({x,y})->terrain=TerrainType::Land;
+            complete(local,"city_keep",{{2,2},5,7});
+            const auto barracks=complete(local,"barracks",{{11,2},5,5});
+            world.settlement(id)->simulationState().citizens().placeUnpositionedCitizens(local);
+            return barracks;
+        };
+        const auto originalBarracks=prepare(origin), otherBarracks=prepare(other);
+        const auto actor=sim.playerRealmId(), enemy=world.createRealm();
+        PALADIN_CHECK(MilitarySystem::recruit(world,actor,origin,1)==MilitaryResult::Success);
+        PALADIN_CHECK(MilitarySystem::recruit(world,actor,other,1)==MilitaryResult::Success);
+        const auto unit=MilitarySystem::createUnit(world,actor,origin);
+        PALADIN_CHECK(unit);
+        const auto soldierId=world.army(unit)->soldiers().front();
+        const auto personId=world.soldier(soldierId)->sourceCitizenId();
+        auto& map=*sim.settlementMap(origin); auto& supply=*sim.settlementMap(other);
+        const auto population=world.settlement(origin)->population()+world.settlement(other)->population();
+        world.realm(actor)->treasury->balance=100000;
+        map.commerce.treasury=world.realm(actor)->treasury;
+        PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{42,32})==MilitaryResult::Success);
+        PALADIN_CHECK(map.objectState().demolish(originalBarracks,{11,2}));
+        PALADIN_CHECK(world.assignSettlementToRealm(origin,enemy));
+        map.commerce.treasury=world.realm(enemy)->treasury;
+        map.commerce.treasury->balance=50000;
+        const auto originalEnemyCash=map.commerce.treasury->balance;
+        const auto cashBefore=world.realm(actor)->treasury->balance+map.commerce.householdTotal();
+        MilitarySystem::tick(world,360,360);
+        PALADIN_CHECK(world.army(unit)->ownerRealmId()==actor);
+        PALADIN_CHECK(world.army(unit)->soldierCount()==1 && world.soldier(soldierId));
+        PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(42,32));
+        PALADIN_CHECK(world.army(unit)->stationedSettlementId()==other);
+        PALADIN_CHECK(MilitarySystem::canOrganize(world,*world.army(unit)));
+        PALADIN_CHECK(map.commerce.treasury->balance==originalEnemyCash);
+        PALADIN_CHECK(world.realm(actor)->treasury->balance<100000);
+        PALADIN_CHECK(world.realm(actor)->treasury->balance+map.commerce.householdTotal()==cashBefore);
+        const auto& person=*world.settlement(origin)->simulationState().citizens().citizen(personId);
+        PALADIN_CHECK(person.militaryDeployed && !person.workplaceId && person.militaryUnitId==unit);
+        PALADIN_CHECK(MilitarySystem::resizeUnit(world,actor,unit,1)==MilitaryResult::Success);
+        PALADIN_CHECK(world.army(unit)->soldierCount()==2 && MilitarySystem::available(world,other)==0);
+        // A mixed-origin roster can recruit locally, but discharge never
+        // teleports the foreign-source person or partially disbands a unit.
+        PALADIN_CHECK(MilitarySystem::disbandUnit(world,actor,unit)==MilitaryResult::PersonnelOrigin);
+        PALADIN_CHECK(world.army(unit)->soldierCount()==2);
+        const auto pack=supply.logistics.forObject(otherBarracks);
+        PALADIN_CHECK(supply.logistics.add(pack,"rations",12,450));
+        PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{43,32})==MilitaryResult::Success);
+        PALADIN_CHECK(world.army(unit)->rations()==12);
+        PALADIN_CHECK(!world.army(unit)->stationedSettlementId());
+        MilitarySystem::tick(world,450,30);
+        PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(43,32));
+        PALADIN_CHECK(world.army(unit)->soldierCount()==2);
+        PALADIN_CHECK(world.settlement(origin)->population()+world.settlement(other)->population()==population);
+        // Land movement wraps by one adjacent tile across the world seam.
+        PALADIN_CHECK(world.setArmyPosition(unit,{63,32}));
+        PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{0,32})==MilitaryResult::Success);
+        MilitarySystem::tick(world,480,15);
+        PALADIN_CHECK(std::abs(world.army(unit)->visualX()-63.5)<1e-8);
+        MilitarySystem::tick(world,495,15);
+        PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(0,32));
+        std::cout<<"[military] free barracks seats, captured/demolished origin independence, mixed-city recruitment, field cash conservation and seam travel passed\n";
+    }
+
 }
 void runMilitaryIndustryTests()
 {
     testIndustry();
     testEmergencyFoodAndGathering();
     testUnits();
+    testIndependentFieldForce();
 }

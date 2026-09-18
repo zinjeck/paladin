@@ -69,6 +69,7 @@ namespace Paladin
         {
             return globe_.preparationProgress();
         }
+        const SceneSpriteLibrary& artwork() const noexcept { return artwork_; }
         void reloadArt() const
         {
             artwork_.reset();

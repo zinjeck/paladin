@@ -29,9 +29,9 @@ namespace Paladin
         // terrain features stay readable without making realm identity vanish.
         float closeRealmFillOpacity = 0.18F;
 
-        // Realm borders remain legible in the closest world view without
-        // becoming the dominant visual layer.
-        float closeRealmBorderOpacity = 0.22F;
+        // Border lines retain their far-view strength at close zoom. This is
+        // independent of the subdued .18 fill, which does not become stronger.
+        float closeRealmBorderOpacity = 1.0F;
 
         float minimumRealmLabelPixelSize = 0.75F;
         float maximumRealmLabelPixelSize = 3.0F;

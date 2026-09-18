@@ -246,13 +246,13 @@ namespace
         PALADIN_CHECK(secondTransition.settlementMarkerWeight < 1.0F);
         PALADIN_CHECK(secondTransition.localWorldWeight > 0.0F);
         PALADIN_CHECK(secondTransition.localWorldWeight < 1.0F);
-        PALADIN_CHECK(secondTransition.realmBorderWeight < 1.0F);
+        PALADIN_CHECK(secondTransition.realmBorderWeight == 1.0F);
 
         PALADIN_CHECK(std::abs(local.realmFillWeight - 0.18F) < 1e-5F);
         PALADIN_CHECK(local.realmLabelWeight < 0.001F);
         PALADIN_CHECK(local.settlementMarkerWeight < 0.001F);
         PALADIN_CHECK(local.localWorldWeight > 0.999F);
-        PALADIN_CHECK(std::abs(local.realmBorderWeight - 0.22F) < 1e-5F);
+        PALADIN_CHECK(std::abs(local.realmBorderWeight - 1.0F) < 1e-5F);
 
         const auto terrain = presentationForMapMode(local, WorldMapMode::Terrain);
         PALADIN_CHECK(terrain.realmFillWeight == 0.0F);

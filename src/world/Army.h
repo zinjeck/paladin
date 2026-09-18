@@ -45,7 +45,8 @@ namespace Paladin
         }
 
         const std::string& name() const noexcept { return name_; }
-        SettlementId homeSettlementId() const noexcept { return home_; }
+        // A station is current presence, never a permanent recruitment-home link.
+        SettlementId stationedSettlementId() const noexcept { return station_; }
         std::span<const SoldierId> soldiers() const noexcept { return soldiers_; }
         std::size_t soldierCount() const noexcept { return soldiers_.size(); }
         int rations() const noexcept { return rations_; }
@@ -72,7 +73,7 @@ namespace Paladin
     private:
         friend class MilitarySystem;
         std::string name_ = "Unit";
-        SettlementId home_;
+        SettlementId station_;
         std::vector<SoldierId> soldiers_;
         std::vector<WorldTilePosition> route_;
         std::size_t routeIndex_ = 0;

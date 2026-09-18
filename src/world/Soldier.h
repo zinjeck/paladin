@@ -4,9 +4,11 @@
 namespace Paladin
 {
     // A military entity, not another citizen or an independently editable
-    // headcount. The source pair identifies its ONE living person/payroll seat;
+    // headcount. The source pair identifies its ONE living personnel record;
     // CitizenId alone is not unique across settlements. Family and savings
     // remain with that person while this entity travels with a world unit.
+    // The old barracks is provenance only after deployment: its staff slot is
+    // released, and loss/capture of that building cannot invalidate the soldier.
     class Soldier
     {
     public:
