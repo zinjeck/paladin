@@ -67,10 +67,16 @@ jobs:
           --target PaladinArtCheck
           --parallel
 
+      - name: Verify application input and army deployment
+        env:
+          PALADIN_SMOKE_UI_ONLY: "1"
+          PALADIN_SMOKE_SCREENSHOTS: ${{ github.workspace }}\art-review
+        run: ctest --test-dir art-build -R "^PaladinApplicationSmokeTests$" --output-on-failure
+
       - name: Require focused world regression evidence
         shell: pwsh
         run: |
-          $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv", "pr26-military-panel.png", "pr26-world-city.png", "pr26-world-marching.png", "pr26-walk-0.png", "pr26-gather-2.png", "pr26-sleep-close.png", "pr26-sleep-normal.png", "pr26-ui-states.png")
+          $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv", "pr26-military-panel.png", "pr26-world-city.png", "pr26-world-marching.png", "pr26-walk-0.png", "pr26-gather-2.png", "pr26-sleep-close.png", "pr26-sleep-normal.png", "pr26-ui-states.png", "pr27-portrait-unit-column.png", "pr27-selection-skinned.png", "pr27-rule-buildings.png", "pr27-close-border-only.png", "pr27-army-globe-selected.bmp", "pr27-army-flat-selected.bmp", "pr27-army-half-tile-march.bmp")
           foreach ($file in $required) {
             if (-not (Test-Path "art-review/$file")) { throw "Missing mandatory render evidence: $file" }
           }
