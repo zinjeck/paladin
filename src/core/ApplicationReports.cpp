@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
 #include "interaction/SettlementObjectPlacementController.h"
@@ -27,6 +28,15 @@ namespace Paladin
     }
     bool Application::handleReportAction(CityHudAction action)
     {
+        if (action == CityHudAction::Diplomacy && screen_ == Screen::World)
+        {
+            employmentPanel_->close(); ledgerPanel_->close(); militaryPanel_->close();
+            selectedWorldArmy_ = {}; militaryOrderMessage_.clear();
+            diplomacyPanel_->toggle();
+            diplomacyPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
+            return true;
+        }
+        if (action != CityHudAction::None) diplomacyPanel_->close();
         if (action == CityHudAction::Military)
         {
             employmentPanel_->close(); ledgerPanel_->close();

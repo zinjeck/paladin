@@ -15,6 +15,7 @@ namespace Paladin
     class Army
     {
     public:
+        static constexpr double MarchMinutesPerTile = 5.0;
         Army(ArmyId id, WorldTilePosition position) noexcept
             : id_(id), position_(position)
         {
@@ -78,7 +79,7 @@ namespace Paladin
         std::vector<WorldTilePosition> route_;
         std::size_t routeIndex_ = 0;
         double stepMinutes_ = 0;
-        double minutesPerTile_ = 30;
+        double minutesPerTile_ = MarchMinutesPerTile;
         int wrapWidth_ = 0;
         int rations_ = 0;
         friend class World;

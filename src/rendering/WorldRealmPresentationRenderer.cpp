@@ -6,6 +6,8 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldPixelGrid.h"
 #include "rendering/WorldPoliticalSurface.h"
+#include "rendering/WorldRealmQuery.h"
+#include "rendering/WorldThematicPalette.h"
 #include "ui/BitmapFontRenderer.h"
 
 #include <algorithm>
@@ -130,8 +132,11 @@ namespace Paladin
         }
 
 
+        struct FrontierPixel { int x, y; RealmId realm; };
         struct PoliticalTextures
         {
+            int density=1;
+            std::vector<FrontierPixel> frontiers;
             std::unique_ptr<Texture> fill, border;
             int x = 0, y = 0, width = 0, height = 0;
             std::uint64_t used = 0;
@@ -154,18 +159,21 @@ namespace Paladin
             int x, y, width, height, density, pw, ph, stride;
             int nextSample = -1, row = 0, uploadLayer = 0, uploadRow = 0;
             std::vector<WorldPoliticalSurfaceSample> samples;
+            std::vector<RealmId> regions;
+            bool recordFrontiers=false;
             std::vector<RenderColor> fills, borders;
             bool hasFill = false, hasBorder = false;
             PoliticalTextures result;
 
-            PoliticalRaster(int tx, int ty, int w, int h, int d)
+            PoliticalRaster(int tx, int ty, int w, int h, int d, bool record=false)
                 : x(tx), y(ty), width(w), height(h), density(d), pw(w * d),
-                  ph(h * d), stride(pw + 2), samples(std::size_t(stride) * 3)
+                  ph(h * d), stride(pw + 2), samples(std::size_t(stride) * 3), regions(std::size_t(stride)*3), recordFrontiers(record)
             {
                 // Reserve address space once, then touch only one output row
                 // per work slice. Large initial zero-fills otherwise stall too.
                 fills.reserve(std::size_t(pw) * ph);
                 borders.reserve(std::size_t(pw) * ph);
+                result.density=d;
                 result.x = x;
                 result.y = y;
                 result.width = width;
@@ -206,7 +214,10 @@ namespace Paladin
         bool ready = false;
         bool detailDemandPending = false;
         int width = 0, height = 0;
-        PoliticalTextures coarse;
+        WorldMapMode mode=WorldMapMode::Political;
+        RealmId selected, paintedSelection;
+        std::uint64_t coarseGeneration=0, selectionGeneration=~std::uint64_t{};
+        PoliticalTextures selection, coarse;
         std::unordered_map<std::uint64_t, PoliticalTextures> detail;
         std::vector<float> distance;
         std::vector<Label> labels;
@@ -281,6 +292,7 @@ namespace Paladin
             std::uint64_t next = 1469598103934665603ULL;
             const auto mix = [&](std::uint64_t value)
             { next = (next ^ value) * 1099511628211ULL; };
+            mix(std::uint64_t(mode));
             mix(world.grid().revision());
             mix(world.territory().revision());
             mix(world.grid().width());
@@ -291,6 +303,8 @@ namespace Paladin
                 mix(realm.usesTribalInfluence());
             }
             const auto topology = next;
+            if (mode==WorldMapMode::Population)
+                for (const auto& city:world.settlements()) { mix(city.ownerRealmId().value()); mix(city.population()); }
             mix(influence.revision());
             for (const auto& realm : world.realms())
             {
@@ -362,13 +376,21 @@ namespace Paladin
             {
                 preparation->stage = -1;
             }
+            std::unordered_map<RealmId,std::uint64_t,StrongIdHash> populations;
+            if (mode==WorldMapMode::Population)
+                for (const auto& city:world.settlements()) populations[city.ownerRealmId()]+=city.population();
             for (const auto& realm : world.realms())
             {
                 preparation->byRealm[realm.id()] = preparation->labels.size();
                 preparation->labels.push_back({realm.id()});
                 preparation->palette.emplace(
                     realm.id(),
-                    RealmInk{realm.mapColor(), realm.usesTribalInfluence()}
+                    RealmInk{[&] {
+                        if (!thematicMapMode(mode)) return realm.mapColor();
+                        const auto c=mode==WorldMapMode::Government ?
+                            (realm.usesTribalInfluence()?GovernmentTribal:GovernmentCivic) : populationMapColor(populations[realm.id()]);
+                        return MapColor{c.red,c.green,c.blue};
+                    }(), realm.usesTribalInfluence()}
                 );
             }
         }
@@ -550,7 +572,7 @@ namespace Paladin
                             0,
                             width,
                             height,
-                            density
+                            density, true
                         );
                         ++job.stage;
                     }
@@ -570,6 +592,7 @@ namespace Paladin
                         return;
                     }
                     coarse = std::move(job.raster->result);
+                    ++coarseGeneration;
                     distance = std::move(job.distance);
                     labels = std::move(job.labels);
                     presentedInfluence = std::move(job.influence);
@@ -629,6 +652,8 @@ namespace Paladin
                                     job.x + (i + .5) / job.density,
                                     job.y + (j + .5) / job.density
                                 );
+                            if (job.recordFrontiers || thematicMapMode(mode))
+                                job.regions[start+i+1]=worldSurfaceRealm(job.samples[start+i+1],influence,policy.visibleInfluenceThreshold);
                         }
                         continue;
                     }
@@ -643,6 +668,24 @@ namespace Paladin
                     {
                         const auto n = center + i + 1, out = output + i;
                         const auto& surface = job.samples[n];
+                        const auto region=job.regions[n];
+                        const bool frontier=surface.land && region &&
+                            (job.regions[n-1]!=region || job.regions[n+1]!=region ||
+                             job.regions[above+i+1]!=region || job.regions[below+i+1]!=region);
+                        if (job.recordFrontiers && frontier) job.result.frontiers.push_back({i,j,region});
+                        if (thematicMapMode(mode))
+                        {
+                            RenderColor color=!surface.land?ThematicWater:
+                                mode==WorldMapMode::Population?populationMapColor(0):UnclaimedLand;
+                            if (surface.land)
+                                if (const auto ink=palette.find(region);ink!=palette.end())
+                                    color={ink->second.color.red,ink->second.color.green,ink->second.color.blue,255};
+                            job.fills[out]=color; job.hasFill=true;
+                            // Opaque, unshaded thematic fills suppress terrain and
+                            // foliage on BOTH projections, including unclaimed land.
+                            if (frontier) { job.borders[out]={8,15,27,230}; job.hasBorder=true; }
+                            continue;
+                        }
                         if (!surface.land)
                         {
                             continue;
@@ -1149,6 +1192,21 @@ namespace Paladin
             }
         }
 
+        void prepareSelection(Renderer& renderer)
+        {
+            if (!selected || (paintedSelection==selected && selectionGeneration==coarseGeneration)) return;
+            const int pw=width*coarse.density, ph=height*coarse.density;
+            std::vector<RenderColor> pixels(std::size_t(pw)*ph,{0,0,0,0});
+            for (const auto& p:coarse.frontiers)
+                if (p.realm==selected) pixels[std::size_t(p.y)*pw+p.x]={235,196,107,255};
+            if (!selection.border || selection.border->width()!=pw || selection.border->height()!=ph)
+                selection.border=renderer.createTextureFromPixels(pw,ph,pixels);
+            else if (!renderer.updateTexturePixels(*selection.border,pixels)) throw std::runtime_error("Selection mask upload failed");
+            renderer.setTextureFiltering(*selection.border,false);
+            selection.x=selection.y=0; selection.width=width; selection.height=height;
+            paintedSelection=selected; selectionGeneration=coarseGeneration;
+        }
+
         void render(
             Renderer& r,
             const World& world,
@@ -1160,7 +1218,7 @@ namespace Paladin
         )
         {
             beginWorkFrame(r);
-            if (world.realms().empty() ||
+            if ((!thematicMapMode(mode) && world.realms().empty()) ||
                 (p.realmFillWeight <= .001F && p.realmBorderWeight <= .001F &&
                  p.realmLabelWeight <= .001F))
             {
@@ -1285,6 +1343,14 @@ namespace Paladin
                     }
                 }
             }
+            if (selected && pixels<=12.)
+            {
+                prepareSelection(r);
+                WorldPresentationState highlight{};
+                highlight.realmFillWeight=0; highlight.realmBorderWeight=1.F;
+                if (globe) spherePage(r,selection,view,0,0,width,height,false,highlight);
+                else flatPage(r,selection,c,pixels,0,0,width,height,highlight);
+            }
             drawLabels(r, world, c, pixels, globe, p, policy);
         }
     };
@@ -1297,6 +1363,17 @@ namespace Paladin
     void WorldRealmPresentationRenderer::reset()
     {
         cache_ = std::make_unique<Cache>();
+    }
+    void WorldRealmPresentationRenderer::configure(WorldMapMode mode, RealmId selected)
+    {
+        // Terrain shares the political cache so toggling P/T is immediate.
+        const auto cacheMode=mode==WorldMapMode::Terrain?WorldMapMode::Political:mode;
+        if (cache_->mode!=cacheMode)
+        {
+            cache_=std::make_unique<Cache>();
+            cache_->mode=cacheMode;
+        }
+        cache_->selected=selected;
     }
     bool WorldRealmPresentationRenderer::prepare(Renderer& r, const World& w)
     {

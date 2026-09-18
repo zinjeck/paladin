@@ -1,4 +1,8 @@
 #include "core/Application.h"
+#include "ui/DiplomacyPanel.h"
+#include "ui/MilitaryPanel.h"
+#include "ui/LedgerPanel.h"
+#include "rendering/WorldRealmQuery.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementInspectionController.h"
 #include "interaction/SettlementPlacementController.h"
@@ -264,6 +268,8 @@ namespace Paladin
                 renderer_->outputHeight()
             );
 
+        const auto governmentButtonBounds=WorldMapNavigation::governmentModeButtonBounds(renderer_->outputWidth(),renderer_->outputHeight());
+        const auto populationButtonBounds=WorldMapNavigation::populationModeButtonBounds(renderer_->outputWidth(),renderer_->outputHeight());
         const auto focusMinimap = [&](double x, double y)
         {
             WorldMapNavigation::focus(
@@ -302,6 +308,13 @@ namespace Paladin
                 return;
             }
 
+            if (leftButtonEvent && (governmentButtonBounds.contains(event.button.x,event.button.y) ||
+                                    populationButtonBounds.contains(event.button.x,event.button.y)))
+            {
+                if (event.type==SDL_EVENT_MOUSE_BUTTON_DOWN)
+                    worldRenderer_->setMapMode(governmentButtonBounds.contains(event.button.x,event.button.y)?WorldMapMode::Government:WorldMapMode::Population);
+                return;
+            }
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
                 event.button.button == SDL_BUTTON_LEFT &&
                 mapBounds.contains(event.button.x, event.button.y))
@@ -563,6 +576,20 @@ namespace Paladin
                     worldRenderer_->globeEnabled
                         ? view.radius * 6.283185307179586 / grid.width()
                         : tileRenderMetrics_->scaledTilePixels(camera_->zoom());
+                if (pixels <= WorldPresentationPolicy{}.realmToRegionalEndPixels)
+                {
+                    const auto uv=WorldMapNavigation::pick(*camera_,grid,width,height,pixels,
+                        worldRenderer_->globeEnabled,event.button.x,event.button.y);
+                    const auto realm=uv ? worldRealmAt(simulation_->world(),uv->u*grid.width(),uv->v*grid.height()) : RealmId{};
+                    if (realm)
+                    {
+                        militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
+                        selectedWorldArmy_={}; militaryOrderMessage_.clear();
+                        diplomacyPanel_->open(realm);
+                        diplomacyPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
+                        return true;
+                    }
+                }
                 SettlementId nearest;
                 double best = 20.0;
                 for (const auto& city : simulation_->world().settlements())

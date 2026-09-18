@@ -11,7 +11,7 @@
 namespace Paladin
 {
     struct SceneSprite : SpriteAsset {
-        std::shared_ptr<Texture> texture,shadow;
+        std::shared_ptr<Texture> texture,shadow,selectionSilhouette;
     };
     // Optional artist-owned exports. Missing catalog = existing placeholders.
     // Loaded once, independent of working directory and simulation RNG.

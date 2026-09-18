@@ -8,6 +8,7 @@
 #include "rendering/WorldRealmPresentationRenderer.h"
 #include "rendering/WorldRenderer.h"
 #include "rendering/WorldPixelStability.h"
+#include "rendering/WorldThematicPalette.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <algorithm>
@@ -64,7 +65,6 @@ namespace Paladin::Test
         const auto tribe=world.createRealm();
         PALADIN_CHECK(world.foundCapitalSettlement({42,24},tribe,{"Tribal coast","Greenfolk","WALD",{79,140,122},"tribal"}));
         const auto civicTiles=world.territory().controlledTileCount();
-        const auto influenceRevision=world.tribalInfluence().revision();
 
         // Mathematical coast agreement at every canonical sub-tile sample,
         // including water-side rounding, islands and concave coves.
@@ -343,6 +343,7 @@ namespace Paladin::Test
         }
         people=originalPeople;
         settleMask();
+        const auto influenceRevision=world.tribalInfluence().revision();
 
         // Real native-pixel marker rasters, compared after removing ONLY whole-
         // plate translation. Include crossing snapped-camera epochs, roll,
@@ -440,6 +441,58 @@ namespace Paladin::Test
         }
         PALADIN_CHECK(world.territory().controlledTileCount()==civicTiles);
         PALADIN_CHECK(world.territory().controlledTileCount(tribe)==0);
+
+        // Opaque thematic maps use the same authoritative realms in both
+        // projections; selected frontiers do not convert tribal influence into land ownership.
+        PALADIN_CHECK(world.tribalInfluence().revision()==influenceRevision);
+        PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(40));
+        const auto thematicInfluenceRevision=world.tribalInfluence().revision();
+        for(const bool globe:{false,true}) for(const auto mode:{WorldMapMode::Government,WorldMapMode::Population})
+        {
+            map.globeEnabled=globe; map.setMapMode(mode); map.selectedRealm={};
+            camera.setPosition(34,24); camera.setWorldZoom(1); metrics.tilePixels=8;
+            if(globe)
+            {
+                camera.setPlanetRotation(GlobeView::orientationAt({34./64,24./48},.37),64,48);
+                camera.setWorldZoom(8.*64/(640*.4*2*3.14159265358979323846));
+            }
+            const auto themeDeadline=SDL_GetTicks()+30000;
+            do { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }
+            while(map.politicalWorkPending() && SDL_GetTicks()<themeDeadline);
+            PALADIN_CHECK(!map.politicalWorkPending());
+            auto image=readWorldReview(native);
+            const auto a=mode==WorldMapMode::Government?GovernmentCivic:populationMapColor(world.settlement(city)->population());
+            const auto b=mode==WorldMapMode::Government?GovernmentTribal:populationMapColor(world.settlement(world.realm(tribe)->capitalSettlementId())->population());
+            std::size_t first=0,second=0,water=0;
+            for(int y=0;y<640;++y) for(int x=0;x<960;++x)
+            { const auto p=reviewPixel(image.get(),x,y); first+=p==a; second+=p==b; water+=p==ThematicWater; }
+            PALADIN_CHECK(first>10 && second>10 && water>20);
+            const std::string prefix=std::string("pr29-")+(globe?"globe-":"flat-")+(mode==WorldMapMode::Government?"government":"population");
+            saveWorldReview(native,prefix+".png");
+            for(const auto selected:{civic,tribe})
+            {
+                map.selectedRealm=selected;
+                renderer.beginFrame(); map.render(renderer,world,camera,metrics);
+                auto marked=readWorldReview(native); std::size_t changed=0;
+                for(int y=0;y<640;++y) for(int x=0;x<960;++x)
+                    changed+=reviewPixel(marked.get(),x,y)!=reviewPixel(image.get(),x,y);
+                PALADIN_CHECK(changed>5);
+                saveWorldReview(native,prefix+(selected==civic?"-selected-civic.png":"-selected-tribal.png"));
+            }
+            map.selectedRealm={};
+            // Detail pages remain opaque at the close scale as well.
+            camera.setWorldZoom(globe?64.*64/(640*.4*2*3.14159265358979323846):8.);
+            const auto closeDeadline=SDL_GetTicks()+30000;
+            do { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }
+            while(map.politicalWorkPending() && SDL_GetTicks()<closeDeadline);
+            PALADIN_CHECK(!map.politicalWorkPending());
+            saveWorldReview(native,prefix+"-close.png");
+        }
+        map.selectedRealm={}; metrics.tilePixels=64;
+        PALADIN_CHECK(world.territory().controlledTileCount()==civicTiles);
+        PALADIN_CHECK(world.territory().controlledTileCount(tribe)==0);
+        PALADIN_CHECK(world.tribalInfluence().revision()==thematicInfluenceRevision);
+        std::cout<<"Thematic government/population and selected civic/tribal frontiers: globe and flat passed\n";
 
         // Both projections request territory pages during the curved-to-local
         // transition. Neither may cancel the other's unfinished page forever.

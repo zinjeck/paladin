@@ -79,7 +79,8 @@ namespace Paladin
         std::span<const SpriteRenderItem> fallbackSprites,
         std::optional<WorldPlacementMarker> placementMarker,
         WorldSurface::Point3 rigidResidual,
-        const SceneSpriteLibrary* artwork
+        const SceneSpriteLibrary* artwork,
+        ArmyId selectedArmy
     ) const
     {
         if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0 ||
@@ -89,6 +90,7 @@ namespace Paladin
             return;
         }
 
+        const float armyVisibility=worldArmyVisibility(effectiveTilePixels);
         const float localWeight = globe
                                       ? std::clamp(
                                             presentation.localWorldWeight,
@@ -317,36 +319,20 @@ namespace Paladin
                 double scale;
                 int pose;
                 float visibility;
+                bool selected=false;
             };
             std::vector<ArtItem> items;
-            const auto append = [&](const char* id, double x, double y,
-                                    double scale, int pose = 0)
-            {
-                const auto* sprite = artwork->find(id);
-                const auto point = project(x, y);
-                if (sprite && sprite->texture && point && !outside(*point, renderer, 256))
-                    items.push_back({sprite, *point, scale, pose,
-                        worldObjectVisibility * std::clamp(float((effectiveTilePixels-5)/11),0.F,1.F)});
-            };
-            // These are presentation thresholds, not new settlement entity types.
-            for (const auto& settlement : world.settlements())
-            {
-                const char* stage = settlement.isFortress() ? "world.fortress" :
-                    settlement.population() >= 1024 ? "world.city" :
-                    settlement.population() >= 128 ? "world.town" : "world.settlement";
-                const auto p = settlement.position();
-                if (worldObjectVisibility > .001F) append(stage, p.x + .5, p.y + .5, 1.0);
-            }
+            // Settlement sprawl is removed. Only universal native map symbols remain.
             for (const auto& army : world.armies())
             {
-                if (army.soldierCount() == 0) continue;
+                if (army.soldierCount() == 0 || armyVisibility <= .001F) continue;
                 // One strategic representative, regardless of roster size.
                 // Actual strength is the native-screen count below the sprite.
                 const auto* sprite = worldArmySprite(*artwork,world,army);
                 const auto point = project(army.visualX()+.5,army.visualY()+.5);
                 if (sprite && sprite->texture && point && !outside(*point,renderer,256))
                     items.push_back({sprite,*point,worldArmySpriteScale(effectiveTilePixels,sprite),
-                        army.moving()?int(std::floor(army.marchDistance()*4))%4:0,1.F});
+                        army.moving()?int(std::floor(army.marchDistance()*4))%4:0,armyVisibility,army.id()==selectedArmy});
             }
             std::stable_sort(items.begin(), items.end(), [](const auto& a, const auto& b)
             { return a.point.y < b.point.y; });
@@ -358,6 +344,18 @@ namespace Paladin
                 source.x += float(item.pose % std::max(1, item.sprite->frames)) * source.width;
                 const float w = float(item.sprite->width * item.scale * effectiveTilePixels);
                 const float h = float(item.sprite->height * item.scale * effectiveTilePixels);
+                if (item.selected && item.sprite->selectionSilhouette)
+                {
+                    // Eight offset alpha silhouettes, hidden by the sprite's
+                    // interior, produce a contour rather than a selection box.
+                    const float step=float(worldObjectPixelPitch(effectiveTilePixels));
+                    for (int dy=-1;dy<=1;++dy) for (int dx=-1;dx<=1;++dx)
+                        if (dx || dy) renderer.drawTexture(*item.sprite->selectionSilhouette,
+                            source.x,source.y,source.width,source.height,
+                            item.point.x-w*float(item.sprite->pivotX)+dx*step,
+                            item.point.y-h*float(item.sprite->pivotY)+dy*step,w,h,
+                            visibleColor({255,255,255,255},item.visibility*item.point.visibility).alpha);
+                }
                 renderer.drawTexture(*item.sprite->texture, source.x, source.y, source.width, source.height,
                     item.point.x - w * float(item.sprite->pivotX),
                     item.point.y - h * float(item.sprite->pivotY), w, h,
@@ -370,7 +368,7 @@ namespace Paladin
         // Native-resolution cartography is not squeezed through the world art
         // layer. Every symbol has immutable local geometry; only its whole plate
         // origin moves, using the snapped source camera plus the terrain's SAME
-        // final integer-screen residual. Population still controls size.
+        // final integer-screen residual. Universal symbols never change with population.
         const auto annotationProject = [&](double x, double y)
             -> std::optional<ProjectedWorldObject>
         {
@@ -420,7 +418,7 @@ namespace Paladin
             if (artwork)
                 for (const auto& army : world.armies())
                 {
-                    if (!army.soldierCount()) continue;
+                    if (!army.soldierCount() || armyVisibility <= .001F) continue;
                     const auto point=annotationProject(army.visualX()+.5,army.visualY()+.5);
                     const auto* sprite=worldArmySprite(*artwork,world,army);
                     if (point && sprite && sprite->texture && !outside(*point,renderer,256))
@@ -455,7 +453,7 @@ namespace Paladin
 
             for (const Army& army : world.armies())
             {
-                if (army.soldierCount() == 0) continue;
+                if (army.soldierCount() == 0 || armyVisibility <= .001F) continue;
                 const auto point = annotationProject(
                     army.visualX() + 0.5,
                     army.visualY() + 0.5
@@ -464,55 +462,14 @@ namespace Paladin
                 {
                     continue;
                 }
-                const auto label=worldArmyCountBounds(point->x,point->y,army.soldierCount());
-                const float countVisibility = point->visibility;
+                const auto* sprite = artwork ? worldArmySprite(*artwork,world,army) : nullptr;
+                const auto label=worldArmyCountBounds(point->x,point->y,army.soldierCount(),effectiveTilePixels,sprite);
+                const float countVisibility = point->visibility * armyVisibility;
                 renderer.fillRectangle(label.x,label.y,label.width,label.height,
                     visibleColor({8,15,27,235},countVisibility));
                 BitmapFontRenderer{}.drawText(renderer,std::to_string(army.soldierCount()),label.x+4,label.y+3,2.F,
                     visibleColor({239,226,207,255},countVisibility));
-                const auto* sprite = artwork ? worldArmySprite(*artwork,world,army) : nullptr;
-                const float symbolWeight = sprite && sprite->texture ? 0.F : 1.F;
-                const float visibility =
-                    point->visibility * symbolWeight;
-                const float radius = std::clamp(
-                    float(effectiveTilePixels * 0.22),
-                    5.0F,
-                    11.0F
-                );
-                const RenderColor shadow =
-                    visibleColor({8, 15, 27, 230}, visibility);
-                const RenderColor banner = visibleColor(
-                    worldObjectColor(
-                        world,
-                        army.ownerRealmId(),
-                        {255, 215, 131, 255}
-                    ),
-                    visibility
-                );
-                const RenderColor tip =
-                    visibleColor({244, 243, 232, 255}, visibility);
 
-                renderer.fillRectangle(
-                    point->x - radius - 1.0F,
-                    point->y - radius - 1.0F,
-                    radius * 2.0F + 2.0F,
-                    radius * 2.0F + 2.0F,
-                    shadow
-                );
-                renderer.fillRectangle(
-                    point->x - radius,
-                    point->y - radius,
-                    radius * 2.0F,
-                    radius * 2.0F,
-                    banner
-                );
-                renderer.fillRectangle(
-                    point->x - 1.0F,
-                    point->y - radius + 1.0F,
-                    2.0F,
-                    radius * 2.0F - 2.0F,
-                    tip
-                );
             }
 
         }

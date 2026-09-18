@@ -30,6 +30,8 @@
 #include "rendering/WorldArmyPresentation.h"
 #include "rendering/WorldMapNavigation.h"
 #include "ui/MilitaryPanel.h"
+#include "ui/DiplomacyPanel.h"
+#include "rendering/WorldRealmQuery.h"
 #include "simulation/Simulation.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
@@ -277,7 +279,7 @@ namespace Paladin
                 PALADIN_CHECK(app.selectedWorldArmy_==first);
                 PALADIN_CHECK(click(app,body.x+body.width*.5F,body.y+8));
                 PALADIN_CHECK(app.selectedWorldArmy_==second); // overlap cycling
-                const auto count=worldArmyCountBounds(pos->x,pos->y,1);
+                const auto count=worldArmyCountBounds(pos->x,pos->y,1,pixels,sprite);
                 PALADIN_CHECK(click(app,count.x+count.width*.5F,count.y+count.height*.5F));
                 PALADIN_CHECK(app.selectedWorldArmy_==first);
                 frame(app); capture(app,globe?"pr27-army-globe-selected.bmp":"pr27-army-flat-selected.bmp");
@@ -297,7 +299,7 @@ namespace Paladin
             PALADIN_CHECK(!world.army(first)->stationedSettlementId());
             const auto initial=world.army(first)->visualX();
             sim.tick(1); PALADIN_CHECK(world.army(first)->visualX()==initial);
-            MilitarySystem::tick(world,double(world.time().totalGameMinutes()),15);
+            MilitarySystem::tick(world,double(world.time().totalGameMinutes()),Army::MarchMinutesPerTile*.5);
             PALADIN_CHECK(std::abs(world.army(first)->visualX()-(initial+.5))<1.e-8);
             frame(app); capture(app,"pr27-army-half-tile-march.bmp");
             PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
@@ -308,6 +310,71 @@ namespace Paladin
             key(app,SDL_SCANCODE_ESCAPE); key(app,SDL_SCANCODE_ESCAPE);
             PALADIN_CHECK(!app.selectedWorldArmy_ && !app.militaryPanel_->isOpen());
             std::cout<<"Military actual event routing: portrait creation, large sprite/head/count picking, overlap cycling, rolled-globe tile order, pause and city detachment passed\n";
+        }
+
+        static void diplomacyRoutingChecks(Application& app)
+        {
+            auto& world=app.simulation_->world();
+            const auto actor=app.simulation_->playerRealmId();
+            const auto city=world.realm(actor)->capitalSettlementId();
+            const auto location=world.settlement(city)->position();
+            const float width=float(app.renderer_->outputWidth()),height=float(app.renderer_->outputHeight());
+            PALADIN_CHECK(app.screen_==Application::Screen::World);
+            app.militaryPanel_->close(); app.employmentPanel_->close(); app.ledgerPanel_->close();
+            app.diplomacyPanel_->close(); frame(app);
+            const float tabWidth=std::clamp((width-300-SimulationSpeedControls::RowWidth-36)/5,0.F,140.F);
+            PALADIN_CHECK(click(app,300+tabWidth*1.5F,22));
+            PALADIN_CHECK(app.diplomacyPanel_->isOpen() && !app.diplomacyPanel_->selection());
+            PALADIN_CHECK(!app.employmentPanel_->isOpen());
+            capture(app,"pr29-world-diplomacy-toolbar.bmp");
+            key(app,SDL_SCANCODE_ESCAPE);
+            const auto nav=WorldMapNavigation::buttonBounds(int(width),int(height));
+            PALADIN_CHECK(nav.y+nav.height<height-44); // no overlap with Back
+            for(const bool globe:{false,true})
+            {
+                app.worldRenderer_->globeEnabled=globe;
+                for(const auto mode:{WorldMapMode::Government,WorldMapMode::Population,WorldMapMode::Terrain,WorldMapMode::Political})
+                {
+                    const auto b=mode==WorldMapMode::Government?WorldMapNavigation::governmentModeButtonBounds(int(width),int(height)):
+                        mode==WorldMapMode::Population?WorldMapNavigation::populationModeButtonBounds(int(width),int(height)):
+                        mode==WorldMapMode::Terrain?WorldMapNavigation::terrainModeButtonBounds(int(width),int(height)):
+                        WorldMapNavigation::politicalModeButtonBounds(int(width),int(height));
+                    PALADIN_CHECK(click(app,b.x+13,b.y+13));
+                    PALADIN_CHECK(app.worldRenderer_->mapMode()==mode && app.screen_==Application::Screen::World);
+                    PALADIN_CHECK(!app.globePointerDown_ && !app.globeDragging_);
+                }
+            }
+            const auto* realm=world.realm(actor);
+            const FoundingIdentity original{std::string(realm->name()),"Routing Folk",std::string(world.settlement(city)->name()),
+                realm->mapColor(),std::string(realm->startingOriginId()),realm->flag()};
+            for(const auto* origin:{"civic","tribal"})
+            {
+                auto identity=original; identity.realmOriginId=origin;
+                PALADIN_CHECK(world.editRealmIdentity(actor,identity));
+                PALADIN_CHECK(worldRealmAt(world,location.x+.5,location.y+.5)==actor);
+                for(const bool globe:{false,true})
+                {
+                    app.diplomacyPanel_->close(); app.selectedWorldArmy_={};
+                    app.worldRenderer_->globeEnabled=globe;
+                    app.camera_->setPosition(location.x+.5,location.y+.5);
+                    constexpr double pixels=8, pi=3.14159265358979323846;
+                    app.camera_->setWorldZoom(globe?pixels*world.grid().width()/(height*.4*2*pi):pixels/app.tileRenderMetrics_->tilePixels);
+                    if(globe) app.camera_->setPlanetRotation(GlobeView::orientationAt(
+                        {(location.x+.5)/world.grid().width(),(location.y+.5)/world.grid().height()},.37),world.grid().width(),world.grid().height());
+                    frame(app);
+                    PALADIN_CHECK(click(app,width*.5F,height*.5F));
+                    PALADIN_CHECK(app.diplomacyPanel_->isOpen() && app.diplomacyPanel_->selection()==actor);
+                    PALADIN_CHECK(!app.selectedWorldArmy_ && !app.globePointerDown_);
+                    frame(app); PALADIN_CHECK(app.worldRenderer_->selectedRealm==actor);
+                    capture(app,(std::string("pr29-select-")+origin+(globe?"-globe.bmp":"-flat.bmp")).c_str());
+                }
+            }
+            PALADIN_CHECK(world.editRealmIdentity(actor,original)); app.diplomacyPanel_->close();
+            app.selectedWorldArmy_=world.armies().front().id();
+            PALADIN_CHECK(!app.worldArmySelectionVisible());
+            PALADIN_CHECK(!app.activeHudContainsPoint(350,110));
+            app.selectedWorldArmy_={};
+            std::cout<<"Diplomacy actual input: world toolbar, four map modes, no Back overlap, civic/tribal click selection in globe/flat and hidden army hitbox passed\n";
         }
 
         static void realmPanelChecks(Application& app)
@@ -3285,6 +3352,7 @@ namespace Paladin
             std::cout
                 << "Fortress creation and AI map isolation routing passed\n";
             militaryRoutingChecks(app);
+            diplomacyRoutingChecks(app);
             PALADIN_CHECK(click(app, 70, height - 22)); // World Back.
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(!app.simulation_);

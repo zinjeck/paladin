@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
@@ -229,8 +230,14 @@ namespace Paladin
         {
             return true;
         }
+        if (screen_ == Screen::World && controlsVisible && diplomacyPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
+        {
+            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
+            return true;
+        }
         if (handleMilitaryEvent(event))
         {
+            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
             return true;
         }
         if (handleReportEvent(event))

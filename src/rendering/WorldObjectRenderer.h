@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/SettlementMarkerRenderer.h"
+#include "core/StrongId.h"
 #include "rendering/SpriteRenderer.h"
 #include "rendering/WorldObjectPresentation.h"
 #include "rendering/WorldSurface.h"
@@ -33,7 +34,8 @@ namespace Paladin
             std::span<const SpriteRenderItem> fallbackSprites = {},
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt,
             WorldSurface::Point3 rigidResidual = {},
-            const SceneSpriteLibrary* artwork = nullptr
+            const SceneSpriteLibrary* artwork = nullptr,
+            ArmyId selectedArmy = {}
         ) const;
 
     private:
