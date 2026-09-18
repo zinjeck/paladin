@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/world-diplomacy-cartography
-          fetch-depth: 2
+          fetch-depth: 3
       - name: Apply and commit verified source patch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -21,8 +21,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^)" = "a63e09f2d0ec4f515e61212dcf39b2c8e527a6f5"
-          git diff --exit-code HEAD^ HEAD -- . ':(exclude).github/workflows/pr29-apply.yml'
+          test "$(git rev-parse HEAD^)" = "d1039489803511af2fe088a56bc421e1cd0c4aeb"
+          git diff --exit-code a63e09f2d0ec4f515e61212dcf39b2c8e527a6f5 HEAD -- . ':(exclude).github/workflows/pr29-apply.yml'
           archive="$RUNNER_TEMP/pr29.patch.xz"
           patch="$RUNNER_TEMP/pr29.patch"
           : > "$archive"
@@ -38,9 +38,11 @@ jobs:
           echo "4f79191545839eef90ab5131d31c807c271f6fac5083d2d51b05a2ca8b3f9826  $archive" | sha256sum -c -
           xz -dc "$archive" > "$patch"
           echo "6ef305948f3447b8c5754a5f5ce4e9bea81fcb11ce5c9794d5af23eafc6eecea  $patch" | sha256sum -c -
-          git apply --check "$patch"
-          git apply --index "$patch"
-          git rm -- .github/workflows/pr29-apply.yml
+          # Workflow changes are published separately through the authorized connector.
+          # GITHUB_TOKEN is used only for source files, within its contents permission.
+          git apply --check --exclude='.github/*' "$patch"
+          git apply --index --exclude='.github/*' "$patch"
+          git diff --cached --exit-code -- .github
           git diff --cached --check
           git diff --cached --stat
           git config user.name 'github-actions[bot]'
