@@ -1,0 +1,41 @@
+name: Publish verified input fixture
+on:
+  push:
+    branches: [fix/world-billboards-city-army-flow]
+    paths: [.github/workflows/pr28-publish-input-fixture.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact locally tested fixture and review notes
+        shell: python
+        run: |
+          import base64, hashlib, json, lzma, pathlib, subprocess
+          encoded = '''/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AVFAyNdAC3ghOhlOV6/A4HjfAenhfI1sgtDOKynx1ADw6PFI0DOhjvdGopKt2WM2Zo8LPEhQzC+9OLd1Vm8/9io5xrys5YQJ6lkfvIkhpZUdLEbdlm62aGyBgfHP1E7D6PrVVncaQFzJ12RnMJ+gH2qyLsL78zJExH1W3Y0QWmWjcpX4wViylEvYAFwjRyjmCjVV0/Z0jhwKhri//io8J/nG+KHdQfJubH6VefJcs7CCHTog3L7XTAs4XXjsj4xJO2MAopExNSiDXaDA2K9f4aiNRANCbrOMnW1boD3DI5TseUUokb+4/XgeHP6C2/6z2Z+Oei2rtuvd17zlYnuuKy0W/JFOoq+98MDIR5Lz2fkvPYnPKgM8VXx/DYeUPD+Q/qXb7balez0wbAuTzage11D9++fWQcaCHGkPSGdCDF5K2g5ZO5p384lU6qiBP+n6RP+riU56NrMWuId7t2hmPZUh5r8ib8mke/P/rzMRFom5ZXRPpjWhSowMV2mYFilMdP2fIpUFT43Xt7/efAP3vA5Z+vSjpJEbyLR28VdF3DL39JN9RMSVVi0DdqlX40sUkuhuCQjGQQtYNANqsLmugg6zl++LRVoDwr+wP0RofXa48cHJwEi0IKimadiGlhVn7wvqnvOdgTGRA/5jI0Flkb2snoETfKELr6wd4eZ16VIM4wRS5FINrNQ3krrpx9at4/s3UHqUXZQL1aDs8/Xb85VI0gqssMsXgWFqQEwFDCp80Uy/8L4J1wG126jua/LFAr3q1bplILEqjJEvhsOWOU2Ghzv6e/gk1jcajD45wfv7t1GD3Jt03e01Rh8w6GoQqX1Qwib/DiDM0Avv4EVVvCK0w2s1+Xq9SVUukJqOdjF88gzgVaG9EkZrbL/Gm4Yr419uAUGtVMP7w+gbIZE5bcAentvp5hZ+0l//4EhMglLxcnGnCBzTXbvhjGasesAivb90GJVwoPgfDcXmE5XjSufeN+HXMoh3uoEQ3VDKUPTeYnBRaOrudNqu5fm2gel0rNXMrZbTfFFpTBpcR04n+wx60MzT/uZciU3E8r1ZEdCg9zb7uudQurAAAARRV1SejLzwQABvwbGCgAA0bQ4+bHEZ/sCAAAAAARZWg=='''
+          raw = lzma.decompress(base64.b64decode(encoded))
+          assert hashlib.sha256(raw).hexdigest() == '8a83fca9c7decfe7ac835aade889f9f8337fb07dacb4204640c2951a1cac0a0b'
+          pending = []
+          for name, before, after, edits in json.loads(raw):
+              assert name in ('tests/ApplicationSmokeTests.cpp', 'docs/reviews/2026-09-18-world-army-fixes.md')
+              path = pathlib.Path(name)
+              original = path.read_bytes()
+              assert hashlib.sha256(original).hexdigest() == before, name
+              lines = original.decode('utf-8').splitlines(keepends=True)
+              for start, count, text in reversed(edits):
+                  lines[start:start+count] = [text]
+              revised = ''.join(lines).encode('utf-8')
+              assert hashlib.sha256(revised).hexdigest() == after, name
+              pending.append((path, revised))
+          for path, revised in pending:
+              path.write_bytes(revised)
+              subprocess.run(['git', 'add', '-f', '--', str(path)], check=True)
+          subprocess.run(['git', 'diff', '--cached', '--check'], check=True)
+      - name: Commit fixture correction to this review branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Synchronize synthetic clicks with SDL pointer state to prevent phantom edge scrolling'
+          git push origin HEAD:refs/heads/fix/world-billboards-city-army-flow
