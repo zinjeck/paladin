@@ -1,0 +1,32 @@
+name: World army review inputs
+on:
+  push:
+    branches: [fix/world-billboards-city-army-flow]
+    paths: [.github/workflows/pr-world-army-review-inputs.yml]
+permissions:
+  contents: read
+jobs:
+  inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch pinned build dependencies
+        run: >-
+          cmake -S . -B /tmp/paladin-review-deps -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DSDL_UNIX_CONSOLE_BUILD=ON
+          -DSDL_X11=OFF -DSDL_WAYLAND=OFF -DSDL_ALSA=OFF
+          -DSDL_PULSEAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_KMSDRM=OFF
+      - name: Bundle repository and dependency sources only
+        run: |
+          mkdir /tmp/paladin-review-inputs
+          git archive HEAD | gzip > /tmp/paladin-review-inputs/source.tar.gz
+          tar --exclude=.git -czf /tmp/paladin-review-inputs/dependencies.tar.gz -C /tmp/paladin-review-deps/_deps sdl3-src sdl3_ttf-src sdl3_image-src
+          git rev-parse HEAD > /tmp/paladin-review-inputs/commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: world-army-review-inputs
+          path: /tmp/paladin-review-inputs/*
+          retention-days: 7
+          if-no-files-found: error
