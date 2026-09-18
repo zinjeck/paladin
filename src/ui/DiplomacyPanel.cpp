@@ -23,16 +23,23 @@ namespace Paladin
             for (auto& r:next)
                 for (const auto& old:stats_) if (r.realm==old.realm) { r.size=old.size; break; }
         stats_=std::move(next); statsMinute_=world.time().totalGameMinutes(); areaRevision_=revision; dirty_=false;
-        const auto value=[&](const RealmStatistics& r)->long double
+        const auto compare=[&](const RealmStatistics& a,const RealmStatistics& b)
         {
+            // Keep money and counts in their exact integer domains. On MSVC,
+            // long double has only double precision and merges large balances.
+            const auto order=[](auto x,auto y) { return (x>y)-(x<y); };
             switch(sort_) {
-            case Sort::Soldiers:return r.soldiers; case Sort::Gold:return r.gold;
-            case Sort::Size:return r.size; case Sort::Cities:return r.cities; case Sort::Fortresses:return r.fortresses;
+            case Sort::Soldiers:return order(a.soldiers,b.soldiers);
+            case Sort::Gold:return order(a.gold,b.gold);
+            case Sort::Size:return order(a.size,b.size);
+            case Sort::Cities:return order(a.cities,b.cities);
+            case Sort::Fortresses:return order(a.fortresses,b.fortresses);
             } return 0;
         };
         std::stable_sort(stats_.begin(),stats_.end(),[&](const auto& a,const auto& b)
         {
-            if (value(a)!=value(b)) return descending_ ? value(a)>value(b) : value(a)<value(b);
+            const int order=compare(a,b);
+            if (order!=0) return descending_ ? order>0 : order<0;
             const auto* ar=world.realm(a.realm); const auto* br=world.realm(b.realm);
             if (ar && br && ar->name()!=br->name()) return ar->name()<br->name();
             return a.realm.value()<b.realm.value();

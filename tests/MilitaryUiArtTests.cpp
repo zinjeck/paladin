@@ -1,3 +1,4 @@
+#include <limits>
 #include "TestFramework.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
@@ -365,6 +366,16 @@ namespace
         PALADIN_CHECK(panel.realmBounds(actor)->y<panel.realmBounds(target)->y);
         click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
         PALADIN_CHECK(panel.realmBounds(target)->y<panel.realmBounds(actor)->y);
+        // Adjacent 64-bit balances must not collapse into a floating-point tie
+        // on Windows, where long double has the same precision as double.
+        world.realm(actor)->treasury->balance=std::numeric_limits<Money>::max()-1;
+        world.realm(target)->treasury->balance=std::numeric_limits<Money>::max();
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(target)->y<panel.realmBounds(actor)->y);
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(actor)->y<panel.realmBounds(target)->y);
+        world.realm(actor)->treasury->balance=99000;
+        world.realm(target)->treasury->balance=1100;
         // A captured button must not fire if released outside, or on another action.
         auto b=*panel.actionBounds(DiplomaticAction::War);
         SDL_Event event{}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN; event.button.button=SDL_BUTTON_LEFT;
