@@ -1,5 +1,6 @@
 #include "rendering/SceneSpriteLibrary.h"
 #include "assets/PresentationCodec.h"
+#include "assets/AssetBinary.h"
 #include "rendering/AssetUpload.h"
 #include "rendering/SceneDetail.h"
 #ifdef PALADIN_SOURCE_ART
@@ -17,6 +18,23 @@
 
 namespace Paladin
 {
+    namespace
+    {
+        std::shared_ptr<Texture> soldierSilhouette(Renderer& renderer,const SpriteAtlas& atlas,
+            int x,int y,int width,int height)
+        {
+            if (width<=0 || height<=0 || x<0 || y<0 || x+width>atlas.width || y+height>atlas.height)
+                throw std::runtime_error("Invalid soldier silhouette bounds");
+            std::vector<RenderColor> pixels(std::size_t(width)*height);
+            for (int row=0;row<height;++row)
+                for (int col=0;col<width;++col)
+                    pixels[std::size_t(row)*width+col]={235,196,107,atlas.pixels[std::size_t(y+row)*atlas.width+x+col].alpha};
+            auto texture=renderer.createTextureFromPixels(width,height,pixels);
+            renderer.setTextureFiltering(*texture,false);
+            return texture;
+        }
+    }
+
     void SceneSpriteLibrary::load(Renderer& renderer, const std::string& root)
     {
         if (loaded_)
@@ -65,6 +83,8 @@ namespace Paladin
                         *out.texture,
                         in.texture->atlas.linear
                     );
+                    if (id.starts_with("citizen.militia.") && id.ends_with(".walk"))
+                        out.selectionSilhouette=soldierSilhouette(renderer,in.texture->atlas,0,0,in.texture->width(),in.texture->height());
                     if (in.shadow)
                     {
                         out.shadow = renderer.createTextureFromPixels(
@@ -94,6 +114,9 @@ namespace Paladin
 #endif
             auto manager = renderer.compiledAssets();
             std::unordered_map<std::string, SceneSprite> sprites;
+            // At most four cached walking silhouettes; CPU atlases are shared
+            // during this upload then discarded, not rebuilt when zoom changes.
+            std::unordered_map<AssetId,SpriteAtlas> silhouetteAtlases;
             std::unordered_map<std::string, ObjectPresentation> objects;
             std::vector<BuildingPiece> pieces;
             std::vector<BlueprintLight> lights;
@@ -117,6 +140,12 @@ namespace Paladin
                         sprite.pixelWidth,
                         sprite.pixelHeight
                     );
+                    if (name.starts_with("citizen.militia.") && name.ends_with(".walk"))
+                    {
+                        auto it=silhouetteAtlases.find(sprite.atlas);
+                        if (it==silhouetteAtlases.end()) it=silhouetteAtlases.emplace(sprite.atlas,decodeAtlas(manager->data(sprite.atlas))).first;
+                        sprite.selectionSilhouette=soldierSilhouette(renderer,it->second,sprite.x,sprite.y,sprite.pixelWidth,sprite.pixelHeight);
+                    }
                     if (sprite.shadowAtlas)
                     {
                         sprite.shadow = assetTextureView(

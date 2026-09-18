@@ -7,6 +7,7 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldFoliage.h"
 #include "rendering/WorldPixelGrid.h"
+#include "rendering/WorldThematicPalette.h"
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -171,6 +172,14 @@ namespace Paladin
             );
         }
 
+        territoryPresentationRenderer_.configure(mapMode_,selectedRealm);
+        if (thematicMapMode(mapMode_) && !territoryPresentationRenderer_.preparationReady() &&
+            !territoryPresentationRenderer_.prepare(renderer,world))
+        {
+            renderer.fillRectangle(0,0,float(renderer.outputWidth()),float(renderer.outputHeight()),ThematicWater);
+            BitmapFontRenderer{}.drawText(renderer,"Preparing thematic map",20,78,2,{239,226,207,255});
+            return;
+        }
         artwork_.setTime(animationSeconds);
         stage(0);
 
@@ -343,7 +352,7 @@ namespace Paladin
                 pixelStabilityActive_,
                 sprites,
                 placementMarker,
-                objectResidual, &artwork_
+                objectResidual, &artwork_, selectedArmy
             );
             stage(7);
             return;
@@ -417,7 +426,7 @@ namespace Paladin
             pixelStabilityActive_,
             sprites,
             placementMarker,
-            {flatResidualX, flatResidualY, 0}, &artwork_
+            {flatResidualX, flatResidualY, 0}, &artwork_, selectedArmy
         );
     }
 
@@ -513,6 +522,25 @@ namespace Paladin
             true
         );
 
+        ui.drawButton(r,WorldMapNavigation::governmentModeButtonBounds(r.outputWidth(),r.outputHeight()),"G",false,false,mapMode_==WorldMapMode::Government,true);
+        ui.drawButton(r,WorldMapNavigation::populationModeButtonBounds(r.outputWidth(),r.outputHeight()),"N",false,false,mapMode_==WorldMapMode::Population,true);
+        const float legendY=WorldMapNavigation::buttonBounds(r.outputWidth(),r.outputHeight()).y-30;
+        if (mapMode_==WorldMapMode::Government)
+        {
+            r.fillRectangle(12,legendY,10,10,GovernmentTribal); ui.drawLabel(r,"Tribal",28,legendY,1);
+            r.fillRectangle(84,legendY,10,10,GovernmentCivic); ui.drawLabel(r,"Civic",100,legendY,1);
+            r.fillRectangle(151,legendY,10,10,UnclaimedLand); ui.drawLabel(r,"Unclaimed",167,legendY,1);
+        }
+        else if (mapMode_==WorldMapMode::Population)
+        {
+            ui.drawLabel(r,"People per realm",12,legendY-16,1);
+            constexpr std::array<const char*,7> labels{"0","1-31","32-127","128-511","512-2047","2048-8191","8192+"};
+            for (int i=0;i<7;++i)
+            {
+                const float x=12+i*62.F;
+                r.fillRectangle(x,legendY,54,8,PopulationColors[i]); ui.drawLabel(r,labels[i],x,legendY+11,1);
+            }
+        }
         if (const auto* t = globe_.mapTexture(0))
         {
             r.drawTexture(

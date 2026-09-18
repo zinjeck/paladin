@@ -25,6 +25,7 @@ namespace Paladin
         Population,
         Laws,
         Employment,
+        Diplomacy,
         Technology,
         Military,
         Economy,
@@ -57,8 +58,9 @@ namespace Paladin
         {
             treasuryGold_ = cents;
         }
-        void setWorldMode(bool enabled) noexcept
+        void setWorldMode(bool enabled)
         {
+            if (worldMode_ != enabled) topButtons_[1].setText(enabled ? "Diplomacy" : "Employment");
             worldMode_ = enabled;
             if (enabled)
             {

@@ -4,6 +4,7 @@
 #include "core/StrongId.h"
 
 #include "world/Army.h"
+#include "world/Diplomacy.h"
 #include "world/Soldier.h"
 #include "world/Culture.h"
 #include "world/FoundingIdentity.h"
@@ -29,6 +30,8 @@ namespace Paladin
     class World
     {
     public:
+        DiplomacyState& diplomacy() noexcept { return diplomacy_; }
+        const DiplomacyState& diplomacy() const noexcept { return diplomacy_; }
         const Soldier* soldier(SoldierId id) const noexcept { return soldiers_.find(id); }
         std::span<const Soldier> soldiers() const noexcept { return soldiers_.entities(); }
         World();
@@ -279,6 +282,7 @@ namespace Paladin
     private:
         friend class MilitarySystem;
         void connectRealmTerritory(RealmId realmId);
+        DiplomacyState diplomacy_;
         WorldTime time_;
         std::uint64_t generationSeed_ = 0;
         WorldGrid grid_;

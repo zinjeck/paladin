@@ -9,6 +9,7 @@
 #include "TribalInfluenceChecks.h"
 
 void runMilitaryIndustryTests();
+void runDiplomacyTests();
 void runRealmFeatureTests();
 void runEntityAttributeTests();
 void runWorldReliefTests();
@@ -23,6 +24,7 @@ int main()
 {
     try
     {
+        runDiplomacyTests();
         runMilitaryIndustryTests();
         runRealmFeatureTests();
         Paladin::Test::runCityResourceFlowChecks();

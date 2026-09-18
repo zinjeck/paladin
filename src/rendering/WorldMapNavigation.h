@@ -17,8 +17,8 @@ namespace Paladin
         }
         static UiRectangle buttonBounds(int width, int height)
         {
-            const auto b = mapBounds(width, height);
-            return {b.x, b.y - 30.0F, 58.0F, 26.0F};
+            (void)width;
+            return {12.F, std::max(0.F,float(height)-82.F), 122.F, 26.0F};
         }
         static UiRectangle politicalModeButtonBounds(int width, int height)
         {
@@ -30,6 +30,10 @@ namespace Paladin
             const auto b = buttonBounds(width, height);
             return {b.x + 32.0F, b.y, 26.0F, b.height};
         }
+        static UiRectangle governmentModeButtonBounds(int width,int height)
+        { const auto b=buttonBounds(width,height); return {b.x+64.F,b.y,26.F,b.height}; }
+        static UiRectangle populationModeButtonBounds(int width,int height)
+        { const auto b=buttonBounds(width,height); return {b.x+96.F,b.y,26.F,b.height}; }
         static WorldSurface::UV minimapPoint(UiRectangle b, double x, double y)
         {
             return {

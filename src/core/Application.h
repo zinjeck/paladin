@@ -20,6 +20,7 @@ namespace Paladin
     class CityHud;
     class LedgerPanel;
     class MilitaryPanel;
+    class DiplomacyPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -94,6 +95,7 @@ namespace Paladin
         bool handleReportEvent(const SDL_Event&);
         bool handleMilitaryEvent(const SDL_Event&);
         void renderMilitary();
+        bool worldArmySelectionVisible() const noexcept;
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
@@ -169,6 +171,7 @@ namespace Paladin
         std::unique_ptr<CityHud> cityHud_;
         std::unique_ptr<LedgerPanel> ledgerPanel_;
         std::unique_ptr<MilitaryPanel> militaryPanel_;
+        std::unique_ptr<DiplomacyPanel> diplomacyPanel_;
         ArmyId selectedWorldArmy_;
         bool militaryPointerCaptured_ = false;
         std::string militaryOrderMessage_;
@@ -207,7 +210,6 @@ namespace Paladin
         std::unique_ptr<Camera2D> savedWorldCamera_;
         SettlementId activeCitySettlementId_;
         SettlementId inspectedWorldSettlementId_;
-        void renderWorldRealmInspection();
         bool cityHudCapturedPointer_ = false;
         bool globePointerDown_ = false, globeDragging_ = false;
         int worldNavigatorPress_ = 0;

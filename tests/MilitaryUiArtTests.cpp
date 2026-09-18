@@ -1,3 +1,4 @@
+#include <limits>
 #include "TestFramework.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
@@ -14,6 +15,7 @@
 #include "simulation/Simulation.h"
 #include "ui/GrayUiRenderer.h"
 #include "ui/MilitaryPanel.h"
+#include "ui/DiplomacyPanel.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
@@ -177,19 +179,19 @@ namespace
         click(A::New); const auto second=panel.selection(); PALADIN_CHECK(second && second!=unit);
         const auto firstCard=panel.controlBounds(A::Row,unit), secondCard=panel.controlBounds(A::Row,second);
         PALADIN_CHECK(firstCard && secondCard && firstCard->height>firstCard->width);
-        PALADIN_CHECK(firstCard->x==secondCard->x && firstCard->y+firstCard->height<secondCard->y);
+        PALADIN_CHECK(firstCard->y==secondCard->y && firstCard->x+firstCard->width<secondCard->x);
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
         panel.render(renderer,ui,world,sim.playerRealmId(),&art);
-        capture(window,"pr27-portrait-unit-column.png"); renderer.endFrame();
+        capture(window,"pr29-compact-unit-grid.png"); renderer.endFrame();
         click(A::Disband); PALADIN_CHECK(!world.army(second));
         click(A::Row,unit); click(A::Local); click(A::World); click(A::Focus);
         PALADIN_CHECK(panel.takeFocus()==unit && !panel.isOpen());
-        // Sprite stages are presentation derived from actual population.
+        // Universal markers do not grow or acquire sprawl with population.
         WorldObjectRenderer objects; Camera2D camera(32.5,33.5); camera.setWorldZoom(16);
-        const auto worldFrame=[&](const std::string& name, const SceneSpriteLibrary* library)
+        const auto worldFrame=[&](const std::string& name, const SceneSpriteLibrary* library, ArmyId selected=ArmyId{})
         {
             renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
-            objects.render(renderer,world,camera,64,false,worldPresentationState(64),true,{},std::nullopt,{},library);
+            objects.render(renderer,world,camera,64,false,worldPresentationState(64),true,{},std::nullopt,{},library,selected);
             const auto pixels=capture(window,name); renderer.endFrame(); return pixels;
         };
         const auto fallback=worldFrame("pr26-world-without-art.png",nullptr);
@@ -197,28 +199,60 @@ namespace
         PALADIN_CHECK(MilitarySystem::resizeUnit(world,sim.playerRealmId(),unit,1)==MilitaryResult::Success);
         const auto two=worldFrame("pr27-one-character-two-soldiers.png",&art);
         bool labelChanged=false;
-        const auto countPlate=worldArmyCountBounds(480,256,2);
+        const auto countPlate=worldArmyCountBounds(480,256,2,64,worldArmySprite(art,world,*world.army(unit)));
         for (int y=0;y<640;++y) for (int x=0;x<960;++x)
         {
             if (countPlate.contains(float(x),float(y))) labelChanged |= two[y*960+x]!=settlement[y*960+x];
             else PALADIN_CHECK(two[y*960+x]==settlement[y*960+x]);
         }
         PALADIN_CHECK(labelChanged);
+        const auto unselected=worldFrame("pr29-army-unselected.png",&art);
+        const auto selected=worldFrame("pr29-army-selected.png",&art,unit);
+        const auto body=worldArmySpriteBounds(480,256,64,worldArmySprite(art,world,*world.army(unit)));
+        std::size_t contour=0;
+        for(int y=0;y<640;++y) for(int x=0;x<960;++x)
+            if(unselected[y*960+x]!=selected[y*960+x])
+            {
+                ++contour;
+                PALADIN_CHECK(x>=body.x-5 && x<=body.x+body.width+5 && y>=body.y-5 && y<=body.y+body.height+5);
+                // No rectangle spanning the bounding box: transparent sprite
+                // corners remain untouched by the selected contour.
+                PALADIN_CHECK(!(x<body.x+3 && y<body.y+3));
+            }
+        PALADIN_CHECK(contour>20);
+        std::vector<std::uint32_t> far;
+        for(const auto* library:{static_cast<const SceneSpriteLibrary*>(nullptr),static_cast<const SceneSpriteLibrary*>(&art)})
+        {
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
+            objects.render(renderer,world,camera,4,false,worldPresentationState(4),true,{},std::nullopt,{},library,unit);
+            const auto image=capture(window,"pr29-army-far.png"); renderer.endFrame();
+            if(far.empty()) far=image; else PALADIN_CHECK(far==image);
+        }
         for (const double scale : {.25,4.,16.,64.,256.})
         {
             const auto* sprite=worldArmySprite(art,world,*world.army(unit));
             const auto body=worldArmySpriteBounds(480,320,scale,sprite);
-            PALADIN_CHECK(body.height>=24.F);
-            PALADIN_CHECK(worldArmyHitTest(body.x+body.width*.5,body.y+3,480,320,scale,sprite,2));
-            PALADIN_CHECK(worldArmyHitTest(480,335,480,320,scale,sprite,2));
+            PALADIN_CHECK(body.height>=36.F);
+            const bool visible=worldArmyVisibility(scale)>.001F;
+            const auto plate=worldArmyCountBounds(480,320,2,scale,sprite);
+            PALADIN_CHECK(worldArmyHitTest(body.x+body.width*.5,body.y+3,480,320,scale,sprite,2)==visible);
+            PALADIN_CHECK(worldArmyHitTest(480,plate.y+plate.height*.5,480,320,scale,sprite,2)==visible);
             PALADIN_CHECK(!worldArmyHitTest(5,5,480,320,scale,sprite,2));
         }
         PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(120));
-        auto town=worldFrame("pr26-world-town.png",&art); PALADIN_CHECK(town!=settlement);
+        auto town=worldFrame("pr26-world-town.png",&art); PALADIN_CHECK(town==two);
         PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(896));
-        auto cityPixels=worldFrame("pr26-world-city.png",&art); PALADIN_CHECK(cityPixels!=town);
+        auto cityPixels=worldFrame("pr26-world-city.png",&art); PALADIN_CHECK(cityPixels==town);
+        auto fortressProfile=defaultSettlementFoundationProfile(); fortressProfile.kind=SettlementKind::Fortress;
+        const auto fortress=world.foundSettlement({48,32},sim.playerRealmId(),fortressProfile);
+        PALADIN_CHECK(fortress && world.renameSettlement(fortress,"Westgate"));
+        camera.setPosition(48.5,33.5);
+        const auto fortImage=worldFrame("pr29-fortress-icon.png",&art);
+        PALADIN_CHECK(world.settlement(fortress)->simulationState().spawnCitizens(900));
+        PALADIN_CHECK(worldFrame("pr29-fortress-population-invariant.png",&art)==fortImage);
+        camera.setPosition(32.5,33.5);
         PALADIN_CHECK(MilitarySystem::orderMove(world,sim.playerRealmId(),unit,{33,32})==MilitaryResult::Success);
-        MilitarySystem::tick(world,360,8);
+        MilitarySystem::tick(world,360,Army::MarchMinutesPerTile*.5);
         const auto march=worldFrame("pr26-world-marching.png",&art);
         PALADIN_CHECK(worldFrame("pr26-world-marching-paused.png",&art)==march);
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
@@ -281,6 +315,121 @@ namespace
             hud.closeCategoryMenus();
         }
     }
+    void diplomacyAndOverflow(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
+    {
+        WorldGenerationSettings settings; settings.width=settings.height=64; settings.seed=573; settings.populateAiRealms=false;
+        World world(settings);
+        for(int y=0;y<64;++y) for(int x=0;x<64;++x) world.grid().tile({x,y})->terrain=TerrainType::Land;
+        world.grid().terrainChanged();
+        const auto actor=world.createRealm(), target=world.createRealm();
+        const auto city=world.foundCapitalSettlement({12,24},actor,{"Amber Crown","Amberfolk","Amber",{},"civic"});
+        PALADIN_CHECK(city);
+        PALADIN_CHECK(world.foundCapitalSettlement({48,24},target,{"Blue Confederacy","Bluefolk","Blue",{},"tribal"}));
+        world.realm(actor)->treasury->balance=100000;
+        world.realm(target)->treasury->balance=100;
+        DiplomacyPanel panel; GrayUiRenderer ui;
+        panel.open(); panel.layout(960,640,world,actor);
+        PALADIN_CHECK(!panel.selection());
+        PALADIN_CHECK(!panel.actionBounds(DiplomaticAction::Alliance));
+        const auto frame=[&](const char* name)
+        {
+            renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
+            panel.render(renderer,ui,world,actor); capture(window,name); renderer.endFrame();
+        };
+        frame("pr29-diplomacy-blank.png");
+        const auto click=[&](std::optional<UiRectangle> b)
+        {
+            PALADIN_CHECK(b);
+            SDL_Event event{}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN; event.button.button=SDL_BUTTON_LEFT;
+            event.button.x=b->x+b->width*.5F; event.button.y=b->y+b->height*.5F;
+            PALADIN_CHECK(panel.handle(event,world,actor)); event.type=SDL_EVENT_MOUSE_BUTTON_UP;
+            PALADIN_CHECK(panel.handle(event,world,actor));
+        };
+        click(panel.realmBounds(target)); PALADIN_CHECK(panel.selection()==target);
+        float previous=0;
+        for (const auto action:{DiplomaticAction::Alliance,DiplomaticAction::Gift,DiplomaticAction::Tribute,
+                               DiplomaticAction::Trade,DiplomaticAction::War,DiplomaticAction::Peace})
+        {
+            const auto b=panel.actionBounds(action); PALADIN_CHECK(b && b->y>previous); previous=b->y;
+        }
+        frame("pr29-diplomacy-actions.png");
+        click(panel.actionBounds(DiplomaticAction::Alliance)); PALADIN_CHECK(world.diplomacy().between(actor,target)->allied);
+        click(panel.actionBounds(DiplomaticAction::Gift));
+        PALADIN_CHECK(world.realm(actor)->treasury->balance==99000 && world.realm(target)->treasury->balance==1100);
+        click(panel.actionBounds(DiplomaticAction::Tribute)); PALADIN_CHECK(world.diplomacy().overlordOf(target)==actor);
+        frame("pr29-diplomacy-tributary.png");
+        click(panel.actionBounds(DiplomaticAction::Tribute)); PALADIN_CHECK(!world.diplomacy().overlordOf(target));
+        click(panel.actionBounds(DiplomaticAction::Trade)); PALADIN_CHECK(world.diplomacy().between(actor,target)->trading);
+        click(panel.actionBounds(DiplomaticAction::War)); PALADIN_CHECK(world.diplomacy().between(actor,target)->atWar);
+        click(panel.actionBounds(DiplomaticAction::Peace)); PALADIN_CHECK(!world.diplomacy().between(actor,target)->atWar);
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(actor)->y<panel.realmBounds(target)->y);
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(target)->y<panel.realmBounds(actor)->y);
+        // Adjacent 64-bit balances must not collapse into a floating-point tie
+        // on Windows, where long double has the same precision as double.
+        world.realm(actor)->treasury->balance=std::numeric_limits<Money>::max()-1;
+        world.realm(target)->treasury->balance=std::numeric_limits<Money>::max();
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(target)->y<panel.realmBounds(actor)->y);
+        click(panel.sortBounds(DiplomacyPanel::Sort::Gold));
+        PALADIN_CHECK(panel.realmBounds(actor)->y<panel.realmBounds(target)->y);
+        world.realm(actor)->treasury->balance=99000;
+        world.realm(target)->treasury->balance=1100;
+        // A captured button must not fire if released outside, or on another action.
+        auto b=*panel.actionBounds(DiplomaticAction::War);
+        SDL_Event event{}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN; event.button.button=SDL_BUTTON_LEFT;
+        event.button.x=b.x+8; event.button.y=b.y+8; PALADIN_CHECK(panel.handle(event,world,actor));
+        event.type=SDL_EVENT_MOUSE_BUTTON_UP; event.button.x=2; event.button.y=2;
+        PALADIN_CHECK(panel.handle(event,world,actor)); PALADIN_CHECK(!world.diplomacy().between(actor,target)->atWar);
+        click(panel.realmBounds(actor)); click(panel.actionBounds(DiplomaticAction::War));
+        PALADIN_CHECK(!world.diplomacy().between(actor,actor));
+        panel.layout(320,240,world,actor); PALADIN_CHECK(panel.bounds().x>=0 && panel.bounds().y>=0);
+        PALADIN_CHECK(panel.bounds().x+panel.bounds().width<=320 && panel.bounds().y+panel.bounds().height<=240);
+        panel.close();
+
+        // Grid overflow uses rows and a draggable thumb, not a sideways strip.
+        std::vector<ArmyId> armies;
+        for(int i=0;i<25;++i)
+        { const auto id=world.createArmy({12,24}); PALADIN_CHECK(world.assignArmyToRealm(id,actor)); armies.push_back(id); }
+        MilitaryPanel military; military.toggle(city); military.layout(960,640,world,actor);
+        using A=MilitaryPanel::Action;
+        const auto first=military.controlBounds(A::Row,armies.front());
+        PALADIN_CHECK(first && first->width==76 && first->height==88);
+        PALADIN_CHECK(military.controlBounds(A::Row,armies[13]) && !military.controlBounds(A::Row,armies[14]));
+        PALADIN_CHECK(military.controlBounds(A::Row,armies[7])->y>first->y);
+        PALADIN_CHECK(military.controlBounds(A::World)->y>military.controlBounds(A::Row,armies[13])->y+88);
+        PALADIN_CHECK(military.controlBounds(A::New)->y>military.controlBounds(A::World)->y);
+        renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
+        military.render(renderer,ui,world,actor,&art); capture(window,"pr29-military-overflow-top.png"); renderer.endFrame();
+        event={}; event.type=SDL_EVENT_MOUSE_WHEEL; event.wheel.x=0; event.wheel.y=-20;
+        event.wheel.mouse_x=first->x+10; event.wheel.mouse_y=first->y+10;
+        PALADIN_CHECK(military.handle(event,world,actor));
+        PALADIN_CHECK(!military.controlBounds(A::Row,armies.front()) && military.controlBounds(A::Row,armies.back()));
+        renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
+        military.render(renderer,ui,world,actor,&art); capture(window,"pr29-military-overflow-bottom.png"); renderer.endFrame();
+        const auto mb=military.bounds();
+        event={}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN; event.button.button=SDL_BUTTON_LEFT;
+        event.button.x=mb.x+mb.width-22; event.button.y=mb.y+44+178;
+        PALADIN_CHECK(military.handle(event,world,actor));
+        event={}; event.type=SDL_EVENT_MOUSE_MOTION; event.motion.x=mb.x+mb.width-22; event.motion.y=mb.y+44;
+        PALADIN_CHECK(military.handle(event,world,actor));
+        event={}; event.type=SDL_EVENT_MOUSE_BUTTON_UP; event.button.button=SDL_BUTTON_LEFT;
+        event.button.x=mb.x+mb.width-22; event.button.y=mb.y+44;
+        PALADIN_CHECK(military.handle(event,world,actor));
+        PALADIN_CHECK(military.controlBounds(A::Row,armies.front()) && !military.selection());
+        // Exercise all five sorts and a list longer than the left viewport.
+        for (int i=0;i<20;++i) PALADIN_CHECK(world.createRealm());
+        panel.open(); panel.layout(960,640,world,actor);
+        for(auto sort:{DiplomacyPanel::Sort::Soldiers,DiplomacyPanel::Sort::Gold,DiplomacyPanel::Sort::Size,
+                       DiplomacyPanel::Sort::Cities,DiplomacyPanel::Sort::Fortresses}) click(panel.sortBounds(sort));
+        event={}; event.type=SDL_EVENT_MOUSE_WHEEL; event.wheel.y=-40;
+        event.wheel.mouse_x=panel.bounds().x+30; event.wheel.mouse_y=panel.bounds().y+140;
+        PALADIN_CHECK(panel.handle(event,world,actor));
+        PALADIN_CHECK(panel.realmBounds(actor) && panel.realmBounds(target));
+        std::cout<<"Diplomacy UI: blank/selected states, ordered actions, conserved gift, tributary toggle, five sorts, scroll and compact army overflow passed\n";
+    }
+
     void uprightSettlements(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
     {
         WorldGenerationSettings settings;
@@ -341,8 +490,9 @@ int main()
         actors(renderer,window.nativeHandle(),art);
         militaryAndCities(renderer,window.nativeHandle(),art);
         selectionAndConstruction(renderer,window.nativeHandle());
+        diplomacyAndOverflow(renderer,window.nativeHandle(),art);
         uprightSettlements(renderer,window.nativeHandle(),art);
-        std::cout<<"Military UI, live city tiers, walking/gathering, sleep pixel blocks and pause checks passed.\n";
+        std::cout<<"Military UI, universal markers, walking/gathering, sleep pixel blocks and pause checks passed.\n";
     }
     catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; result=1; }
     SDL_Quit(); return result;

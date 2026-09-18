@@ -49,106 +49,43 @@ namespace Paladin
             settlementWorldPresentation(settlement.population(), policy_);
         centerX = std::round(centerX);
         centerY = std::round(centerY);
-        const float size = std::round(presentation.markerDiameterPixels);
-        const float border = std::round(presentation.borderPixels);
-
-        // The marker is intentionally procedural. It is a stable cartographic
-        // symbol whose size comes from settlement data, not a sprite or a
-        // village/town/city type. Base colors are from the approved palette;
-        // realm color is an ownership annotation.
-        const RenderColor shadow =
-            visibleColor({8, 15, 27, 205}, visibility);       // #080F1B
-        const RenderColor parchment =
-            visibleColor({244, 243, 232, 255}, visibility);   // #F4F3E8
-        const RenderColor ink =
-            visibleColor({32, 44, 67, 255}, visibility);      // #202C43
-
-        RenderColor ownership{255, 215, 131, 255}; // #FFD783
-        if (const Realm* realm = world.realm(settlement.ownerRealmId()))
-        {
-            const MapColor mapColor = realm->mapColor();
-            ownership =
-                {mapColor.red, mapColor.green, mapColor.blue, 255};
-        }
-        ownership = visibleColor(ownership, visibility);
-
-        const float top = std::round(centerY - size * 0.5F);
-        const float bodyTop = top + std::round(size * 0.25F);
-        const float bodyHeight = std::round(size * 0.67F);
-        const float towerWidth = std::max(3.0F, std::round(size * 0.34F));
-        const float towerHeight = std::round(size * 0.38F);
-        const float bodyLeft = std::round(centerX - size * 0.5F);
-
+        // A single immutable 18-pixel building for every city and a single
+        // immutable fortress. Population, culture and zoom never change these.
+        constexpr float size=SettlementMapIconDiameterPixels;
+        const float top=std::round(centerY-size*.5F), left=std::round(centerX-size*.5F);
+        const auto rect=[&](float x,float y,float w,float h,RenderColor color)
+        { renderer.fillRectangle(left+x,top+y,w,h,visibleColor(color,visibility)); };
+        constexpr RenderColor ink{8,15,27,255}, wall{239,226,207,255}, shade{169,148,120,255};
         if (showSymbol)
         {
-        renderer.fillRectangle(
-            bodyLeft - 1.0F,
-            bodyTop + 1.0F,
-            size + 2.0F,
-            bodyHeight + 1.0F,
-            shadow
-        );
-        renderer.fillRectangle(
-            std::round(centerX - towerWidth * 0.5F) - 1.0F,
-            top + 1.0F,
-            towerWidth + 2.0F,
-            towerHeight + 1.0F,
-            shadow
-        );
-
-        renderer.fillRectangle(bodyLeft, bodyTop, size, bodyHeight, parchment);
-        renderer.fillRectangle(
-            std::round(centerX - towerWidth * 0.5F),
-            top,
-            towerWidth,
-            towerHeight,
-            parchment
-        );
-
-        renderer.fillRectangle(
-            bodyLeft + border,
-            bodyTop + border,
-            std::max(1.0F, size - border * 2.0F),
-            std::max(1.0F, bodyHeight - border * 2.0F),
-            ink
-        );
-        renderer.fillRectangle(
-            centerX - std::max(1.0F, towerWidth - border * 2.0F) * 0.5F,
-            top + border,
-            std::max(1.0F, towerWidth - border * 2.0F),
-            std::max(1.0F, towerHeight - border * 1.5F),
-            ink
-        );
-
-        const float ownershipWidth = std::max(4.0F, std::round(size * 0.58F));
-        const float ownershipHeight = std::max(2.0F, std::round(size * 0.12F));
-        renderer.fillRectangle(
-            centerX - ownershipWidth * 0.5F,
-            bodyTop + bodyHeight - border - ownershipHeight,
-            ownershipWidth,
-            ownershipHeight,
-            ownership
-        );
-
-        if (settlement.isFortress())
-        {
-            // Flanking battlements distinguish bastions without scaling a world
-            // sprite.
-            for (float x : {bodyLeft, bodyLeft + size - towerWidth})
+            if (settlement.isFortress())
             {
-                renderer
-                    .fillRectangle(x, top, towerWidth, towerHeight, parchment);
-                renderer.fillRectangle(
-                    x + border,
-                    top + border,
-                    std::max(1.F, towerWidth - 2 * border),
-                    std::max(1.F, towerHeight - border),
-                    ink
-                );
+                constexpr RenderColor stone{154,167,175,255}, light{215,224,227,255}, dark{89,102,121,255};
+                rect(0,4,18,14,ink); rect(1,5,16,12,stone);
+                rect(6,9,6,8,dark); rect(7,12,4,6,ink);
+                for (float x:{0.F,12.F})
+                {
+                    rect(x,1,6,16,ink); rect(x+1,3,4,13,stone); rect(x+1,3,1,13,light);
+                    rect(x,0,2,4,ink); rect(x+4,0,2,4,ink);
+                    rect(x+1,1,1,2,light); rect(x+4,1,1,2,light);
+                    rect(x+2,7,2,3,ink);
+                }
+                rect(6,7,6,2,light); rect(1,16,16,1,dark);
+            }
+            else
+            {
+                rect(2,7,14,11,ink); rect(3,8,12,9,wall); rect(12,8,3,9,shade);
+                for (int row=0;row<7;++row)
+                {
+                    rect(8-row,float(row),2+2*row,2,ink);
+                    if (row>0) rect(9-row,float(row)+1,2*row,1,{183,106,54,255});
+                    if (row>1) rect(9-row,float(row)+1,float(row),1,{243,174,69,255});
+                }
+                rect(1,7,16,1,ink); rect(5,10,2,2,{32,44,67,255}); rect(12,10,2,2,{32,44,67,255});
+                rect(8,12,3,5,{73,53,47,255}); rect(8,12,1,5,{183,131,80,255});
+                rect(3,16,4,1,shade);
             }
         }
-
-        } // A stationed army takes precedence over the small map symbol.
 
         if (settlement.name().empty())
         {
@@ -212,7 +149,7 @@ namespace Paladin
         const double viewportHeight =
             static_cast<double>(renderer.outputHeight());
         const float cullMargin =
-            std::max(32.0F, policy_.maximumMarkerDiameterPixels);
+            std::max(32.0F, SettlementMapIconDiameterPixels);
 
         for (const Settlement& settlement : world.settlements())
         {

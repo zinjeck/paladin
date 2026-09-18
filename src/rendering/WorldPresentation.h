@@ -11,8 +11,15 @@ namespace Paladin
     enum class WorldMapMode : std::uint8_t
     {
         Political,
-        Terrain
+        Terrain,
+        Government,
+        Population
     };
+
+    inline bool thematicMapMode(WorldMapMode mode) noexcept
+    { return mode==WorldMapMode::Government || mode==WorldMapMode::Population; }
+    inline float worldArmyVisibility(double pixels) noexcept
+    { return std::isfinite(pixels) ? float(detailBlend(pixels,10.0,16.0)) : 0.F; }
 
     // One authoritative zoom policy for the world screen.  The values are
     // expressed in effective screen pixels per logical world tile, so the same
@@ -126,6 +133,11 @@ namespace Paladin
             // while political paint and formal borders are removed.
             presentation.realmFillWeight = 0.0F;
             presentation.realmBorderWeight = 0.0F;
+        }
+        if (thematicMapMode(mode))
+        {
+            presentation.realmFillWeight=1.F;
+            presentation.realmBorderWeight=1.F;
         }
         return presentation;
     }

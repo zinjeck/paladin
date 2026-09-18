@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/WorldPresentation.h"
+#include "core/StrongId.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -23,6 +24,7 @@ namespace Paladin
         WorldRealmPresentationRenderer(const WorldRealmPresentationRenderer&) = delete;
         WorldRealmPresentationRenderer& operator=(const WorldRealmPresentationRenderer&) = delete;
         void reset();
+        void configure(WorldMapMode, RealmId selected = {});
         // Loading may prepare the first complete political presentation. Later
         // influence refreshes retain it while replacement work is time sliced.
         bool prepare(Renderer&, const World&);

@@ -530,7 +530,7 @@ namespace Paladin
             if (topButtons_[i].pointerReleased(x, y))
             {
                 closeCategoryMenus();
-                topAction = topActions[i];
+                topAction = worldMode_ && i == 1 ? CityHudAction::Diplomacy : topActions[i];
             }
         }
 
@@ -1159,7 +1159,7 @@ namespace Paladin
         {
             if (topButtons_[i].containsPoint(x, y))
             {
-                return titles[i];
+                return worldMode_ && i == 1 ? "Diplomacy - realms and agreements" : titles[i];
             }
         }
         if (goodsOpen_)

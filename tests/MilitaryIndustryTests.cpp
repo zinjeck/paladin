@@ -230,7 +230,7 @@ namespace
             PALADIN_CHECK(!people.citizen(world.soldier(id)->sourceCitizenId())->workplaceId);
         PALADIN_CHECK(map.logistics.inventory(inventory)->amount("rations") == 0);
         PALADIN_CHECK(MilitarySystem::resizeUnit(world, actor, unitId, -1) == MilitaryResult::ReturnHome);
-        MilitarySystem::tick(world, 360, 15);
+        MilitarySystem::tick(world, 360, Army::MarchMinutesPerTile*.5);
         PALADIN_CHECK(std::abs(world.army(unitId)->visualX() - 32.5) < 1e-8);
         int deployed = 0;
         for (const auto& c : people.citizens())
@@ -347,9 +347,9 @@ namespace
         // Land movement wraps by one adjacent tile across the world seam.
         PALADIN_CHECK(world.setArmyPosition(unit,{63,32}));
         PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{0,32})==MilitaryResult::Success);
-        MilitarySystem::tick(world,480,15);
+        MilitarySystem::tick(world,480,Army::MarchMinutesPerTile*.5);
         PALADIN_CHECK(std::abs(world.army(unit)->visualX()-63.5)<1e-8);
-        MilitarySystem::tick(world,495,15);
+        MilitarySystem::tick(world,482.5,Army::MarchMinutesPerTile*.5);
         PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(0,32));
         std::cout<<"[military] free barracks seats, captured/demolished origin independence, mixed-city recruitment, field cash conservation and seam travel passed\n";
     }

@@ -199,17 +199,17 @@ namespace
             std::numeric_limits<std::uint64_t>::max()
         );
 
-        PALADIN_CHECK(hamletSized.markerDiameterPixels >
+        PALADIN_CHECK(hamletSized.markerDiameterPixels ==
                       empty.markerDiameterPixels);
-        PALADIN_CHECK(growing.markerDiameterPixels >
+        PALADIN_CHECK(growing.markerDiameterPixels ==
                       hamletSized.markerDiameterPixels);
-        PALADIN_CHECK(large.markerDiameterPixels >
+        PALADIN_CHECK(large.markerDiameterPixels ==
                       growing.markerDiameterPixels);
         PALADIN_CHECK(std::abs(enormous.markerDiameterPixels -
                                large.markerDiameterPixels) < 1e-6F);
         PALADIN_CHECK(large.labelPixelSize >= growing.labelPixelSize);
-        PALADIN_CHECK(empty.markerDiameterPixels == 10.0F);
-        PALADIN_CHECK(large.markerDiameterPixels == 22.0F);
+        PALADIN_CHECK(empty.markerDiameterPixels == 18.0F);
+        PALADIN_CHECK(large.markerDiameterPixels == 18.0F);
         PALADIN_CHECK(large.labelPixelSize <= 1.90F);
         PALADIN_CHECK(large.borderPixels > 0.0F);
     }
@@ -296,8 +296,12 @@ namespace
         const auto terrain =
             Paladin::WorldMapNavigation::terrainModeButtonBounds(1280, 720);
 
-        PALADIN_CHECK(political.y + political.height <= map.y);
-        PALADIN_CHECK(terrain.y + terrain.height <= map.y);
+        PALADIN_CHECK(political.y + political.height < 720 - 44);
+        PALADIN_CHECK(terrain.y + terrain.height < 720 - 44);
+        const auto government=Paladin::WorldMapNavigation::governmentModeButtonBounds(1280,720);
+        const auto population=Paladin::WorldMapNavigation::populationModeButtonBounds(1280,720);
+        PALADIN_CHECK(terrain.x+terrain.width<government.x && government.x+government.width<population.x);
+        PALADIN_CHECK(population.x+population.width<map.x && strip.contains(population.x+13,population.y+13));
         PALADIN_CHECK(political.x + political.width < terrain.x);
         PALADIN_CHECK(
             strip.contains(

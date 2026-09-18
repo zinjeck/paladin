@@ -36,7 +36,10 @@ namespace Paladin
         void act(const Control&, World&, RealmId);
         std::vector<Control> controls_;
         std::optional<Control> pressedControl_;
-        UiRectangle bounds_, rows_;
+        UiRectangle bounds_, rows_, scrollTrack_, scrollThumb_;
+        bool draggingScroll_=false;
+        float scrollGrab_=0;
+        int maxScroll_=0;
         SettlementId city_;
         ArmyId selected_, focus_;
         bool open_=false, local_=false, captured_=false;

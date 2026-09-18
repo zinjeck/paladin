@@ -29,6 +29,8 @@ namespace Paladin
     class WorldRenderer
     {
     public:
+        RealmId selectedRealm;
+        ArmyId selectedArmy;
         double animationSeconds = 0;
         bool profileRendering = false;
         mutable std::array<double, 8> renderTimings{};

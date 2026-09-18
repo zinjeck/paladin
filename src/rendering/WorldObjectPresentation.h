@@ -24,7 +24,7 @@ namespace Paladin
 
     // Cartographic symbols are screen-sized annotations, not world sprites.
     // Quantize their finished origin to ONE physical pixel. Never divide their
-    // 10-22 px dimensions by the zoom-dependent 32-art-pixel world raster.
+    // 18 px dimensions by the zoom-dependent 32-art-pixel world raster.
     [[nodiscard]]
     inline float stableWorldObjectScreenCoordinate(
         float coordinate, double /*effectiveTilePixels*/) noexcept

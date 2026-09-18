@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementPlacementController.h"
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
@@ -28,6 +29,15 @@ namespace Paladin
                 6.283185307179586 / world.grid().width() : metrics.tilePixels*camera.zoom();
         }
     }
+    bool Application::worldArmySelectionVisible() const noexcept
+    {
+        if (screen_!=Screen::World || !simulation_ || !renderer_ || !camera_ || !worldRenderer_ ||
+            !tileRenderMetrics_ || !selectedWorldArmy_ || (diplomacyPanel_ && diplomacyPanel_->isOpen())) return false;
+        const auto& world=simulation_->world();
+        const auto* unit=world.army(selectedWorldArmy_);
+        return unit && unit->ownerRealmId()==simulation_->playerRealmId() && unit->soldierCount()>0 &&
+            worldArmyVisibility(worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled))>.001F;
+    }
     void Application::renderMilitary()
     {
         if (!simulationControlsVisible()) return;
@@ -37,23 +47,7 @@ namespace Paladin
         const auto* unit=world.army(selectedWorldArmy_);
         if (screen_!=Screen::World || !unit || unit->ownerRealmId()!=simulation_->playerRealmId()) return;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
-        const auto position=WorldMapNavigation::annotationPosition(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),pixels,
-            worldRenderer_->globeEnabled,unit->visualX()+.5,unit->visualY()+.5);
-        if (position)
-        {
-            const auto* sprite=worldArmySprite(worldRenderer_->artwork(),world,*unit);
-            const auto body=worldArmySpriteBounds(position->x,position->y,pixels,sprite);
-            const float left=std::min(body.x-3.F,float(position->x)-13.F);
-            const float right=std::max(body.x+body.width+3.F,float(position->x)+13.F);
-            // Keep the ground bracket above the count plate, never across its digits.
-            const float ground=std::min(body.y+body.height+3.F,float(position->y)+6.F);
-            for (int i=0;i<2;++i)
-            {
-                renderer_->drawLine(left-i,ground+i,right+i,ground+i,{235,196,107,255});
-                renderer_->drawLine(left-i,ground-5,left-i,ground+i,{235,196,107,255});
-                renderer_->drawLine(right+i,ground-5,right+i,ground+i,{235,196,107,255});
-            }
-        }
+        if (worldArmyVisibility(pixels)<=.001F || diplomacyPanel_->isOpen()) return;
         if (!militaryPanel_->isOpen())
         {
             const UiRectangle status{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70};
@@ -77,6 +71,9 @@ namespace Paladin
                 if (const auto* unit=world.army(focus))
                 {
                     selectedWorldArmy_=focus;
+                    const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
+                    if (pixels<20.) camera_->setWorldZoom(camera_->zoom()*20./std::max(.001,pixels));
+                    diplomacyPanel_->close();
                     WorldMapNavigation::focus(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),worldRenderer_->globeEnabled,
                         {(unit->visualX()+.5)/world.grid().width(),(unit->visualY()+.5)/world.grid().height()});
                     militaryOrderMessage_="Unit selected.";
@@ -90,7 +87,7 @@ namespace Paladin
         if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT && militaryPointerCaptured_)
         { militaryPointerCaptured_=false; return true; }
         if (event.type!=SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
-        if (selectedWorldArmy_ && !militaryPanel_->isOpen())
+        if (worldArmySelectionVisible() && !militaryPanel_->isOpen())
         {
             const UiRectangle status{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70};
             if (status.contains(event.button.x,event.button.y))
@@ -101,6 +98,7 @@ namespace Paladin
         }
         if (activeHudContainsPoint(event.button.x,event.button.y)) return false;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
+        if (worldArmyVisibility(pixels)<=.001F) return false;
         if (event.button.button==SDL_BUTTON_LEFT)
         {
             std::vector<std::pair<double,ArmyId>> hits;
@@ -121,7 +119,7 @@ namespace Paladin
                 auto choice=hits.begin();
                 const auto current=std::find_if(hits.begin(),hits.end(),[&](const auto& h){return h.second==selectedWorldArmy_;});
                 if (current!=hits.end()) { choice=std::next(current); if (choice==hits.end()) choice=hits.begin(); }
-                selectedWorldArmy_=choice->second; militaryPointerCaptured_=true;
+                selectedWorldArmy_=choice->second; diplomacyPanel_->close(); militaryPointerCaptured_=true;
                 militaryOrderMessage_=hits.size()>1?"Unit selected. Click the stack again to select another unit.":"Unit selected.";
                 return true;
             }
