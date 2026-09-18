@@ -1,0 +1,37 @@
+name: Publish PR29 integer sorting correction
+on:
+  push:
+    branches: [feat/world-diplomacy-cartography]
+    paths: [.github/workflows/pr29-sort-check.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/world-diplomacy-cartography
+          fetch-depth: 2
+      - name: Apply verified source-only correction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "bdb703a8c3f4534963b4db6056d09f825148a96c"
+          git diff --exit-code HEAD^ HEAD -- . ':(exclude).github/workflows/pr29-sort-check.yml'
+          patch="$RUNNER_TEMP/pr29-sortfix.patch"
+          gh api repos/zinjeck/paladin/git/blobs/3d5d4be1b0a941f1a8fb6db94a93b99cf05ba2d1 --jq '.content' | base64 --decode > "$patch"
+          echo "1207fe91928172e115824a771994a6e1f79bd3ec2193ab44479d5fcc821dfa16  $patch" | sha256sum -c -
+          git apply --check "$patch"
+          git apply --index "$patch"
+          git diff --cached --exit-code -- .github
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Keep realm sorting exact for adjacent 64-bit treasury balances'
+          git push origin HEAD:feat/world-diplomacy-cartography
+          git rev-parse HEAD
