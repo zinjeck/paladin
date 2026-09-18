@@ -185,6 +185,11 @@ namespace Paladin
 
         static bool click(Application& app, float x, float y)
         {
+            // Directly dispatched button events bypass SDL's pointer state.
+            // Keep the polled position in sync with the click, just as native
+            // input does; otherwise later frames edge-scroll from (0, 0),
+            // moving the placement camera by a timing-dependent number of tiles.
+            SDL_WarpMouseInWindow(app.window_->nativeHandle(), x, y);
             SDL_Event event{};
             event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
             event.button.button = SDL_BUTTON_LEFT;
@@ -3193,6 +3198,7 @@ namespace Paladin
                 {38, 32}, app.simulation_->playerRealmId(), SettlementKind::City));
             frame(app);
             // Re-entering region selection must retain the fortress footprint.
+            PALADIN_CHECK(app.foundingPanel_->settlementKind() == SettlementKind::Fortress);
             PALADIN_CHECK(click(app, width * .5F, 38));
             app.worldRenderer_->globeEnabled = false;
             app.camera_->setPosition(38.5, 32.5);
@@ -3204,6 +3210,8 @@ namespace Paladin
             while (!app.worldRenderer_->terrainDetailReady() && SDL_GetTicks()<returnDeadline)
             { frame(app); SDL_Delay(1); }
             PALADIN_CHECK(app.worldRenderer_->terrainDetailReady());
+            PALADIN_CHECK(std::abs(app.camera_->tileX() - 38.5) < 1e-8);
+            PALADIN_CHECK(std::abs(app.camera_->tileY() - 32.5) < 1e-8);
             PALADIN_CHECK(click(app, width * .5F, height * .5F));
             PALADIN_CHECK(
                 app.settlementPlacementController_->hasLockedSelection()

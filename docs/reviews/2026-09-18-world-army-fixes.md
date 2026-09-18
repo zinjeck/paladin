@@ -73,7 +73,10 @@ entire eligible roster first and refuses partial or duplicating demobilization.
   pick their heads and count plates on flat/rolled globe views, block orders
   through the status panel, march half a tile, respect pause, and remove moving
   units from the city tab. The existing asynchronous terrain input gate is
-  awaited before the fortress placement regression.
+  awaited before the fortress placement regression. Synthetic clicks also update
+  SDL's polled pointer position, preventing the dummy driver's initial (0, 0)
+  pointer from edge-scrolling the camera between clicks. The fortress target's
+  exact camera coordinates and selected type are asserted before placement.
 
 `PaladinArtCheck` remains mandatory. CI additionally runs the full UI/event
 routing scenario separately from the art-only capture mode and requires the
