@@ -4,7 +4,8 @@
 #include "rendering/Texture.h"
 namespace Paladin
 {
-    inline void uploadAssets(Renderer& renderer, AssetManager& manager)
+    inline void uploadAssets(Renderer& renderer, AssetManager& manager,
+                             const std::function<void()>& completed = {})
     {
         while (!manager.uploads.empty())
         {
@@ -31,6 +32,7 @@ namespace Paladin
                     texture,
                     job.image.pixels.size() * 4
                 );
+                if (completed) completed();
             }
             catch (...)
             {

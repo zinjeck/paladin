@@ -29,7 +29,8 @@ namespace Paladin
         {
             environmentArtEnabled_ = enabled;
         }
-        void load(Renderer& renderer, const std::string& root);
+        void load(Renderer& renderer, const std::string& root, const AssetLoadProgress& progress = {});
+        bool ready() const noexcept { return assets_ && !sprites_.empty(); }
         void reset()
         {
             loaded_ = false;

@@ -30,12 +30,13 @@ namespace Paladin
                 for (int col=0;col<width;++col)
                     pixels[std::size_t(row)*width+col]={235,196,107,atlas.pixels[std::size_t(y+row)*atlas.width+x+col].alpha};
             auto texture=renderer.createTextureFromPixels(width,height,pixels);
+            if (!texture) throw std::runtime_error("Unable to create soldier selection mask");
             renderer.setTextureFiltering(*texture,false);
             return texture;
         }
     }
 
-    void SceneSpriteLibrary::load(Renderer& renderer, const std::string& root)
+    void SceneSpriteLibrary::load(Renderer& renderer, const std::string& root, const AssetLoadProgress& progress)
     {
         if (loaded_)
         {
@@ -116,6 +117,17 @@ namespace Paladin
 #endif
 #endif
             auto manager = renderer.compiledAssets();
+            if (const auto cache = renderer.sceneSpriteCache(); cache && cache->assets_ == manager)
+            {
+                assets_ = manager;
+                sprites_ = cache->sprites_;
+                objects_ = cache->objects_;
+                pieces_ = cache->pieces_;
+                lights_ = cache->lights_;
+                loaded_ = true;
+                if (progress) progress(1, 1, "Reusing prepared sprites");
+                return;
+            }
             std::unordered_map<std::string, SceneSprite> sprites;
             // Decode each citizen atlas once. Compact alpha masks survive the
             // upload; the full CPU atlases do not. Zoom never allocates textures.
@@ -123,8 +135,11 @@ namespace Paladin
             std::unordered_map<std::string, ObjectPresentation> objects;
             std::vector<BuildingPiece> pieces;
             std::vector<BlueprintLight> lights;
-            for (auto& record : manager->records())
+            const auto records = manager->records();
+            std::size_t completed = 0;
+            for (const auto& record : records)
             {
+                if (progress) progress(completed++, records.size(), "Preparing sprite views and selection masks");
                 auto name = record.name.starts_with("paladin:")
                                 ? record.name.substr(8)
                                 : record.name;
@@ -206,6 +221,8 @@ namespace Paladin
             pieces_ = std::move(pieces);
             lights_ = std::move(lights);
             loaded_ = true;
+            renderer.cacheSceneSprites(std::make_shared<SceneSpriteLibrary>(*this));
+            if (progress) progress(records.size(), records.size(), "Sprites ready");
         }
         catch (const std::exception& e)
         {

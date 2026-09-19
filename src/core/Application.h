@@ -158,6 +158,12 @@ namespace Paladin
 
         void applyCameraZoom(double multiplier, double screenX, double screenY);
 
+        bool loadStartupAssets();
+        bool startupReady_ = false;
+        bool startupCancelled_ = false;
+        double startupProgress_ = 0;
+        std::size_t startupProgressFrames_ = 0;
+        std::string startupError_;
         bool sdlInitialized_ = false;
         Screen screen_ = Screen::MainMenu;
 
