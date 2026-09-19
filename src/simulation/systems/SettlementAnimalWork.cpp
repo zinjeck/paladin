@@ -52,10 +52,14 @@ namespace Paladin
         {
             return false;
         }
+        const auto* workplace = map.employment().workplace(c.workplaceId);
+        const SettlementObjectId assignedPasture = workplace && workplace->operational &&
+            workplace->objectTypeId == SettlementObjectTypes::Pastureland ? workplace->objectId : SettlementObjectId{};
         std::vector<EntityId> candidates;
         for (const auto& a : map.animals.all())
         {
-            if (a.health > 0 && !a.handler && a.order != AnimalOrder::None)
+            if (a.health > 0 && !a.handler && a.order != AnimalOrder::None &&
+                (!assignedPasture || a.order == AnimalOrder::Gather))
             {
                 candidates.push_back(a.id);
             }
@@ -95,6 +99,7 @@ namespace Paladin
                 {
                     if (object.objectTypeId ==
                             SettlementObjectTypes::Pastureland &&
+                        (!assignedPasture || object.id == assignedPasture) &&
                         map.animals.capacity(object.footprint) >=
                             map.animals.usedSpace(object.id) +
                                 animalSpecies(animal->species)->pastureSpace)

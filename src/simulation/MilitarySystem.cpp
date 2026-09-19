@@ -1,4 +1,5 @@
 #include "simulation/MilitarySystem.h"
+#include "simulation/WorldLandNavigation.h"
 #include "simulation/CitizenshipSystem.h"
 #include "simulation/WorldShipmentSystem.h"
 #include "world/World.h"
@@ -544,30 +545,9 @@ namespace Paladin
         const auto start = continuingStep ? unit->route_[unit->routeIndex_] : unit->position();
         const double continuedMinutes = continuingStep ? unit->stepMinutes_ : 0;
         const int width = grid.width();
-        const auto index = [width](WorldTilePosition p) { return std::size_t(p.y) * width + p.x; };
-        const auto startIndex = index(start), targetIndex = index(target);
-        if (!grid.isValidPosition(start)) return MilitaryResult::InvalidDestination;
-        std::vector<int> parents(grid.tileCount(), -1);
-        std::queue<WorldTilePosition> open;
-        open.push(start); parents[startIndex] = int(startIndex);
-        std::size_t expanded = 0;
-        constexpr std::size_t MaximumExpanded = 262144;
-        while (!open.empty() && parents[targetIndex] < 0 && expanded++ < MaximumExpanded)
-        {
-            const auto p = open.front(); open.pop();
-            for (const auto d : {WorldTilePosition{1,0}, {-1,0}, {0,1}, {0,-1}})
-            {
-                const WorldTilePosition next{(p.x + d.x + width) % width, p.y + d.y};
-                const auto* t = grid.tile(next);
-                if (!t || t->terrain != TerrainType::Land || parents[index(next)] >= 0) continue;
-                parents[index(next)] = int(index(p)); open.push(next);
-            }
-        }
-        if (parents[targetIndex] < 0) return MilitaryResult::NoLandRoute;
-        std::vector<WorldTilePosition> route;
-        for (auto at = targetIndex; at != startIndex; at = std::size_t(parents[at]))
-            route.push_back({int(at % width), int(at / width)});
-        std::reverse(route.begin(), route.end());
+        auto planned = worldLandRoute(grid, start, target, WorldLandMovement::EightWay);
+        if (!planned) return MilitaryResult::NoLandRoute;
+        std::vector<WorldTilePosition> route(planned->begin() + 1, planned->end());
         if (continuingStep) route.insert(route.begin(), start);
         // Buy/load only already produced rations before leaving supply range.
         resupply(world, *unit, double(world.time().totalGameMinutes()));
@@ -640,15 +620,22 @@ namespace Paladin
                 const double dt = std::min(remaining, 15.0);
                 if (unit.moving())
                 {
-                    unit.stepMinutes_ += dt;
-                    while (unit.moving() && unit.stepMinutes_ >= unit.minutesPerTile_)
+                    double movementMinutes = dt;
+                    while (unit.moving() && movementMinutes > 1e-9)
                     {
                         const auto next = unit.route_[unit.routeIndex_];
-                        const auto* tile = world.grid().tile(next);
-                        if (!tile || tile->terrain != TerrainType::Land)
+                        // Validate before interpolating, not after reaching a newly
+                        // blocked tile. Planning and movement share the same rules.
+                        if (!worldLandStepAllowed(world.grid(), unit.position_, next))
                         { unit.route_.clear(); unit.routeIndex_ = 0; unit.stepMinutes_ = 0; break; }
-                        unit.position_ = next; ++unit.routeIndex_;
-                        unit.stepMinutes_ -= unit.minutesPerTile_;
+                        const double duration = unit.currentStepMinutes();
+                        const double used = std::min(movementMinutes, std::max(0.0, duration - unit.stepMinutes_));
+                        unit.stepMinutes_ += used;
+                        movementMinutes -= used;
+                        if (unit.stepMinutes_ + 1e-9 < duration) break;
+                        unit.position_ = next;
+                        ++unit.routeIndex_;
+                        unit.stepMinutes_ = 0;
                     }
                     if (!unit.moving()) unit.stepMinutes_ = 0;
                 }

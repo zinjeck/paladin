@@ -5,6 +5,7 @@
 #include "CityResourceFlowChecks.h"
 #include "CloseWorldStabilityChecks.h"
 #include "PastureDormancyRegression.h"
+#include "Pr31AnimalNavigationChecks.h"
 #include "Pr16Regression.h"
 #include "TribalInfluenceChecks.h"
 
@@ -27,6 +28,7 @@ int main()
 {
     try
     {
+        runPr31AnimalNavigationChecks();
         runPr30ShipmentTests();
         runPr30StrategyTests();
         runPr30SocietyTests();
