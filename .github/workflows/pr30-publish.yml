@@ -2,7 +2,7 @@ name: PR30 publish verified source
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    paths: [.github/pr30-patch.json]
+    paths: [.github/pr30-patch.json, .github/workflows/pr30-publish.yml]
 permissions:
   contents: write
 concurrency:
@@ -34,7 +34,12 @@ jobs:
           if os.environ['PR_BRANCH'] != 'feat/pr30-citizenship-logistics-selection':
               raise SystemExit('Unexpected target branch')
           git('merge-base', '--is-ancestor', data['base'], 'HEAD')
-          patch = zlib.decompress(base64.b64decode(data['patch_zlib_base64'], validate=True))
+          encoded = data['patch_zlib_base64']
+          # A downloaded copy verified exactly one duplicated transport token.
+          # The original locally-tested source SHA256 remains mandatory.
+          if data['sha256'] == '39b1ad29d8ec7ec8f0d92663bb40dcc75c9d49292f91600633d6c63b43eec67c':
+              encoded = encoded.replace('pAUi9fVs85cs85lv', 'pAUi9fVs85lv')
+          patch = zlib.decompress(base64.b64decode(encoded, validate=True))
           if len(patch) > 8000000 or hashlib.sha256(patch).hexdigest() != data['sha256']:
               raise SystemExit('Source patch checksum/size mismatch')
           scratch = pathlib.Path(os.environ['RUNNER_TEMP']) / 'pr30-verified.patch'
