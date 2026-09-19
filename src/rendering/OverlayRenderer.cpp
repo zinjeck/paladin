@@ -1,4 +1,5 @@
 #include "rendering/OverlayRenderer.h"
+#include "rendering/SelectionOutline.h"
 
 #include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
@@ -75,20 +76,8 @@ namespace Paladin
             const float height =
                 static_cast<float>(outline.heightTiles * tilePixels);
 
-            const float lineWidth = std::clamp(
-                outline.lineWidthPixels,
-                1.0F,
-                std::max(1.0F, std::min(width, height) * 0.5F)
-            );
-
-            const std::array<RenderRectangle, 4> border{
-                RenderRectangle{x, y, width, lineWidth},
-                RenderRectangle{x, y + height - lineWidth, width, lineWidth},
-                RenderRectangle{x, y, lineWidth, height},
-                RenderRectangle{x + width - lineWidth, y, lineWidth, height}
-            };
-
-            renderer.fillRectangles(border, outline.color);
+            drawSelectionBorder(renderer, {x, y, width, height},
+                                outline.color, outline.lineWidthPixels);
         }
     }
 } // namespace Paladin

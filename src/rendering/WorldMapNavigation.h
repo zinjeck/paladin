@@ -17,8 +17,8 @@ namespace Paladin
         }
         static UiRectangle buttonBounds(int width, int height)
         {
-            (void)width;
-            return {12.F, std::max(0.F,float(height)-82.F), 122.F, 26.0F};
+            const auto map = mapBounds(width, height);
+            return {map.x, std::max(0.F, map.y - 32.F), 122.F, 26.F};
         }
         static UiRectangle politicalModeButtonBounds(int width, int height)
         {
