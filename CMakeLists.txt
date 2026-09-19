@@ -117,6 +117,8 @@ add_executable(Paladin
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
+    src/simulation/WorldLandNavigation.cpp
+    src/simulation/WorldShipmentSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
@@ -222,6 +224,7 @@ add_executable(PaladinTests
     tests/MilitaryIndustryTests.cpp
     tests/DiplomacyTests.cpp
     tests/Pr30SocietyTests.cpp
+    tests/Pr30ShipmentTests.cpp
     src/simulation/Simulation.cpp
     tests/TestMain.cpp
     tests/RealmFeatureTests.cpp
@@ -235,6 +238,8 @@ add_executable(PaladinTests
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
 
+    src/simulation/WorldLandNavigation.cpp
+    src/simulation/WorldShipmentSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp

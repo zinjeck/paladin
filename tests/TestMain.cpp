@@ -10,6 +10,7 @@
 
 void runMilitaryIndustryTests();
 void runPr30SocietyTests();
+void runPr30ShipmentTests();
 void runDiplomacyTests();
 void runRealmFeatureTests();
 void runEntityAttributeTests();
@@ -25,6 +26,7 @@ int main()
 {
     try
     {
+        runPr30ShipmentTests();
         runPr30SocietyTests();
         runDiplomacyTests();
         runMilitaryIndustryTests();

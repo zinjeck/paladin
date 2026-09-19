@@ -4,6 +4,7 @@
 #include "core/StrongId.h"
 
 #include "world/Army.h"
+#include "world/WorldShipment.h"
 #include "world/Diplomacy.h"
 #include "world/Soldier.h"
 #include "world/Culture.h"
@@ -30,6 +31,9 @@ namespace Paladin
     class World
     {
     public:
+        std::span<const WorldShipment> shipments() const noexcept { return shipments_; }
+        const WorldShipment* shipment(ShipmentId id) const noexcept
+        { for (const auto& route : shipments_) if (route.id==id) return &route; return nullptr; }
         DiplomacyState& diplomacy() noexcept { return diplomacy_; }
         const DiplomacyState& diplomacy() const noexcept { return diplomacy_; }
         const Soldier* soldier(SoldierId id) const noexcept { return soldiers_.find(id); }
@@ -281,6 +285,9 @@ namespace Paladin
 
     private:
         friend class MilitarySystem;
+        friend class WorldShipmentSystem;
+        std::vector<WorldShipment> shipments_;
+        IdGenerator<ShipmentId> shipmentIds_;
         void connectRealmTerritory(RealmId realmId);
         DiplomacyState diplomacy_;
         WorldTime time_;

@@ -141,6 +141,7 @@ namespace Paladin
         friend class WorldSimulationPipeline;
         friend class Simulation;
         friend class MilitarySystem;
+        friend class WorldShipmentSystem;
 
         void setSimulationTier(SettlementSimulationTier tier) noexcept;
 
