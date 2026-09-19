@@ -51,6 +51,8 @@ namespace Paladin
         std::span<const SoldierId> soldiers() const noexcept { return soldiers_; }
         std::size_t soldierCount() const noexcept { return soldiers_.size(); }
         int rations() const noexcept { return rations_; }
+        ArmyId attackTarget() const noexcept { return attackTarget_; }
+        ArmyId engagedOpponent() const noexcept { return engagedOpponent_; }
         bool moving() const noexcept { return routeIndex_ < route_.size(); }
         bool facingNorth() const noexcept
         { return moving() && route_[routeIndex_].y < position_.y; }
@@ -81,6 +83,8 @@ namespace Paladin
         }
     private:
         friend class MilitarySystem;
+        friend class BattleSystem;
+        ArmyId attackTarget_, engagedOpponent_;
         std::string name_ = "Unit";
         SettlementId station_;
         std::vector<SoldierId> soldiers_;

@@ -121,6 +121,7 @@ add_executable(Paladin
     src/simulation/WorldShipmentSystem.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
+    src/simulation/BattleSystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
@@ -246,6 +247,7 @@ add_executable(PaladinTests
     src/simulation/WorldShipmentSystem.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
+    src/simulation/BattleSystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp

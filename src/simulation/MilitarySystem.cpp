@@ -1,4 +1,5 @@
 #include "simulation/MilitarySystem.h"
+#include "simulation/BattleSystem.h"
 #include "simulation/WorldLandNavigation.h"
 #include "simulation/CitizenshipSystem.h"
 #include "simulation/WorldShipmentSystem.h"
@@ -20,6 +21,7 @@ namespace Paladin
     {
         switch (r)
         {
+        case MilitaryResult::InBattle: return "Resolve the current battle or retreat first.";
         case MilitaryResult::Success: return "Order accepted.";
         case MilitaryResult::NotOwned: return "This is not your realm's unit or city.";
         case MilitaryResult::NoBarracksEmployee: return "Hire an unassigned adult at a completed barracks first.";
@@ -62,7 +64,7 @@ namespace Paladin
     bool MilitarySystem::canOrganize(const World& world, const Army& unit) noexcept
     {
         const auto* city = world.settlement(stationAt(world, unit));
-        return city && city->simulationState().localMap();
+        return !unit.engagedOpponent_ && city && city->simulationState().localMap();
     }
     std::size_t MilitarySystem::available(const World& world, SettlementId id) noexcept
     {
@@ -374,6 +376,7 @@ namespace Paladin
         auto* unit = world.army(id);
         if (!unit) return MilitaryResult::InvalidUnit;
         if (!actor || unit->ownerRealmId() != actor) return MilitaryResult::NotOwned;
+        if (unit->engagedOpponent_) return MilitaryResult::InBattle;
         if (!canOrganize(world, *unit)) return MilitaryResult::ReturnHome;
         if (delta == 0) return MilitaryResult::Success;
         if (delta > 0)
@@ -427,6 +430,7 @@ namespace Paladin
         const auto* existing = world.army(id);
         if (!existing) return MilitaryResult::InvalidUnit;
         if (!actor || existing->ownerRealmId() != actor) return MilitaryResult::NotOwned;
+        if (existing->engagedOpponent_) return MilitaryResult::InBattle;
         const double minute = double(world.time().totalGameMinutes());
         // Demobilization is not hiring back into a barracks. Return each SAME
         // canonical person to their source settlement as an unemployed civilian.
@@ -535,6 +539,7 @@ namespace Paladin
         auto* unit = world.army(id);
         if (!unit) return MilitaryResult::InvalidUnit;
         if (!actor || unit->ownerRealmId() != actor) return MilitaryResult::NotOwned;
+        if (unit->engagedOpponent_) return MilitaryResult::InBattle;
         if (unit->soldiers_.empty()) return MilitaryResult::EmptyUnit;
         const auto& grid = world.grid();
         const auto* tile = grid.tile(target);
@@ -551,6 +556,7 @@ namespace Paladin
         if (continuingStep) route.insert(route.begin(), start);
         // Buy/load only already produced rations before leaving supply range.
         resupply(world, *unit, double(world.time().totalGameMinutes()));
+        unit->attackTarget_ = {};
         unit->route_ = std::move(route); unit->routeIndex_ = 0;
         unit->stepMinutes_ = continuedMinutes; unit->wrapWidth_ = width;
         unit->station_ = stationAt(world, *unit);
@@ -589,10 +595,52 @@ namespace Paladin
         }
         (void)minute;
     }
+    std::size_t MilitarySystem::applyBattleCasualties(World& world, ArmyId id, std::size_t amount)
+    {
+        auto* unit=world.army(id);
+        if (!unit) return 0;
+        amount=std::min(amount,unit->soldiers_.size());
+        const double minute=double(world.time().totalGameMinutes());
+        std::size_t removed=0;
+        // Soldier IDs are independent of vector addresses. Reacquire each person
+        // after erasure; ancestry and surviving relatives retain the original ID.
+        while (removed<amount && !unit->soldiers_.empty())
+        {
+            const auto sid=unit->soldiers_.back();
+            const auto* soldier=world.soldier(sid);
+            auto* city=soldier?world.settlement(soldier->homeSettlementId()):nullptr;
+            auto* c=soldier?person(world,*soldier):nullptr;
+            if (city && c)
+            {
+                auto& state=city->simulationState();
+                auto& citizens=state.citizens_;
+                const auto personId=c->id;
+                const bool resident=!c->militaryDeployed;
+                c->health=0;
+                if (auto* local=map(world,city->id()))
+                    local->activities.retireCitizen(*local,citizens,*c,minute);
+                else
+                {
+                    citizens.rememberAncestry(*c);
+                    for (auto& survivor:citizens.citizens_) survivor.familiarities.erase(personId);
+                }
+                std::erase_if(citizens.citizens_,[&](const auto& person){return person.id==personId;});
+                ++citizens.familyVersion_; ++citizens.version_;
+                if (state.localMap()) state.synchronizeCitizenPopulation();
+                else if (resident) static_cast<void>(state.population_.transferResidents(-1));
+            }
+            unit->soldiers_.pop_back();
+            world.soldiers_.erase(sid);
+            ++removed;
+        }
+        return removed;
+    }
     void MilitarySystem::tick(World& world, double minute, double elapsed)
     {
         if (!std::isfinite(elapsed) || elapsed <= 0) return;
         synchronize(world, minute);
+        BattleSystem::updatePursuit(world);
+        BattleSystem::detectContacts(world);
         // Indexed once per tick, never a citizen-array scan per marching soldier.
         PersonnelIndex people;
         for (auto& city : world.settlements())
@@ -636,6 +684,7 @@ namespace Paladin
                         unit.position_ = next;
                         ++unit.routeIndex_;
                         unit.stepMinutes_ = 0;
+                        BattleSystem::detectContacts(world);
                     }
                     if (!unit.moving()) unit.stepMinutes_ = 0;
                 }
@@ -676,5 +725,6 @@ namespace Paladin
             }
         }
         synchronize(world, minute + elapsed);
+        BattleSystem::detectContacts(world);
     }
 }

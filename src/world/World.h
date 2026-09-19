@@ -285,6 +285,7 @@ namespace Paladin
 
     private:
         friend class MilitarySystem;
+        friend class BattleSystem;
         friend class WorldShipmentSystem;
         std::vector<WorldShipment> shipments_;
         IdGenerator<ShipmentId> shipmentIds_;
