@@ -27,3 +27,23 @@ jobs:
             commit.txt
             SHA256SUMS
           retention-days: 5
+  dependency-sources:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/pr30-citizenship-logistics-selection'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Fetch pinned source dependencies for offline reproducibility
+        run: cmake -S . -B dependency-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL_X11=OFF -DSDL_WAYLAND=OFF
+      - name: Archive dependency source only
+        run: |
+          tar --exclude=.git -czf dependencies.tar.gz -C dependency-build/_deps sdl3-src sdl3_ttf-src sdl3_image-src
+          sha256sum dependencies.tar.gz > DEPENDENCIES-SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paladin-pr30-pinned-dependency-sources
+          path: |
+            dependencies.tar.gz
+            DEPENDENCIES-SHA256SUMS
+          retention-days: 5
