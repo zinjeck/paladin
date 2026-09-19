@@ -173,6 +173,7 @@ namespace Paladin
         if (worldMode_ && section_!="Laws") return;
         if (hit.type == "migrate")
         {
+            if (!immigrationOriginAvailable_) return;
             admissionCount_ =
                 std::min(admissionCount_, map.immigration.available());
             if (hit.delta > 0 && admissionCount_ < map.immigration.available())
@@ -187,7 +188,7 @@ namespace Paladin
         }
         if (hit.type == "admit")
         {
-            if (admissionCount_ > 0 &&
+            if (immigrationOriginAvailable_ && admissionCount_ > 0 &&
                 admissionCount_ <= map.immigration.available())
             {
                 admissionRequest_ = admissionCount_;

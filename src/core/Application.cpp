@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/DebugConsole.h"
 #include "ui/LedgerPanel.h"
@@ -73,6 +74,7 @@ namespace Paladin
         ledgerPanel_ = std::make_unique<LedgerPanel>();
         militaryPanel_ = std::make_unique<MilitaryPanel>();
         diplomacyPanel_ = std::make_unique<DiplomacyPanel>();
+        worldSettlementPanel_ = std::make_unique<WorldSettlementPanel>();
 
         simulationSpeedControls_ = std::make_unique<SimulationSpeedControls>();
 

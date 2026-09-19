@@ -1,5 +1,6 @@
 #include "simulation/CitizenshipSystem.h"
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/MilitaryPanel.h"
 #include "ui/LedgerPanel.h"
@@ -581,20 +582,6 @@ namespace Paladin
                     worldRenderer_->globeEnabled
                         ? view.radius * 6.283185307179586 / grid.width()
                         : tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-                if (pixels <= WorldPresentationPolicy{}.realmToRegionalEndPixels)
-                {
-                    const auto uv=WorldMapNavigation::pick(*camera_,grid,width,height,pixels,
-                        worldRenderer_->globeEnabled,event.button.x,event.button.y);
-                    const auto realm=uv ? worldRealmAt(simulation_->world(),uv->u*grid.width(),uv->v*grid.height()) : RealmId{};
-                    if (realm)
-                    {
-                        militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
-                        selectedWorldArmy_={}; militaryOrderMessage_.clear();
-                        diplomacyPanel_->open(realm);
-                        diplomacyPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
-                        return true;
-                    }
-                }
                 SettlementId nearest;
                 double best = 20.0;
                 for (const auto& city : simulation_->world().settlements())
@@ -623,21 +610,44 @@ namespace Paladin
                         nearest = city.id();
                     }
                 }
-                inspectedWorldSettlementId_ = nearest;
-                if (nearest && simulation_->setPresentedSettlement(nearest))
+                if (nearest)
                 {
-                    if (event.button.clicks >= 2)
-                    {
-                        enterPlayerCapitalCity();
-                    }
+                    if (worldSettlementPanel_->chooseDestination(simulation_->world(),simulation_->playerRealmId(),nearest)) return true;
+                    inspectedWorldSettlementId_ = nearest;
+                    selectedWorldArmy_={}; militaryOrderMessage_.clear();
+                    diplomacyPanel_->close(); militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
+                    worldSettlementPanel_->open(nearest);
+                    worldSettlementPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
+                    // Inspection is read-only for foreign cities. Entering your
+                    // city still uses the established double-click action.
+                    if (simulation_->setPresentedSettlement(nearest) && event.button.clicks>=2)
+                    { worldSettlementPanel_->close(); enterPlayerCapitalCity(); }
                     return true;
                 }
+                if (worldSettlementPanel_->choosingDestination()) return true;
+                if (pixels <= WorldPresentationPolicy{}.realmToRegionalEndPixels)
+                {
+                    const auto uv=WorldMapNavigation::pick(*camera_,grid,width,height,pixels,
+                        worldRenderer_->globeEnabled,event.button.x,event.button.y);
+                    const auto realm=uv ? worldRealmAt(simulation_->world(),uv->u*grid.width(),uv->v*grid.height()) : RealmId{};
+                    if (realm)
+                    {
+                        worldSettlementPanel_->close();
+                        militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
+                        selectedWorldArmy_={}; militaryOrderMessage_.clear();
+                        diplomacyPanel_->open(realm);
+                        diplomacyPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
+                        return true;
+                    }
+                }
+
             }
         }
         if (event.type == SDL_EVENT_MOUSE_WHEEL &&
             employmentPanel_
                 ->containsPoint(event.wheel.mouse_x, event.wheel.mouse_y))
         {
+            employmentPanel_->scroll(event.wheel.y);
             return true;
         }
         return false;

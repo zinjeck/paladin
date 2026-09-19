@@ -55,10 +55,15 @@ namespace Paladin
                                            const SettlementCitizenState& citizens)
     {
         constexpr std::array tabs{"Military","Administration","Commerce","Production"};
-        const float tabWidth=(bounds_.width-38)/4;
+        // Reserve enough width for Administration at the same integral font
+        // size as its neighbors instead of silently halving that one label.
+        constexpr std::array weights{.23F,.28F,.23F,.26F};
+        const float tabSpace=bounds_.width-37;
+        float tabX=bounds_.x+14;
         for (int i=0;i<4;++i)
         {
-            const UiRectangle b{bounds_.x+14+i*(tabWidth+3),bounds_.y+50,tabWidth,30};
+            const UiRectangle b{tabX,bounds_.y+50,tabSpace*weights[i],30};
+            tabX+=b.width+3;
             ui.drawButton(renderer,b,tabs[i],false,false,i==techTab_,true);
             hits_.push_back({b,"techTab",{},i});
         }

@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
 #include "interaction/GlobeCameraNavigation.h"
@@ -23,6 +24,7 @@ namespace Paladin
     void Application::layoutWorldScreen()
     {
         worldHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
+        worldSettlementPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
         diplomacyPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
 
         const Realm* playerRealm =
@@ -50,10 +52,10 @@ namespace Paladin
         if (!foundingPanel_->isOpen())
         {
             const double frameDeltaSeconds = simulationClock_->frameDeltaSeconds();
-            updateCameraMovement(frameDeltaSeconds);
+            if (!worldSettlementPanel_->wantsKeyboard()) updateCameraMovement(frameDeltaSeconds);
             updateCameraZoom(frameDeltaSeconds);
 
-            if (!debugConsole_->wantsKeyboard() && worldRenderer_->globeEnabled)
+            if (!debugConsole_->wantsKeyboard() && !worldSettlementPanel_->wantsKeyboard() && worldRenderer_->globeEnabled)
             {
                 const bool* keyboardState = SDL_GetKeyboardState(nullptr);
                 double rollDirection = 0.0;
@@ -198,6 +200,7 @@ namespace Paladin
             !settlementPlacementController_->isActive())
         {
             diplomacyPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
+            worldSettlementPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
         }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
     }

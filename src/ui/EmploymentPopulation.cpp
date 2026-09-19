@@ -27,7 +27,7 @@ namespace Paladin
         float top
     )
     {
-        const auto available = map.immigration.available();
+        const auto available = immigrationOriginAvailable_ ? map.immigration.available() : 0;
         admissionCount_ = std::min(admissionCount_, available);
         const auto button = [&](UiRectangle bounds,
                                 const std::string& text,
@@ -59,7 +59,7 @@ namespace Paladin
             ui.drawLabel(renderer, text, x, y, scale);
         };
         label(
-            "Available Immigrants: " + std::to_string(available),
+            immigrationOriginAvailable_ ? "Available Immigrants: " + std::to_string(available) : "No nearby immigrant origins",
             section.x + 14,
             section.y + 16,
             section.width - 28
@@ -78,7 +78,7 @@ namespace Paladin
         label(text.str(), section.x + 14, section.y + 63, section.width - 28);
         const float y = section.y + section.height - 48;
         label("Migrate:", section.x + 14, y + 9, 100);
-        const bool enabled = !worldMode_ && map.logistics.founded();
+        const bool enabled = !worldMode_ && map.logistics.founded() && immigrationOriginAvailable_;
         button(
             {section.x + 122, y, 34, 32},
             "<",

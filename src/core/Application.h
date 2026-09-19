@@ -21,6 +21,7 @@ namespace Paladin
     class LedgerPanel;
     class MilitaryPanel;
     class DiplomacyPanel;
+    class WorldSettlementPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -171,6 +172,7 @@ namespace Paladin
         std::unique_ptr<LedgerPanel> ledgerPanel_;
         std::unique_ptr<MilitaryPanel> militaryPanel_;
         std::unique_ptr<DiplomacyPanel> diplomacyPanel_;
+        std::unique_ptr<WorldSettlementPanel> worldSettlementPanel_;
         ArmyId selectedWorldArmy_;
         bool militaryPointerCaptured_ = false;
         std::string militaryOrderMessage_;

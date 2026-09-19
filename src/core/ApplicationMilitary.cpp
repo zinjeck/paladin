@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementPlacementController.h"
 #include "rendering/Camera2D.h"
@@ -53,7 +54,7 @@ namespace Paladin
                     selectedWorldArmy_=focus;
                     const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
                     if (pixels<20.) camera_->setWorldZoom(camera_->zoom()*20./std::max(.001,pixels));
-                    diplomacyPanel_->close();
+                    diplomacyPanel_->close(); worldSettlementPanel_->close();
                     WorldMapNavigation::focus(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),worldRenderer_->globeEnabled,
                         {(unit->visualX()+.5)/world.grid().width(),(unit->visualY()+.5)/world.grid().height()});
                     militaryOrderMessage_="Unit selected.";
@@ -67,6 +68,7 @@ namespace Paladin
         if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT && militaryPointerCaptured_)
         { militaryPointerCaptured_=false; return true; }
         if (event.type!=SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
+        if (worldSettlementPanel_->choosingDestination()) return false;
         if (activeHudContainsPoint(event.button.x,event.button.y)) return false;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
         if (worldArmyVisibility(pixels)<=.001F) return false;
@@ -95,7 +97,7 @@ namespace Paladin
                     selectedWorldArmy_={}; militaryOrderMessage_.clear(); militaryPointerCaptured_=true;
                     return true;
                 }
-                selectedWorldArmy_=choice->second; diplomacyPanel_->close(); militaryPointerCaptured_=true;
+                selectedWorldArmy_=choice->second; diplomacyPanel_->close(); worldSettlementPanel_->close(); militaryPointerCaptured_=true;
                 militaryOrderMessage_=hits.size()>1?"Unit selected. Click the stack again to select another unit.":"Unit selected.";
                 return true;
             }

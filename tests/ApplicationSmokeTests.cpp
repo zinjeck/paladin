@@ -30,6 +30,10 @@
 #include "rendering/WorldArmyPresentation.h"
 #include "rendering/WorldMapNavigation.h"
 #include "ui/MilitaryPanel.h"
+#include "ui/WorldSettlementPanel.h"
+#include "simulation/WorldShipmentSystem.h"
+#include "simulation/DiplomacySystem.h"
+#include "simulation/CitizenshipSystem.h"
 #include "ui/DiplomacyPanel.h"
 #include "rendering/WorldRealmQuery.h"
 #include "simulation/Simulation.h"
@@ -242,7 +246,7 @@ namespace Paladin
             app.foundingPanel_->close();
             app.settlementInspectionController_->clear();
             app.settlementInspectionPanel_->clearLayout();
-            app.simulationClock_->setPaused(true); sim.setSpeed(SimulationSpeed::Paused);
+            app.simulationClock_->setPaused(true); sim.setSpeed(SimulationSpeed::Paused); app.simulationClock_->setPaused(true);
             PALADIN_CHECK(sim.setPresentedSettlement(city));
             PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
             frame(app);
@@ -362,7 +366,25 @@ namespace Paladin
                     if(globe) app.camera_->setPlanetRotation(GlobeView::orientationAt(
                         {(location.x+.5)/world.grid().width(),(location.y+.5)/world.grid().height()},.37),world.grid().width(),world.grid().height());
                     frame(app);
-                    PALADIN_CHECK(click(app,width*.5F,height*.5F));
+                    // A city click now opens the city inspector. Realm ink is
+                    // picked in its background, outside every marker's hit radius.
+                    std::optional<std::pair<float,float>> background;
+                    for(int dy=-10;dy<=10 && !background;++dy) for(int dx=-10;dx<=10 && !background;++dx)
+                    {
+                        const double x=location.x+dx+.5,y=location.y+dy+.5;
+                        if(worldRealmAt(world,x,y)!=actor) continue;
+                        const auto point=WorldMapNavigation::annotationPosition(*app.camera_,world.grid(),int(width),int(height),pixels,globe,x,y);
+                        if(!point || app.activeHudContainsPoint(float(point->x),float(point->y))) continue;
+                        bool clear=true;
+                        for(const auto& city:world.settlements())
+                        {
+                            const auto marker=WorldMapNavigation::annotationPosition(*app.camera_,world.grid(),int(width),int(height),pixels,globe,city.position().x+.5,city.position().y+.5);
+                            if(marker && std::hypot(marker->x-point->x,marker->y-point->y)<25) clear=false;
+                        }
+                        if(clear) background=std::pair{float(point->x),float(point->y)};
+                    }
+                    PALADIN_CHECK(background);
+                    PALADIN_CHECK(click(app,background->first,background->second));
                     PALADIN_CHECK(app.diplomacyPanel_->isOpen() && app.diplomacyPanel_->selection()==actor);
                     PALADIN_CHECK(!app.selectedWorldArmy_ && !app.globePointerDown_);
                     frame(app); PALADIN_CHECK(app.worldRenderer_->selectedRealm==actor);
@@ -374,6 +396,121 @@ namespace Paladin
             PALADIN_CHECK(!app.activeHudContainsPoint(350,110));
             app.selectedWorldArmy_={};
             std::cout<<"Diplomacy actual input: world toolbar, four map modes, no Back overlap, civic/tribal click selection in globe/flat and hidden army hitbox passed\n";
+        }
+
+        static void worldLogisticsRoutingChecks(Application& app,SettlementId enemy)
+        {
+            auto& sim=*app.simulation_; auto& world=sim.world(); const auto actor=sim.playerRealmId();
+            auto& panel=*app.worldSettlementPanel_;
+            const auto source=sim.presentedSettlementId();
+            SettlementId destination;
+            for(const auto& city:world.settlements()) if(city.ownerRealmId()==actor && city.id()!=source) { destination=city.id(); break; }
+            PALADIN_CHECK(source && destination);
+            const auto width=app.renderer_->outputWidth(),height=app.renderer_->outputHeight();
+            app.selectedWorldArmy_={}; app.militaryPanel_->close(); app.diplomacyPanel_->close(); app.employmentPanel_->close();
+            sim.setSpeed(SimulationSpeed::Paused); app.simulationClock_->setPaused(true);
+            const auto focus=[&](SettlementId id,bool globe)
+            {
+                panel.close(); const auto p=world.settlement(id)->position();
+                app.worldRenderer_->globeEnabled=globe; app.worldRenderer_->setMapMode(WorldMapMode::Political);
+                app.camera_->setPosition(p.x+.5,p.y+.5);
+                app.camera_->setWorldZoom(globe?8.*world.grid().width()/(height*.4*6.283185307179586):8./app.tileRenderMetrics_->tilePixels);
+                if(globe) app.camera_->setPlanetRotation(GlobeView::orientationAt({(p.x+.5)/world.grid().width(),(p.y+.5)/world.grid().height()},.37),world.grid().width(),world.grid().height());
+                frame(app); PALADIN_CHECK(click(app,width*.5F,height*.5F)); frame(app);
+                PALADIN_CHECK(panel.isOpen() && panel.selection()==id && !app.diplomacyPanel_->isOpen());
+            };
+            for(bool globe:{false,true})
+            {
+                focus(enemy,globe);
+                PALADIN_CHECK(!panel.sendBounds("food") && !sim.settlementMap(enemy));
+                PALADIN_CHECK(sim.presentedSettlementId()==source); // Inspection is not ownership.
+                capture(app,globe?"pr30-foreign-settlement-globe.bmp":"pr30-foreign-settlement-flat.bmp");
+            }
+            focus(source,false);
+            PALADIN_CHECK(WorldShipmentSystem::receive(world,source,"lumber",100,world.time().totalGameMinutes()));
+            frame(app);
+            using Kind=WorldSettlementPanel::Kind;
+            const auto control=[&](Kind kind,int value=0)
+            {
+                for(const auto& c:panel.controls_) if(c.kind==kind && c.value==value) return c.bounds;
+                throw std::runtime_error("Missing shipment control");
+            };
+            const auto press=[&](UiRectangle box){PALADIN_CHECK(click(app,box.x+box.width*.5F,box.y+box.height*.5F)); frame(app);};
+            const auto begin=[&]() { const auto button=panel.sendBounds("lumber"); PALADIN_CHECK(button); press(*button); PALADIN_CHECK(panel.choosingDestination()); };
+            const auto goods=[&]()
+            {
+                double total=0; for(const auto& city:world.settlements()) total+=WorldShipmentSystem::total(city,"lumber");
+                for(const auto& route:world.shipments()) if(route.resource=="lumber") total+=route.cargo;
+                return total;
+            };
+            begin(); key(app,SDL_SCANCODE_ESCAPE); PALADIN_CHECK(panel.isOpen() && !panel.choosingDestination());
+            begin(); press(control(Kind::Cancel)); PALADIN_CHECK(!panel.choosingDestination());
+            begin(); press(control(Kind::Amount)); PALADIN_CHECK(panel.wantsKeyboard());
+            key(app,SDL_SCANCODE_1); key(app,SDL_SCANCODE_7); key(app,SDL_SCANCODE_RETURN); frame(app);
+            PALADIN_CHECK(panel.amount()==17 && !panel.wantsKeyboard());
+            capture(app,"pr30-shipment-setup.bmp");
+            press(control(Kind::Once));
+            auto target=panel.destinationBounds(destination); PALADIN_CHECK(target);
+            const auto before=goods(); press(*target);
+            PALADIN_CHECK(!panel.choosingDestination() && !world.shipments().empty());
+            const auto one=world.shipments().back().id;
+            PALADIN_CHECK(world.shipment(one)->amount==17 && world.shipment(one)->cargo==17 && !world.shipment(one)->repeating && goods()==before);
+            capture(app,"pr30-settlement-caravans.bmp");
+            WorldShipmentSystem::tick(world,360,10000); PALADIN_CHECK(!world.shipment(one)->active() && goods()==before);
+            begin(); press(control(Kind::Repeat));
+            // Destination picking must also work on the world, not only in the list.
+            const auto p=world.settlement(destination)->position(); app.camera_->setPosition(p.x+.5,p.y+.5); frame(app);
+            PALADIN_CHECK(click(app,width*.5F,height*.5F)); frame(app);
+            PALADIN_CHECK(!panel.choosingDestination() && world.shipments().back().repeating);
+            const auto repeated=world.shipments().back().id; const auto quantity=world.shipment(repeated)->amount;
+            const auto trip=double(world.shipment(repeated)->path.size()-1)*WorldShipment::MinutesPerTile;
+            WorldShipmentSystem::tick(world,10360,trip*3); frame(app);
+            PALADIN_CHECK(world.shipment(repeated)->deliveries==2 && goods()==before);
+            const auto stop=panel.stopBounds(repeated); PALADIN_CHECK(stop); press(*stop);
+            WorldShipmentSystem::tick(world,10360+trip*3,trip); frame(app);
+            PALADIN_CHECK(!world.shipment(repeated)->active() && goods()==before);
+            // Refresh layout for a fresh route and inspect a visible in-flight wagon.
+            begin(); press(control(Kind::Once)); target=panel.destinationBounds(destination); PALADIN_CHECK(target); press(*target);
+            const auto moving=world.shipments().back().id; panel.close();
+            WorldShipmentSystem::tick(world,15000,WorldShipment::MinutesPerTile*1.5);
+            const auto* wagon=world.shipment(moving); PALADIN_CHECK(wagon && wagon->moving());
+            app.camera_->setPosition(wagon->visualX()+.5,wagon->visualY()+.5); app.camera_->setWorldZoom(64./app.tileRenderMetrics_->tilePixels);
+            frame(app); capture(app,"pr30-caravan-flat.bmp");
+            app.worldRenderer_->globeEnabled=true;
+            app.camera_->setWorldZoom(64.*world.grid().width()/(height*.4*6.283185307179586));
+            app.camera_->setPlanetRotation(GlobeView::orientationAt({(wagon->visualX()+.5)/world.grid().width(),(wagon->visualY()+.5)/world.grid().height()},.45),world.grid().width(),world.grid().height());
+            frame(app); capture(app,"pr30-caravan-globe.bmp");
+            focus(source,false);
+            const auto old=panel.bounds(); const double cameraX=app.camera_->tileX(),cameraY=app.camera_->tileY();
+            SDL_Event e{}; e.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.button=SDL_BUTTON_LEFT; e.button.x=old.x+50; e.button.y=old.y+20; PALADIN_CHECK(send(app,e));
+            e={}; e.type=SDL_EVENT_MOUSE_MOTION; e.motion.x=old.x-150; e.motion.y=old.y+80; PALADIN_CHECK(send(app,e)); frame(app);
+            e={}; e.type=SDL_EVENT_MOUSE_BUTTON_UP; e.button.button=SDL_BUTTON_LEFT; e.button.x=old.x-150; e.button.y=old.y+80; PALADIN_CHECK(send(app,e)); frame(app);
+            PALADIN_CHECK(panel.bounds().x<old.x && !app.globePointerDown_ && !app.globeDragging_);
+            PALADIN_CHECK(app.camera_->tileX()==cameraX && app.camera_->tileY()==cameraY);
+            capture(app,"pr30-settlement-dragged.bmp"); key(app,SDL_SCANCODE_ESCAPE); PALADIN_CHECK(!panel.isOpen());
+            // Laws and technology use real application events on the world too.
+            app.employmentPanel_->toggle("Laws"); frame(app); capture(app,"pr30-laws.bmp");
+            for(const auto& hit:app.employmentPanel_->hits_) PALADIN_CHECK(hit.type!="governance" && hit.type!="gender" && hit.type!="citizenshipLaw");
+            app.employmentPanel_->toggle("Technology"); frame(app);
+            auto& tech=*app.employmentPanel_;
+            for(const auto& hit:tech.hits_) if(hit.type=="techTab" && hit.delta==1) { press(hit.bounds); break; }
+            PALADIN_CHECK(tech.techTab_==1);
+            const auto canvas=tech.techCanvas_; const auto previous=tech.techViews_[1].zoom;
+            e={}; e.type=SDL_EVENT_MOUSE_WHEEL; e.wheel.mouse_x=canvas.x+100; e.wheel.mouse_y=canvas.y+100; e.wheel.y=1; PALADIN_CHECK(send(app,e)); frame(app);
+            PALADIN_CHECK(tech.techViews_[1].zoom>previous);
+            const auto cx=canvas.x+canvas.width*.5F,cy=canvas.y+canvas.height*.5F;
+            const auto panBefore=tech.techViews_[1];
+            e={}; e.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.button=SDL_BUTTON_LEFT; e.button.x=cx; e.button.y=cy; PALADIN_CHECK(send(app,e));
+            e={}; e.type=SDL_EVENT_MOUSE_MOTION; e.motion.x=cx+48; e.motion.y=cy+23; PALADIN_CHECK(send(app,e)); frame(app);
+            e={}; e.type=SDL_EVENT_MOUSE_BUTTON_UP; e.button.button=SDL_BUTTON_LEFT; e.button.x=cx+48; e.button.y=cy+23; PALADIN_CHECK(send(app,e)); frame(app);
+            PALADIN_CHECK(tech.techViews_[1].panX==panBefore.panX+48 && tech.techViews_[1].panY==panBefore.panY+23);
+            PALADIN_CHECK(!world.realm(actor)->citizenshipResearched);
+            capture(app,"pr30-technology-tree.bmp");
+            bool research=false;
+            for(const auto& hit:tech.hits_) if(hit.type=="citizenship") { press(hit.bounds); research=true; break; }
+            PALADIN_CHECK(research && world.realm(actor)->citizenshipResearched);
+            capture(app,"pr30-citizenship-researched.bmp"); tech.close();
+            std::cout<<"PR30 application routing: foreign/own city inspection, real quantities, cancel, one-off/sustained map dispatch, stop, dragged panels and pannable/zoomable Citizenship tree passed\n";
         }
 
         static void realmPanelChecks(Application& app)
@@ -2777,9 +2914,11 @@ namespace Paladin
                 for (int x = 0; x < grid.width(); ++x)
                 {
                     grid.tile({x, y})->terrain = TerrainType::Land;
+                    grid.tile({x, y})->biome = BiomeType::Plain;
                     grid.tile({x, y})->elevation = Elevation{.5F};
                 }
             }
+            grid.terrainChanged(); // Publish fixture edits to both terrain projections.
             app.camera_->setPosition(32, 32);
             frame(app);
             const auto terrainDeadline = SDL_GetTicks() + 120000;
@@ -2864,6 +3003,15 @@ namespace Paladin
                 {"Smoke Realm", "Smoke Culture", "Smoke City", {}, "tribal", {}}
             );
             PALADIN_CHECK(capital);
+            // Create origins before taking references into dense settlement storage.
+            auto& originWorld = app.simulation_->world();
+            const auto originRealm = originWorld.createRealm();
+            auto originProfile = defaultSettlementFoundationProfile();
+            originProfile.initialDetailedCitizenCount = 0;
+            originWorld.grid().tile({32, 23})->biome = BiomeType::Plain;
+            const auto originCity = originWorld.foundCapitalSettlement({32, 23}, originRealm,
+                {"Local Neighbors", "Local Neighbor Culture", "Northern Village", {}, "tribal", {}}, originProfile);
+            PALADIN_CHECK(originCity);
             const auto treasury = app.simulation_->world()
                                       .realm(app.simulation_->playerRealmId())
                                       ->treasury;
@@ -3110,6 +3258,13 @@ namespace Paladin
                 return false;
             };
             PALADIN_CHECK(!clickPopulationAction("immigration"));
+            PALADIN_CHECK(!clickPopulationAction("migrate", 1));
+            PALADIN_CHECK(!app.simulation_->admitImmigrants(capital, 1));
+            // Applicants may only be admitted from a nearby AI culture. The
+            // old isolated-world fixture no longer represents a valid origin.
+            RealmRulerSystem::establishAi(originWorld, originRealm);
+            PALADIN_CHECK(!CitizenshipSystem::nearbyOrigins(originWorld, capital).empty());
+            frame(app);
             const auto beforeAdmission = people.citizens().size();
             const auto expectedAttributes = people.averageAttributes();
             PALADIN_CHECK(clickPopulationAction("migrate", 1));
@@ -3128,6 +3283,8 @@ namespace Paladin
             );
             const auto& immigrant = people.citizens().back();
             PALADIN_CHECK(!immigrant.child && !immigrant.workplaceId);
+            PALADIN_CHECK(immigrant.primaryCultureId == originWorld.settlement(originCity)->primaryCultureId());
+            PALADIN_CHECK(immigrant.birthSettlementId == originCity && !immigrant.secondaryCultureId);
             for (std::size_t a = 0; a < entityAttributeCount; ++a)
             {
                 PALADIN_CHECK(
@@ -3352,6 +3509,7 @@ namespace Paladin
                 << "Fortress creation and AI map isolation routing passed\n";
             militaryRoutingChecks(app);
             diplomacyRoutingChecks(app);
+            worldLogisticsRoutingChecks(app,enemyCity);
             PALADIN_CHECK(click(app, 70, height - 22)); // World Back.
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(!app.simulation_);

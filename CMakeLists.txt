@@ -178,6 +178,7 @@ add_executable(Paladin
     src/ui/CityHud.cpp
     src/ui/LedgerPanel.cpp
     src/ui/MilitaryPanel.cpp
+    src/ui/WorldSettlementPanel.cpp
     src/ui/DiplomacyPanel.cpp
     src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
