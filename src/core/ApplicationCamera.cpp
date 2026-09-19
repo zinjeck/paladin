@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/MilitaryPanel.h"
 #include "interaction/GlobeCameraNavigation.h"
@@ -485,6 +486,7 @@ namespace Paladin
 
     bool Application::activeHudContainsPoint(float x, float y) const noexcept
     {
+        if (screen_ == Screen::World && caravanPanel_ && caravanPanel_->contains(x,y)) return true;
         if (screen_ == Screen::World && worldSettlementPanel_ && worldSettlementPanel_->contains(x,y)) return true;
         if (screen_ == Screen::World && diplomacyPanel_ && diplomacyPanel_->contains(x,y)) return true;
         if (militaryPanel_ && militaryPanel_->contains(x,y)) return true;

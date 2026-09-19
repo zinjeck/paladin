@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
@@ -30,6 +31,9 @@ namespace Paladin
     }
     bool Application::handleReportAction(CityHudAction action)
     {
+        if (action == CityHudAction::FocusActiveSettlement && screen_ == Screen::World)
+        { focusWorldSettlement(simulation_->presentedSettlementId()); return true; }
+        if (action != CityHudAction::None) caravanPanel_->close();
         if (action != CityHudAction::None) worldSettlementPanel_->close();
         if (action == CityHudAction::Diplomacy && screen_ == Screen::World)
         {

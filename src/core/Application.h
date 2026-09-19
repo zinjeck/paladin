@@ -22,6 +22,7 @@ namespace Paladin
     class MilitaryPanel;
     class DiplomacyPanel;
     class WorldSettlementPanel;
+    class CaravanPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -96,6 +97,8 @@ namespace Paladin
         bool handleReportEvent(const SDL_Event&);
         bool handleMilitaryEvent(const SDL_Event&);
         void renderMilitary();
+        bool handleCaravanEvent(const SDL_Event&);
+        void focusWorldSettlement(SettlementId);
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
@@ -179,6 +182,8 @@ namespace Paladin
         std::unique_ptr<MilitaryPanel> militaryPanel_;
         std::unique_ptr<DiplomacyPanel> diplomacyPanel_;
         std::unique_ptr<WorldSettlementPanel> worldSettlementPanel_;
+        std::unique_ptr<CaravanPanel> caravanPanel_;
+        bool caravanPointerCaptured_ = false;
         ArmyId selectedWorldArmy_;
         bool militaryPointerCaptured_ = false;
         std::string militaryOrderMessage_;

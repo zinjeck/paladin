@@ -256,6 +256,7 @@ namespace Paladin
             informationWidth,
             36
         };
+        activeSettlementButton_.setBounds(activeSettlementPanel_);
         // Ledger fits beside the minimap, or above it on narrow windows.
         const float ledgerX = minimapPanel_.x - 44;
         ledgerButton_.setBounds(
@@ -331,6 +332,7 @@ namespace Paladin
 
     void CityHud::pointerMoved(float x, float y) noexcept
     {
+        if (worldMode_) activeSettlementButton_.pointerMoved(x, y);
         artButton_.pointerMoved(x, y);
         if (!worldMode_)
         {
@@ -381,7 +383,7 @@ namespace Paladin
             bool captured = populationButton_.pointerPressed(x, y) ||
                             cityNamePanel_.contains(x, y) ||
                             dayTimePanel_.contains(x, y) ||
-                            activeSettlementPanel_.contains(x, y);
+                            activeSettlementButton_.pointerPressed(x, y);
             for (auto& button : topButtons_)
             {
                 captured = button.pointerPressed(x, y) || captured;
@@ -490,6 +492,8 @@ namespace Paladin
 
     CityHudAction CityHud::pointerReleased(float x, float y) noexcept
     {
+        if (worldMode_ && activeSettlementButton_.pointerReleased(x, y))
+            return CityHudAction::FocusActiveSettlement;
         if (artButton_.pointerReleased(x, y))
         {
             return CityHudAction::ToggleEnvironmentArt;
@@ -845,21 +849,7 @@ namespace Paladin
         ledgerButton_.render(renderer, uiRenderer);
         if (worldMode_)
         {
-            uiRenderer.drawPanel(renderer, activeSettlementPanel_);
-            const std::string label =
-                "Active Settlement: " + activeSettlementName_;
-            const float scale = std::min(
-                1.5F,
-                (activeSettlementPanel_.width - 12) /
-                    std::max(1.0F, float(label.size() * 6 - 1))
-            );
-            uiRenderer.drawLabel(
-                renderer,
-                label,
-                6,
-                activeSettlementPanel_.y + (36 - 7 * scale) * .5F,
-                scale
-            );
+            activeSettlementButton_.render(renderer, uiRenderer);
             for (const auto& button : topButtons_)
             {
                 button.render(renderer, uiRenderer);

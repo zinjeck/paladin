@@ -5,6 +5,8 @@
 #include <array>
 #include <cmath>
 #include <numeric>
+#include <unordered_set>
+#include "world/generation/GenerationNoise.h"
 
 namespace Paladin
 {
@@ -26,9 +28,12 @@ namespace Paladin
     {
         if(width_<=0 || height_<=0) return;
         const auto index=[&](WorldTilePosition p){return std::size_t(p.y)*width_+p.x;};
-        const auto dry=[&](WorldTilePosition p){const auto* t=world.grid().tile(p); return t && t->terrain!=TerrainType::Water;};
+        const auto dry=[&](WorldTilePosition p){const auto* t=world.grid().tile(p); return t && t->terrain==TerrainType::Land;};
         const auto deposit=[&](WorldTilePosition p,double count)
         { p.x=(p.x%width_+width_)%width_; if(dry(p)) people_[index(p)]+=float(count); };
+        std::unordered_set<std::size_t> roadCells;
+        for (const auto& road : world.worldRoads()) for (const auto p : road.points())
+            if (world.grid().isValidPosition(p)) roadCells.insert(index(p));
         for(const auto& city:world.settlements())
         {
             if(!city.population()) continue;
@@ -80,7 +85,14 @@ namespace Paladin
             for(const auto p:cells)
             {
                 const int dx=std::min(std::abs(p.x-centre.x),width_-std::abs(p.x-centre.x)),dy=p.y-centre.y;
-                const double weight=1./(1.+.5*(dx*dx+dy*dy));
+                const auto* terrain=world.grid().tile(p);
+                const auto noise=GenerationNoise::mix(city.id().value()*7307ULL+index(p)*9176ULL);
+                const double texture=.65+double(noise%1000)/1000.;
+                const double access=roadCells.contains(index(p))?1.6:1.;
+                const double slope=terrain?1.+2.*std::abs(double(terrain->elevation.value())-.5):1.;
+                // Census is conserved below: this is a cartographic estimate of
+                // where aggregate residents live, not new simulated population.
+                const double weight=texture*access/(slope*(1.+.5*(dx*dx+dy*dy)));
                 weights.push_back(weight); sum+=weight;
             }
             for(std::size_t i=0;i<cells.size();++i) deposit(cells[i],double(city.population())*weights[i]/sum);

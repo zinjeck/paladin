@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/MilitaryPanel.h"
 #include "core/SimulationClock.h"
@@ -37,6 +38,7 @@ namespace Paladin
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();
+        caravanPanel_->close(); caravanPointerCaptured_ = false;
         selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         simulation_ = std::make_unique<Simulation>();
@@ -87,6 +89,7 @@ namespace Paladin
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();
+        caravanPanel_->close(); caravanPointerCaptured_ = false;
         selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         debugConsole_->reset();
@@ -128,6 +131,7 @@ namespace Paladin
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();
+        caravanPanel_->close(); caravanPointerCaptured_ = false;
         selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         if (screen_ != Screen::World || !simulation_ || !camera_ ||
@@ -223,6 +227,7 @@ namespace Paladin
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();
+        caravanPanel_->close(); caravanPointerCaptured_ = false;
         selectedWorldArmy_ = {}; militaryPointerCaptured_ = false; militaryOrderMessage_.clear();
         ledgerPanel_->close();
         employmentPanel_->close();

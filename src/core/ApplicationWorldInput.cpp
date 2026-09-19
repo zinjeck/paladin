@@ -1,6 +1,9 @@
 #include "simulation/CitizenshipSystem.h"
 #include "core/Application.h"
+#include "rendering/SettlementWorldPresentation.h"
+#include <limits>
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/MilitaryPanel.h"
 #include "ui/LedgerPanel.h"
@@ -583,7 +586,7 @@ namespace Paladin
                         ? view.radius * 6.283185307179586 / grid.width()
                         : tileRenderMetrics_->scaledTilePixels(camera_->zoom());
                 SettlementId nearest;
-                double best = 20.0;
+                double best = std::numeric_limits<double>::max();
                 for (const auto& city : simulation_->world().settlements())
                 {
                     const auto point = WorldMapNavigation::annotationPosition(
@@ -604,7 +607,9 @@ namespace Paladin
                         point->x - event.button.x,
                         point->y - event.button.y
                     );
-                    if (distance < best)
+                    const double hitHalf = SettlementMapIconDiameterPixels * .5 + 2;
+                    if (std::abs(point->x - event.button.x) <= hitHalf &&
+                        std::abs(point->y - event.button.y) <= hitHalf && distance < best)
                     {
                         best = distance;
                         nearest = city.id();
@@ -616,6 +621,7 @@ namespace Paladin
                     inspectedWorldSettlementId_ = nearest;
                     selectedWorldArmy_={}; militaryOrderMessage_.clear();
                     diplomacyPanel_->close(); militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
+                    caravanPanel_->close();
                     worldSettlementPanel_->open(nearest);
                     worldSettlementPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
                     // Inspection is read-only for foreign cities. Entering your
@@ -625,7 +631,7 @@ namespace Paladin
                     return true;
                 }
                 if (worldSettlementPanel_->choosingDestination()) return true;
-                if (pixels <= WorldPresentationPolicy{}.realmToRegionalEndPixels)
+                // The same cartographic surface is pickable at every zoom.
                 {
                     const auto uv=WorldMapNavigation::pick(*camera_,grid,width,height,pixels,
                         worldRenderer_->globeEnabled,event.button.x,event.button.y);
@@ -635,6 +641,7 @@ namespace Paladin
                         worldSettlementPanel_->close();
                         militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
                         selectedWorldArmy_={}; militaryOrderMessage_.clear();
+                        caravanPanel_->close();
                         diplomacyPanel_->open(realm);
                         diplomacyPanel_->layout(width,height,simulation_->world(),simulation_->playerRealmId());
                         return true;

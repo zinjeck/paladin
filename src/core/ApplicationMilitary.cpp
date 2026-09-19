@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementPlacementController.h"
 #include "rendering/Camera2D.h"
@@ -9,6 +10,9 @@
 #include "rendering/WorldMapNavigation.h"
 #include "rendering/WorldRenderer.h"
 #include "rendering/WorldArmyPresentation.h"
+#include "rendering/WorldCaravanPresentation.h"
+#include "ui/LedgerPanel.h"
+#include "ui/EmploymentPanel.h"
 #include "simulation/Simulation.h"
 #include "simulation/MilitarySystem.h"
 #include "ui/FoundingPanel.h"
@@ -19,6 +23,7 @@
 #include <iterator>
 #include <algorithm>
 #include <vector>
+#include <limits>
 namespace Paladin
 {
     namespace
@@ -29,6 +34,50 @@ namespace Paladin
             return globe ? GlobeView::from(camera,world.grid(),renderer.outputWidth(),renderer.outputHeight()).radius *
                 6.283185307179586 / world.grid().width() : metrics.tilePixels*camera.zoom();
         }
+    }
+    void Application::focusWorldSettlement(SettlementId id)
+    {
+        if (screen_ != Screen::World || !simulation_ || !camera_ || !worldRenderer_) return;
+        const auto& world = simulation_->world();
+        const auto* city = world.settlement(id);
+        if (!city) return;
+        const double pixels = worldPixels(*camera_, world, *renderer_, *tileRenderMetrics_, worldRenderer_->globeEnabled);
+        camera_->setWorldZoom(camera_->zoom() * 32. / std::max(.001, pixels));
+        WorldMapNavigation::focus(*camera_, world.grid(), renderer_->outputWidth(), renderer_->outputHeight(),
+            worldRenderer_->globeEnabled, {(city->position().x+.5)/world.grid().width(), (city->position().y+.5)/world.grid().height()});
+        globePointerDown_ = globeDragging_ = false;
+        clampCameraToWorld();
+    }
+    bool Application::handleCaravanEvent(const SDL_Event& event)
+    {
+        if (screen_ != Screen::World || !simulation_ || foundingPanel_->isOpen() ||
+            settlementPlacementController_->isActive()) return false;
+        auto& world = simulation_->world();
+        if (caravanPanel_->handle(event, world, simulation_->playerRealmId())) return true;
+        if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) caravanPointerCaptured_ = false;
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT && caravanPointerCaptured_)
+        { caravanPointerCaptured_ = false; return true; }
+        if (event.type != SDL_EVENT_MOUSE_BUTTON_DOWN || event.button.button != SDL_BUTTON_LEFT ||
+            worldSettlementPanel_->choosingDestination() || activeHudContainsPoint(event.button.x, event.button.y)) return false;
+        const double pixels = worldPixels(*camera_, world, *renderer_, *tileRenderMetrics_, worldRenderer_->globeEnabled);
+        ShipmentId hit;
+        double best = std::numeric_limits<double>::max();
+        for (const auto& caravan : world.shipments())
+        {
+            if (!worldCaravanVisible(caravan, pixels)) continue;
+            const auto p = WorldMapNavigation::annotationPosition(*camera_, world.grid(), renderer_->outputWidth(),
+                renderer_->outputHeight(), pixels, worldRenderer_->globeEnabled, caravan.visualX()+.5, caravan.visualY()+.5);
+            if (!p || !worldCaravanBounds(p->x, p->y, pixels).contains(event.button.x, event.button.y)) continue;
+            const double distance = std::hypot(p->x - event.button.x, p->y - event.button.y);
+            if (distance < best) { best = distance; hit = caravan.id; }
+        }
+        if (!hit) return false;
+        selectedWorldArmy_ = {}; militaryOrderMessage_.clear();
+        diplomacyPanel_->close(); worldSettlementPanel_->close(); militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
+        caravanPanel_->open(hit);
+        caravanPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), world, simulation_->playerRealmId());
+        caravanPointerCaptured_ = true;
+        return true;
     }
     void Application::renderMilitary()
     {
@@ -52,6 +101,7 @@ namespace Paladin
                 if (const auto* unit=world.army(focus))
                 {
                     selectedWorldArmy_=focus;
+                    caravanPanel_->close();
                     const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
                     if (pixels<20.) camera_->setWorldZoom(camera_->zoom()*20./std::max(.001,pixels));
                     diplomacyPanel_->close(); worldSettlementPanel_->close();
@@ -97,6 +147,7 @@ namespace Paladin
                     selectedWorldArmy_={}; militaryOrderMessage_.clear(); militaryPointerCaptured_=true;
                     return true;
                 }
+                caravanPanel_->close();
                 selectedWorldArmy_=choice->second; diplomacyPanel_->close(); worldSettlementPanel_->close(); militaryPointerCaptured_=true;
                 militaryOrderMessage_=hits.size()>1?"Unit selected. Click the stack again to select another unit.":"Unit selected.";
                 return true;

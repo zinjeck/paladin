@@ -352,7 +352,7 @@ namespace Paladin
                 pixelStabilityActive_,
                 sprites,
                 placementMarker,
-                objectResidual, &artwork_, selectedArmy
+                objectResidual, &artwork_, selectedArmy, selectedCaravan
             );
             stage(7);
             return;
@@ -426,7 +426,7 @@ namespace Paladin
             pixelStabilityActive_,
             sprites,
             placementMarker,
-            {flatResidualX, flatResidualY, 0}, &artwork_, selectedArmy
+            {flatResidualX, flatResidualY, 0}, &artwork_, selectedArmy, selectedCaravan
         );
     }
 

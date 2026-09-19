@@ -31,6 +31,7 @@ namespace Paladin
     public:
         RealmId selectedRealm;
         ArmyId selectedArmy;
+        ShipmentId selectedCaravan;
         double animationSeconds = 0;
         bool profileRendering = false;
         mutable std::array<double, 8> renderTimings{};

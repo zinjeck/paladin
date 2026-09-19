@@ -1,5 +1,6 @@
 #include <array>
 #include "rendering/WorldObjectRenderer.h"
+#include "rendering/WorldCaravanPresentation.h"
 
 #include "rendering/GlobeView.h"
 #include "rendering/LocalTangentWorldView.h"
@@ -81,7 +82,8 @@ namespace Paladin
         std::optional<WorldPlacementMarker> placementMarker,
         WorldSurface::Point3 rigidResidual,
         const SceneSpriteLibrary* artwork,
-        ArmyId selectedArmy
+        ArmyId selectedArmy,
+        ShipmentId selectedCaravan
     ) const
     {
         if (renderer.outputWidth() <= 0 || renderer.outputHeight() <= 0 ||
@@ -316,16 +318,18 @@ namespace Paladin
         if (armyVisibility > .001F)
             for (const auto& caravan : world.shipments())
             {
-                if (!caravan.active() || caravan.phase==ShipmentPhase::Waiting) continue;
+                if (!worldCaravanVisible(caravan, effectiveTilePixels)) continue;
                 const auto point=project(caravan.visualX()+.5,caravan.visualY()+.5);
                 if (!point || outside(*point,renderer,80)) continue;
-                constexpr std::array<const char*,14> rows{{
-                    "      hhhh      ", "    hhiiiihh    ", "   hiwwwwwih   ",
-                    "  hiwwwwwwwih  ", "  hiwwwwwwwih  ", "  hiwwwwwwwih  ",
-                    "  hhwwwwwiihh  ", "  hdhhhhhdhdh  ", "  dbbbbbbbbd   ",
-                    " ddbbbbbb bdd  ", " ddhdddddhddd  ", " ddhdddddhddd  ",
-                    "  dd     dd    ", "               "}};
-                const float step=float(std::max(worldObjectPixelPitch(effectiveTilePixels),effectiveTilePixels/16.));
+                const auto& rows = WorldCaravanRows;
+                const float step = worldCaravanPixelStep(effectiveTilePixels);
+                if (caravan.id == selectedCaravan)
+                    for (int y=0; y<int(rows.size()); ++y) for (int x=0; rows[y][x]; ++x)
+                        if (rows[y][x] != ' ')
+                            for (int dy=-1; dy<=1; ++dy) for (int dx=-1; dx<=1; ++dx)
+                                if (dx || dy) renderer.fillRectangle(point->x+(x-8+dx)*step,
+                                    point->y+(y-13+dy)*step, step, step,
+                                    visibleColor({235,196,107,255}, point->visibility*armyVisibility));
                 for(int y=0;y<int(rows.size());++y) for(int x=0;rows[y][x];++x)
                 {
                     const char c=rows[y][x]; if(c==' ') continue;

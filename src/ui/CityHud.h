@@ -26,6 +26,7 @@ namespace Paladin
         Laws,
         Employment,
         Diplomacy,
+        FocusActiveSettlement,
         Technology,
         Military,
         Economy,
@@ -67,9 +68,11 @@ namespace Paladin
                 closeCategoryMenus();
             }
         }
+        const UiRectangle& activeSettlementBounds() const noexcept { return activeSettlementPanel_; }
         void setActiveSettlementName(std::string name)
         {
             activeSettlementName_ = std::move(name);
+            activeSettlementButton_.setText("Active Settlement: " + activeSettlementName_);
         }
 
         void setFortress(bool value) noexcept
@@ -149,6 +152,7 @@ namespace Paladin
         bool worldMode_ = false;
         std::string activeSettlementName_;
         UiRectangle activeSettlementPanel_;
+        UiButton activeSettlementButton_{"Active Settlement"};
         UiRectangle treasuryPanel_, extensionPanel_;
         std::int64_t treasuryGold_ = 0;
 

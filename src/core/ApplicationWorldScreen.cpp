@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
 #include "interaction/GlobeCameraNavigation.h"
@@ -24,6 +25,7 @@ namespace Paladin
     void Application::layoutWorldScreen()
     {
         worldHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
+        caravanPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), simulation_->world(), simulation_->playerRealmId());
         worldSettlementPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
         diplomacyPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
 
@@ -163,6 +165,7 @@ namespace Paladin
 
         worldRenderer_->selectedRealm = diplomacyPanel_->selection();
         worldRenderer_->selectedArmy = selectedWorldArmy_;
+        worldRenderer_->selectedCaravan = caravanPanel_->selection();
         worldRenderer_->animationSeconds =
             simulationClock_->presentationSeconds();
         worldRenderer_->render(
@@ -199,6 +202,7 @@ namespace Paladin
         if (!foundingPanel_->isOpen() &&
             !settlementPlacementController_->isActive())
         {
+            caravanPanel_->render(*renderer_, *grayUiRenderer_, simulation_->world());
             diplomacyPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
             worldSettlementPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
         }
