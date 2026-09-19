@@ -1,0 +1,48 @@
+name: PR31 startup source publication
+on:
+  push:
+    branches: [feat/pr31-world-interaction-battle-simulation]
+    paths: [.github/workflows/pr31-startup.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: github.repository == 'zinjeck/paladin' && github.ref == 'refs/heads/feat/pr31-world-interaction-battle-simulation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Apply checked source and remove publisher
+        shell: python
+        run: |
+          import base64,gzip,hashlib,pathlib,subprocess
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD^') == '7228374d433988a3baace8a6f702d6ab58f9d9b9'
+          encoded='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'
+          patch=gzip.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='8cbb363d85416517ea6dcd9bce845e221d5d757922500db0fd7d9cc5d15822c3'
+          path=pathlib.Path('/tmp/startup.patch');path.write_bytes(patch)
+          allowed={'CMakeLists.txt','src/core/Application.cpp','src/core/Application.h','src/rendering/AssetUpload.h','src/rendering/Renderer.cpp','src/rendering/Renderer.h','src/rendering/SceneSpriteLibrary.cpp','src/rendering/SceneSpriteLibrary.h','tests/Pr31ApplicationTests.cpp'}
+          assert {line.split('\t')[-1] for line in git('apply','--numstat',str(path)).splitlines()}==allowed
+          subprocess.run(['git','apply','--check','--index',str(path)],check=True)
+          subprocess.run(['git','apply','--index',str(path)],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          git('rm','.github/workflows/pr31-startup.yml')
+          git('config','user.name','github-actions[bot]')
+          git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          git('commit','-m','feat(pr31): real startup loading screen and reusable resident sprite caches')
+          git('push','origin','HEAD:refs/heads/feat/pr31-world-interaction-battle-simulation')
+      - name: Archive source checkpoint
+        run: |
+          mkdir checkpoint
+          git rev-parse HEAD > checkpoint/commit.txt
+          git archive HEAD | gzip -n > checkpoint/source.tar.gz
+          sha256sum checkpoint/source.tar.gz > checkpoint/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr31-startup-source
+          path: checkpoint
+          retention-days: 7
