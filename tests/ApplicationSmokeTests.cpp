@@ -3078,13 +3078,28 @@ namespace Paladin
             PALADIN_CHECK(SceneSpriteLibrary::environmentArtEnabled());
             auto& placement = *app.settlementObjectPlacementController_;
             auto* map = app.simulation_->settlementMap(capital);
+            // A single-tile hover may draw its validity square, not a full
+            // barracks recipe expanded beside the cursor. A real sized drag
+            // must still enable the building illustration.
+            PALADIN_CHECK(placement.beginPlacement(SettlementObjectTypes::Barracks));
+            placement.pointerMoved(SettlementTilePosition{20,20});
+            PALADIN_CHECK(placement.visibleFootprint() && !placement.hasDrawablePreview());
+            frame(app); capture(app,"pr30-barracks-hover.bmp");
+            static_cast<void>(placement.pointerPressed(SettlementTilePosition{20,20},*map));
+            const auto* barracksDefinition=placement.activeDefinition();
+            placement.pointerMoved(SettlementTilePosition{20+barracksDefinition->minimumWidth-1,
+                20+barracksDefinition->minimumHeight-1});
+            PALADIN_CHECK(placement.hasDrawablePreview());
+            placement.cancelPlacement();
+            PALADIN_CHECK(!placement.hasDrawablePreview());
             PALADIN_CHECK(
                 placement.beginPlacement(SettlementObjectTypes::CityKeep)
             );
             placement.pointerMoved(SettlementTilePosition{20, 20});
             const auto original = placement.visibleFootprint();
-            PALADIN_CHECK(original);
+            PALADIN_CHECK(original && placement.hasDrawablePreview());
             key(app, SDL_SCANCODE_F);
+            PALADIN_CHECK(placement.hasDrawablePreview());
             PALADIN_CHECK(
                 placement.visibleFootprint()->width == original->height
             );

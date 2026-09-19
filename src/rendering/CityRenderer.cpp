@@ -266,8 +266,7 @@ namespace Paladin
         if (const auto* definition = placementController.activeDefinition())
         {
             if (const auto footprint = placementController.visibleFootprint();
-                footprint && footprint->width >= definition->minimumWidth &&
-                footprint->height >= definition->minimumHeight)
+                footprint && placementController.hasDrawablePreview())
             {
                 // An adjustable building begins as ONE hover tile. Do not feed
                 // that undersized tile to a recipe that expands a barracks to
