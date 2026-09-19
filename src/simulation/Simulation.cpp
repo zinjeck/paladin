@@ -86,55 +86,25 @@ namespace Paladin
                 auto& state = settlement.simulationState();
                 if (auto* map = settlementMap(settlement.id()))
                 {
+                    const double now = world_->time().totalGameMinutes() + pendingGameMinutes_;
                     if (settlement.id() != detailedSimulationSettlementId_)
                     {
-                        map->animals.tick(
-                            *map,
-                            state.citizens(),
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes,
-                            false
-                        );
-                        map->activities.advanceInactiveLifecycle(
-                            *map,
-                            state.citizens(),
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes
-                        );
-                        map->commerce.tickInactive(
-                            *map,
-                            state.citizens(),
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes
-                        );
-                        map->immigration.advance(
-                            *map,
-                            state.citizens(),
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes
-                        );
-                        state.citizens().recordAttributes(
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes
-                        );
+                        // Reuse the physical activity authority, but avoid per-frame
+                        // AI sweeps and visual snapshots for cities nobody is viewing.
+                        // Aggregate commerce must NOT run as well: it would fabricate
+                        // production while jobs consume/deliver the same real goods.
+                        state.pendingLocalActivityMinutes_ += gameDeltaMinutes;
+                        if (state.pendingLocalActivityMinutes_ + 1e-9 >= 1.0)
+                            flushLocalActivity(settlement.id(), now + gameDeltaMinutes);
                     }
                     else
                     {
+                        flushLocalActivity(settlement.id(), now);
                         map->commerce.resumeActive();
                         state.citizens().captureVisualPositions();
                         map->animals.captureVisualPositions();
-                        map->activities.tick(
-                            *map,
-                            state.citizens(),
-                            world_->time().totalGameMinutes() +
-                                pendingGameMinutes_,
-                            gameDeltaMinutes
-                        );
+                        map->activities.tick(*map, state.citizens(), now, gameDeltaMinutes);
+                        ++state.localActivityUpdates_;
                     }
                     if (map->logistics.founded())
                     {
@@ -171,6 +141,22 @@ namespace Paladin
         ScopedTiming aggregateTimer{aggregateTiming};
         worldSimulationPipeline_->tick(*world_, gameMinutes);
         reports.update(*world_, playerRealmId_);
+    }
+
+
+    void Simulation::flushLocalActivity(SettlementId id, double now)
+    {
+        auto* settlement = world_->settlement(id);
+        auto* map = settlementMap(id);
+        if (!settlement || !map) return;
+        auto& state = settlement->simulationState();
+        const double elapsed = state.pendingLocalActivityMinutes_;
+        if (elapsed <= 1e-9) return;
+        map->commerce.resumeActive();
+        map->activities.tick(*map, state.citizens(), now - elapsed, elapsed);
+        state.pendingLocalActivityMinutes_ = 0;
+        ++state.localActivityUpdates_;
+        if (map->logistics.founded()) state.synchronizeCitizenPopulation();
     }
 
 
@@ -283,6 +269,14 @@ namespace Paladin
 
         const SettlementId previousSettlementId =
             detailedSimulationSettlementId_;
+        const double now = world_->time().totalGameMinutes() + pendingGameMinutes_;
+        flushLocalActivity(settlementId, now);
+        if (auto* map = settlementMap(settlementId))
+        {
+            // Never interpolate against the snapshot from the last visit.
+            world_->settlement(settlementId)->simulationState().citizens().captureVisualPositions();
+            map->animals.captureVisualPositions();
+        }
 
         detailedSimulationSettlementId_ = settlementId;
 

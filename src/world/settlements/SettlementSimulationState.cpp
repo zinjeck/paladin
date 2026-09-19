@@ -332,6 +332,7 @@ namespace Paladin
 
         citizens_.resetLocalPlacement();
         localMap_ = std::move(localMap);
+        pendingLocalActivityMinutes_ = 0;
         citizens_.placeUnpositionedCitizens(*localMap_);
         ++localMapVersion_;
     }
@@ -346,6 +347,7 @@ namespace Paladin
 
         citizens_.resetLocalPlacement();
         localMap_.reset();
+        pendingLocalActivityMinutes_ = 0;
         ++localMapVersion_;
     }
 } // namespace Paladin

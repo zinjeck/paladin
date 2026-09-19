@@ -143,6 +143,7 @@ namespace Paladin
 
         [[nodiscard]]
         bool synchronizeSettlementSimulationTiers();
+        void flushLocalActivity(SettlementId settlementId, double now);
 
         std::unique_ptr<World> world_;
         std::unique_ptr<WorldSimulationPipeline> worldSimulationPipeline_;
