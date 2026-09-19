@@ -1,4 +1,5 @@
 #pragma once
+#include "core/StrongId.h"
 #include "rendering/CityPresentation.h"
 #include "rendering/ScenePresentation.h"
 #include "rendering/SceneSpriteLibrary.h"
@@ -26,7 +27,8 @@ namespace Paladin
             SceneDrawQueue* shared = nullptr,
             const SceneSpriteLibrary* sprites = nullptr,
             const CityPresentation* policy = nullptr,
-            const SettlementEmploymentState* employment = nullptr
+            const SettlementEmploymentState* employment = nullptr,
+            CitizenId selectedCitizen = {}
         ) const;
 
         void renderAnnotations(Renderer&, double tilePixels) const;

@@ -26,7 +26,8 @@ namespace Paladin
         SceneDrawQueue* shared,
         const SceneSpriteLibrary* sprites,
         const CityPresentation* policy,
-        const SettlementEmploymentState* employment
+        const SettlementEmploymentState* employment,
+        CitizenId selectedCitizen
     ) const
     {
         const double tilePixels = metrics.scaledTilePixels(camera.zoom());
@@ -116,7 +117,7 @@ namespace Paladin
                 ? (std::uint64_t(3) << 61) | citizen.soldierId.value()
                 : (std::uint64_t(1) << 62) | citizen.id.value();
             const bool custom =
-                tilePixels >= StaticDetailPixels && sprites &&
+                (tilePixels >= StaticDetailPixels || citizen.id == selectedCitizen) && sprites &&
                 sprites->submit(
                     queue,
                     projection,

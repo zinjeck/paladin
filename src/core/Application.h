@@ -95,7 +95,6 @@ namespace Paladin
         bool handleReportEvent(const SDL_Event&);
         bool handleMilitaryEvent(const SDL_Event&);
         void renderMilitary();
-        bool worldArmySelectionVisible() const noexcept;
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);

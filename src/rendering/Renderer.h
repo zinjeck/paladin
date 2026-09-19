@@ -194,6 +194,8 @@ namespace Paladin
 
         int outputHeight() const noexcept;
         double currentPixelPitch() const noexcept { return pixelSceneActive_ ? pixelPitch_ : 1.0; }
+        bool pixelSceneActive() const noexcept { return pixelSceneActive_; }
+        bool usesSoftwareRasterizer() const noexcept;
         bool beginPixelScene(double pitch);
         bool beginPixelScene(double pitch, bool transparent, bool force = false);
         void endPixelScene();

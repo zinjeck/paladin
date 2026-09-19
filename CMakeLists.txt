@@ -397,3 +397,17 @@ add_test(NAME PaladinAssetTests COMMAND PaladinAssetTests)
 if(MSVC)
  target_compile_options(PaladinAssetImport PRIVATE /O2 /Ob2)
 endif()
+
+if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
+    add_executable(PaladinPr30RenderTests tests/Pr30RenderTests.cpp)
+    target_link_libraries(PaladinPr30RenderTests PRIVATE PaladinSmokeCore)
+    add_dependencies(PaladinPr30RenderTests Paladin)
+    add_test(NAME PaladinPr30RenderTests COMMAND PaladinPr30RenderTests)
+    set_tests_properties(PaladinPr30RenderTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software" TIMEOUT 120)
+    add_custom_target(PaladinPr30Check
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinPr30RenderTests>
+        DEPENDS PaladinPr30RenderTests)
+    add_dependencies(PaladinArtCheck PaladinPr30Check)
+endif()

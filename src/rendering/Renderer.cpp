@@ -10,11 +10,18 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
 namespace Paladin
 {
+    bool Renderer::usesSoftwareRasterizer() const noexcept
+    {
+        const char* name = renderer_ ? SDL_GetRendererName(renderer_) : nullptr;
+        return name && std::strcmp(name, "software") == 0;
+    }
+
     std::shared_ptr<AssetManager> Renderer::compiledAssets()
     {
         const auto base = std::filesystem::path(SDL_GetBasePath()) / "assets";

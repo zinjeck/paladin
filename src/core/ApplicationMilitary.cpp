@@ -29,34 +29,14 @@ namespace Paladin
                 6.283185307179586 / world.grid().width() : metrics.tilePixels*camera.zoom();
         }
     }
-    bool Application::worldArmySelectionVisible() const noexcept
-    {
-        if (screen_!=Screen::World || !simulation_ || !renderer_ || !camera_ || !worldRenderer_ ||
-            !tileRenderMetrics_ || !selectedWorldArmy_ || (diplomacyPanel_ && diplomacyPanel_->isOpen())) return false;
-        const auto& world=simulation_->world();
-        const auto* unit=world.army(selectedWorldArmy_);
-        return unit && unit->ownerRealmId()==simulation_->playerRealmId() && unit->soldierCount()>0 &&
-            worldArmyVisibility(worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled))>.001F;
-    }
     void Application::renderMilitary()
     {
         if (!simulationControlsVisible()) return;
         auto& world=simulation_->world();
         militaryPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),world,simulation_->playerRealmId());
         militaryPanel_->render(*renderer_,*grayUiRenderer_,world,simulation_->playerRealmId(),&worldRenderer_->artwork());
-        const auto* unit=world.army(selectedWorldArmy_);
-        if (screen_!=Screen::World || !unit || unit->ownerRealmId()!=simulation_->playerRealmId()) return;
-        const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
-        if (worldArmyVisibility(pixels)<=.001F || diplomacyPanel_->isOpen()) return;
-        if (!militaryPanel_->isOpen())
-        {
-            const UiRectangle status{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70};
-            grayUiRenderer_->drawPanel(*renderer_,status);
-            const std::string label=unit->name()+" | "+std::to_string(unit->soldierCount())+" soldiers | "+std::to_string(unit->rations())+" rations";
-            grayUiRenderer_->drawLabel(*renderer_,label,28,88,2);
-            grayUiRenderer_->drawLabel(*renderer_,"Right-click land to march. Escape clears selection.",28,111,1);
-            grayUiRenderer_->drawLabel(*renderer_,militaryOrderMessage_.substr(0,72),28,126,1,{235,196,107,255});
-        }
+        // Selection is shown by the world sprite contour and count only.
+        // No floating status panel is allowed to cover the realm HUD.
     }
     bool Application::handleMilitaryEvent(const SDL_Event& event)
     {
@@ -87,15 +67,6 @@ namespace Paladin
         if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT && militaryPointerCaptured_)
         { militaryPointerCaptured_=false; return true; }
         if (event.type!=SDL_EVENT_MOUSE_BUTTON_DOWN) return false;
-        if (worldArmySelectionVisible() && !militaryPanel_->isOpen())
-        {
-            const UiRectangle status{16,76,std::min(480.F,float(renderer_->outputWidth())-32),70};
-            if (status.contains(event.button.x,event.button.y))
-            {
-                if (event.button.button==SDL_BUTTON_LEFT) militaryPointerCaptured_=true;
-                return true;
-            }
-        }
         if (activeHudContainsPoint(event.button.x,event.button.y)) return false;
         const double pixels=worldPixels(*camera_,world,*renderer_,*tileRenderMetrics_,worldRenderer_->globeEnabled);
         if (worldArmyVisibility(pixels)<=.001F) return false;
@@ -119,10 +90,21 @@ namespace Paladin
                 auto choice=hits.begin();
                 const auto current=std::find_if(hits.begin(),hits.end(),[&](const auto& h){return h.second==selectedWorldArmy_;});
                 if (current!=hits.end()) { choice=std::next(current); if (choice==hits.end()) choice=hits.begin(); }
+                if (hits.size()==1 && choice->second==selectedWorldArmy_)
+                {
+                    selectedWorldArmy_={}; militaryOrderMessage_.clear(); militaryPointerCaptured_=true;
+                    return true;
+                }
                 selectedWorldArmy_=choice->second; diplomacyPanel_->close(); militaryPointerCaptured_=true;
                 militaryOrderMessage_=hits.size()>1?"Unit selected. Click the stack again to select another unit.":"Unit selected.";
                 return true;
             }
+        }
+        if (event.button.button==SDL_BUTTON_LEFT && selectedWorldArmy_)
+        {
+            // Blank-land click clears the contour but continues to ordinary
+            // settlement/realm picking. Clicking HUD never clears selection.
+            selectedWorldArmy_={}; militaryOrderMessage_.clear();
         }
         if (event.button.button==SDL_BUTTON_RIGHT && selectedWorldArmy_)
         {
