@@ -383,17 +383,30 @@ namespace Paladin
 
     void Application::renderBattleOverlay()
     {
+        const auto heading = [&](std::string_view text)
+        {
+            const BitmapFontRenderer font;
+            const float size = std::min(
+                4.F,
+                (encounterBounds_.width - 40.F) /
+                    std::max(1.F, font.measureWidth(text, 1.F))
+            );
+            grayUiRenderer_->drawLabel(
+                *renderer_,
+                text,
+                encounterBounds_.x +
+                    (encounterBounds_.width - font.measureWidth(text, size)) *
+                        .5F,
+                encounterBounds_.y + 24,
+                size
+            );
+        };
         if (!battleResultMessage_.empty())
         {
             SDL_ShowCursor();
             grayUiRenderer_->drawModalBackdrop(*renderer_);
             grayUiRenderer_->drawPanel(*renderer_, encounterBounds_);
-            grayUiRenderer_->drawTitle(
-                *renderer_,
-                battleMessage_,
-                renderer_->outputWidth() * .5F,
-                encounterBounds_.y + 20
-            );
+            heading(battleMessage_);
             grayUiRenderer_->drawLabel(
                 *renderer_,
                 battleResultMessage_,
@@ -409,12 +422,7 @@ namespace Paladin
             SDL_ShowCursor();
             grayUiRenderer_->drawModalBackdrop(*renderer_);
             grayUiRenderer_->drawPanel(*renderer_, encounterBounds_);
-            grayUiRenderer_->drawTitle(
-                *renderer_,
-                "Initialize battle",
-                renderer_->outputWidth() * .5F,
-                encounterBounds_.y + 20
-            );
+            heading("Initialize battle");
             const auto& world = simulation_->world();
             const auto* player = world.army(battleEncounter_->player);
             const auto* enemy = world.army(battleEncounter_->enemy);
