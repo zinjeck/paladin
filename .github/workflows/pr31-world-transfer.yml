@@ -1,0 +1,53 @@
+name: PR31 checked world source transfer
+on:
+  push:
+    branches: [feat/pr31-world-interaction-battle-simulation]
+    paths: [.github/workflows/pr31-world-transfer.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: github.repository == 'zinjeck/paladin' && github.ref == 'refs/heads/feat/pr31-world-interaction-battle-simulation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - name: Validate exact transfer
+        shell: python
+        run: |
+          import base64,gzip,hashlib,pathlib,re,subprocess
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD^') == '6759c8a2c765aa22785a7b018bd956932ba81863'
+          text=pathlib.Path('.github/workflows/pr31-world-ui.yml').read_text()
+          encoded=re.search("encoded='([^']+)'",text).group(1)
+          encoded=encoded.replace('RvwSHWZ2','RvwSHwZ2').replace('HeAHulJJuX','HeAHulJZuX').replace('25163edgg','25163XZdgg')
+          pathlib.Path('transport.txt').write_text(encoded)
+          patch=gzip.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='5d9693806d0f53b1027d5378055ad78866e9b46116e034614c608cc15cebd3f2'
+          path=pathlib.Path('/tmp/world.patch');path.write_bytes(patch)
+          allowed={'src/core/Application.cpp','src/core/Application.h','src/core/ApplicationCamera.cpp','src/core/ApplicationFrame.cpp','src/core/ApplicationMilitary.cpp','src/core/ApplicationReports.cpp','src/core/ApplicationSession.cpp','src/core/ApplicationWorldInput.cpp','src/core/ApplicationWorldScreen.cpp','src/rendering/WorldCaravanPresentation.h','src/rendering/WorldObjectRenderer.cpp','src/rendering/WorldObjectRenderer.h','src/rendering/WorldRealmPresentationRenderer.cpp','src/rendering/WorldRenderer.cpp','src/rendering/WorldRenderer.h','src/rendering/WorldThematicPalette.h','src/ui/CaravanPanel.h','src/ui/CityHud.cpp','src/ui/CityHud.h','src/world/WorldPopulationField.cpp','tests/Pr31ApplicationTests.cpp'}
+          assert {line.split('\t')[-1] for line in git('apply','--numstat',str(path)).splitlines()}==allowed
+          subprocess.run(['git','apply','--check','--index',str(path)],check=True)
+          subprocess.run(['git','apply','--index',str(path)],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          git('rm','.github/workflows/pr31-world-ui.yml','.github/workflows/pr31-world-transfer.yml')
+          git('config','user.name','github-actions[bot]')
+          git('config','user.email','41898282+github-actions[bot]@users.noreply.github.com')
+          git('commit','-m','feat(pr31): caravan cargo inspector, all-zoom diplomacy and geographic density with input tests')
+          git('push','origin','HEAD:refs/heads/feat/pr31-world-interaction-battle-simulation')
+      - name: Archive exact source and transport
+        if: always()
+        run: |
+          mkdir checkpoint
+          git rev-parse HEAD > checkpoint/commit.txt
+          git archive HEAD | gzip -n > checkpoint/source.tar.gz
+          if [ -f transport.txt ]; then cp transport.txt checkpoint/transport.txt; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr31-world-source
+          path: checkpoint
+          retention-days: 7
