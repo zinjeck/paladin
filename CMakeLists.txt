@@ -117,11 +117,16 @@ add_executable(Paladin
     src/simulation/WorldSimulationPipeline.cpp
     src/simulation/systems/SettlementEconomySystem.cpp
     src/simulation/systems/SettlementPopulationSystem.cpp
+    src/simulation/WorldLandNavigation.cpp
+    src/simulation/WorldShipmentSystem.cpp
+    src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
+    src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
+    src/world/WorldPopulationField.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp
@@ -173,9 +178,11 @@ add_executable(Paladin
     src/ui/CityHud.cpp
     src/ui/LedgerPanel.cpp
     src/ui/MilitaryPanel.cpp
+    src/ui/WorldSettlementPanel.cpp
     src/ui/DiplomacyPanel.cpp
     src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
+    src/ui/EmploymentTechnology.cpp
     src/ui/EmploymentPopulation.cpp
     src/ui/DebugConsole.cpp
     src/ui/GrayUiRenderer.cpp
@@ -219,6 +226,9 @@ enable_testing()
 add_executable(PaladinTests
     tests/MilitaryIndustryTests.cpp
     tests/DiplomacyTests.cpp
+    tests/Pr30SocietyTests.cpp
+    tests/Pr30ShipmentTests.cpp
+    tests/Pr30StrategyTests.cpp
     src/simulation/Simulation.cpp
     tests/TestMain.cpp
     tests/RealmFeatureTests.cpp
@@ -232,11 +242,16 @@ add_executable(PaladinTests
     tests/WorldTests.cpp
     tests/WorldGenerationTests.cpp
 
+    src/simulation/WorldLandNavigation.cpp
+    src/simulation/WorldShipmentSystem.cpp
+    src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
+    src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
+    src/world/WorldPopulationField.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp
@@ -396,4 +411,18 @@ add_test(NAME PaladinAssetTests COMMAND PaladinAssetTests)
 
 if(MSVC)
  target_compile_options(PaladinAssetImport PRIVATE /O2 /Ob2)
+endif()
+
+if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
+    add_executable(PaladinPr30RenderTests tests/Pr30RenderTests.cpp)
+    target_link_libraries(PaladinPr30RenderTests PRIVATE PaladinSmokeCore)
+    add_dependencies(PaladinPr30RenderTests Paladin)
+    add_test(NAME PaladinPr30RenderTests COMMAND PaladinPr30RenderTests)
+    set_tests_properties(PaladinPr30RenderTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software" TIMEOUT 120)
+    add_custom_target(PaladinPr30Check
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinPr30RenderTests>
+        DEPENDS PaladinPr30RenderTests)
+    add_dependencies(PaladinArtCheck PaladinPr30Check)
 endif()

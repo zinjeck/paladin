@@ -82,7 +82,7 @@ namespace Paladin
         void synchronizeCitizenPopulation()
         {
             population_.applyNetChange(
-                double(citizens_.citizens().size()) -
+                double(citizens_.residentCount()) -
                 double(population_.residents())
             );
         }
@@ -141,6 +141,7 @@ namespace Paladin
         friend class WorldSimulationPipeline;
         friend class Simulation;
         friend class MilitarySystem;
+        friend class WorldShipmentSystem;
 
         void setSimulationTier(SettlementSimulationTier tier) noexcept;
 

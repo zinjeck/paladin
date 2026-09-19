@@ -37,6 +37,21 @@ namespace Paladin
         dragging_ = false;
     }
 
+    bool SettlementObjectPlacementController::hasDrawablePreview() const noexcept
+    {
+        const auto* definition = activeDefinition();
+        const auto footprint = visibleFootprint();
+        if (!definition || !footprint) return false;
+        if (footprint->width >= definition->minimumWidth &&
+            footprint->height >= definition->minimumHeight) return true;
+        return definition->allowsFootprintRotation &&
+            definition->selectionMode == SettlementFootprintSelectionMode::Fixed &&
+            footprint->width == definition->previewHeight &&
+            footprint->height == definition->previewWidth &&
+            footprint->width >= definition->minimumHeight &&
+            footprint->height >= definition->minimumWidth;
+    }
+
     bool SettlementObjectPlacementController::isActive() const noexcept
     {
         return !activeObjectTypeId_.empty();

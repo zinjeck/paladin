@@ -25,6 +25,7 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
+            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
         }
         void close() noexcept
         {
@@ -32,14 +33,18 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
+            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
             admissionRequest_.reset();
         }
+        bool takeCitizenshipResearch() noexcept
+        { const bool result=citizenshipRequest_; citizenshipRequest_=false; return result; }
         bool isOpen() const noexcept
         {
             return open_;
         }
         bool containsPoint(float, float) const noexcept;
         bool pointerPressed(float, float);
+        bool capturingPointer() const noexcept { return dragging_ || dragCandidate_ || techPointer_; }
         bool pointerMoved(float, float);
         std::string tooltipAt(float, float) const;
         std::string tooltipKeyAt(float, float) const;
@@ -73,6 +78,12 @@ namespace Paladin
             workDayChange_.reset();
             return change;
         }
+        void setImmigrationOriginAvailable(bool available) noexcept
+        {
+            immigrationOriginAvailable_ = available;
+            if (!available) admissionCount_ = 0;
+        }
+        bool showsPopulation() const noexcept { return open_ && section_ == "Population"; }
         void setWorldMode(bool world)
         {
             worldMode_ = world;
@@ -98,6 +109,15 @@ namespace Paladin
 
     private:
         friend struct ApplicationSmokeTest;
+        friend struct Pr30UiTest;
+        struct TechView { float panX=0,panY=0,zoom=1; };
+        std::array<TechView,4> techViews_{};
+        int techTab_=0;
+        UiRectangle techCanvas_;
+        bool techPointer_=false,techPanned_=false,citizenshipRequest_=false;
+        float techStartX_=0,techStartY_=0;
+        void renderTechnology(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
+        void renderLaws(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
         std::uint64_t immigrationMap_ = 0, admissionCount_ = 0;
         std::optional<std::uint64_t> admissionRequest_;
         std::array<UiRectangle, 4> attributeBounds_{};
@@ -109,6 +129,7 @@ namespace Paladin
             float top
         );
         bool worldMode_ = false, foundSettlement_ = false;
+        bool immigrationOriginAvailable_ = false;
         bool dragCandidate_ = false;
         float pressX_ = 0, pressY_ = 0;
         bool dragging_ = false;

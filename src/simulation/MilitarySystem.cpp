@@ -1,4 +1,6 @@
 #include "simulation/MilitarySystem.h"
+#include "simulation/CitizenshipSystem.h"
+#include "simulation/WorldShipmentSystem.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementIndustry.h"
@@ -72,7 +74,7 @@ namespace Paladin
         for (const auto& c : city->simulationState().citizens().citizens())
         {
             const auto* w = local->employment().workplace(c.workplaceId);
-            if (!c.child && c.health > 0 && !c.militaryDeployed && !c.militaryUnitId &&
+            if (city->simulationState().citizens().militaryEligible(c) && !c.militaryDeployed && !c.militaryUnitId &&
                 w && w->operational && w->objectTypeId == SettlementObjectTypes::Barracks &&
                 local->objectState().completedObject(w->objectId)) ++count;
         }
@@ -103,6 +105,7 @@ namespace Paladin
     }
     void MilitarySystem::synchronize(World& world, double minute)
     {
+        CitizenshipSystem::synchronize(world);
         std::unordered_set<SoldierId, StrongIdHash> retained;
         std::unordered_map<SoldierId, ArmyId, StrongIdHash> roster;
         retained.reserve(world.soldiers().size());
@@ -147,7 +150,7 @@ namespace Paladin
                         local->activities.finish(*local, c, minute);
                     }
                 }
-                const bool enlisted = !c.child && c.health > 0 && w && w->operational &&
+                const bool enlisted = people.militaryEligible(c) && w && w->operational &&
                                       w->objectTypeId == SettlementObjectTypes::Barracks;
                 auto* soldier = world.soldiers_.find(c.soldierId);
                 if (soldier && (soldier->home_ != city.id() || soldier->person_ != c.id ||
@@ -200,6 +203,62 @@ namespace Paladin
             unit.station_ = stationAt(world, unit);
         }
     }
+    ArmyId MilitarySystem::maintainStrategicGarrison(World& world, RealmId actor, SettlementId id, int target, int changeLimit)
+    {
+        auto* city=world.settlement(id); const auto* realm=world.realm(actor);
+        if(!city || !realm || !realm->aiControlled || city->ownerRealmId()!=actor || map(world,id)) return {};
+        target=std::clamp(target,0,96); changeLimit=std::clamp(changeLimit,0,8);
+        auto& state=city->simulationState(); auto& people=state.citizens_;
+        people.configureCommunity(id,actor,city->primaryCultureId(),realm->laws,realm->citizenshipResearched);
+        ArmyId unitId;
+        for(const auto& unit:world.armies())
+            if(unit.ownerRealmId()==actor && presentAt(world,unit,id) &&
+                std::all_of(unit.soldiers().begin(),unit.soldiers().end(),[&](SoldierId soldier)
+                { const auto* s=world.soldier(soldier); return s && s->homeSettlementId()==id; }))
+            { unitId=unit.id(); break; }
+        if(!unitId && target>0)
+        {
+            if(std::count_if(world.armies().begin(),world.armies().end(),[&](const auto& u){return u.ownerRealmId()==actor;})>=MaximumUnitsPerRealm) return {};
+            unitId=world.createArmy(city->position()); world.assignArmyToRealm(unitId,actor);
+            auto* unit=world.army(unitId); unit->station_=id; unit->name_=std::string(city->name())+" Guard";
+        }
+        auto* unit=world.army(unitId); if(!unit) return {};
+        int changes=0;
+        while(int(unit->soldierCount())>target && changes++<changeLimit)
+        {
+            const auto sid=unit->soldiers_.back(); const auto* soldier=world.soldier(sid);
+            auto* c=soldier?person(world,*soldier):nullptr;
+            if(!c || !state.population_.transferResidents(1)) break;
+            c->militaryDeployed=false; c->militaryUnitId={}; c->soldierId={};
+            c->activity=CitizenActivity::Idle; c->workplaceId={}; c->hasVisualSnapshot=false;
+            unit->soldiers_.pop_back(); world.soldiers_.erase(sid); ++people.version_;
+        }
+        returnSurplus(world,*unit,double(world.time().totalGameMinutes()));
+        changes=0;
+        while(int(unit->soldierCount())<target && changes<changeLimit && city->population()>8)
+        {
+            // Protect two civilian days of food and provision the new person
+            // with an actual field pack. No abstract food or phantom recruits.
+            const double spare=state.stockpile().amount("rations")+
+                std::max(0.,state.stockpile().amount("food")-2.*double(city->population()));
+            if(spare<RationsPerSoldier) break;
+            SettlementCitizen* candidate=nullptr;
+            for(int attempts=0;attempts<32 && !candidate;++attempts)
+            {
+                for(auto& c:people.citizens_)
+                    if(!c.soldierId && !c.militaryDeployed && people.militaryEligible(c)) { candidate=&c; break; }
+                if(candidate || people.residentCount()>=city->population() || !people.appendCitizens(1,false)) break;
+            }
+            if(!candidate || !state.population_.transferResidents(-1)) break;
+            candidate->soldierId=world.soldiers_.create(id,candidate->id,SettlementObjectId{});
+            candidate->militaryUnitId=unitId; candidate->militaryDeployed=true;
+            candidate->workplaceId={}; candidate->insideHome=false;
+            world.soldiers_.find(candidate->soldierId)->unit_=unitId;
+            unit->soldiers_.push_back(candidate->soldierId); ++people.version_; ++changes;
+            resupply(world,*unit,double(world.time().totalGameMinutes()));
+        }
+        return unitId;
+    }
     ArmyId MilitarySystem::createUnit(World& world, RealmId actor, SettlementId home)
     {
         auto* city = world.settlement(home);
@@ -248,6 +307,8 @@ namespace Paladin
             c->insideHome = false;
             c->hasVisualSnapshot = false;
             c->activity = CitizenActivity::Idle;
+            if (auto* home = world.settlement(soldier->homeSettlementId()))
+                home->simulationState().synchronizeCitizenPopulation();
         }
     }
     void MilitarySystem::returnSurplus(World& world, Army& unit, double minute)
@@ -255,6 +316,11 @@ namespace Paladin
         const int capacity = int(unit.soldierCount()) * RationsPerSoldier;
         int excess = std::max(0, unit.rations_ - capacity);
         auto* local = map(world, stationAt(world, unit));
+        if(!local && excess>0)
+        {
+            if(auto* city=world.settlement(stationAt(world,unit)); city && city->simulationState().stockpile().addAmount("rations",excess)) unit.rations_-=excess;
+            return;
+        }
         if (!local || !canOrganize(world, unit) || excess == 0) return;
         for (const auto& w : local->employment().workplaces())
         {
@@ -344,6 +410,7 @@ namespace Paladin
                     c->militaryDeployed = false;
                     c->hasVisualSnapshot = false;
                     c->nextWorkCheckMinutes = 0;
+                    world.settlement(s->homeSettlementId())->simulationState().synchronizeCitizenPopulation();
                 }
                 unit->soldiers_.erase(unit->soldiers_.begin() + std::ptrdiff_t(i-1));
                 ++removed;
@@ -359,24 +426,87 @@ namespace Paladin
         const auto* existing = world.army(id);
         if (!existing) return MilitaryResult::InvalidUnit;
         if (!actor || existing->ownerRealmId() != actor) return MilitaryResult::NotOwned;
-        // An empty, exhausted record has no people or goods to teleport home.
-        if (existing->soldierCount() == 0 && existing->rations() == 0)
+        const double minute = double(world.time().totalGameMinutes());
+        // Demobilization is not hiring back into a barracks. Return each SAME
+        // canonical person to their source settlement as an unemployed civilian.
+        // This is an immediate administrative return, not a simulated return march.
+        struct Return { SoldierId soldier; SettlementId home; SettlementTilePosition tile; };
+        std::vector<Return> returns;
+        for (const auto soldierId : existing->soldiers())
         {
-            world.armies_.erase(id);
-            return MilitaryResult::Success;
+            const auto* soldier = world.soldier(soldierId);
+            auto* c = soldier ? person(world, *soldier) : nullptr;
+            auto* local = soldier ? map(world, soldier->homeSettlementId()) : nullptr;
+            if (!c) return MilitaryResult::PersonnelOrigin;
+            if (!local)
+            {
+                const auto* home=world.settlement(soldier->homeSettlementId());
+                if(!home || !home->simulationState().isInitialized() || std::uint64_t(std::count_if(returns.begin(),returns.end(),[&](const auto& ret){return ret.home==home->id();}))+1 >
+                    std::numeric_limits<std::uint64_t>::max()-home->population()) return MilitaryResult::PersonnelOrigin;
+                returns.push_back({soldierId,soldier->homeSettlementId(),{0,0}});
+                continue;
+            }
+            SettlementTilePosition anchor = c->tilePosition;
+            for (const auto& object : local->objectState().completedObjects())
+                if (object.objectTypeId == SettlementObjectTypes::CityKeep)
+                { anchor = object.footprint.topLeft; break; }
+            SettlementNavigation navigation;
+            navigation.synchronize(*local);
+            bool found = false;
+            SettlementTilePosition destination = anchor;
+            for (int radius = 0; radius <= 16 && !found; ++radius)
+                for (int y = -radius; y <= radius && !found; ++y)
+                    for (int x = -radius; x <= radius; ++x)
+                    {
+                        if (std::max(std::abs(x), std::abs(y)) != radius) continue;
+                        const SettlementTilePosition candidate{anchor.x+x,anchor.y+y};
+                        if (navigation.walkable(*local,candidate))
+                        { destination=candidate; found=true; break; }
+                    }
+            if (!found) return MilitaryResult::PersonnelOrigin;
+            returns.push_back({soldierId,soldier->homeSettlementId(),destination});
         }
-        if (!canOrganize(world, *existing)) return MilitaryResult::ReturnHome;
-        if (releasable(world, *existing) != existing->soldierCount()) return MilitaryResult::PersonnelOrigin;
-        const auto result = resizeUnit(world, actor, id, std::numeric_limits<int>::min());
-        if (result != MilitaryResult::Success) return result;
         auto* unit = world.army(id);
-        // A city without a keep may have nowhere to return its physical pack.
-        // Keep that empty record instead of deleting goods.
-        if (!unit->soldiers_.empty()) return MilitaryResult::PersonnelOrigin;
-        if (unit->rations_ > 0) return MilitaryResult::ReturnHome;
+        if (returns.empty() && unit->rations_ > 0)
+        {
+            returnSurplus(world,*unit,minute);
+            if (unit->rations_ > 0) return MilitaryResult::ReturnHome;
+        }
+        // Preflight above is all-or-nothing: never partially discharge a mixed
+        // roster because one home cannot currently receive its person.
+        for (const auto& ret : returns)
+        {
+            auto& home = world.settlement(ret.home)->simulationState();
+            auto* local = map(world,ret.home);
+            auto& c = *person(world,*world.soldier(ret.soldier));
+            if(local)
+            {
+                local->activities.finish(*local,c,minute);
+                if (c.workplaceId) local->employment().citizenDeparted(c.workplaceId);
+            }
+            c.workplaceId={}; c.soldierId={}; c.militaryUnitId={};
+            c.militaryDeployed=false; c.insideHome=false;
+            c.path.clear(); c.pathIndex=0; c.stepProgress=0;
+            c.explicitMovement=false; c.tilePosition=ret.tile;
+            c.hasVisualSnapshot=false; c.activity=CitizenActivity::Idle;
+            c.nextWorkCheckMinutes=0;
+            ++home.citizens_.version_;
+            if(local) home.synchronizeCitizenPopulation();
+            else static_cast<void>(home.population_.transferResidents(1));
+            world.soldiers_.erase(ret.soldier);
+        }
+        if (!returns.empty() && unit->rations_ > 0)
+        {
+            // The returning personnel carry the remaining physical pack home.
+            auto* local=map(world,returns.front().home);
+            if(local) local->logistics.drop(returns.front().tile,"rations",unit->rations_,minute);
+            else static_cast<void>(world.settlement(returns.front().home)->simulationState().stockpile().addAmount("rations",unit->rations_));
+            unit->rations_=0;
+        }
         world.armies_.erase(id);
         return MilitaryResult::Success;
     }
+
     MilitaryResult MilitarySystem::recruit(World& world, RealmId actor, SettlementId cityId, int delta)
     {
         auto* city = world.settlement(cityId);
@@ -457,7 +587,17 @@ namespace Paladin
             if (needed <= 0) break;
             if (city.ownerRealmId() != unit.ownerRealmId() || !presentAt(world, unit, city.id())) continue;
             auto* local = map(world, city.id());
-            if (!local) continue;
+            if (!local)
+            {
+                auto& supply=world.settlement(city.id())->simulationState().stockpile();
+                for(const auto* resource:{"rations","food"})
+                {
+                    const double reserve=std::string_view(resource)=="food"?2.*double(city.population()):0.;
+                    const int load=int(std::clamp(std::floor(supply.amount(resource)-reserve),0.,double(needed)));
+                    if(load>0 && supply.addAmount(resource,-load)) { unit.rations_+=load; needed-=load; }
+                }
+                continue;
+            }
             for (const auto& w : local->employment().workplaces())
             {
                 if (!w.operational || w.objectTypeId != SettlementObjectTypes::Barracks) continue;

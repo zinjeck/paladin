@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/PanelDrag.h"
 #include "core/StrongId.h"
 #include "ui/UiTypes.h"
 #include <optional>
@@ -31,6 +32,7 @@ namespace Paladin
         ArmyId selection() const noexcept { return selected_; }
         const UiRectangle& bounds() const noexcept { return bounds_; }
     private:
+        PanelDrag drag_;
         struct Control { UiRectangle bounds; Action action; std::string text;
                          bool enabled=true; ArmyId unit; };
         void act(const Control&, World&, RealmId);

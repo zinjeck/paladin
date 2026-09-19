@@ -59,6 +59,10 @@ namespace Paladin
         std::optional<
             SettlementObjectFootprint> visibleFootprint() const noexcept;
 
+        // Size readiness is separate from placement validity: blocked areas
+        // still show a red full preview, undersized drag starts show one tile.
+        [[nodiscard]] bool hasDrawablePreview() const noexcept;
+
         [[nodiscard]]
         bool visibleFootprintIsValid(
             const SettlementMap& settlementMap

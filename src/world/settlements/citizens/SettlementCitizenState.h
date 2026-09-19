@@ -2,6 +2,7 @@
 #include <deque>
 
 #include "core/StrongId.h"
+#include "world/RealmLaws.h"
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/SettlementTilePosition.h"
@@ -66,6 +67,11 @@ namespace Paladin
     {
         // A single personnel record underlies both civil life and enlistment.
         // Deployed people do not also work, eat or appear in their home city.
+        CultureId primaryCultureId, secondaryCultureId;
+        RealmId citizenshipRealmId;
+        SettlementId birthSettlementId;
+        [[nodiscard]] bool hasCulture(CultureId culture) const noexcept
+        { return culture && (primaryCultureId==culture || secondaryCultureId==culture); }
         SoldierId soldierId;
         ArmyId militaryUnitId;
         bool militaryDeployed = false;
@@ -181,6 +187,22 @@ namespace Paladin
         [[nodiscard]]
         bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);
 
+        // Canonical personnel records remain here while soldiers are deployed,
+        // but they are not residents, workers, or city population.
+        [[nodiscard]] std::size_t residentCount() const noexcept
+        {
+            std::size_t count = 0;
+            for (const auto& c : citizens_)
+                if (!c.militaryDeployed && c.health > 0) ++count;
+            return count;
+        }
+        void configureCommunity(SettlementId, RealmId, CultureId, const RealmLaws&, bool citizenshipResearched);
+        [[nodiscard]] const RealmLaws& laws() const noexcept { return laws_; }
+        [[nodiscard]] CultureId dominantCulture() const noexcept { return dominantCulture_; }
+        [[nodiscard]] RealmId communityRealm() const noexcept { return communityRealm_; }
+        [[nodiscard]] bool citizenshipResearched() const noexcept { return naturalization_; }
+        [[nodiscard]] bool militaryEligible(const SettlementCitizen& c) const noexcept
+        { return !c.child && c.health>0 && laws_.allowsMilitaryOrOffice(c.sex==CitizenSex::Female); }
         bool spawn(std::uint64_t count);
         bool spawnImmigrants(std::uint64_t count);
         EntityAttributes averageAttributes() const;
@@ -244,7 +266,13 @@ namespace Paladin
         CitizenIdlePolicy idlePolicy;
 
     private:
+        friend class CitizenshipSystem;
         friend class MilitarySystem;
+        SettlementId community_;
+        RealmId communityRealm_;
+        CultureId dominantCulture_;
+        RealmLaws laws_;
+        bool naturalization_=false;
         friend class SettlementEmploymentState;
         friend class SettlementActivitySystem;
         friend class SettlementFamilySystem;

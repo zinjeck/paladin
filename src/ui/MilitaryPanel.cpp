@@ -16,7 +16,7 @@ namespace Paladin
         captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset();
     }
     void MilitaryPanel::close() noexcept
-    { open_=false; captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset(); controls_.clear(); }
+    { drag_.cancel(); open_=false; captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset(); controls_.clear(); }
     std::optional<UiRectangle> MilitaryPanel::controlBounds(Action action, ArmyId unit) const noexcept
     {
         for (const auto& c : controls_)
@@ -36,7 +36,7 @@ namespace Paladin
             return;
         }
         const float w=std::min(672.F,float(width)-16.F), h=std::min(560.F,float(height)-32.F);
-        bounds_={(float(width)-w)*.5F,(float(height)-h)*.5F,w,h};
+        bounds_=drag_.place({(float(width)-w)*.5F,(float(height)-h)*.5F,w,h},width,height);
         const float x=bounds_.x+16, y=bounds_.y, inner=w-32;
         const auto button=[&](UiRectangle b, Action a, std::string label, bool enabled=true, ArmyId id=ArmyId{})
         { controls_.push_back({b,a,std::move(label),enabled,id}); };
@@ -87,8 +87,7 @@ namespace Paladin
         button({x+2*(third+6),tools,third,28},Action::Focus,"Show on map",unit && unit->soldierCount()>0);
         button({x,tools+34,third,28},Action::RemoveOne,"-1 soldier",organize && releasable>0);
         button({x+third+6,tools+34,third,28},Action::RemoveFive,"-5 soldiers",organize && releasable>0);
-        button({x+2*(third+6),tools+34,third,28},Action::Disband,"Disband",unit &&
-            ((organize && releasable==unit->soldierCount()) || (unit->soldierCount()==0 && unit->rations()==0)));
+        button({x+2*(third+6),tools+34,third,28},Action::Disband,"Disband",unit != nullptr);
     }
     void MilitaryPanel::act(const Control& control, World& world, RealmId actor)
     {
@@ -121,6 +120,8 @@ namespace Paladin
     bool MilitaryPanel::handle(const SDL_Event& event, World& world, RealmId actor)
     {
         if (!open_) return false;
+        if (drag_.handle(event,bounds_))
+        { captured_=false; draggingScroll_=false; pressedControl_.reset(); pressed_=-1; layout(viewportWidth_,viewportHeight_,world,actor); return true; }
         if (event.type==SDL_EVENT_WINDOW_FOCUS_LOST) { captured_=draggingScroll_=false; pressedControl_.reset(); pressed_=-1; return false; }
         if (event.type==SDL_EVENT_KEY_DOWN && event.key.scancode==SDL_SCANCODE_ESCAPE)
         { close(); return true; }
@@ -242,7 +243,7 @@ namespace Paladin
         }
         const float foot=bounds_.y+bounds_.height-40;
         label("Scroll or drag the unit scrollbar. Reserves are employed barracks soldiers.",x,foot,inner,1);
-        label("Show on map; right-click land to march. Discharge at the recruitment city.",x,foot+12,inner,1);
+        label("Disband returns civilians to their original cities. Right-click land to march.",x,foot+12,inner,1);
         ui.drawLabel(renderer,fit(message_,inner,1),x,foot+26,1,{235,196,107,255});
     }
 }

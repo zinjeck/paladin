@@ -10,9 +10,9 @@ namespace Paladin
 {
     void DiplomacyPanel::toggle() { if (open_) close(); else open(); }
     void DiplomacyPanel::open(RealmId realm)
-    { open_=true; selected_=realm; scroll_=0; dirty_=true; pressed_.reset(); captured_=false; message_.clear(); }
+    { drag_.cancel(); open_=true; selected_=realm; giftFor_={}; opinions_=false; opinionScroll_=0; scroll_=0; dirty_=true; pressed_.reset(); captured_=false; message_.clear(); }
     void DiplomacyPanel::close() noexcept
-    { open_=false; selected_={}; captured_=false; pressed_.reset(); controls_.clear(); stats_.clear(); dirty_=true; areaRevision_=~std::uint64_t{}; }
+    { drag_.cancel(); open_=false; selected_={}; captured_=false; pressed_.reset(); controls_.clear(); stats_.clear(); dirty_=true; areaRevision_=~std::uint64_t{}; }
     void DiplomacyPanel::refresh(const World& world)
     {
         const auto revision=world.grid().revision() ^ (world.territory().revision()*1315423911ULL) ^
@@ -50,8 +50,8 @@ namespace Paladin
         width_=width; height_=height; if (!open_) return;
         refresh(world);
         if (selected_ && !world.realm(selected_)) selected_={};
-        const float w=std::max(0.F,std::min(730.F,float(width)-24)), h=std::max(0.F,std::min(540.F,float(height)-100));
-        bounds_={(width-w)*.5F,(height-h)*.5F,w,h}; controls_.clear(); list_={};
+        const float w=std::max(0.F,std::min(730.F,float(width)-24)), h=std::max(0.F,std::min(540.F,float(height)-24));
+        bounds_=drag_.place({(width-w)*.5F,(height-h)*.5F,w,h},width,height); controls_.clear(); list_={}; opinionList_={};
         const auto add=[&](UiRectangle rect,Kind kind,int value,std::string label,bool enabled=true,RealmId realm=RealmId{})
         { controls_.push_back({rect,kind,value,realm,std::move(label),enabled}); };
         add({bounds_.x+w-42,bounds_.y+10,28,26},Kind::Close,0,"X");
@@ -73,15 +73,33 @@ namespace Paladin
         add({x+left-14,list_.y+list_.height-24,14,24},Kind::ScrollDown,0,"v",scroll_+visible<int(stats_.size()));
         if (!selected_) return; // Right side intentionally blank until a realm is selected.
         const float right=x+left+16, side=w-48-left;
+        if (giftFor_!=selected_) { giftFor_=selected_; gift_=DiplomacySystem::suggestedGift(world,actor,selected_); }
+        add({right,y+160,side*.5F-3,25},Kind::ActionsTab,0,"Actions");
+        add({right+side*.5F+3,y+160,side*.5F-3,25},Kind::OpinionsTab,0,"Nearby opinions");
+        if (opinions_)
+        {
+            nearby_.clear();
+            for (const auto& r:world.realms())
+                if (DiplomacySystem::inRange(world,selected_,r.id())) nearby_.push_back(r.id());
+            std::stable_sort(nearby_.begin(),nearby_.end(),[&](RealmId a,RealmId b){ return world.realm(a)->name()<world.realm(b)->name(); });
+            opinionList_={right,y+216,side-20,h-278};
+            const int count=std::max(1,int(opinionList_.height/32));
+            opinionScroll_=std::clamp(opinionScroll_,0,std::max(0,int(nearby_.size())-count));
+            add({right+side-16,opinionList_.y,16,24},Kind::OpinionUp,0,"^",opinionScroll_>0);
+            add({right+side-16,opinionList_.y+opinionList_.height-24,16,24},Kind::OpinionDown,0,"v",opinionScroll_+count<int(nearby_.size()));
+            return;
+        }
         const auto* relation=world.diplomacy().between(actor,selected_);
+        const bool reachable=DiplomacySystem::inRange(world,actor,selected_);
         const bool own=actor==selected_, war=relation && relation->atWar;
         const bool release=relation && relation->overlord==actor && relation->tributary==selected_;
         const std::array<const char*,6> actions{"Form Alliance","Send Gift",release?"Release Tributary":"Demand Tribute",
             "Establish Trade","Declare War","Establish Peace"};
-        const float start=y+142, pitch=std::min(43.F,(h-224)/6), bh=pitch-5;
+        const float start=y+196, pitch=std::min(39.F,(h-282)/6), bh=pitch-5;
         for (int i=0;i<6;++i)
         {
-            bool enabled=bool(actor) && !own;
+            bool enabled=bool(actor) && !own && reachable;
+            if (i==1) enabled=enabled && gift_>0 && world.realm(actor)->treasury && world.realm(actor)->treasury->balance>=gift_;
             if (i==0) enabled=enabled && !war && !(relation && relation->allied);
             if (i==2) enabled=enabled && (release || !war);
             if (i==3) enabled=enabled && !war && !(relation && relation->trading);
@@ -90,8 +108,8 @@ namespace Paladin
             add({right,start+i*pitch,side,bh},Kind::Action,i,actions[i],enabled);
         }
         const float giftY=start+6*pitch+5;
-        add({right,giftY,28,26},Kind::GiftLess,0,"-",gift_>100);
-        add({right+side-28,giftY,28,26},Kind::GiftMore,0,"+",gift_<100000000);
+        add({right,giftY,28,26},Kind::GiftLess,0,"-",reachable && gift_>0);
+        add({right+side-28,giftY,28,26},Kind::GiftMore,0,"+",reachable && gift_<100000000);
     }
     std::optional<UiRectangle> DiplomacyPanel::sortBounds(Sort sort) const noexcept
     { for (const auto& c:controls_) if (c.kind==Kind::Sort && c.value==int(sort)) return c.bounds; return {}; }
@@ -108,9 +126,13 @@ namespace Paladin
         case Kind::Sort:
             if (sort_==Sort(c.value)) descending_=!descending_; else { sort_=Sort(c.value); descending_=true; }
             scroll_=0; dirty_=true; break;
-        case Kind::Realm: selected_=c.realm; message_.clear(); break;
-        case Kind::GiftLess: gift_=std::max<Money>(100,gift_-1000); break;
-        case Kind::GiftMore: gift_=std::min<Money>(100000000,gift_+1000); break;
+        case Kind::Realm: selected_=c.realm; giftFor_={}; opinions_=false; opinionScroll_=0; message_.clear(); break;
+        case Kind::ActionsTab: opinions_=false; break;
+        case Kind::OpinionsTab: opinions_=true; break;
+        case Kind::OpinionUp: --opinionScroll_; break;
+        case Kind::OpinionDown: ++opinionScroll_; break;
+        case Kind::GiftLess: gift_=std::max<Money>(0,gift_-100); break;
+        case Kind::GiftMore: gift_=std::min<Money>(100000000,gift_+100); break;
         case Kind::ScrollUp: --scroll_; break;
         case Kind::ScrollDown: ++scroll_; break;
         case Kind::Action:
@@ -122,12 +144,16 @@ namespace Paladin
     bool DiplomacyPanel::handle(const SDL_Event& event,World& world,RealmId actor)
     {
         if (!open_) return false;
+        if (drag_.handle(event,bounds_))
+        { captured_=false; pressed_.reset(); layout(width_,height_,world,actor); return true; }
         if (event.type==SDL_EVENT_WINDOW_FOCUS_LOST) { captured_=false; pressed_.reset(); return false; }
         if (event.type==SDL_EVENT_KEY_DOWN && event.key.scancode==SDL_SCANCODE_ESCAPE) { close(); return true; }
         if (event.type==SDL_EVENT_MOUSE_WHEEL && contains(event.wheel.mouse_x,event.wheel.mouse_y))
         {
             if (list_.contains(event.wheel.mouse_x,event.wheel.mouse_y))
             { scroll_-=int(std::round(event.wheel.y)); layout(width_,height_,world,actor); }
+            if (opinions_ && opinionList_.contains(event.wheel.mouse_x,event.wheel.mouse_y))
+            { opinionScroll_-=int(std::round(event.wheel.y)); layout(width_,height_,world,actor); }
             return true;
         }
         if (event.type==SDL_EVENT_MOUSE_MOTION)
@@ -168,7 +194,7 @@ namespace Paladin
         text("Diplomacy",x,y+14,w-76,3);
         for (const auto& c:controls_)
         {
-            const bool selected=c.kind==Kind::Realm?c.realm==selected_:c.kind==Kind::Sort?Sort(c.value)==sort_:false;
+            const bool selected=c.kind==Kind::Realm?c.realm==selected_:c.kind==Kind::Sort?Sort(c.value)==sort_:c.kind==Kind::ActionsTab?!opinions_:c.kind==Kind::OpinionsTab?opinions_:false;
             const bool pressed=pressed_ && pressed_->kind==c.kind && pressed_->value==c.value && pressed_->realm==c.realm;
             ui.drawButton(renderer,c.bounds,c.label,c.bounds.contains(mouseX_,mouseY_),pressed,selected,c.enabled);
         }
@@ -199,8 +225,29 @@ namespace Paladin
         if (relation && relation->trading) status+=" | Trade pact";
         if (relation && relation->tributary) status+=relation->tributary==selected_?" | Tributary":" | Overlord";
         text(status,right,y+130,side,1);
-        const float giftY=y+142+6*std::min(43.F,(h-224)/6)+11;
-        text("Gift: "+goldText(gift_)+" gold",right+36,giftY,side-72,1.5F);
+        const bool reachable=DiplomacySystem::inRange(world,actor,selected_);
+        text(actor==selected_ ? "Your relations with neighbouring realms" : reachable ?
+            "Their opinion of you: "+std::to_string(DiplomacySystem::opinion(world,selected_,actor)) :
+            "Outside diplomatic range: actions unavailable",right,y+145,side,1);
+        if (opinions_)
+        {
+            text("Realm | their view / neighbour's view",right,y+196,side,1);
+            const int visible=std::max(1,int(opinionList_.height/32));
+            if (nearby_.empty()) text("No realms within diplomatic range.",right,opinionList_.y,side,1);
+            for (int i=opinionScroll_;i<std::min(int(nearby_.size()),opinionScroll_+visible);++i)
+            {
+                const auto id=nearby_[i]; const auto* other=world.realm(id); if (!other) continue;
+                const float row=opinionList_.y+(i-opinionScroll_)*32.F;
+                text(std::string(other->name()),right,row,side-105,1.25F);
+                text(std::to_string(DiplomacySystem::opinion(world,selected_,id))+" / "+
+                     std::to_string(DiplomacySystem::opinion(world,id,selected_)),right+side-100,row,80,1.25F);
+            }
+        }
+        else
+        {
+            const float giftY=y+196+6*std::min(39.F,(h-282)/6)+11;
+            text("Gift: "+goldText(gift_)+" gold",right+36,giftY,side-72,1.5F);
+        }
         text(message_,right,y+h-45,side,1);
     }
 }

@@ -1,4 +1,6 @@
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
+#include "ui/EmploymentPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
 #include "rendering/CityRenderer.h"
@@ -226,8 +228,10 @@ namespace Paladin
         {
             return handleMainMenuEvent(event);
         }
-        if (controlsVisible && handleSimulationControlEvent(event))
+        if (screen_ == Screen::World && controlsVisible &&
+            worldSettlementPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
         {
+            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
             return true;
         }
         if (screen_ == Screen::World && controlsVisible && diplomacyPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
@@ -244,6 +248,17 @@ namespace Paladin
         {
             return true;
         }
+        // Movable management panels own their pointer capture above the HUD,
+        // minimap and speed buttons. A drag must not click through those layers.
+        if (screen_ == Screen::World && employmentPanel_->isOpen())
+        {
+            const bool pointer = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP;
+            const bool inside = pointer ? employmentPanel_->containsPoint(event.button.x,event.button.y) :
+                event.type == SDL_EVENT_MOUSE_WHEEL ? employmentPanel_->containsPoint(event.wheel.mouse_x,event.wheel.mouse_y) : false;
+            if ((inside || employmentPanel_->capturingPointer() || employmentCapturedPointer_) && handleWorldManagement(event))
+                return true;
+        }
+        if (controlsVisible && handleSimulationControlEvent(event)) return true;
         switch (screen_)
         {
         case Screen::MainMenu:

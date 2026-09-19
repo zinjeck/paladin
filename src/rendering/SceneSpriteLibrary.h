@@ -1,5 +1,6 @@
 #pragma once
 #include "rendering/ScenePresentation.h"
+#include "rendering/SpriteSelection.h"
 #include "assets/PresentationData.h"
 #include "assets/AssetManager.h"
 #include "rendering/Texture.h"
@@ -12,6 +13,7 @@ namespace Paladin
 {
     struct SceneSprite : SpriteAsset {
         std::shared_ptr<Texture> texture,shadow,selectionSilhouette;
+        SpriteSelectionMask selectionMask;
     };
     // Optional artist-owned exports. Missing catalog = existing placeholders.
     // Loaded once, independent of working directory and simulation RNG.
@@ -75,6 +77,16 @@ namespace Paladin
             double doorOpen = 0
         ) const;
         const SceneSprite* find(const std::string& id) const;
+        bool renderSelection(Renderer& renderer, const SceneDrawItem& item) const
+        {
+            for (const auto& [id, sprite] : sprites_)
+                if (sprite.texture.get() == item.texture && !sprite.selectionMask.alpha.empty())
+                {
+                    renderSpriteSelection(renderer, sprite.selectionMask, item);
+                    return true;
+                }
+            return false;
+        }
         bool submitTree(
             SceneDrawQueue&,
             const SceneProjection&,

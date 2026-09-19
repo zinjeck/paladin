@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
 #include "world/RealmRuler.h"
+#include "world/RealmLaws.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <algorithm>
@@ -15,7 +16,12 @@ namespace Paladin
     class Realm
     {
     public:
+        RealmLaws laws;
+        bool citizenshipResearched = false;
         bool aiControlled = false;
+        // Persisted strategic scheduling, separate from ruler genealogy RNG.
+        double nextStrategyMinute=360, nextDiplomacyMinute=360;
+        std::uint64_t strategyDecisions=0;
         RealmScale scale = RealmScale::Small;
         RealmRuler ruler;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();

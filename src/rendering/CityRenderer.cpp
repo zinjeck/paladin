@@ -1,4 +1,5 @@
 #include "rendering/CityRenderer.h"
+#include "rendering/SelectionOutline.h"
 #include "rendering/BuildingView.h"
 #include "rendering/CityPixelView.h"
 #include "rendering/GrassPresentation.h"
@@ -264,8 +265,12 @@ namespace Paladin
         }
         if (const auto* definition = placementController.activeDefinition())
         {
-            if (const auto footprint = placementController.visibleFootprint())
+            if (const auto footprint = placementController.visibleFootprint();
+                footprint && placementController.hasDrawablePreview())
             {
+                // An adjustable building begins as ONE hover tile. Do not feed
+                // that undersized tile to a recipe that expands a barracks to
+                // its minimum dimensions, creating a detached carpet beside it.
                 const auto first = raised_.size();
                 tribalBuilding(
                     raised_,
@@ -290,7 +295,8 @@ namespace Paladin
             &raised_,
             &sprites_,
             &presentation,
-            &settlementMap.employment()
+            &settlementMap.employment(),
+            inspection.selectedCitizen(citizens) ? inspection.selectedCitizen(citizens)->id : CitizenId{}
         );
         const auto drawStart = SDL_GetTicksNS();
         raised_.render(renderer, -3, -1);
@@ -374,40 +380,9 @@ namespace Paladin
             renderer,
             metrics.scaledTilePixels(camera.zoom())
         );
-        const float selectionStroke =
-            static_cast<float>(worldPixelPitch(projection.tilePixels));
         const auto highlight = [&](const RenderRectangle& b)
         {
-            const RenderColor selected{0xFF, 0xD7, 0x83, 255};
-            const float stroke = std::max(1.0F, selectionStroke);
-            renderer.fillRectangle(
-                b.x - stroke,
-                b.y - stroke,
-                b.width + stroke * 2,
-                stroke,
-                selected
-            );
-            renderer.fillRectangle(
-                b.x - stroke,
-                b.y + b.height,
-                b.width + stroke * 2,
-                stroke,
-                selected
-            );
-            renderer.fillRectangle(
-                b.x - stroke,
-                b.y,
-                stroke,
-                b.height,
-                selected
-            );
-            renderer.fillRectangle(
-                b.x + b.width,
-                b.y,
-                stroke,
-                b.height,
-                selected
-            );
+            drawSelectionBorder(renderer, b, {235,196,107,255});
         };
         const auto footprintHighlight = [&](const auto& f)
         {
@@ -442,15 +417,15 @@ namespace Paladin
         }
         else if (const auto* c = inspection.selectedCitizen(citizens))
         {
-            highlight(projection.bounds(
-                {c->renderX(c->visualX(), interpolationAlpha) + .5,
-                 c->renderY(c->visualY(), interpolationAlpha) + .5,
-                 0,
-                 .65,
-                 .65,
-                 .5,
-                 .5}
-            ));
+            const std::uint64_t actorKey = c->soldierId
+                ? (std::uint64_t(3) << 61) | c->soldierId.value()
+                : (std::uint64_t(1) << 62) | c->id.value();
+            for (const auto& item : raised_.items())
+                if (item.stableId == actorKey && item.layer == 0 && item.part == 0 && item.texture)
+                {
+                    sprites_.renderSelection(renderer, item);
+                    break;
+                }
         }
     }
 } // namespace Paladin

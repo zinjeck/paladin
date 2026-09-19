@@ -22,11 +22,11 @@ namespace Paladin
         const double boundary = std::floor(minute / 240) * 240;
         if (populationHistory_.empty())
         {
-            populationHistory_.push_back({minute, citizens_.size()});
+            populationHistory_.push_back({minute, residentCount()});
         }
         else if (boundary > populationHistory_.back().gameMinute)
         {
-            populationHistory_.push_back({boundary, citizens_.size()});
+            populationHistory_.push_back({boundary, residentCount()});
         }
         while (populationHistory_.size() > 97)
         {

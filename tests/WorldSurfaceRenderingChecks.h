@@ -19,6 +19,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <set>
 
 namespace Paladin::Test
 {
@@ -442,11 +443,12 @@ namespace Paladin::Test
         PALADIN_CHECK(world.territory().controlledTileCount()==civicTiles);
         PALADIN_CHECK(world.territory().controlledTileCount(tribe)==0);
 
-        // Opaque thematic maps use the same authoritative realms in both
+        // Government ink uses authoritative realms; population is a geographic census in both
         // projections; selected frontiers do not convert tribal influence into land ownership.
         PALADIN_CHECK(world.tribalInfluence().revision()==influenceRevision);
         PALADIN_CHECK(world.settlement(city)->simulationState().spawnCitizens(40));
         const auto thematicInfluenceRevision=world.tribalInfluence().revision();
+        std::array<std::size_t,2> governmentWater{};
         for(const bool globe:{false,true}) for(const auto mode:{WorldMapMode::Government,WorldMapMode::Population})
         {
             map.globeEnabled=globe; map.setMapMode(mode); map.selectedRealm={};
@@ -466,7 +468,25 @@ namespace Paladin::Test
             std::size_t first=0,second=0,water=0;
             for(int y=0;y<640;++y) for(int x=0;x<960;++x)
             { const auto p=reviewPixel(image.get(),x,y); first+=p==a; second+=p==b; water+=p==ThematicWater; }
-            PALADIN_CHECK(first>10 && second>10 && water>20);
+            if(mode==WorldMapMode::Government)
+            {
+                PALADIN_CHECK(first>10 && second>10 && water>20);
+                governmentWater[globe?1:0]=water;
+            }
+            else
+            {
+                // A population view retains shaded terrain, not a handful of
+                // opaque country swatches. Its urban distribution is separately
+                // checked for exact census conservation and no ownership input.
+                std::set<std::uint32_t> shades;
+                for(int y=100;y<450;++y) for(int x=100;x<700;++x)
+                {
+                    const auto p=reviewPixel(image.get(),x,y);
+                    shades.insert((std::uint32_t(p.red)<<16)|(std::uint32_t(p.green)<<8)|p.blue);
+                }
+                PALADIN_CHECK(shades.size()>64);
+                PALADIN_CHECK(water<governmentWater[globe?1:0]); // Natural sea restored; space may share the old color.
+            }
             const std::string prefix=std::string("pr29-")+(globe?"globe-":"flat-")+(mode==WorldMapMode::Government?"government":"population");
             saveWorldReview(native,prefix+".png");
             for(const auto selected:{civic,tribe})
@@ -480,7 +500,7 @@ namespace Paladin::Test
                 saveWorldReview(native,prefix+(selected==civic?"-selected-civic.png":"-selected-tribal.png"));
             }
             map.selectedRealm={};
-            // Detail pages remain opaque at the close scale as well.
+            // Verify close detail pages with the same mode-specific rendering policy.
             camera.setWorldZoom(globe?64.*64/(640*.4*2*3.14159265358979323846):8.);
             const auto closeDeadline=SDL_GetTicks()+30000;
             do { renderer.beginFrame(); map.render(renderer,world,camera,metrics); }

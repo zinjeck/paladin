@@ -23,6 +23,10 @@ namespace Paladin
         // No independent soldier count: synchronize actual staffed barracks.
         static void synchronize(World&, double minute);
         static void tick(World&, double minute, double elapsed);
+        // Only AI strategic settlements may materialize a bounded cadre from
+        // their existing aggregate civilians. Every enlisted person then uses
+        // the same canonical Soldier/Army pipeline as the player's force.
+        static ArmyId maintainStrategicGarrison(World&, RealmId, SettlementId, int target, int changeLimit=8);
         static ArmyId createUnit(World&, RealmId actor, SettlementId home);
         static MilitaryResult resizeUnit(World&, RealmId actor, ArmyId, int delta);
         static MilitaryResult disbandUnit(World&, RealmId actor, ArmyId);

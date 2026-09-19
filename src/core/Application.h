@@ -21,6 +21,7 @@ namespace Paladin
     class LedgerPanel;
     class MilitaryPanel;
     class DiplomacyPanel;
+    class WorldSettlementPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -95,7 +96,6 @@ namespace Paladin
         bool handleReportEvent(const SDL_Event&);
         bool handleMilitaryEvent(const SDL_Event&);
         void renderMilitary();
-        bool worldArmySelectionVisible() const noexcept;
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
@@ -172,6 +172,7 @@ namespace Paladin
         std::unique_ptr<LedgerPanel> ledgerPanel_;
         std::unique_ptr<MilitaryPanel> militaryPanel_;
         std::unique_ptr<DiplomacyPanel> diplomacyPanel_;
+        std::unique_ptr<WorldSettlementPanel> worldSettlementPanel_;
         ArmyId selectedWorldArmy_;
         bool militaryPointerCaptured_ = false;
         std::string militaryOrderMessage_;

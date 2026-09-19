@@ -12,6 +12,8 @@ namespace Paladin
         bool allied = false, trading = false, atWar = false;
         // The subject may have only one overlord. This never changes land ownership.
         RealmId overlord, tributary;
+        // Opinions are directional even though treaties are shared.
+        int firstOpinion = 0, secondOpinion = 0;
     };
     struct DiplomacyState
     {

@@ -1318,6 +1318,9 @@ namespace Paladin
                 }
                 return result;
             };
+            const float viewportGuard = float(std::max(1., r.currentPixelPitch()));
+            const float viewportRight = float(r.outputWidth()) + viewportGuard;
+            const float viewportBottom = float(r.outputHeight()) + viewportGuard;
             const auto triangle = [&](const V& a, const V& b, const V& c)
             {
                 std::array<const V*, 5> poly{};
@@ -1351,6 +1354,21 @@ namespace Paladin
                 {
                     return;
                 }
+                // At regional zoom most of the visible hemisphere is outside
+                // the viewport. Reject only fully off-screen polygons before
+                // handing them to SDL's software triangle pipeline. Keep a
+                // one-lattice-cell guard so edge coverage and raster rounding stay
+                // identical; no visible triangles or source detail are lost.
+                bool left = true, right = true, above = true, below = true;
+                for (int i = 0; i < count; ++i)
+                {
+                    const auto& point = poly[i]->shaded;
+                    left = left && point.x < -viewportGuard;
+                    right = right && point.x > viewportRight;
+                    above = above && point.y < -viewportGuard;
+                    below = below && point.y > viewportBottom;
+                }
+                if (left || right || above || below) return;
                 const int first = int(vertices_.size());
                 for (int i = 0; i < count; ++i)
                 {

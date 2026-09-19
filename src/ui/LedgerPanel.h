@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/PanelDrag.h"
 #include "core/StrongId.h"
 #include "simulation/SimulationReports.h"
 #include "ui/NormalFontRenderer.h"
@@ -29,6 +30,7 @@ namespace Paladin
         void toggle(bool events, bool world, SettlementId city);
         void close()
         {
+            drag_.cancel();
             open_ = false;
             captured_ = false;
         }
@@ -46,6 +48,8 @@ namespace Paladin
         void render(Renderer&, const GrayUiRenderer&) const;
 
     private:
+        PanelDrag drag_;
+        int viewportWidth_=0, viewportHeight_=0;
         friend struct ApplicationSmokeTest;
         mutable NormalFontRenderer font_;
         void label(

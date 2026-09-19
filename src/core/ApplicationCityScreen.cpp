@@ -5,6 +5,7 @@
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
 #include "simulation/Simulation.h"
+#include "simulation/CitizenshipSystem.h"
 #include "ui/CityHud.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
@@ -47,7 +48,7 @@ namespace Paladin
             );
             cityHud_->setSettlementStatus(
                 currentMap->logistics.founded(),
-                citizens.citizens().size()
+                citizens.residentCount()
             );
         }
     }
@@ -255,6 +256,9 @@ namespace Paladin
         }
         if (settlementMap && citySettlement)
         {
+            if (employmentPanel_->showsPopulation())
+                employmentPanel_->setImmigrationOriginAvailable(!CitizenshipSystem::nearbyOrigins(
+                    simulation_->world(), activeCitySettlementId_).empty());
             employmentPanel_->render(
                 *renderer_,
                 *grayUiRenderer_,

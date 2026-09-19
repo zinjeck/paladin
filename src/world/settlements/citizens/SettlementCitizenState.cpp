@@ -243,6 +243,9 @@ namespace Paladin
                 citizen.id = id;
                 citizen.name = names[poolIndex];
                 citizen.sex = sex;
+                citizen.primaryCultureId=dominantCulture_;
+                citizen.birthSettlementId=community_;
+                if (naturalization_ && !child) citizen.citizenshipRealmId=communityRealm_;
                 citizen.child = child;
                 citizen.ageYears =
                     child

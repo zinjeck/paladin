@@ -1,3 +1,4 @@
+#include <array>
 #include "rendering/WorldObjectRenderer.h"
 
 #include "rendering/GlobeView.h"
@@ -255,7 +256,7 @@ namespace Paladin
         } // Ground-locked roads end their rotated source-chart layer here.
 
         if ((worldObjectVisibility > .001F && (artwork || !fallbackSprites.empty())) ||
-            (artwork && !world.armies().empty()))
+            (artwork && !world.armies().empty()) || !world.shipments().empty())
         {
         // Upright billboards at every latitude, roll and projection/LOD. Only
         // ground anchors follow the globe. Rotating this layer used to turn
@@ -309,6 +310,31 @@ namespace Paladin
                 );
             }
         }
+
+        // Caravan art is a small covered-wagon pixel glyph in the SAME
+        // upright 32-texel object layer, never a native-screen floating badge.
+        if (armyVisibility > .001F)
+            for (const auto& caravan : world.shipments())
+            {
+                if (!caravan.active() || caravan.phase==ShipmentPhase::Waiting) continue;
+                const auto point=project(caravan.visualX()+.5,caravan.visualY()+.5);
+                if (!point || outside(*point,renderer,80)) continue;
+                constexpr std::array<const char*,14> rows{{
+                    "      hhhh      ", "    hhiiiihh    ", "   hiwwwwwih   ",
+                    "  hiwwwwwwwih  ", "  hiwwwwwwwih  ", "  hiwwwwwwwih  ",
+                    "  hhwwwwwiihh  ", "  hdhhhhhdhdh  ", "  dbbbbbbbbd   ",
+                    " ddbbbbbb bdd  ", " ddhdddddhddd  ", " ddhdddddhddd  ",
+                    "  dd     dd    ", "               "}};
+                const float step=float(std::max(worldObjectPixelPitch(effectiveTilePixels),effectiveTilePixels/16.));
+                for(int y=0;y<int(rows.size());++y) for(int x=0;rows[y][x];++x)
+                {
+                    const char c=rows[y][x]; if(c==' ') continue;
+                    const RenderColor color=c=='i'?RenderColor{244,231,199,255}:c=='w'?RenderColor{217,199,159,255}:
+                        c=='b'?RenderColor{183,131,80,255}:c=='h'?RenderColor{136,96,68,255}:RenderColor{73,53,47,255};
+                    renderer.fillRectangle(point->x+(x-8)*step,point->y+(y-13)*step,step,step,
+                        visibleColor(color,point->visibility*armyVisibility));
+                }
+            }
 
         if (artwork)
         {

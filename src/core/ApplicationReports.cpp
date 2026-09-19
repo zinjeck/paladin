@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "ui/WorldSettlementPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
@@ -10,6 +11,7 @@
 #include "ui/EmploymentPanel.h"
 #include "ui/LedgerPanel.h"
 #include "ui/MilitaryPanel.h"
+#include "ui/SimulationSpeedControls.h"
 #include "ui/SettlementInspectionPanel.h"
 #include <SDL3/SDL.h>
 namespace Paladin
@@ -28,6 +30,7 @@ namespace Paladin
     }
     bool Application::handleReportAction(CityHudAction action)
     {
+        if (action != CityHudAction::None) worldSettlementPanel_->close();
         if (action == CityHudAction::Diplomacy && screen_ == Screen::World)
         {
             employmentPanel_->close(); ledgerPanel_->close(); militaryPanel_->close();
@@ -79,6 +82,7 @@ namespace Paladin
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event.button.button == SDL_BUTTON_LEFT &&
             activeHudContainsPoint(event.button.x, event.button.y) &&
+            !simulationSpeedControls_->containsInteractivePoint(event.button.x,event.button.y) &&
             !cityHud_->reportControlAt(event.button.x, event.button.y))
         {
             ledgerPanel_->close();

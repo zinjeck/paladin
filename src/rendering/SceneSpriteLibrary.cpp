@@ -83,6 +83,9 @@ namespace Paladin
                         *out.texture,
                         in.texture->atlas.linear
                     );
+                    if (id == "citizen" || id.starts_with("citizen."))
+                        out.selectionMask = spriteSelectionMask(in.texture->atlas, 0, 0,
+                            in.texture->width(), in.texture->height());
                     if (id.starts_with("citizen.militia.") && id.ends_with(".walk"))
                         out.selectionSilhouette=soldierSilhouette(renderer,in.texture->atlas,0,0,in.texture->width(),in.texture->height());
                     if (in.shadow)
@@ -114,8 +117,8 @@ namespace Paladin
 #endif
             auto manager = renderer.compiledAssets();
             std::unordered_map<std::string, SceneSprite> sprites;
-            // At most four cached walking silhouettes; CPU atlases are shared
-            // during this upload then discarded, not rebuilt when zoom changes.
+            // Decode each citizen atlas once. Compact alpha masks survive the
+            // upload; the full CPU atlases do not. Zoom never allocates textures.
             std::unordered_map<AssetId,SpriteAtlas> silhouetteAtlases;
             std::unordered_map<std::string, ObjectPresentation> objects;
             std::vector<BuildingPiece> pieces;
@@ -140,6 +143,14 @@ namespace Paladin
                         sprite.pixelWidth,
                         sprite.pixelHeight
                     );
+                    if (name == "citizen" || name.starts_with("citizen."))
+                    {
+                        auto it = silhouetteAtlases.find(sprite.atlas);
+                        if (it == silhouetteAtlases.end())
+                            it = silhouetteAtlases.emplace(sprite.atlas, decodeAtlas(manager->data(sprite.atlas))).first;
+                        sprite.selectionMask = spriteSelectionMask(it->second, sprite.x, sprite.y,
+                                                                  sprite.pixelWidth, sprite.pixelHeight);
+                    }
                     if (name.starts_with("citizen.militia.") && name.ends_with(".walk"))
                     {
                         auto it=silhouetteAtlases.find(sprite.atlas);

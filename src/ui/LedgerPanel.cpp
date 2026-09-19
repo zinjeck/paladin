@@ -63,6 +63,7 @@ namespace Paladin
     }
     void LedgerPanel::layout(int width, int height)
     {
+        viewportWidth_=width; viewportHeight_=height;
         const float w = std::max(
             200.F,
             std::min(events_ ? 580.F : 1060.F, float(width) - 32)
@@ -71,7 +72,7 @@ namespace Paladin
             180.F,
             std::min(events_ ? 410.F : 580.F, float(height) - 130)
         );
-        bounds_ = {events_ ? float(width) - w - 16 : (width - w) / 2, 80, w, h};
+        bounds_ = drag_.place({events_ ? float(width) - w - 16 : (width - w) / 2, 80, w, h},width,height);
         close_ = {bounds_.x + w - 36, bounds_.y + 8, 28, 28};
         content_ = {bounds_.x + 12, bounds_.y + 74, w - 24, h - 130};
         columns_.clear();
@@ -153,6 +154,8 @@ namespace Paladin
         {
             return false;
         }
+        if (drag_.handle(e,bounds_))
+        { captured_=false; pressed_=-1; layout(viewportWidth_,viewportHeight_); return true; }
         if ((e.type == SDL_EVENT_KEY_DOWN &&
              e.key.scancode == SDL_SCANCODE_ESCAPE) ||
             (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
