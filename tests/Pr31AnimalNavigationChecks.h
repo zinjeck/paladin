@@ -1,7 +1,9 @@
 #pragma once
 #include "TestFramework.h"
-#include "simulation/WorldLandNavigation.h"
+#include "interaction/SettlementCommandController.h"
 #include "simulation/MilitarySystem.h"
+#include "simulation/Simulation.h"
+#include "simulation/WorldLandNavigation.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <cmath>
@@ -71,7 +73,12 @@ inline void runPr31AnimalNavigationChecks()
     PALADIN_CHECK(resident); map.animals.find(resident)->pasture=pasture;
     const auto wild=map.animals.spawn(map,"cow",{16,21});
     PALADIN_CHECK(wild); map.animals.find(wild)->nextWanderMinute=10000;
-    PALADIN_CHECK(map.animals.designate({{16,21},1,1},AnimalOrder::Gather)==1);
+    SettlementCommandController gather;
+    PALADIN_CHECK(gather.begin("gather"));
+    gather.pointerPressed(SettlementTilePosition{16, 21});
+    PALADIN_CHECK(
+        gather.pointerReleased(SettlementTilePosition{16, 21}, map, people, 600)
+    );
     bool gathered=false;
     for(int i=0;i<150 && !gathered;++i)
     {
@@ -83,4 +90,123 @@ inline void runPr31AnimalNavigationChecks()
     PALADIN_CHECK(map.animals.containedCount(pasture)==2);
     PALADIN_CHECK(worker.workplaceId==map.employment().forObject(pasture));
     std::cout<<"[pr31] diagonal army speed/interpolation, blocked corners/seam and occupied-pasture gathering passed\n";
+
+    // Two real prepared settlements: physical work must advance off-screen,
+    // including visits shorter than the background batching interval.
+    Simulation sim(settings);
+    for (int y = 0; y < 32; ++y)
+    {
+        for (int x = 0; x < 64; ++x)
+        {
+            auto& t = *sim.world().grid().tile({x, y});
+            t.terrain = TerrainType::Land;
+            t.biome = BiomeType::Plain;
+            t.elevation = Elevation{.5};
+        }
+    }
+    const auto first =
+        sim.foundPlayerCapital({16, 16}, {"A", "A Folk", "A", {}, "civic"});
+    auto secondProfile = defaultSettlementFoundationProfile();
+    const auto second = sim.world().foundSettlement(
+        {44, 16},
+        sim.playerRealmId(),
+        secondProfile
+    );
+    PALADIN_CHECK(first && second);
+    SettlementMapGenerationSettings localSettings;
+    localSettings.localTilesPerWorldTile = 16;
+    PALADIN_CHECK(
+        sim.prepareSettlementMap(first, localSettings) &&
+        sim.prepareSettlementMap(second, localSettings)
+    );
+    for (const auto id : {first, second})
+    {
+        auto& localMap = *sim.settlementMap(id);
+        for (int y = 0; y < localMap.grid().height(); ++y)
+        {
+            for (int x = 0; x < localMap.grid().width(); ++x)
+            {
+                localMap.grid().tile({x, y})->terrain = TerrainType::Land;
+            }
+        }
+        localMap.naturalFeatures().clear(
+            {{0, 0}, localMap.grid().width(), localMap.grid().height()}
+        );
+        PALADIN_CHECK(localMap.objectState().placeCompletedObject(
+            localMap.grid(),
+            *SettlementObjectCatalog::definition("city_keep"),
+            {{2, 2}, 5, 7}
+        ));
+        localMap.logistics.synchronize(localMap.objectState(), 360);
+        auto& citizens =
+            sim.world().settlement(id)->simulationState().citizens();
+        citizens.placeUnpositionedCitizens(localMap);
+        localMap.naturalFeatures().set({12, 12}, NaturalFeatureKind::Tree);
+        SettlementCommandController command;
+        PALADIN_CHECK(command.begin("chop_tree"));
+        command.pointerPressed(SettlementTilePosition{12, 12});
+        PALADIN_CHECK(command.pointerReleased(
+            SettlementTilePosition{12, 12},
+            localMap,
+            citizens,
+            360
+        ));
+        PALADIN_CHECK(localMap.objectState().createConstructionSites(
+            localMap.grid(),
+            *SettlementObjectCatalog::definition("house"),
+            {{14, 4}, 5, 5}
+        ));
+    }
+    PALADIN_CHECK(sim.setDetailedSimulationSettlement(first));
+    sim.setSpeed(SimulationSpeed::Normal);
+    for (int i = 0; i < 6; ++i)
+    {
+        sim.tick(.05);
+        PALADIN_CHECK(
+            sim.setDetailedSimulationSettlement(i % 2 ? first : second)
+        );
+    }
+    PALADIN_CHECK(sim.setDetailedSimulationSettlement(second));
+    const auto before =
+        sim.world().settlement(first)->simulationState().localActivityUpdates();
+    for (int i = 0; i < 3600; ++i)
+    {
+        sim.tick(.05);
+    }
+    PALADIN_CHECK(
+        sim.world()
+            .settlement(first)
+            ->simulationState()
+            .localActivityUpdates() > before
+    );
+    for (const auto id : {first, second})
+    {
+        const auto& localMap = *sim.settlementMap(id);
+        PALADIN_CHECK(
+            localMap.naturalFeatures().at({12, 12}).kind ==
+            NaturalFeatureKind::None
+        );
+        PALADIN_CHECK(localMap.objectState().constructionSites().empty());
+        PALADIN_CHECK(localMap.objectState().completedObjectAt({15, 5}));
+        PALADIN_CHECK(sim.setDetailedSimulationSettlement(id));
+        PALADIN_CHECK(
+            sim.world()
+                .settlement(id)
+                ->simulationState()
+                .pendingLocalActivityMinutes() == 0
+        );
+    }
+    const auto ticks =
+        sim.world().settlement(first)->simulationState().localActivityUpdates();
+    sim.setSpeed(SimulationSpeed::Paused);
+    sim.tick(10);
+    PALADIN_CHECK(
+        sim.world()
+            .settlement(first)
+            ->simulationState()
+            .localActivityUpdates() == ticks
+    );
+    std::cout
+        << "[pr31/background] short A/B visits, off-screen gathering/material "
+           "delivery/building, reactivation flush and pause passed\n";
 }

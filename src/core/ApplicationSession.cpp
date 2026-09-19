@@ -35,6 +35,7 @@ namespace Paladin
 {
     void Application::startWorldSession()
     {
+        clearBattle();
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();
@@ -86,6 +87,7 @@ namespace Paladin
 
     void Application::endWorldSession()
     {
+        clearBattle();
         militaryPanel_->close();
         diplomacyPanel_->close();
         worldSettlementPanel_->close();

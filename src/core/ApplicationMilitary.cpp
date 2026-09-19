@@ -53,10 +53,15 @@ namespace Paladin
         if (screen_ != Screen::World || !simulation_ || foundingPanel_->isOpen() ||
             settlementPlacementController_->isActive()) return false;
         auto& world = simulation_->world();
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+            event.button.button == SDL_BUTTON_LEFT && caravanPointerCaptured_)
+        {
+            caravanPointerCaptured_ = false;
+            globePointerDown_ = globeDragging_ = false;
+            return true;
+        }
         if (caravanPanel_->handle(event, world, simulation_->playerRealmId())) return true;
         if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) caravanPointerCaptured_ = false;
-        if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT && caravanPointerCaptured_)
-        { caravanPointerCaptured_ = false; return true; }
         if (event.type != SDL_EVENT_MOUSE_BUTTON_DOWN || event.button.button != SDL_BUTTON_LEFT ||
             worldSettlementPanel_->choosingDestination() || activeHudContainsPoint(event.button.x, event.button.y)) return false;
         const double pixels = worldPixels(*camera_, world, *renderer_, *tileRenderMetrics_, worldRenderer_->globeEnabled);
@@ -75,6 +80,10 @@ namespace Paladin
         selectedWorldArmy_ = {}; militaryOrderMessage_.clear();
         diplomacyPanel_->close(); worldSettlementPanel_->close(); militaryPanel_->close(); ledgerPanel_->close(); employmentPanel_->close();
         caravanPanel_->open(hit);
+        worldRenderer_->selectedCaravan = hit;
+        worldRenderer_->selectedArmy = {};
+        worldRenderer_->selectedRealm = {};
+        globePointerDown_ = globeDragging_ = false;
         caravanPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), world, simulation_->playerRealmId());
         caravanPointerCaptured_ = true;
         return true;
@@ -161,6 +170,21 @@ namespace Paladin
         }
         if (event.button.button==SDL_BUTTON_RIGHT && selectedWorldArmy_)
         {
+            if (const auto target =
+                    attackTargetAt(event.button.x, event.button.y))
+            {
+                militaryOrderMessage_ = militaryResultText(
+                    BattleSystem::orderAttack(
+                        world,
+                        simulation_->playerRealmId(),
+                        selectedWorldArmy_,
+                        target
+                    )
+                );
+                globePointerDown_ = globeDragging_ = false;
+                updateBattleEncounter();
+                return true;
+            }
             const auto uv=WorldMapNavigation::pick(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),pixels,
                 worldRenderer_->globeEnabled,event.button.x,event.button.y);
             const auto result=uv?MilitarySystem::orderMove(world,simulation_->playerRealmId(),selectedWorldArmy_,

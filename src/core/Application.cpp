@@ -1,10 +1,11 @@
 #include "core/Application.h"
-#include "ui/WorldSettlementPanel.h"
+#include "rendering/BattleScene.h"
 #include "ui/CaravanPanel.h"
-#include "ui/DiplomacyPanel.h"
 #include "ui/DebugConsole.h"
+#include "ui/DiplomacyPanel.h"
 #include "ui/LedgerPanel.h"
 #include "ui/MilitaryPanel.h"
+#include "ui/WorldSettlementPanel.h"
 
 #include "core/SimulationClock.h"
 #include "interaction/SettlementCommandController.h"
@@ -157,6 +158,7 @@ namespace Paladin
 
     Application::~Application()
     {
+        battleScene_.reset();
         if (window_)
         {
             SDL_StopTextInput(window_->nativeHandle());

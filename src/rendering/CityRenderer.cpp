@@ -1,8 +1,9 @@
 #include "rendering/CityRenderer.h"
-#include "rendering/SelectionOutline.h"
+#include "rendering/BattleScene.h"
 #include "rendering/BuildingView.h"
 #include "rendering/CityPixelView.h"
 #include "rendering/GrassPresentation.h"
+#include "rendering/SelectionOutline.h"
 #include "rendering/WorldPixelGrid.h"
 #include "ui/UiTypes.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -126,7 +127,8 @@ namespace Paladin
         const SettlementInspectionController& inspection,
         double interpolationAlpha,
         double hour,
-        double sunIncidence
+        double sunIncidence,
+        std::span<const BattleSoldierView> battleSoldiers
     ) const
     {
         std::string artRoot = std::string(SDL_GetBasePath()) + "assets/sprites";
@@ -298,6 +300,23 @@ namespace Paladin
             &settlementMap.employment(),
             inspection.selectedCitizen(citizens) ? inspection.selectedCitizen(citizens)->id : CitizenId{}
         );
+        for (const auto& soldier : battleSoldiers)
+        {
+            static const std::string sprites[2][2] = {
+                {"citizen.militia.male.front", "citizen.militia.male.back"},
+                {"citizen.militia.female.front", "citizen.militia.female.back"}
+            };
+            sprites_.submit(
+                raised_,
+                projection,
+                sprites[soldier.female][soldier.player],
+                soldier.x + .5,
+                soldier.y + .5,
+                (std::uint64_t(3) << 61) | soldier.soldier.value(),
+                1,
+                0
+            );
+        }
         const auto drawStart = SDL_GetTicksNS();
         raised_.render(renderer, -3, -1);
         logisticsRenderer_.render(

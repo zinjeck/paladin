@@ -14,7 +14,21 @@ FetchContent_Declare(
     GIT_TAG release-3.2.20
 )
 
+# Keep SDL's pixel loops optimized in the interactive Debug build as well.
+# Retain debug symbols, the debug CRT and assertions. An /Od software backend
+# otherwise dominates the same rendering timing gates used for Release.
+if(MSVC)
+    set(PALADIN_SDL_C_DEBUG_FLAGS "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/Od" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(REPLACE "/Ob0" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    string(APPEND CMAKE_C_FLAGS_DEBUG " /O2 /Ob2")
+endif()
 FetchContent_MakeAvailable(SDL3)
+if(MSVC)
+    set(CMAKE_C_FLAGS_DEBUG "${PALADIN_SDL_C_DEBUG_FLAGS}")
+    unset(PALADIN_SDL_C_DEBUG_FLAGS)
+endif()
 
 set(SDLTTF_VENDORED ON CACHE BOOL "" FORCE)
 set(SDLTTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
@@ -71,6 +85,8 @@ add_executable(Paladin
     src/main.cpp
     src/core/ApplicationCameraBenchmark.cpp
     src/core/Application.cpp
+    src/core/ApplicationBattle.cpp
+    src/rendering/BattleScene.cpp
     src/core/ApplicationMainMenu.cpp
     src/core/ApplicationWorldScreen.cpp
     src/core/ApplicationCityScreen.cpp
@@ -397,11 +413,16 @@ if(MSVC)
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
     file(GLOB_RECURSE PALADIN_DEBUG_SOURCES CONFIGURE_DEPENDS "src/*.cpp" "tests/*.cpp")
     foreach(PALADIN_DEBUG_SOURCE IN LISTS PALADIN_DEBUG_SOURCES)
-        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/(rendering|assets)/")
+        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/(rendering|assets)/|/tests/(ApplicationSmokeTests|WorldSurfaceRenderTests)\\.cpp$")
             set_property(SOURCE ${PALADIN_DEBUG_SOURCE} APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:/RTC1>")
         endif()
     endforeach()
     file(GLOB PALADIN_RENDER_SOURCES CONFIGURE_DEPENDS "src/rendering/*.cpp" "src/assets/*.cpp")
+    # These checks directly instantiate header-defined rendering (including
+    # GlobeRenderer). Match the game's rendering flags, retaining symbols and
+    # every assertion; otherwise the timing gates benchmark a different path.
+    list(APPEND PALADIN_RENDER_SOURCES
+        tests/ApplicationSmokeTests.cpp tests/WorldSurfaceRenderTests.cpp)
     set_property(SOURCE ${PALADIN_RENDER_SOURCES} APPEND PROPERTY COMPILE_OPTIONS
         "$<$<CONFIG:Debug>:/O2>" "$<$<CONFIG:Debug>:/Ob2>")
 endif()

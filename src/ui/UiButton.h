@@ -17,6 +17,10 @@ namespace Paladin
         void setText(std::string text);
         void setSkinId(std::string id);
         void setBounds(UiRectangle bounds) noexcept;
+        const UiRectangle& bounds() const noexcept
+        {
+            return bounds_;
+        }
         void setSelected(bool selected) noexcept;
         void setEnabled(bool enabled) noexcept;
 

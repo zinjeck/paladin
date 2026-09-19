@@ -1,4 +1,6 @@
 #pragma once
+#include "simulation/BattleSystem.h"
+#include "ui/UiButton.h"
 #include "ui/UiTooltip.h"
 #include <string>
 #include <string_view>
@@ -17,6 +19,7 @@ union SDL_Event;
 namespace Paladin
 {
     class Camera2D;
+    class BattleScene;
     class CityHud;
     class LedgerPanel;
     class MilitaryPanel;
@@ -68,7 +71,8 @@ namespace Paladin
         {
             MainMenu,
             World,
-            City
+            City,
+            Battle
         };
 
         // Frame orchestration. Modal input helpers report event consumption;
@@ -99,6 +103,15 @@ namespace Paladin
         void renderMilitary();
         bool handleCaravanEvent(const SDL_Event&);
         void focusWorldSettlement(SettlementId);
+        ArmyId attackTargetAt(float x, float y) const;
+        void updateBattleEncounter();
+        bool handleBattleEvent(const SDL_Event&);
+        void renderBattleOverlay();
+        void renderBattleScreen();
+        void layoutBattle();
+        void beginBattleScene();
+        void finishBattle(bool retreat);
+        void clearBattle();
         bool handleReportAction(CityHudAction);
         void renderCityScreen();
         void handleCityEvent(const SDL_Event& event);
@@ -185,6 +198,15 @@ namespace Paladin
         std::unique_ptr<CaravanPanel> caravanPanel_;
         bool caravanPointerCaptured_ = false;
         ArmyId selectedWorldArmy_;
+        std::optional<BattleEncounter> battleEncounter_;
+        std::unique_ptr<BattleScene> battleScene_;
+        UiButton fightButton_{"Fight"}, simulateButton_{"Simulate"},
+            encounterRetreat_{"Retreat"};
+        UiRectangle encounterBounds_;
+        bool preBattlePaused_ = true;
+        double preBattleSpeed_ = 1;
+        std::string battleMessage_;
+        std::string battleResultMessage_;
         bool militaryPointerCaptured_ = false;
         std::string militaryOrderMessage_;
         std::unique_ptr<EmploymentPanel> employmentPanel_;

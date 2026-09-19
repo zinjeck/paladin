@@ -1,4 +1,5 @@
 #pragma once
+#include <span>
 
 #include "rendering/CityClouds.h"
 #include "rendering/CityDistantObjects.h"
@@ -16,6 +17,7 @@
 
 namespace Paladin
 {
+    struct BattleSoldierView;
     class Camera2D;
     class Renderer;
     class SettlementInspectionController;
@@ -59,7 +61,8 @@ namespace Paladin
             const SettlementInspectionController& inspection,
             double interpolationAlpha = 1,
             double hour = 12,
-            double sunIncidence = std::numeric_limits<double>::quiet_NaN()
+            double sunIncidence = std::numeric_limits<double>::quiet_NaN(),
+            std::span<const BattleSoldierView> battleSoldiers = {}
         ) const;
 
         void renderMinimap(

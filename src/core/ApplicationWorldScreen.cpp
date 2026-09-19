@@ -100,6 +100,11 @@ namespace Paladin
 
     void Application::renderWorldScreen()
     {
+        // Selection is application state, independent of asynchronous terrain
+        // preparation. Keep it current even on a loading/projection frame.
+        worldRenderer_->selectedRealm = diplomacyPanel_->selection();
+        worldRenderer_->selectedArmy = selectedWorldArmy_;
+        worldRenderer_->selectedCaravan = caravanPanel_->selection();
         if (!worldRenderer_->prepareTerrain(*renderer_, simulation_->world()))
         {
             renderer_->fillRectangle(
@@ -163,9 +168,6 @@ namespace Paladin
             };
         }
 
-        worldRenderer_->selectedRealm = diplomacyPanel_->selection();
-        worldRenderer_->selectedArmy = selectedWorldArmy_;
-        worldRenderer_->selectedCaravan = caravanPanel_->selection();
         worldRenderer_->animationSeconds =
             simulationClock_->presentationSeconds();
         worldRenderer_->render(

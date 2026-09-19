@@ -1,18 +1,19 @@
 #include "core/Application.h"
-#include "ui/WorldSettlementPanel.h"
-#include "ui/CaravanPanel.h"
-#include "ui/EmploymentPanel.h"
-#include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
+#include "rendering/BattleScene.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
-#include "ui/DebugConsole.h"
+#include "ui/CaravanPanel.h"
 #include "ui/CityHud.h"
+#include "ui/DebugConsole.h"
+#include "ui/DiplomacyPanel.h"
+#include "ui/EmploymentPanel.h"
 #include "ui/LedgerPanel.h"
 #include "ui/SimulationSpeedControls.h"
+#include "ui/WorldSettlementPanel.h"
 #include <SDL3/SDL.h>
 #include <cmath>
 
@@ -20,7 +21,7 @@ namespace Paladin
 {
     bool Application::simulationControlsVisible() const noexcept
     {
-        return screen_ == Screen::City ||
+        return screen_ == Screen::Battle || screen_ == Screen::City ||
                (screen_ == Screen::World && simulationControlsUnlocked_);
     }
 
@@ -37,6 +38,12 @@ namespace Paladin
         case Screen::City:
             layoutCityScreen();
             break;
+        case Screen::Battle:
+            break;
+        }
+        if (battleEncounter_ || !battleResultMessage_.empty())
+        {
+            layoutBattle();
         }
         if (simulationControlsVisible())
         {
@@ -140,15 +147,29 @@ namespace Paladin
 
     void Application::updateFrame()
     {
+        updateBattleEncounter();
         switch (screen_)
         {
         case Screen::MainMenu:
             break;
         case Screen::World:
-            updateWorldScreen();
+            if (!battleEncounter_ && battleResultMessage_.empty())
+            {
+                updateWorldScreen();
+            }
             break;
         case Screen::City:
             updateCityScreen();
+            break;
+        case Screen::Battle:
+            if (battleScene_)
+            {
+                battleScene_->update(
+                    simulationClock_->frameDeltaSeconds(),
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight()
+                );
+            }
             break;
         }
         const auto simulationDeadline = SDL_GetTicksNS() + 8000000;
@@ -162,13 +183,14 @@ namespace Paladin
             }
             simulationClock_->consumeTick();
             ++frameTicks;
+            updateBattleEncounter();
         }
         if (screen_ == Screen::City)
         {
             synchronizeCityStatus();
             updateCityHud();
         }
-        if (screen_ != Screen::MainMenu)
+        if (screen_ != Screen::MainMenu && screen_ != Screen::Battle)
         {
             updateReports();
         }
@@ -188,13 +210,18 @@ namespace Paladin
         case Screen::City:
             renderCityScreen();
             break;
+        case Screen::Battle:
+            renderBattleScreen();
+            break;
         }
-        if (screen_ != Screen::MainMenu && simulation_)
+        if (screen_ != Screen::MainMenu && screen_ != Screen::Battle &&
+            simulation_)
         {
             ledgerPanel_->render(*renderer_, *grayUiRenderer_);
             renderMilitary();
             renderDebug();
         }
+        renderBattleOverlay();
         renderer_->endFrame();
     }
 
@@ -202,7 +229,13 @@ namespace Paladin
     {
         if (event.type == SDL_EVENT_QUIT)
         {
+            clearBattle();
             return false;
+        }
+        if (battleEncounter_ || !battleResultMessage_.empty() ||
+            screen_ == Screen::Battle)
+        {
+            return handleBattleEvent(event);
         }
         if (screen_ != Screen::MainMenu && event.type == SDL_EVENT_KEY_DOWN &&
             !event.key.repeat && event.key.scancode == SDL_SCANCODE_F8)
@@ -275,6 +308,8 @@ namespace Paladin
             break;
         case Screen::City:
             handleCityEvent(event);
+            break;
+        case Screen::Battle:
             break;
         }
         return true;
