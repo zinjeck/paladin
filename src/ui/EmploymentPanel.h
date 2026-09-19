@@ -25,7 +25,7 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
-            techPointer_ = false; techPanned_ = false;
+            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
         }
         void close() noexcept
         {
@@ -33,7 +33,7 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
-            techPointer_ = false; techPanned_ = false;
+            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
             admissionRequest_.reset();
         }
         bool takeCitizenshipResearch() noexcept

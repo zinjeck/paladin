@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/PanelDrag.h"
 #include "ui/UiTypes.h"
 #include "ui/RealmStatistics.h"
 #include <optional>
@@ -27,12 +28,16 @@ namespace Paladin
         std::optional<UiRectangle> realmBounds(RealmId id) const noexcept;
         std::optional<UiRectangle> actionBounds(DiplomaticAction action) const noexcept;
     private:
-        enum class Kind { Close, Sort, Realm, Action, GiftLess, GiftMore, ScrollUp, ScrollDown };
+        PanelDrag drag_;
+        enum class Kind { Close, Sort, Realm, Action, GiftLess, GiftMore, ScrollUp, ScrollDown, ActionsTab, OpinionsTab, OpinionUp, OpinionDown };
         struct Control { UiRectangle bounds; Kind kind; int value=0; RealmId realm; std::string label; bool enabled=true; };
         void refresh(const World&);
         void act(const Control&,World&,RealmId);
         bool open_=false, captured_=false, dirty_=true, descending_=true;
-        RealmId selected_;
+        RealmId selected_, giftFor_;
+        bool opinions_=false; int opinionScroll_=0;
+        UiRectangle opinionList_;
+        std::vector<RealmId> nearby_;
         Sort sort_=Sort::Soldiers;
         Money gift_=1000;
         int scroll_=0,width_=0,height_=0;

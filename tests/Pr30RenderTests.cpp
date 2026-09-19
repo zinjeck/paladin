@@ -1,4 +1,5 @@
 #include "TestFramework.h"
+#include "ui/PanelDrag.h"
 #include "platform/Window.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
@@ -33,6 +34,31 @@ namespace
             result.insert(result.end(),row,row+rgba->w);
         }
         return result;
+    }
+    void panelDragging()
+    {
+        PanelDrag drag;
+        auto bounds=drag.place({40,60,300,220},640,480);
+        SDL_Event e{}; e.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.button=SDL_BUTTON_LEFT;
+        e.button.x=80; e.button.y=80; PALADIN_CHECK(drag.handle(e,bounds));
+        e={}; e.type=SDL_EVENT_MOUSE_MOTION; e.motion.x=230; e.motion.y=160;
+        PALADIN_CHECK(drag.handle(e,bounds)); bounds=drag.place(bounds,640,480);
+        PALADIN_CHECK(bounds.x==190 && bounds.y==140);
+        e.motion.x=10000; e.motion.y=10000; PALADIN_CHECK(drag.handle(e,bounds));
+        bounds=drag.place(bounds,640,480); PALADIN_CHECK(bounds.x==340 && bounds.y==260);
+        e={}; e.type=SDL_EVENT_MOUSE_BUTTON_UP; e.button.button=SDL_BUTTON_LEFT;
+        PALADIN_CHECK(drag.handle(e,bounds) && !drag.active());
+        bounds=drag.place({0,0,300,220},400,300);
+        PALADIN_CHECK(bounds.x==100 && bounds.y==80);
+        e={}; e.type=SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.button=SDL_BUTTON_LEFT;
+        e.button.x=bounds.x+270; e.button.y=bounds.y+18;
+        PALADIN_CHECK(!drag.handle(e,bounds)); // Close button is never a drag target.
+        e.button.x=bounds.x+40; e.button.y=bounds.y+100;
+        PALADIN_CHECK(!drag.handle(e,bounds)); // Content controls remain interactive.
+        e.button.y=bounds.y+18; PALADIN_CHECK(drag.handle(e,bounds));
+        e={}; e.type=SDL_EVENT_WINDOW_FOCUS_LOST; drag.handle(e,bounds);
+        PALADIN_CHECK(!drag.active());
+        std::cout<<"PR30: panel drag capture, title-only routing, resize and focus cancellation passed\n";
     }
     void outlines()
     {
@@ -107,6 +133,7 @@ int main()
     try
     {
         outlines();
+        panelDragging();
         Window window("Paladin PR30 regressions",640,480);
         PALADIN_CHECK(window.isValid()); SDL_HideWindow(window.nativeHandle());
         Renderer renderer(window.nativeHandle()); PALADIN_CHECK(renderer.isValid());

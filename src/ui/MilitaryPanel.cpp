@@ -16,7 +16,7 @@ namespace Paladin
         captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset();
     }
     void MilitaryPanel::close() noexcept
-    { open_=false; captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset(); controls_.clear(); }
+    { drag_.cancel(); open_=false; captured_=false; draggingScroll_=false; pressed_=hovered_=-1; pressedControl_.reset(); controls_.clear(); }
     std::optional<UiRectangle> MilitaryPanel::controlBounds(Action action, ArmyId unit) const noexcept
     {
         for (const auto& c : controls_)
@@ -36,7 +36,7 @@ namespace Paladin
             return;
         }
         const float w=std::min(672.F,float(width)-16.F), h=std::min(560.F,float(height)-32.F);
-        bounds_={(float(width)-w)*.5F,(float(height)-h)*.5F,w,h};
+        bounds_=drag_.place({(float(width)-w)*.5F,(float(height)-h)*.5F,w,h},width,height);
         const float x=bounds_.x+16, y=bounds_.y, inner=w-32;
         const auto button=[&](UiRectangle b, Action a, std::string label, bool enabled=true, ArmyId id=ArmyId{})
         { controls_.push_back({b,a,std::move(label),enabled,id}); };
@@ -120,6 +120,8 @@ namespace Paladin
     bool MilitaryPanel::handle(const SDL_Event& event, World& world, RealmId actor)
     {
         if (!open_) return false;
+        if (drag_.handle(event,bounds_))
+        { captured_=false; draggingScroll_=false; pressedControl_.reset(); pressed_=-1; layout(viewportWidth_,viewportHeight_,world,actor); return true; }
         if (event.type==SDL_EVENT_WINDOW_FOCUS_LOST) { captured_=draggingScroll_=false; pressedControl_.reset(); pressed_=-1; return false; }
         if (event.type==SDL_EVENT_KEY_DOWN && event.key.scancode==SDL_SCANCODE_ESCAPE)
         { close(); return true; }
