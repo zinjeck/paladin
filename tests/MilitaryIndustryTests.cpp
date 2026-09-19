@@ -331,10 +331,8 @@ namespace
         PALADIN_CHECK(person.militaryDeployed && !person.workplaceId && person.militaryUnitId==unit);
         PALADIN_CHECK(MilitarySystem::resizeUnit(world,actor,unit,1)==MilitaryResult::Success);
         PALADIN_CHECK(world.army(unit)->soldierCount()==2 && MilitarySystem::available(world,other)==0);
-        // A mixed-origin roster can recruit locally, but discharge never
-        // teleports the foreign-source person or partially disbands a unit.
-        PALADIN_CHECK(MilitarySystem::disbandUnit(world,actor,unit)==MilitaryResult::PersonnelOrigin);
-        PALADIN_CHECK(world.army(unit)->soldierCount()==2);
+        // A mixed-origin roster can recruit locally. Disband returns each
+        // original person as a civilian, without requiring barracks seats.
         const auto pack=supply.logistics.forObject(otherBarracks);
         PALADIN_CHECK(supply.logistics.add(pack,"rations",12,450));
         PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{43,32})==MilitaryResult::Success);
@@ -343,7 +341,7 @@ namespace
         MilitarySystem::tick(world,450,30);
         PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(43,32));
         PALADIN_CHECK(world.army(unit)->soldierCount()==2);
-        PALADIN_CHECK(world.settlement(origin)->population()+world.settlement(other)->population()==population);
+        PALADIN_CHECK(world.settlement(origin)->population()+world.settlement(other)->population()==population-2);
         // Land movement wraps by one adjacent tile across the world seam.
         PALADIN_CHECK(world.setArmyPosition(unit,{63,32}));
         PALADIN_CHECK(MilitarySystem::orderMove(world,actor,unit,{0,32})==MilitaryResult::Success);
@@ -351,6 +349,23 @@ namespace
         PALADIN_CHECK(std::abs(world.army(unit)->visualX()-63.5)<1e-8);
         MilitarySystem::tick(world,482.5,Army::MarchMinutesPerTile*.5);
         PALADIN_CHECK(world.army(unit)->position()==WorldTilePosition(0,32));
+        const auto originalRecords=world.settlement(origin)->simulationState().citizens().citizens().size();
+        const auto supplyRecords=world.settlement(other)->simulationState().citizens().citizens().size();
+        const auto remainingRations=world.army(unit)->rations();
+        const auto storedRations=map.logistics.total("rations");
+        PALADIN_CHECK(MilitarySystem::disbandUnit(world,enemy,unit)==MilitaryResult::NotOwned);
+        PALADIN_CHECK(MilitarySystem::disbandUnit(world,actor,unit)==MilitaryResult::Success);
+        PALADIN_CHECK(!world.army(unit) && !world.soldier(soldierId));
+        PALADIN_CHECK(world.settlement(origin)->population()+world.settlement(other)->population()==population);
+        PALADIN_CHECK(world.settlement(origin)->simulationState().citizens().citizens().size()==originalRecords);
+        PALADIN_CHECK(world.settlement(other)->simulationState().citizens().citizens().size()==supplyRecords);
+        const auto& returned=*world.settlement(origin)->simulationState().citizens().citizen(personId);
+        PALADIN_CHECK(!returned.militaryDeployed && !returned.soldierId && !returned.militaryUnitId && !returned.workplaceId);
+        PALADIN_CHECK(map.logistics.total("rations")==storedRations+remainingRations);
+        MilitarySystem::synchronize(world,490);
+        PALADIN_CHECK(!world.soldier(soldierId));
+        PALADIN_CHECK(world.settlement(origin)->population()+world.settlement(other)->population()==population);
+
         std::cout<<"[military] free barracks seats, captured/demolished origin independence, mixed-city recruitment, field cash conservation and seam travel passed\n";
     }
 

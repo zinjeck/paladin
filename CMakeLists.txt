@@ -119,6 +119,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
+    src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
@@ -176,6 +177,7 @@ add_executable(Paladin
     src/ui/DiplomacyPanel.cpp
     src/ui/LedgerPanelData.cpp
     src/ui/EmploymentPanel.cpp
+    src/ui/EmploymentTechnology.cpp
     src/ui/EmploymentPopulation.cpp
     src/ui/DebugConsole.cpp
     src/ui/GrayUiRenderer.cpp
@@ -219,6 +221,7 @@ enable_testing()
 add_executable(PaladinTests
     tests/MilitaryIndustryTests.cpp
     tests/DiplomacyTests.cpp
+    tests/Pr30SocietyTests.cpp
     src/simulation/Simulation.cpp
     tests/TestMain.cpp
     tests/RealmFeatureTests.cpp
@@ -234,6 +237,7 @@ add_executable(PaladinTests
 
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
+    src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp

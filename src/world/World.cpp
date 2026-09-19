@@ -1,4 +1,5 @@
 #include "world/World.h"
+#include "simulation/CitizenshipSystem.h"
 #include "world/RealmOrigin.h"
 #include "world/TerrainType.h"
 #include "world/generation/WorldGenerator.h"
@@ -387,6 +388,7 @@ namespace Paladin
         }
 
         connectRealmTerritory(ownerRealmId);
+        CitizenshipSystem::synchronize(*this);
         return settlementId;
     }
 
@@ -491,6 +493,7 @@ namespace Paladin
             );
         }
 
+        CitizenshipSystem::synchronize(*this);
         return settlementId;
     }
 

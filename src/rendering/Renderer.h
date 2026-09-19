@@ -3,6 +3,7 @@
 #include "assets/AssetTypes.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 
@@ -66,6 +67,10 @@ namespace Paladin
 
         bool isValid() const noexcept;
 
+        // Native-output UI clipping. Callers restore the prior rectangle when
+        // drawing scrollable graph/table content inside a management window.
+        std::optional<RenderRectangle> clipRectangle() const;
+        void setClipRectangle(const RenderRectangle* rectangle);
         void beginFrame();
         std::uint64_t frameId() const noexcept { return frameId_; }
         void compositeLighting(Texture& light, Texture& glow);

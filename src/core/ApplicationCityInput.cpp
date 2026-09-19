@@ -1,3 +1,4 @@
+#include "simulation/CitizenshipSystem.h"
 #include "core/Application.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
@@ -104,6 +105,8 @@ namespace Paladin
                 citizens,
                 simulation_->world().time().totalGameMinutes()
             );
+            if (employmentPanel_->takeCitizenshipResearch())
+                CitizenshipSystem::research(simulation_->world(),simulation_->playerRealmId());
             if (const auto change = employmentPanel_->takeWorkDayChange())
             {
                 simulation_->changeWorkDay(

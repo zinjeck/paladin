@@ -176,7 +176,7 @@ namespace Paladin
             identity.realmName =
                 base + (scale == RealmScale::Empire ? " Empire" : " Realm") +
                 " " + std::to_string(number);
-            identity.cultureName = base + " Folk";
+            identity.cultureName = base + " Folk " + std::to_string(number);
             identity.capitalName = base + " " + std::to_string(number);
             identity.mapColor = colors[(number + next(rng)) % colors.size()];
             identity.realmOriginId = next(rng) % 3 == 0 ? "tribal" : "civic";

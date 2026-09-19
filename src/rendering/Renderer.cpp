@@ -980,3 +980,23 @@ namespace Paladin
         return height;
     }
 } // namespace Paladin
+
+namespace Paladin
+{
+    std::optional<RenderRectangle> Renderer::clipRectangle() const
+    {
+        if (!renderer_ || !SDL_RenderClipEnabled(renderer_)) return std::nullopt;
+        SDL_Rect rect{};
+        SDL_GetRenderClipRect(renderer_,&rect);
+        return RenderRectangle{float(rect.x),float(rect.y),float(rect.w),float(rect.h)};
+    }
+    void Renderer::setClipRectangle(const RenderRectangle* rectangle)
+    {
+        if (!renderer_) return;
+        if (!rectangle) { SDL_SetRenderClipRect(renderer_,nullptr); return; }
+        const int x=int(std::floor(rectangle->x)),y=int(std::floor(rectangle->y));
+        const SDL_Rect rect{x,y,std::max(0,int(std::ceil(rectangle->x+rectangle->width))-x),
+                                std::max(0,int(std::ceil(rectangle->y+rectangle->height))-y)};
+        SDL_SetRenderClipRect(renderer_,&rect);
+    }
+}

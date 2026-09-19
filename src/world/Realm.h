@@ -3,6 +3,7 @@
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
 #include "world/RealmRuler.h"
+#include "world/RealmLaws.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <algorithm>
@@ -15,6 +16,8 @@ namespace Paladin
     class Realm
     {
     public:
+        RealmLaws laws;
+        bool citizenshipResearched = false;
         bool aiControlled = false;
         RealmScale scale = RealmScale::Small;
         RealmRuler ruler;

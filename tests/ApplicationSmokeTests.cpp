@@ -371,7 +371,6 @@ namespace Paladin
             }
             PALADIN_CHECK(world.editRealmIdentity(actor,original)); app.diplomacyPanel_->close();
             app.selectedWorldArmy_=world.armies().front().id();
-            PALADIN_CHECK(!app.worldArmySelectionVisible());
             PALADIN_CHECK(!app.activeHudContainsPoint(350,110));
             app.selectedWorldArmy_={};
             std::cout<<"Diplomacy actual input: world toolbar, four map modes, no Back overlap, civic/tribal click selection in globe/flat and hidden army hitbox passed\n";

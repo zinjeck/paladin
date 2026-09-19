@@ -144,9 +144,10 @@ namespace Paladin
             if (map)
             {
                 const auto people = state.citizens().citizens();
-                sample.population = double(people.size());
+                sample.population = double(state.citizens().residentCount());
                 for (const auto& c : people)
                 {
+                    if (c.militaryDeployed || c.health <= 0) continue;
                     sample.health += c.health;
                     sample.happiness += c.happiness;
                     if (c.hunger >= map->activities.policy.starvationThreshold)
@@ -154,10 +155,10 @@ namespace Paladin
                         ++report.starving;
                     }
                 }
-                if (!people.empty())
+                if (sample.population > 0)
                 {
-                    sample.health /= people.size();
-                    sample.happiness /= people.size();
+                    sample.health /= sample.population;
+                    sample.happiness /= sample.population;
                 }
                 for (const auto& inventory : map->logistics.inventories())
                 {

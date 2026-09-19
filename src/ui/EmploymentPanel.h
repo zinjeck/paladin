@@ -25,6 +25,7 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
+            techPointer_ = false; techPanned_ = false;
         }
         void close() noexcept
         {
@@ -32,8 +33,11 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
+            techPointer_ = false; techPanned_ = false;
             admissionRequest_.reset();
         }
+        bool takeCitizenshipResearch() noexcept
+        { const bool result=citizenshipRequest_; citizenshipRequest_=false; return result; }
         bool isOpen() const noexcept
         {
             return open_;
@@ -98,6 +102,15 @@ namespace Paladin
 
     private:
         friend struct ApplicationSmokeTest;
+        friend struct Pr30UiTest;
+        struct TechView { float panX=0,panY=0,zoom=1; };
+        std::array<TechView,4> techViews_{};
+        int techTab_=0;
+        UiRectangle techCanvas_;
+        bool techPointer_=false,techPanned_=false,citizenshipRequest_=false;
+        float techStartX_=0,techStartY_=0;
+        void renderTechnology(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
+        void renderLaws(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
         std::uint64_t immigrationMap_ = 0, admissionCount_ = 0;
         std::optional<std::uint64_t> admissionRequest_;
         std::array<UiRectangle, 4> attributeBounds_{};

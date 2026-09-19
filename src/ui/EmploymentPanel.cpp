@@ -62,116 +62,6 @@ namespace Paladin
             );
             ui.drawLabel(renderer, label, bounds.x + 4, bounds.y + 7, size);
         }
-        UiRectangle reformSection(
-            Renderer& renderer,
-            const GrayUiRenderer& ui,
-            const UiRectangle& bounds,
-            std::string_view title,
-            std::string_view scope,
-            int workHours,
-            bool realm
-        )
-        {
-            const RenderColor edge = realm ? RenderColor{153, 78, 80, 255}
-                                           : RenderColor{88, 88, 95, 255};
-            const RenderColor shadow = realm ? RenderColor{85, 47, 51, 255}
-                                             : RenderColor{49, 49, 54, 255};
-            renderer.fillRectangle(
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height,
-                shadow
-            );
-            renderer.fillRectangle(
-                bounds.x,
-                bounds.y,
-                bounds.width - 2,
-                bounds.height - 2,
-                edge
-            );
-            renderer.fillRectangle(
-                bounds.x + 4,
-                bounds.y + 4,
-                bounds.width - 8,
-                bounds.height - 8,
-                {64, 64, 69, 255}
-            );
-            const BitmapFontRenderer font;
-            const float titleScale = std::min(
-                2.2F,
-                (bounds.width - 24) / font.measureWidth(title, 1)
-            );
-            ui.drawLabel(
-                renderer,
-                title,
-                bounds.x +
-                    (bounds.width - font.measureWidth(title, titleScale)) * .5F,
-                bounds.y + 18,
-                titleScale
-            );
-            const float scopeScale = std::min(
-                1.2F,
-                (bounds.width - 24) / font.measureWidth(scope, 1)
-            );
-            ui.drawLabel(
-                renderer,
-                scope,
-                bounds.x +
-                    (bounds.width - font.measureWidth(scope, scopeScale)) * .5F,
-                bounds.y + 45,
-                scopeScale,
-                {185, 185, 192, 255}
-            );
-            renderer.fillRectangle(
-                bounds.x + 12,
-                bounds.y + 65,
-                bounds.width - 24,
-                2,
-                edge
-            );
-            constexpr float gap = 6;
-            const float cellWidth = (bounds.width - 24 - gap) / 2;
-            const float cellHeight = (bounds.height - 90 - 2 * gap) / 3;
-            UiRectangle workDayCell;
-            for (int i = 0; i < 6; ++i)
-            {
-                const UiRectangle cell{
-                    bounds.x + 12 + (i % 2) * (cellWidth + gap),
-                    bounds.y + 78 + (i / 2) * (cellHeight + gap),
-                    cellWidth,
-                    cellHeight
-                };
-                renderer.fillRectangle(
-                    cell.x,
-                    cell.y,
-                    cell.width,
-                    cell.height,
-                    edge
-                );
-                renderer.fillRectangle(
-                    cell.x + 3,
-                    cell.y + 3,
-                    cell.width - 6,
-                    cell.height - 6,
-                    {64, 64, 69, 255}
-                );
-                if (i == 0)
-                {
-                    workDayCell = cell;
-                    fitLabel(
-                        renderer,
-                        ui,
-                        "Work Day: " + std::to_string(workHours) + " Hours",
-                        {cell.x + 4,
-                         cell.y + 5,
-                         cell.width - 8,
-                         cell.height - 10}
-                    );
-                }
-            }
-            return workDayCell;
-        }
     } // namespace
     bool EmploymentPanel::containsPoint(float x, float y) const noexcept
     {
@@ -194,7 +84,11 @@ namespace Paladin
                 break;
             }
         }
-        dragCandidate_ = true;
+        techPointer_=section_=="Technology" && techCanvas_.contains(x,y);
+        techPanned_=false;
+        techStartX_=techViews_[techTab_].panX;
+        techStartY_=techViews_[techTab_].panY;
+        dragCandidate_ = !techPointer_;
         pressX_ = x;
         pressY_ = y;
         dragX_ = x - positionX_;
@@ -203,6 +97,18 @@ namespace Paladin
     }
     bool EmploymentPanel::pointerMoved(float x, float y)
     {
+        if (techPointer_)
+        {
+            if (std::hypot(x-pressX_,y-pressY_)>=4) techPanned_=true;
+            if (techPanned_)
+            {
+                pressed_=-1;
+                auto& view=techViews_[techTab_];
+                view.panX=std::clamp(techStartX_+x-pressX_,-1400.F,1400.F);
+                view.panY=std::clamp(techStartY_+y-pressY_,-1400.F,1400.F);
+            }
+            return true;
+        }
         if (!dragging_ && dragCandidate_ &&
             std::hypot(x - pressX_, y - pressY_) >= 4)
         {
@@ -231,6 +137,8 @@ namespace Paladin
     )
     {
         dragCandidate_ = false;
+        techPointer_=false;
+        if (techPanned_) { techPanned_=false; pressed_=-1; return; }
         if (dragging_)
         {
             dragging_ = false;
@@ -259,10 +167,10 @@ namespace Paladin
             close();
             return;
         }
-        if (worldMode_)
-        {
-            return;
-        }
+        if (hit.type=="techTab") { techTab_=std::clamp(hit.delta,0,3); return; }
+        if (hit.type=="citizenship")
+        { if (!citizens.citizenshipResearched()) citizenshipRequest_=true; return; }
+        if (worldMode_ && section_!="Laws") return;
         if (hit.type == "migrate")
         {
             admissionCount_ =
@@ -343,6 +251,16 @@ namespace Paladin
     }
     void EmploymentPanel::scroll(float amount)
     {
+        if (section_=="Technology" && std::isfinite(amount))
+        {
+            auto& view=techViews_[techTab_];
+            const float previous=view.zoom;
+            view.zoom=std::clamp(previous*std::pow(1.15F,amount),.5F,2.5F);
+            const float anchorY=techCanvas_.height*.5F-20;
+            view.panX*=view.zoom/previous;
+            view.panY=anchorY-(anchorY-view.panY)*view.zoom/previous;
+            return;
+        }
         if (!selectedType_.empty())
         {
             scrollOffset_ = amount > 0
@@ -372,15 +290,15 @@ namespace Paladin
         }
         const bool laws = section_ == "Laws";
         const float width =
-            std::min(730.0F, float(renderer.outputWidth()) * .62F);
+            std::max(0.F,std::min(730.0F, float(renderer.outputWidth()) - 24));
         const float height =
-            std::min(540.0F, float(renderer.outputHeight()) - 150);
+            std::max(0.F,std::min(540.0F, float(renderer.outputHeight()) - 92));
         viewportWidth_ = float(renderer.outputWidth());
         viewportHeight_ = float(renderer.outputHeight());
         if (!positioned_)
         {
             positionX_ = std::max(8.0F, (viewportWidth_ - width - 292) * .5F);
-            positionY_ = 110;
+            positionY_ = std::clamp(110.F,8.F,std::max(8.F,viewportHeight_-height-8));
             positioned_ = true;
         }
         if (!dragging_)
@@ -695,7 +613,7 @@ namespace Paladin
             );
             return;
         }
-        if (worldMode_)
+        if (worldMode_ && !laws && section_!="Technology")
         {
             const float informationHeight = (height - 90) * .62F;
             ui.drawPanel(
@@ -744,60 +662,8 @@ namespace Paladin
             }
             return;
         }
-        if (laws)
-        {
-            const float sideWidth = (width - 54) * .5F;
-            const UiRectangle
-                realm{left + 18, bounds_.y + 60, sideWidth, height - 78};
-            const UiRectangle city{
-                realm.x + sideWidth + 18,
-                realm.y,
-                sideWidth,
-                realm.height
-            };
-            const auto hours = [](const CitizenSimulationPolicy& policy)
-            { return (policy.shiftEndMinute - policy.shiftStartMinute) / 60; };
-            const auto realmCell = reformSection(
-                renderer,
-                ui,
-                realm,
-                "REALM REFORMS",
-                "ALL CONTROLLED SETTLEMENTS",
-                realmWorkDayHours_,
-                true
-            );
-            const auto cityCell = reformSection(
-                renderer,
-                ui,
-                city,
-                "CITY REFORMS",
-                "THIS SETTLEMENT",
-                hours(map.activities.policy),
-                false
-            );
-            const auto controls = [&](const UiRectangle& cell,
-                                      const std::string& type,
-                                      int workHours)
-            {
-                const float side = std::min(28.0F, (cell.width - 24) / 2);
-                const float y = cell.y + 34;
-                button(
-                    {cell.x + 8, y, side, 24},
-                    "<",
-                    {{}, type, {}, -1},
-                    workHours > 0
-                );
-                button(
-                    {cell.x + 12 + side, y, side, 24},
-                    ">",
-                    {{}, type, {}, 1},
-                    workHours < 14
-                );
-            };
-            controls(realmCell, "realmWorkDay", realmWorkDayHours_);
-            controls(cityCell, "cityWorkDay", hours(map.activities.policy));
-            return;
-        }
+        if (laws) { renderLaws(renderer,ui,citizens); return; }
+        if (section_=="Technology") { renderTechnology(renderer,ui,citizens); return; }
         const bool population = section_ == "Population";
         if (section_ != "Employment" && !population)
         {

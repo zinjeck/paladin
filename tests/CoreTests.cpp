@@ -301,7 +301,7 @@ namespace
         const auto government=Paladin::WorldMapNavigation::governmentModeButtonBounds(1280,720);
         const auto population=Paladin::WorldMapNavigation::populationModeButtonBounds(1280,720);
         PALADIN_CHECK(terrain.x+terrain.width<government.x && government.x+government.width<population.x);
-        PALADIN_CHECK(population.x+population.width<map.x && strip.contains(population.x+13,population.y+13));
+        PALADIN_CHECK(strip.x==map.x && strip.y+strip.height<map.y && strip.contains(population.x+13,population.y+13));
         PALADIN_CHECK(political.x + political.width < terrain.x);
         PALADIN_CHECK(
             strip.contains(

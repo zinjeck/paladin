@@ -1,3 +1,4 @@
+#include "simulation/CitizenshipSystem.h"
 #include "core/Application.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/MilitaryPanel.h"
@@ -526,6 +527,10 @@ namespace Paladin
                     simulation_->world().time().totalGameMinutes()
                 );
                 employmentCapturedPointer_ = false;
+                if (employmentPanel_->takeCitizenshipResearch())
+                    CitizenshipSystem::research(simulation_->world(),simulation_->playerRealmId());
+                if (const auto change=employmentPanel_->takeWorkDayChange())
+                    simulation_->changeWorkDay(settlement->id(),true,change->delta);
                 if (employmentPanel_->takeFoundSettlement())
                 {
                     employmentPanel_->close();

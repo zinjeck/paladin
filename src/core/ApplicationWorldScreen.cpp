@@ -243,6 +243,8 @@ namespace Paladin
             );
             map && active)
         {
+            if (const auto* realm=world.realm(simulation_->playerRealmId()))
+                employmentPanel_->setRealmWorkDayHours(realm->workDayHours());
             employmentPanel_->render(
                 *renderer_,
                 *grayUiRenderer_,

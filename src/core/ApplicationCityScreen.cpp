@@ -47,7 +47,7 @@ namespace Paladin
             );
             cityHud_->setSettlementStatus(
                 currentMap->logistics.founded(),
-                citizens.citizens().size()
+                citizens.residentCount()
             );
         }
     }

@@ -1,4 +1,5 @@
 #include "simulation/systems/SettlementActivitySystem.h"
+#include "simulation/CitizenshipSystem.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
@@ -470,6 +471,8 @@ namespace Paladin
                 continue;
             }
             auto& baby = people.back();
+            CitizenshipSystem::inherit(baby,people[index.at(motherId)],people[index.at(fatherId)],
+                citizens.dominantCulture_,citizens.communityRealm_,citizens.community_,citizens.laws_.citizenship);
             baby.motherId = motherId;
             baby.fatherId = fatherId;
             baby.birthMotherId = motherId;

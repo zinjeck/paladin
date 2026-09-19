@@ -82,7 +82,7 @@ namespace Paladin
         void synchronizeCitizenPopulation()
         {
             population_.applyNetChange(
-                double(citizens_.citizens().size()) -
+                double(citizens_.residentCount()) -
                 double(population_.residents())
             );
         }

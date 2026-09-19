@@ -87,8 +87,7 @@ namespace Paladin
         button({x+2*(third+6),tools,third,28},Action::Focus,"Show on map",unit && unit->soldierCount()>0);
         button({x,tools+34,third,28},Action::RemoveOne,"-1 soldier",organize && releasable>0);
         button({x+third+6,tools+34,third,28},Action::RemoveFive,"-5 soldiers",organize && releasable>0);
-        button({x+2*(third+6),tools+34,third,28},Action::Disband,"Disband",unit &&
-            ((organize && releasable==unit->soldierCount()) || (unit->soldierCount()==0 && unit->rations()==0)));
+        button({x+2*(third+6),tools+34,third,28},Action::Disband,"Disband",unit != nullptr);
     }
     void MilitaryPanel::act(const Control& control, World& world, RealmId actor)
     {
@@ -242,7 +241,7 @@ namespace Paladin
         }
         const float foot=bounds_.y+bounds_.height-40;
         label("Scroll or drag the unit scrollbar. Reserves are employed barracks soldiers.",x,foot,inner,1);
-        label("Show on map; right-click land to march. Discharge at the recruitment city.",x,foot+12,inner,1);
+        label("Disband returns civilians to their original cities. Right-click land to march.",x,foot+12,inner,1);
         ui.drawLabel(renderer,fit(message_,inner,1),x,foot+26,1,{235,196,107,255});
     }
 }

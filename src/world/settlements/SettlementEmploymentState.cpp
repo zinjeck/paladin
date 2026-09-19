@@ -288,6 +288,7 @@ namespace Paladin
             {
                 continue;
             }
+            if (delta>0 && w->objectTypeId==SettlementObjectTypes::Barracks && !citizens.militaryEligible(citizen)) continue;
             citizen.workplaceId = delta > 0 ? id : WorkplaceId{};
             if (delta > 0)
             {

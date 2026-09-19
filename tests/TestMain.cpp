@@ -9,6 +9,7 @@
 #include "TribalInfluenceChecks.h"
 
 void runMilitaryIndustryTests();
+void runPr30SocietyTests();
 void runDiplomacyTests();
 void runRealmFeatureTests();
 void runEntityAttributeTests();
@@ -24,6 +25,7 @@ int main()
 {
     try
     {
+        runPr30SocietyTests();
         runDiplomacyTests();
         runMilitaryIndustryTests();
         runRealmFeatureTests();

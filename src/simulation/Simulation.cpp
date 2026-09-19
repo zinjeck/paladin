@@ -1,4 +1,5 @@
 #include "simulation/Simulation.h"
+#include "simulation/CitizenshipSystem.h"
 #include "simulation/MilitarySystem.h"
 #include "simulation/RealmRulerSystem.h"
 #include "world/PlanetAstronomy.h"
@@ -186,6 +187,10 @@ namespace Paladin
             return false;
         }
         auto& state = settlement->simulationState();
+        const auto origins=CitizenshipSystem::nearbyOrigins(*world_,settlementId);
+        if (origins.empty()) return false;
+        CitizenshipSystem::synchronize(*world_);
+        const auto first=state.citizens().citizens().size();
         if (!map->immigration.admit(
                 *map,
                 state.citizens(),
@@ -195,6 +200,7 @@ namespace Paladin
         {
             return false;
         }
+        CitizenshipSystem::assignImmigrants(*world_,settlementId,first,origins);
         state.synchronizeCitizenPopulation();
         return true;
     }
