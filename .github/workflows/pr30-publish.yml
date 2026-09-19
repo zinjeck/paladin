@@ -34,21 +34,20 @@ jobs:
           if os.environ['PR_BRANCH'] != 'feat/pr30-citizenship-logistics-selection':
               raise SystemExit('Unexpected target branch')
           git('merge-base', '--is-ancestor', data['base'], 'HEAD')
-          encoded = data['patch_zlib_base64']
-          # A downloaded copy verified exactly one duplicated transport token.
-          # The original locally-tested source SHA256 remains mandatory.
-          if data['sha256'] == '39b1ad29d8ec7ec8f0d92663bb40dcc75c9d49292f91600633d6c63b43eec67c':
-              encoded = encoded.replace('pAUi9fVs85cs85lv', 'pAUi9fVs85lv')
-          patch = zlib.decompress(base64.b64decode(encoded, validate=True))
+          patch = zlib.decompress(base64.b64decode(data['patch_zlib_base64'], validate=True))
           if len(patch) > 8000000 or hashlib.sha256(patch).hexdigest() != data['sha256']:
               raise SystemExit('Source patch checksum/size mismatch')
+          # Workflow updates use the authorized connector, never this job token.
+          # Its independently installed final content must exactly match first.
+          if git('hash-object', '.github/workflows/pr-ci.yml') != 'ea111d9bbd39abfdc8bfce08ebd06adaaf2d5817':
+              raise SystemExit('Install the separately authorized CI evidence update first')
           scratch = pathlib.Path(os.environ['RUNNER_TEMP']) / 'pr30-verified.patch'
           scratch.write_bytes(patch)
-          git('apply', '--check', '--index', str(scratch))
-          git('apply', '--index', str(scratch))
+          git('apply', '--check', '--index', '--exclude=.github/workflows/pr-ci.yml', str(scratch))
+          git('apply', '--index', '--exclude=.github/workflows/pr-ci.yml', str(scratch))
           names = git('diff', '--cached', '--name-only', '-z').split('\0')
           for name in filter(None, names):
-              if not (name.startswith(('src/', 'tests/', 'docs/')) or name in ('CMakeLists.txt', 'AGENTS.md', '.github/workflows/pr-ci.yml')):
+              if not (name.startswith(('src/', 'tests/', 'docs/')) or name in ('CMakeLists.txt', 'AGENTS.md')):
                   raise SystemExit('Disallowed source path: ' + name)
           git('diff', '--cached', '--check')
           git('rm', '.github/pr30-patch.json')
