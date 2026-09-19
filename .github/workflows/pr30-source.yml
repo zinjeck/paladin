@@ -1,0 +1,29 @@
+name: PR30 source verification bundle
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/pr30-source.yml
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/pr30-citizenship-logistics-selection'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Archive verified source and runtime assets
+        run: |
+          git rev-parse HEAD > commit.txt
+          git archive --format=tar HEAD .github .gitignore AGENTS.md CMakeLists.txt assets config docs licenses src tests tools | gzip > source.tar.gz
+          sha256sum source.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paladin-pr30-source
+          path: |
+            source.tar.gz
+            commit.txt
+            SHA256SUMS
+          retention-days: 5
