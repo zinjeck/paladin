@@ -128,6 +128,17 @@ namespace Paladin
         state.relations.push_back(relation);
         return DiplomaticResult::Success;
     }
+    bool DiplomacySystem::hostileContact(World& world, RealmId actor, RealmId target)
+    {
+        if (!actor || !target || actor==target || !world.realm(actor) || !world.realm(target)) return false;
+        auto& relations=world.diplomacy().relations;
+        auto found=std::find_if(relations.begin(),relations.end(),[&](const auto& r)
+        {return (r.first==actor && r.second==target)||(r.first==target && r.second==actor);});
+        if(found==relations.end()) { relations.push_back({actor,target}); found=std::prev(relations.end()); }
+        found->atWar=true; found->allied=false; found->trading=false;
+        found->overlord={}; found->tributary={}; found->firstOpinion=found->secondOpinion=-100;
+        return true;
+    }
     std::string_view diplomaticResultText(DiplomaticResult result) noexcept
     {
         switch (result)

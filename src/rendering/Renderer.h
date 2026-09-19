@@ -2,6 +2,8 @@
 
 #include "assets/AssetTypes.h"
 #include <cstdint>
+#include <functional>
+#include <string_view>
 #include <memory>
 #include <optional>
 #include <span>
@@ -17,6 +19,8 @@ namespace Paladin
 {
     class Texture;
     class AssetManager;
+    class SceneSpriteLibrary;
+    using AssetLoadProgress = std::function<void(std::size_t, std::size_t, std::string_view)>;
 
     using RenderColor = AssetPixel;
     using RenderRectangle = AssetRectangle;
@@ -55,7 +59,11 @@ namespace Paladin
 
     public:
         explicit Renderer(SDL_Window* window);
-        std::shared_ptr<AssetManager> compiledAssets();
+        std::shared_ptr<AssetManager> compiledAssets(const AssetLoadProgress& progress = {});
+        // The startup loader and scene facades share atlas views, alpha masks,
+        // presentations and recipes. No planet or city is retained here.
+        std::shared_ptr<SceneSpriteLibrary> sceneSpriteCache() const { return sceneSpriteCache_; }
+        void cacheSceneSprites(std::shared_ptr<SceneSpriteLibrary> value) { sceneSpriteCache_ = std::move(value); }
 
         ~Renderer();
 
@@ -216,6 +224,7 @@ namespace Paladin
         std::uint64_t frameId_ = 0;
         bool activatePixelScene(double pitch);
         bool pixelSceneActive_ = false;
+        std::shared_ptr<SceneSpriteLibrary> sceneSpriteCache_;
         std::shared_ptr<AssetManager> assetManager_;
         std::string assetPackageSignature_;
         SDL_Renderer* renderer_ = nullptr;

@@ -169,13 +169,13 @@ namespace Paladin
                     if (!load(world,shipment)) break; // goods may arrive on a future tick
                 }
                 if (!shipment.moving() || shipment.path.size()<2) break;
+                const auto next=shipment.nextIndex();
+                if (next>=shipment.path.size() || !worldLandStepAllowed(world.grid(),
+                    shipment.position(),shipment.path[next],WorldLandMovement::Cardinal))
+                { shipment.phase=ShipmentPhase::Blocked; shipment.stepMinutes=0; break; }
                 const double used=std::min(remaining,WorldShipment::MinutesPerTile-shipment.stepMinutes);
                 shipment.stepMinutes+=used; remaining-=used;
                 if (shipment.stepMinutes+1e-9<WorldShipment::MinutesPerTile) break;
-                const auto next=shipment.nextIndex();
-                const auto* tile=world.grid().tile(shipment.path[next]);
-                if (!tile || tile->terrain!=TerrainType::Land)
-                { shipment.phase=ShipmentPhase::Blocked; shipment.stepMinutes=0; break; }
                 shipment.tileIndex=next; shipment.stepMinutes=0;
                 if (shipment.phase==ShipmentPhase::Outbound && shipment.tileIndex+1==shipment.path.size())
                 {

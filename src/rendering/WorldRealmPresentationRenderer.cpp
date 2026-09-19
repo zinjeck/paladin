@@ -27,7 +27,7 @@ namespace Paladin
     {
         constexpr double Pi = 3.14159265358979323846;
         constexpr int ChunkSide = 16;
-        constexpr std::size_t MaximumDetailChunks = 64; // <= 32 MiB GPU
+        constexpr std::size_t MaximumDetailChunks = 42; // <= 31.5 MiB including selection masks
         double smoothStep(double edge0, double edge1, double value) noexcept
         {
             if (!(edge1 > edge0))
@@ -138,7 +138,8 @@ namespace Paladin
         {
             int density=1;
             std::vector<FrontierPixel> frontiers;
-            std::unique_ptr<Texture> fill, border;
+            std::unique_ptr<Texture> fill, border, selectedBorder;
+            RealmId selectedFor;
             int x = 0, y = 0, width = 0, height = 0;
             std::uint64_t used = 0;
             std::size_t bytes = 0;
@@ -217,9 +218,9 @@ namespace Paladin
         bool detailDemandPending = false;
         int width = 0, height = 0;
         WorldMapMode mode=WorldMapMode::Political;
-        RealmId selected, paintedSelection;
-        std::uint64_t coarseGeneration=0, selectionGeneration=~std::uint64_t{};
-        PoliticalTextures selection, coarse;
+        RealmId selected;
+        std::uint64_t coarseGeneration=0;
+        PoliticalTextures coarse;
         std::unordered_map<std::uint64_t, PoliticalTextures> detail;
         std::vector<float> distance;
         std::vector<Label> labels;
@@ -687,8 +688,9 @@ namespace Paladin
                                 people/=std::max(.000001,surface.landWeight);
                                 auto color=populationDensityColor(people);
                                 job.fills[out]=color; job.hasFill=true;
-                                if(frontier) { job.borders[out]={57,70,88,100}; job.hasBorder=true; }
+                                if(frontier) { job.borders[out]={89,102,121,110}; job.hasBorder=true; }
                             }
+                            else { job.fills[out]=PopulationWater; job.hasFill=true; }
                             continue;
                         }
                         if (mode==WorldMapMode::Government)
@@ -949,7 +951,7 @@ namespace Paladin
                         missing->second,
                         std::min(ChunkSide, width - missing->first),
                         std::min(ChunkSide, height - missing->second),
-                        WorldPixelsPerTile
+                        WorldPixelsPerTile, true
                     );
                 }
                 if (!advanceRaster(
@@ -993,6 +995,7 @@ namespace Paladin
             };
             layer(t.fill.get(), p.realmFillWeight);
             layer(t.border.get(), p.realmBorderWeight);
+            if (selected && t.selectedFor == selected) layer(t.selectedBorder.get(), 1.F);
         }
 
         void flatPage(
@@ -1209,19 +1212,24 @@ namespace Paladin
             }
         }
 
-        void prepareSelection(Renderer& renderer)
+        void prepareSelection(Renderer& renderer, PoliticalTextures& page)
         {
-            if (!selected || (paintedSelection==selected && selectionGeneration==coarseGeneration)) return;
-            const int pw=width*coarse.density, ph=height*coarse.density;
-            std::vector<RenderColor> pixels(std::size_t(pw)*ph,{0,0,0,0});
-            for (const auto& p:coarse.frontiers)
-                if (p.realm==selected) pixels[std::size_t(p.y)*pw+p.x]={235,196,107,255};
-            if (!selection.border || selection.border->width()!=pw || selection.border->height()!=ph)
-                selection.border=renderer.createTextureFromPixels(pw,ph,pixels);
-            else if (!renderer.updateTexturePixels(*selection.border,pixels)) throw std::runtime_error("Selection mask upload failed");
-            renderer.setTextureFiltering(*selection.border,false);
-            selection.x=selection.y=0; selection.width=width; selection.height=height;
-            paintedSelection=selected; selectionGeneration=coarseGeneration;
+            if (!selected || page.selectedFor == selected) return;
+            if (std::none_of(page.frontiers.begin(), page.frontiers.end(),
+                [&](const auto& point) { return point.realm == selected; }))
+            { page.selectedBorder.reset(); page.selectedFor = selected; return; }
+            const int pw = page.width * page.density, ph = page.height * page.density;
+            if (pw <= 0 || ph <= 0) return;
+            std::vector<RenderColor> pixels(std::size_t(pw)*ph, {0,0,0,0});
+            for (const auto& point : page.frontiers)
+                if (point.realm == selected) pixels[std::size_t(point.y)*pw+point.x] = {235,196,107,255};
+            if (!page.selectedBorder || page.selectedBorder->width()!=pw || page.selectedBorder->height()!=ph)
+                page.selectedBorder = renderer.createTextureFromPixels(pw,ph,pixels);
+            else if (!renderer.updateTexturePixels(*page.selectedBorder,pixels))
+                throw std::runtime_error("Selection mask upload failed");
+            if (!page.selectedBorder) throw std::runtime_error("Selection mask allocation failed");
+            renderer.setTextureFiltering(*page.selectedBorder,false);
+            page.selectedFor = selected;
         }
 
         void render(
@@ -1236,7 +1244,7 @@ namespace Paladin
         {
             beginWorkFrame(r);
             if ((!thematicMapMode(mode) && world.realms().empty()) ||
-                (p.realmFillWeight <= .001F && p.realmBorderWeight <= .001F &&
+                (!selected && p.realmFillWeight <= .001F && p.realmBorderWeight <= .001F &&
                  p.realmLabelWeight <= .001F))
             {
                 detailRaster.reset();
@@ -1261,6 +1269,7 @@ namespace Paladin
             );
             if (pixels < 12)
             {
+                prepareSelection(r, coarse);
                 if (globe)
                 {
                     spherePage(r, coarse, view, 0, 0, width, height, false, p);
@@ -1343,8 +1352,9 @@ namespace Paladin
                 for (const auto v : visible)
                 {
                     const auto found = detail.find(key(v.x, v.y));
-                    const auto* page =
+                    auto* page =
                         found == detail.end() ? &coarse : &found->second;
+                    prepareSelection(r, *page);
                     const int w = std::min(ChunkSide, width - v.x),
                               h = std::min(ChunkSide, height - v.y);
                     // Exactly one contribution per surface patch. Painting an
@@ -1359,14 +1369,6 @@ namespace Paladin
                         flatPage(r, *page, c, pixels, v.x, v.y, w, h, p);
                     }
                 }
-            }
-            if (selected && pixels<=12.)
-            {
-                prepareSelection(r);
-                WorldPresentationState highlight{};
-                highlight.realmFillWeight=0; highlight.realmBorderWeight=1.F;
-                if (globe) spherePage(r,selection,view,0,0,width,height,false,highlight);
-                else flatPage(r,selection,c,pixels,0,0,width,height,highlight);
             }
             drawLabels(r, world, c, pixels, globe, p, policy);
         }
@@ -1453,6 +1455,7 @@ namespace Paladin
         for (const auto& [key, t] : cache_->detail)
         {
             n += t.bytes;
+            if (t.selectedBorder) n += std::size_t(t.selectedBorder->width()) * t.selectedBorder->height() * 4;
         }
         return n;
     }

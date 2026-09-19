@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/DebugConsole.h"
 #include "ui/LedgerPanel.h"
@@ -14,6 +15,11 @@
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
+#include "rendering/SceneSpriteLibrary.h"
+#include "assets/AssetManager.h"
+#include <algorithm>
+#include <filesystem>
+#include <stdexcept>
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
@@ -63,6 +69,8 @@ namespace Paladin
         simulationClock_ = std::make_unique<SimulationClock>(20.0);
 
         grayUiRenderer_ = std::make_unique<GrayUiRenderer>();
+        startupReady_ = loadStartupAssets();
+        if (!startupReady_) return;
 
         mainMenu_ = std::make_unique<MainMenu>();
 
@@ -75,6 +83,7 @@ namespace Paladin
         militaryPanel_ = std::make_unique<MilitaryPanel>();
         diplomacyPanel_ = std::make_unique<DiplomacyPanel>();
         worldSettlementPanel_ = std::make_unique<WorldSettlementPanel>();
+        caravanPanel_ = std::make_unique<CaravanPanel>();
 
         simulationSpeedControls_ = std::make_unique<SimulationSpeedControls>();
 
@@ -85,6 +94,65 @@ namespace Paladin
 
         settlementInspectionPanel_ =
             std::make_unique<SettlementInspectionPanel>();
+    }
+
+    bool Application::loadStartupAssets()
+    {
+        // Event pumping and every GPU upload remain on the SDL/main thread.
+        // Progress advances only for finished asset jobs, never for elapsed time.
+        double lastDrawn = -1;
+        Uint64 lastFrame = 0;
+        const auto draw = [&](double fraction, std::string_view label)
+        {
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+                if (event.type == SDL_EVENT_QUIT ||
+                    (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE))
+                    startupCancelled_ = true;
+            if (startupCancelled_) throw std::runtime_error("Loading cancelled");
+            startupProgress_ = std::max(startupProgress_, std::clamp(fraction, 0., 1.));
+            const auto now = SDL_GetTicks();
+            if (startupProgress_ < 1 && lastDrawn >= 0 && startupProgress_ - lastDrawn < .01 && now - lastFrame < 16)
+                return;
+            lastDrawn = startupProgress_; lastFrame = now;
+            renderer_->beginFrame();
+            grayUiRenderer_->drawMainMenuBackground(*renderer_);
+            const float w = float(renderer_->outputWidth()), h = float(renderer_->outputHeight());
+            const float barWidth = std::min(620.F, w - 48.F), x = (w - barWidth) * .5F, y = h * .55F;
+            grayUiRenderer_->drawTitle(*renderer_, "PALADIN", w * .5F, y - 90.F);
+            grayUiRenderer_->drawPanel(*renderer_, {x, y, barWidth, 28.F});
+            renderer_->fillRectangle(x + 4, y + 4, float((barWidth - 8) * startupProgress_), 20,
+                {235, 196, 107, 255});
+            std::string message(label.substr(0, std::min<std::size_t>(label.size(), 65)));
+            grayUiRenderer_->drawLabel(*renderer_, message, x, y + 44, 1.5F);
+            grayUiRenderer_->drawLabel(*renderer_, std::to_string(int(startupProgress_ * 100)) + "%",
+                x + barWidth - 42, y - 24, 1.5F);
+            renderer_->endFrame();
+            ++startupProgressFrames_;
+        };
+        try
+        {
+            draw(0, "Opening asset packages");
+            renderer_->compiledAssets([&](std::size_t done, std::size_t total, std::string_view stage)
+            { draw(.02 + .73 * double(done) / double(std::max<std::size_t>(1, total)), stage); });
+            SceneSpriteLibrary sprites;
+            sprites.load(*renderer_, (std::filesystem::path(SDL_GetBasePath()) / "assets/sprites").string(),
+                [&](std::size_t done, std::size_t total, std::string_view stage)
+                { draw(.75 + .24 * double(done) / double(std::max<std::size_t>(1, total)), stage); });
+            if (startupCancelled_) return false;
+            if (!sprites.ready()) throw std::runtime_error("Compiled sprite catalogue is missing or invalid. Reinstall the assets/packages directory.");
+            draw(1, "Ready");
+            return true;
+        }
+        catch (const std::exception& error)
+        {
+            if (!startupCancelled_)
+            {
+                startupError_ = error.what();
+                SDL_Log("Startup loading failed: %s", error.what());
+            }
+            return false;
+        }
     }
 
     Application::~Application()
@@ -106,6 +174,9 @@ namespace Paladin
         savedWorldCamera_.reset();
         simulation_.reset();
 
+        caravanPanel_.reset();
+        worldSettlementPanel_.reset();
+        diplomacyPanel_.reset();
         worldHud_.reset();
         debugConsole_.reset();
         employmentPanel_.reset();
@@ -129,6 +200,14 @@ namespace Paladin
     int Application::run()
     {
 
+        if (startupCancelled_) return 0;
+        if (!startupReady_)
+        {
+            if (!startupError_.empty())
+                SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Paladin asset loading failed",
+                    startupError_.c_str(), window_ ? window_->nativeHandle() : nullptr);
+            return 1;
+        }
         if (!sdlInitialized_ || !window_ || !renderer_ || !simulationClock_ ||
             !grayUiRenderer_ || !mainMenu_ || !worldHud_ || !cityHud_ ||
             !simulationSpeedControls_ || !foundingPanel_ ||

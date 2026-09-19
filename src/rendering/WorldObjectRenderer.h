@@ -35,7 +35,8 @@ namespace Paladin
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt,
             WorldSurface::Point3 rigidResidual = {},
             const SceneSpriteLibrary* artwork = nullptr,
-            ArmyId selectedArmy = {}
+            ArmyId selectedArmy = {},
+            ShipmentId selectedCaravan = {}
         ) const;
 
     private:

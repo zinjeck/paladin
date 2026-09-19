@@ -79,6 +79,10 @@ namespace Paladin
         bool isInitialized() const noexcept;
 
         bool spawnCitizens(std::uint64_t count);
+        // Loaded inactive cities advance authoritative activity in minute batches.
+        // This is NOT the separate strategic economy scheduler's pending time.
+        double pendingLocalActivityMinutes() const noexcept { return pendingLocalActivityMinutes_; }
+        std::uint64_t localActivityUpdates() const noexcept { return localActivityUpdates_; }
         void synchronizeCitizenPopulation()
         {
             population_.applyNetChange(
@@ -171,5 +175,7 @@ namespace Paladin
         std::uint64_t schedulingVersion_ = 0;
         std::unique_ptr<SettlementMap> localMap_;
         std::uint64_t localMapVersion_ = 0;
+        double pendingLocalActivityMinutes_ = 0;
+        std::uint64_t localActivityUpdates_ = 0;
     };
 } // namespace Paladin

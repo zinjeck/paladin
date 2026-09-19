@@ -11,6 +11,8 @@ namespace Paladin
     public:
         // Angular geographic range, independent of flat/globe camera and wrapping.
         static constexpr double RangeRadians = .7853981633974483; // 45 degrees
+        // Only an actual physical army attack may bypass capital diplomatic range.
+        static bool hostileContact(World&, RealmId, RealmId);
         static bool inRange(const World&, RealmId, RealmId);
         static double distance(const World&, RealmId, RealmId);
         static int opinion(const World&, RealmId observer, RealmId target);

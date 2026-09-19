@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "ui/WorldSettlementPanel.h"
+#include "ui/CaravanPanel.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
@@ -237,6 +238,12 @@ namespace Paladin
         if (screen_ == Screen::World && controlsVisible && diplomacyPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
         {
             if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
+            return true;
+        }
+        if (handleCaravanEvent(event))
+        {
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+                globePointerDown_ = globeDragging_ = false;
             return true;
         }
         if (handleMilitaryEvent(event))

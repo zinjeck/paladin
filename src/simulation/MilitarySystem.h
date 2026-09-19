@@ -13,7 +13,7 @@ namespace Paladin
     enum class MilitaryResult
     {
         Success, InvalidUnit, NotOwned, NoBarracksEmployee, ReturnHome,
-        EmptyUnit, InvalidDestination, NoLandRoute, UnitLimit, PersonnelOrigin
+        EmptyUnit, InvalidDestination, NoLandRoute, UnitLimit, PersonnelOrigin, InBattle
     };
     const char* militaryResultText(MilitaryResult result) noexcept;
 
@@ -23,6 +23,8 @@ namespace Paladin
         // No independent soldier count: synchronize actual staffed barracks.
         static void synchronize(World&, double minute);
         static void tick(World&, double minute, double elapsed);
+        // Removes canonical people and their payroll/reservations, never abstract manpower.
+        static std::size_t applyBattleCasualties(World&, ArmyId, std::size_t);
         // Only AI strategic settlements may materialize a bounded cadre from
         // their existing aggregate civilians. Every enlisted person then uses
         // the same canonical Soldier/Army pipeline as the player's force.

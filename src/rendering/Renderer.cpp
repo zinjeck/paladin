@@ -2,6 +2,7 @@
 #include "assets/AssetManager.h"
 #include "rendering/AssetUpload.h"
 #include "rendering/Texture.h"
+#include "rendering/SceneSpriteLibrary.h"
 
 #include <SDL3/SDL.h>
 #ifdef PALADIN_SOURCE_ART
@@ -22,7 +23,7 @@ namespace Paladin
         return name && std::strcmp(name, "software") == 0;
     }
 
-    std::shared_ptr<AssetManager> Renderer::compiledAssets()
+    std::shared_ptr<AssetManager> Renderer::compiledAssets(const AssetLoadProgress& progress)
     {
         const auto base = std::filesystem::path(SDL_GetBasePath()) / "assets";
         std::string signature =
@@ -59,6 +60,7 @@ namespace Paladin
         }
         if (assetManager_ && signature == assetPackageSignature_)
         {
+            if (progress) progress(1, 1, "Assets already resident");
             return assetManager_;
         }
         auto manager = std::make_shared<AssetManager>();
@@ -68,15 +70,25 @@ namespace Paladin
         {
             manager->mountDirectory(dir, priority++);
         }
-        for (auto& record : manager->records())
+        const auto records = manager->records();
+        const auto atlasCount = std::count_if(records.begin(), records.end(),
+            [](const auto& record) { return record.type == AssetType::SpriteAtlas; });
+        const std::size_t total = records.size() + std::size_t(atlasCount);
+        std::size_t completed = 0;
+        if (progress) progress(0, total, "Preparing packaged assets");
+        for (const auto& record : records)
         {
-            if (record.type == AssetType::Sprite ||
-                record.type == AssetType::UiAsset)
-            {
-                manager->request(record.id, record.type);
-            }
+            manager->request(record.id, record.type);
+            ++completed;
+            if (progress) progress(completed, total, record.name);
+            // Drain while requesting, rather than keeping a second full CPU
+            // copy of every atlas alive until the end of startup.
+            uploadAssets(*this, *manager, [&] {
+                ++completed;
+                if (progress) progress(completed, total, "Uploading textures");
+            });
         }
-        uploadAssets(*this, *manager);
+        sceneSpriteCache_.reset();
         assetManager_ = manager;
         assetPackageSignature_ = signature;
         return manager;
@@ -434,6 +446,7 @@ namespace Paladin
     }
     Renderer::~Renderer()
     {
+        sceneSpriteCache_.reset();
         assetManager_.reset();
         pixelScene_.reset();
         if (renderer_)

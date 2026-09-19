@@ -299,7 +299,10 @@ namespace Paladin
             if (c.task.kind == CitizenTaskKind::AnimalWork)
             {
                 const auto* animal = map.animals.find(c.task.animal);
-                valid = !c.child && generalLabor && !c.youngDependents &&
+                const bool assignedGatherer = w && w->operational &&
+                    w->objectTypeId == SettlementObjectTypes::Pastureland && animal &&
+                    animal->order == AnimalOrder::Gather && animal->reservedPasture == w->objectId;
+                valid = !c.child && (generalLabor || assignedGatherer) && !c.youngDependents &&
                         animal && animal->health > 0 &&
                         animal->handler == c.id &&
                         animal->order != AnimalOrder::None &&
@@ -543,6 +546,18 @@ namespace Paladin
                 }
                 continue;
             }
+            // An occupied pasture must still be able to gather its second and
+            // later animals. Do not wait forever in the generic tending task.
+            if (c.task.kind == CitizenTaskKind::Work && map.animals.hasOrders() &&
+                policy.isWorkTime(minute) && minute >= c.nextWorkCheckMinutes)
+            {
+                const auto* job = map.employment().workplace(c.workplaceId);
+                if (job && job->operational && job->objectTypeId == SettlementObjectTypes::Pastureland)
+                {
+                    c.nextWorkCheckMinutes = minute + policy.retryMinutes;
+                    if (chooseAnimalWork(map, citizens, c, minute)) continue;
+                }
+            }
             if (c.task.kind == CitizenTaskKind::Home && c.path.empty())
             {
                 chooseSocial(map, citizens, c, minute);
@@ -665,6 +680,8 @@ namespace Paladin
                 {
                     return;
                 }
+                if (workplace.objectTypeId == SettlementObjectTypes::Pastureland &&
+                    chooseAnimalWork(map, citizens, c, minute)) return;
                 chooseWork(map, citizens, c, minute);
                 return;
             }

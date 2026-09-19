@@ -121,6 +121,7 @@ add_executable(Paladin
     src/simulation/WorldShipmentSystem.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
+    src/simulation/BattleSystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
@@ -246,6 +247,7 @@ add_executable(PaladinTests
     src/simulation/WorldShipmentSystem.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
+    src/simulation/BattleSystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
@@ -425,4 +427,18 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
             $<TARGET_FILE:PaladinPr30RenderTests>
         DEPENDS PaladinPr30RenderTests)
     add_dependencies(PaladinArtCheck PaladinPr30Check)
+endif()
+
+if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
+    add_executable(PaladinPr31ApplicationTests tests/Pr31ApplicationTests.cpp)
+    target_link_libraries(PaladinPr31ApplicationTests PRIVATE PaladinSmokeCore)
+    add_dependencies(PaladinPr31ApplicationTests Paladin)
+    add_test(NAME PaladinPr31ApplicationTests COMMAND PaladinPr31ApplicationTests)
+    set_tests_properties(PaladinPr31ApplicationTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software" TIMEOUT 180)
+    add_custom_target(PaladinPr31Check
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinPr31ApplicationTests>
+        DEPENDS PaladinPr31ApplicationTests)
+    add_dependencies(PaladinArtCheck PaladinPr31Check)
 endif()
