@@ -12,6 +12,7 @@
 #include "ui/CityHud.h"
 #include "rendering/WorldPixelGrid.h"
 #include "simulation/MilitarySystem.h"
+#include "simulation/DiplomacySystem.h"
 #include "simulation/Simulation.h"
 #include "ui/GrayUiRenderer.h"
 #include "ui/MilitaryPanel.h"
@@ -184,6 +185,9 @@ namespace
         panel.render(renderer,ui,world,sim.playerRealmId(),&art);
         capture(window,"pr29-compact-unit-grid.png"); renderer.endFrame();
         click(A::Disband); PALADIN_CHECK(!world.army(second));
+        // PR30 discharge returns an unemployed civilian, not an automatic
+        // barracks reserve. Rehire explicitly for the count-only render check.
+        PALADIN_CHECK(MilitarySystem::recruit(world,sim.playerRealmId(),city,1)==MilitaryResult::Success);
         click(A::Row,unit); click(A::Local); click(A::World); click(A::Focus);
         PALADIN_CHECK(panel.takeFocus()==unit && !panel.isOpen());
         // Universal markers do not grow or acquire sprawl with population.
@@ -317,14 +321,14 @@ namespace
     }
     void diplomacyAndOverflow(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
     {
-        WorldGenerationSettings settings; settings.width=settings.height=64; settings.seed=573; settings.populateAiRealms=false;
+        WorldGenerationSettings settings; settings.width=128; settings.height=64; settings.seed=573; settings.populateAiRealms=false;
         World world(settings);
-        for(int y=0;y<64;++y) for(int x=0;x<64;++x) world.grid().tile({x,y})->terrain=TerrainType::Land;
+        for(int y=0;y<world.grid().height();++y) for(int x=0;x<world.grid().width();++x) { world.grid().tile({x,y})->terrain=TerrainType::Land; world.grid().tile({x,y})->biome=BiomeType::Plain; }
         world.grid().terrainChanged();
         const auto actor=world.createRealm(), target=world.createRealm();
         const auto city=world.foundCapitalSettlement({12,24},actor,{"Amber Crown","Amberfolk","Amber",{},"civic"});
         PALADIN_CHECK(city);
-        PALADIN_CHECK(world.foundCapitalSettlement({48,24},target,{"Blue Confederacy","Bluefolk","Blue",{},"tribal"}));
+        PALADIN_CHECK(world.foundCapitalSettlement({24,24},target,{"Blue Confederacy","Bluefolk","Blue",{},"tribal"}));
         world.realm(actor)->treasury->balance=100000;
         world.realm(target)->treasury->balance=100;
         DiplomacyPanel panel; GrayUiRenderer ui;
@@ -354,8 +358,9 @@ namespace
         }
         frame("pr29-diplomacy-actions.png");
         click(panel.actionBounds(DiplomaticAction::Alliance)); PALADIN_CHECK(world.diplomacy().between(actor,target)->allied);
+        const auto gift=DiplomacySystem::suggestedGift(world,actor,target);
         click(panel.actionBounds(DiplomaticAction::Gift));
-        PALADIN_CHECK(world.realm(actor)->treasury->balance==99000 && world.realm(target)->treasury->balance==1100);
+        PALADIN_CHECK(gift>0 && world.realm(actor)->treasury->balance==100000-gift && world.realm(target)->treasury->balance==100+gift);
         click(panel.actionBounds(DiplomaticAction::Tribute)); PALADIN_CHECK(world.diplomacy().overlordOf(target)==actor);
         frame("pr29-diplomacy-tributary.png");
         click(panel.actionBounds(DiplomaticAction::Tribute)); PALADIN_CHECK(!world.diplomacy().overlordOf(target));
@@ -435,7 +440,7 @@ namespace
         WorldGenerationSettings settings;
         settings.width=settings.height=64; settings.seed=711; settings.populateAiRealms=false;
         Simulation sim(settings); auto& world=sim.world();
-        for(int y=0;y<64;++y) for(int x=0;x<64;++x) world.grid().tile({x,y})->terrain=TerrainType::Land;
+        for(int y=0;y<world.grid().height();++y) for(int x=0;x<world.grid().width();++x) { world.grid().tile({x,y})->terrain=TerrainType::Land; world.grid().tile({x,y})->biome=BiomeType::Plain; }
         const auto city=sim.foundPlayerCapital({32,32},{"Roll Realm","Roll Folk","Orientation",{},"civic",{}});
         PALADIN_CHECK(city);
         WorldObjectRenderer objects;

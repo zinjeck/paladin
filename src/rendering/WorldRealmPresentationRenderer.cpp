@@ -8,6 +8,7 @@
 #include "rendering/WorldPoliticalSurface.h"
 #include "rendering/WorldRealmQuery.h"
 #include "rendering/WorldThematicPalette.h"
+#include "world/WorldPopulationField.h"
 #include "ui/BitmapFontRenderer.h"
 
 #include <algorithm>
@@ -193,6 +194,7 @@ namespace Paladin
             std::shared_ptr<const WorldTribalSurfaceSource> influence;
             std::shared_ptr<WorldPoliticalSurfaceSource> surface;
             PoliticalPalette palette;
+            std::shared_ptr<const WorldPopulationField> population;
         };
 
         struct DetailRequest
@@ -229,6 +231,7 @@ namespace Paladin
         std::shared_ptr<const WorldTribalSurfaceSource> presentedInfluence;
         std::shared_ptr<WorldPoliticalSurfaceSource> surfaceSource;
         PoliticalPalette presentedPalette;
+        std::shared_ptr<const WorldPopulationField> presentedPopulation;
         std::vector<DetailRequest> previousDemand, currentDemand;
 
         struct WorkSlice
@@ -303,8 +306,7 @@ namespace Paladin
                 mix(realm.usesTribalInfluence());
             }
             const auto topology = next;
-            if (mode==WorldMapMode::Population)
-                for (const auto& city:world.settlements()) { mix(city.ownerRealmId().value()); mix(city.population()); }
+            if (mode==WorldMapMode::Population) mix(WorldPopulationField::fingerprint(world));
             mix(influence.revision());
             for (const auto& realm : world.realms())
             {
@@ -376,9 +378,7 @@ namespace Paladin
             {
                 preparation->stage = -1;
             }
-            std::unordered_map<RealmId,std::uint64_t,StrongIdHash> populations;
-            if (mode==WorldMapMode::Population)
-                for (const auto& city:world.settlements()) populations[city.ownerRealmId()]+=city.population();
+            if (mode==WorldMapMode::Population) preparation->population=std::make_shared<WorldPopulationField>(world);
             for (const auto& realm : world.realms())
             {
                 preparation->byRealm[realm.id()] = preparation->labels.size();
@@ -388,7 +388,7 @@ namespace Paladin
                     RealmInk{[&] {
                         if (!thematicMapMode(mode)) return realm.mapColor();
                         const auto c=mode==WorldMapMode::Government ?
-                            (realm.usesTribalInfluence()?GovernmentTribal:GovernmentCivic) : populationMapColor(populations[realm.id()]);
+                            (realm.usesTribalInfluence()?GovernmentTribal:GovernmentCivic) : populationMapColor(0);
                         return MapColor{c.red,c.green,c.blue};
                     }(), realm.usesTribalInfluence()}
                 );
@@ -586,7 +586,7 @@ namespace Paladin
                             influence,
                             job.palette,
                             job.distance,
-                            *job.raster
+                            *job.raster, job.population.get()
                         ))
                     {
                         return;
@@ -597,6 +597,7 @@ namespace Paladin
                     labels = std::move(job.labels);
                     presentedInfluence = std::move(job.influence);
                     presentedPalette = std::move(job.palette);
+                    presentedPopulation=std::move(job.population);
                     detail.clear();
                     detailRaster.reset();
                     ready = true;
@@ -630,7 +631,7 @@ namespace Paladin
             const WorldTribalSurfaceSource& influence,
             const PoliticalPalette& palette,
             const std::vector<float>& field,
-            PoliticalRaster& job
+            PoliticalRaster& job, const WorldPopulationField* population
         )
         {
             const auto& policy =
@@ -673,10 +674,26 @@ namespace Paladin
                             (job.regions[n-1]!=region || job.regions[n+1]!=region ||
                              job.regions[above+i+1]!=region || job.regions[below+i+1]!=region);
                         if (job.recordFrontiers && frontier) job.result.frontiers.push_back({i,j,region});
-                        if (thematicMapMode(mode))
+                        if (mode==WorldMapMode::Population)
                         {
-                            RenderColor color=!surface.land?ThematicWater:
-                                mode==WorldMapMode::Population?populationMapColor(0):UnclaimedLand;
+                            // Density is geographic, not a realm-treasury-like
+                            // statistic painted across every owned tile. The
+                            // terrain below remains visible even in wilderness.
+                            if (surface.land)
+                            {
+                                double people=0;
+                                if (population) for(int k=0;k<4;++k)
+                                    people+=surface.dryWeights[k]*population->at(surface.positions[k]);
+                                people/=std::max(.000001,surface.landWeight);
+                                auto color=populationDensityColor(people);
+                                job.fills[out]=color; job.hasFill=true;
+                                if(frontier) { job.borders[out]={57,70,88,100}; job.hasBorder=true; }
+                            }
+                            continue;
+                        }
+                        if (mode==WorldMapMode::Government)
+                        {
+                            RenderColor color=!surface.land?ThematicWater:UnclaimedLand;
                             if (surface.land)
                                 if (const auto ink=palette.find(region);ink!=palette.end())
                                     color={ink->second.color.red,ink->second.color.green,ink->second.color.blue,255};
@@ -942,7 +959,7 @@ namespace Paladin
                         *presentedInfluence,
                         presentedPalette,
                         distance,
-                        *detailRaster
+                        *detailRaster, presentedPopulation.get()
                     ))
                 {
                     return;

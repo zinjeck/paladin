@@ -41,6 +41,9 @@ namespace Paladin
     private:
         friend class SettlementPopulationSystem;
         friend class SettlementSimulationState;
+        friend class MilitarySystem;
+        // Exact civil/military transfers preserve the demographic fraction.
+        bool transferResidents(std::int64_t delta) noexcept;
 
         void applyNetChange(double populationChange) noexcept;
 

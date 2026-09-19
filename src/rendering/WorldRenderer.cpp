@@ -524,21 +524,24 @@ namespace Paladin
 
         ui.drawButton(r,WorldMapNavigation::governmentModeButtonBounds(r.outputWidth(),r.outputHeight()),"G",false,false,mapMode_==WorldMapMode::Government,true);
         ui.drawButton(r,WorldMapNavigation::populationModeButtonBounds(r.outputWidth(),r.outputHeight()),"N",false,false,mapMode_==WorldMapMode::Population,true);
-        const float legendY=WorldMapNavigation::buttonBounds(r.outputWidth(),r.outputHeight()).y-30;
+        const auto nav=WorldMapNavigation::buttonBounds(r.outputWidth(),r.outputHeight());
+        const float legendX=WorldMapNavigation::mapBounds(r.outputWidth(),r.outputHeight()).x;
+        const float legendY=nav.y-32;
         if (mapMode_==WorldMapMode::Government)
         {
-            r.fillRectangle(12,legendY,10,10,GovernmentTribal); ui.drawLabel(r,"Tribal",28,legendY,1);
-            r.fillRectangle(84,legendY,10,10,GovernmentCivic); ui.drawLabel(r,"Civic",100,legendY,1);
-            r.fillRectangle(151,legendY,10,10,UnclaimedLand); ui.drawLabel(r,"Unclaimed",167,legendY,1);
+            r.fillRectangle(legendX,legendY,10,10,GovernmentTribal); ui.drawLabel(r,"Tribal",legendX+15,legendY,1);
+            r.fillRectangle(legendX+72,legendY,10,10,GovernmentCivic); ui.drawLabel(r,"Civic",legendX+87,legendY,1);
+            r.fillRectangle(legendX+137,legendY,10,10,UnclaimedLand); ui.drawLabel(r,"Unclaimed",legendX+152,legendY,1);
         }
         else if (mapMode_==WorldMapMode::Population)
         {
-            ui.drawLabel(r,"People per realm",12,legendY-16,1);
-            constexpr std::array<const char*,7> labels{"0","1-31","32-127","128-511","512-2047","2048-8191","8192+"};
+            ui.drawLabel(r,"Estimated people / world tile",legendX,legendY-16,1);
+            constexpr std::array<const char*,7> labels{"0","1+","4+","16+","64+","256+","1024+"};
+            const float swatch=std::min(36.F,WorldMapNavigation::mapBounds(r.outputWidth(),r.outputHeight()).width/7);
             for (int i=0;i<7;++i)
             {
-                const float x=12+i*62.F;
-                r.fillRectangle(x,legendY,54,8,PopulationColors[i]); ui.drawLabel(r,labels[i],x,legendY+11,1);
+                const float x=legendX+i*swatch;
+                r.fillRectangle(x,legendY,swatch-3,8,PopulationColors[i]); ui.drawLabel(r,labels[i],x,legendY+10,.75F);
             }
         }
         if (const auto* t = globe_.mapTexture(0))

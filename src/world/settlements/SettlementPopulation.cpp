@@ -79,6 +79,24 @@ namespace Paladin
         ++version_;
     }
 
+    bool SettlementPopulation::transferResidents(std::int64_t delta) noexcept
+    {
+        if (delta>=0)
+        {
+            const auto count=std::uint64_t(delta);
+            if (count>std::numeric_limits<std::uint64_t>::max()-residents_) return false;
+            residents_+=count;
+        }
+        else
+        {
+            const auto count=std::uint64_t(-(delta+1))+1;
+            if (count>residents_) return false;
+            residents_-=count;
+        }
+        if(delta) ++version_;
+        return true;
+    }
+
     void SettlementPopulation::applyNetChange(double populationChange) noexcept
     {
         if (!std::isfinite(populationChange))

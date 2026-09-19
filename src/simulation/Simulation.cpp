@@ -2,6 +2,7 @@
 #include "simulation/CitizenshipSystem.h"
 #include "simulation/MilitarySystem.h"
 #include "simulation/WorldShipmentSystem.h"
+#include "simulation/AiRealmSystem.h"
 #include "simulation/RealmRulerSystem.h"
 #include "world/PlanetAstronomy.h"
 #include "world/generation/AiRealmGenerator.h"
@@ -146,6 +147,7 @@ namespace Paladin
         MilitarySystem::tick(*world_, world_->time().totalGameMinutes() + pendingGameMinutes_, gameDeltaMinutes);
         WorldShipmentSystem::tick(*world_, world_->time().totalGameMinutes() + pendingGameMinutes_, gameDeltaMinutes);
         RealmRulerSystem::tick(*world_, playerRealmId_, gameDeltaMinutes);
+        AiRealmSystem::tick(*world_, world_->time().totalGameMinutes()+pendingGameMinutes_, gameDeltaMinutes);
         pendingGameMinutes_ += gameDeltaMinutes;
 
         const double wholeMinutes = std::floor(pendingGameMinutes_);

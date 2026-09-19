@@ -139,6 +139,13 @@ namespace Paladin
             presentation.realmFillWeight=1.F;
             presentation.realmBorderWeight=1.F;
         }
+        if (mode==WorldMapMode::Population)
+        {
+            // Keep real intercity roads and small settlement symbols readable
+            // while the density map is zoomed out; do not restore city sprawl.
+            presentation.regionalWeight=std::max(.35F,presentation.regionalWeight);
+            presentation.realmLabelWeight*=.35F;
+        }
         return presentation;
     }
 } // namespace Paladin

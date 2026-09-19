@@ -119,12 +119,14 @@ add_executable(Paladin
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/simulation/WorldLandNavigation.cpp
     src/simulation/WorldShipmentSystem.cpp
+    src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
+    src/world/WorldPopulationField.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp
@@ -225,6 +227,7 @@ add_executable(PaladinTests
     tests/DiplomacyTests.cpp
     tests/Pr30SocietyTests.cpp
     tests/Pr30ShipmentTests.cpp
+    tests/Pr30StrategyTests.cpp
     src/simulation/Simulation.cpp
     tests/TestMain.cpp
     tests/RealmFeatureTests.cpp
@@ -240,12 +243,14 @@ add_executable(PaladinTests
 
     src/simulation/WorldLandNavigation.cpp
     src/simulation/WorldShipmentSystem.cpp
+    src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/DiplomacySystem.cpp
     src/simulation/CitizenshipSystem.cpp
     src/simulation/RealmRulerSystem.cpp
     src/world/generation/AiRealmGenerator.cpp
     src/world/World.cpp
+    src/world/WorldPopulationField.cpp
     src/world/WorldEntities.cpp
     src/world/WorldTime.cpp
     src/world/generation/GenerationNoise.cpp

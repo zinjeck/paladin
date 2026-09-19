@@ -57,6 +57,9 @@ namespace Paladin
         auto* target=world.settlement(shipment.destination);
         if (!source || !target || source->ownerRealmId()!=shipment.owner || target->ownerRealmId()!=shipment.owner ||
             available(*source,shipment.resource)<shipment.amount) return false;
+        if(shipment.aiManaged && shipment.resource=="food" &&
+           (available(*source,"food")-shipment.amount<2.*source->population() ||
+            total(*target,"food")>12.*target->population()+120)) return false;
         if (auto* local=source->simulationState().localMap_.get())
         {
             int remaining=shipment.amount;
