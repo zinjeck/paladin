@@ -1,5 +1,4 @@
 #include "rendering/CityRenderer.h"
-#include "rendering/BattleScene.h"
 #include "rendering/BuildingView.h"
 #include "rendering/CityPixelView.h"
 #include "rendering/GrassPresentation.h"

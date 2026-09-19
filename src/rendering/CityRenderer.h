@@ -1,6 +1,7 @@
 #pragma once
 #include <span>
 
+#include "rendering/BattleSoldierView.h"
 #include "rendering/CityClouds.h"
 #include "rendering/CityDistantObjects.h"
 #include "rendering/CityLighting.h"
@@ -17,7 +18,6 @@
 
 namespace Paladin
 {
-    struct BattleSoldierView;
     class Camera2D;
     class Renderer;
     class SettlementInspectionController;
