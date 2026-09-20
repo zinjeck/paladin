@@ -147,6 +147,8 @@ namespace Paladin
                      : nullptr;
         const bool house =
             object && object->objectTypeId == SettlementObjectTypes::House;
+        const bool tradeDepot =
+            object && object->objectTypeId == SettlementObjectTypes::TradeDepot;
         showingHouse_ = house;
         const bool pasture = object && object->objectTypeId ==
                                            SettlementObjectTypes::Pastureland;
@@ -157,7 +159,7 @@ namespace Paladin
         const float detailsHeight =
             citizen ? 386.0F
                     : (workplace ? 78.0F : 0.0F) + storageHeight +
-                          (pasture ? 48 : 0) +
+                          (tradeDepot ? 32 : 0) + (pasture ? 48 : 0) +
                           (object && (object->objectTypeId ==
                                           SettlementObjectTypes::CityKeep ||
                                       workplace)
@@ -212,21 +214,33 @@ namespace Paladin
         grayUiRenderer.drawPanel(renderer, renderedBounds_);
         if (showingKeep_)
         {
-            keepSalesButton_.setText(
-                settlementMap.commerce.keepFoodSalesEnabled
-                    ? "Sell food to markets: On"
-                    : "Sell food to markets: Off"
+            grayUiRenderer.drawLabel(
+                renderer,
+                "Founding supplies - withdrawals only",
+                renderedBounds_.x + 12,
+                renderedBounds_.y + renderedBounds_.height - 28,
+                1
             );
-            keepSalesButton_.setBounds(
-                {renderedBounds_.x + 12,
-                 renderedBounds_.y + renderedBounds_.height - 38,
-                 renderedBounds_.width - 24,
-                 28}
-            );
-            keepSalesButton_.render(renderer, grayUiRenderer);
         }
         if (object && workplace)
         {
+            if (tradeDepot)
+            {
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    "Trade agreement required",
+                    renderedBounds_.x + 13,
+                    renderedBounds_.y + renderedBounds_.height - 64,
+                    1.25F
+                );
+                grayUiRenderer.drawLabel(
+                    renderer,
+                    "Caravans buy and sell for gold",
+                    renderedBounds_.x + 13,
+                    renderedBounds_.y + renderedBounds_.height - 48,
+                    1.25F
+                );
+            }
             if (pasture)
             {
                 grayUiRenderer.drawLabel(
@@ -256,8 +270,12 @@ namespace Paladin
             }
             grayUiRenderer.drawLabel(
                 renderer,
-                "Operating cash: " +
-                    goldText(settlementMap.commerce.businessCash(object->id)),
+                (tradeDepot ? "Realm treasury: " : "Operating cash: ") +
+                    goldText(
+                        tradeDepot
+                            ? settlementMap.commerce.treasury->balance
+                            : settlementMap.commerce.businessCash(object->id)
+                    ),
                 renderedBounds_.x + 13,
                 renderedBounds_.y + renderedBounds_.height - 30,
                 1.5F
@@ -525,6 +543,21 @@ namespace Paladin
                 1.25F
             );
         }
+        if (object && miningJob(object->objectTypeId))
+        {
+            const auto* progress = settlementMap.mining.find(object->id);
+            const auto depth =
+                int(std::lround(settlementMap.mining.depth(*object) * 100));
+            grayUiRenderer.drawLabel(
+                renderer,
+                progress && progress->exhausted
+                    ? "Deposit exhausted"
+                    : "Excavation: " + std::to_string(depth) + "% depth",
+                renderedBounds_.x + 13,
+                renderedBounds_.y + 119,
+                1.25F
+            );
+        }
         if (inventory && !house)
         {
             float y = renderedBounds_.y + (workplace ? 138 : 60);
@@ -678,7 +711,6 @@ namespace Paladin
         showingKeep_ = false;
         showingHouse_ = false;
         homeUpgradeButton_.cancelPress();
-        keepSalesButton_.cancelPress();
         nameField_.setFocused(false);
     }
 
@@ -704,7 +736,6 @@ namespace Paladin
         nameButton_.pointerMoved(x, y);
         homeUpgradeButton_.pointerMoved(x, y);
         spouseButton_.pointerMoved(x, y);
-        keepSalesButton_.pointerMoved(x, y);
         decreaseButton_.pointerMoved(x, y);
         increaseButton_.pointerMoved(x, y);
     }
@@ -721,11 +752,6 @@ namespace Paladin
             return true;
         }
         if (spouseId_ && spouseButton_.pointerPressed(x, y))
-        {
-            dragCandidate_ = false;
-            return true;
-        }
-        if (showingKeep_ && keepSalesButton_.pointerPressed(x, y))
         {
             dragCandidate_ = false;
             return true;
@@ -765,11 +791,6 @@ namespace Paladin
             citizens.citizen(spouseId_))
         {
             navigateCitizen_ = spouseId_;
-        }
-        if (showingKeep_ && keepSalesButton_.pointerReleased(x, y))
-        {
-            map.commerce.keepFoodSalesEnabled =
-                !map.commerce.keepFoodSalesEnabled;
         }
         const bool less = decreaseButton_.pointerReleased(x, y);
         const bool more = increaseButton_.pointerReleased(x, y);

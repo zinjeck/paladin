@@ -18,7 +18,10 @@ namespace Paladin
     {
         MilitarySystem::synchronize(world, double(world.time().totalGameMinutes()));
         auto* unit=world.army(id); const auto* enemy=world.army(target);
-        if (!unit || !enemy || id==target) return MilitaryResult::InvalidUnit;
+        if (!unit || !enemy || enemy->garrisoned() || id == target)
+        {
+            return MilitaryResult::InvalidUnit;
+        }
         if (!actor || unit->ownerRealmId()!=actor || enemy->ownerRealmId()==actor || !enemy->ownerRealmId()) return MilitaryResult::NotOwned;
         if (!unit->soldierCount() || !enemy->soldierCount()) return MilitaryResult::EmptyUnit;
         if (unit->engagedOpponent_ || enemy->engagedOpponent_) return MilitaryResult::InBattle;
@@ -45,7 +48,10 @@ namespace Paladin
             if (!unit.attackTarget_) continue;
             const auto* target=world.army(unit.attackTarget_);
             const auto* relation=target?world.diplomacy().between(unit.ownerRealmId(),target->ownerRealmId()):nullptr;
-            if (!target || !target->soldierCount() || !unit.soldierCount() || target->ownerRealmId()==unit.ownerRealmId() || !relation || !relation->atWar)
+            if (!target || target->garrisoned() || !target->soldierCount() ||
+                !unit.soldierCount() ||
+                target->ownerRealmId() == unit.ownerRealmId() || !relation ||
+                !relation->atWar)
             { stop(unit); unit.attackTarget_={}; continue; }
             if (target->engagedOpponent_ && target->engagedOpponent_!=unit.id())
             { stop(unit); unit.attackTarget_={}; continue; }
@@ -67,7 +73,13 @@ namespace Paladin
         {
             if (!unit.attackTarget_ || unit.engagedOpponent_ || !unit.soldierCount()) continue;
             auto* enemy=world.army(unit.attackTarget_);
-            if (!enemy || enemy->engagedOpponent_ || !enemy->soldierCount() || enemy->ownerRealmId()==unit.ownerRealmId() || enemy->position()!=unit.position()) continue;
+            if (!enemy || enemy->garrisoned() || enemy->engagedOpponent_ ||
+                !enemy->soldierCount() ||
+                enemy->ownerRealmId() == unit.ownerRealmId() ||
+                enemy->position() != unit.position())
+            {
+                continue;
+            }
             const auto* tile=world.grid().tile(unit.position());
             if (!tile || tile->terrain!=TerrainType::Land) continue;
             // Contact is at a reached world tile, never an interpolated screen

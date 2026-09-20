@@ -1,5 +1,6 @@
 #include "world/generation/AiRealmGenerator.h"
 #include "simulation/RealmRulerSystem.h"
+#include "world/RealmFlagDesigns.h"
 #include "world/World.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -179,16 +180,21 @@ namespace Paladin
             identity.cultureName = base + " Folk " + std::to_string(number);
             identity.capitalName = base + " " + std::to_string(number);
             identity.mapColor = colors[(number + next(rng)) % colors.size()];
-            identity.realmOriginId = next(rng) % 3 == 0 ? "tribal" : "civic";
-            identity.flag.primaryColor = identity.mapColor;
-            for (std::size_t i = 0; i < identity.flag.cells.size(); ++i)
-            {
-                if (i % identity.flag.width == number % identity.flag.width ||
-                    i / identity.flag.width == 4)
-                {
-                    identity.flag.cells[i] = {true, identity.mapColor};
-                }
-            }
+            const auto* homeland = world.grid().tile(capital.at);
+            const double temperature =
+                homeland ? homeland->temperature.value() : .5;
+            const bool temperate = temperature > .32 && temperature < .72;
+            identity.realmOriginId =
+                next(rng) % 100 < (temperate ? 22 : 60) ? "tribal" : "civic";
+            // Long-tailed historical development: occasional prosperous tribal
+            // centers remain possible; climate is a bias, never a caste.
+            const double prosperity =
+                std::exp((double(next(rng) % 10000) / 9999.0 - .5) * 2.4);
+            const double fertility =
+                homeland && homeland->biome == BiomeType::Desert       ? .42
+                : homeland && homeland->relief == ReliefType::Mountain ? .5
+                                                                       : 1.0;
+            identity.flag = realmFlagDesign(number - 1);
             const auto profileFor = [&](bool isCapital, SettlementKind kind)
             {
                 auto profile = defaultSettlementFoundationProfile();
@@ -196,21 +202,20 @@ namespace Paladin
                 profile.initialDetailedCitizenCount = 0;
                 profile.initialSimulationTier =
                     SettlementSimulationTier::Strategic;
-                const int mean =
-                    kind == SettlementKind::Fortress
-                        ? 55
-                        : (scale == RealmScale::Small
-                               ? 105
-                               : (isCapital
-                                      ? (scale == RealmScale::Empire ? 480
-                                                                     : 270)
-                                      : 200));
+                const double mean =
+                    kind == SettlementKind::Fortress ? 180.0
+                    : scale == RealmScale::Small     ? 700.0
+                    : isCapital
+                        ? (scale == RealmScale::Empire ? 16000.0 : 4200.0)
+                        : 1800.0;
                 const double variation =
-                    .70 + (next(rng) % 1000 + next(rng) % 1000) / 3330.0;
-                profile.initialPopulation = std::max(24, int(mean * variation));
+                    std::exp((double(next(rng) % 10000) / 9999.0 - .5) * 2.0);
+                profile.initialPopulation = std::uint64_t(
+                    std::max(48.0, mean * variation * prosperity * fertility)
+                );
                 profile.initialResources = {
                     {std::string(SettlementResourceTypes::Food),
-                     double(profile.initialPopulation) * 8},
+                     double(profile.initialPopulation) * 16},
                     {std::string(SettlementResourceTypes::Materials),
                      double(profile.initialPopulation) * 2}
                 };
@@ -302,6 +307,18 @@ namespace Paladin
                         std::to_string(count)
                 ));
             }
+            std::uint64_t population = 0;
+            for (const auto& city : world.settlements())
+            {
+                if (city.ownerRealmId() == id)
+                {
+                    population += city.population();
+                }
+            }
+            // Historical starting money, issued once during generation. Later
+            // trade and taxation transfer this stock; mining never mints it.
+            world.realm(id)->treasury->balance =
+                std::int64_t(double(population) * 350 * prosperity * fertility);
             return id;
         }
     } // namespace

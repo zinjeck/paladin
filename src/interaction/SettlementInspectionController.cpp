@@ -11,12 +11,13 @@ namespace Paladin
         const SettlementObjectState& objectState,
         const SettlementCitizenState& citizenState,
         bool placePanelOnRight,
-        const SettlementLogistics* logistics
+        const SettlementLogistics* logistics,
+        bool selectTileCitizen
     ) noexcept
     {
         const SettlementCitizen* citizen = citizenState.citizenAt(position);
 
-        if (citizen && !citizen->militaryDeployed)
+        if (selectTileCitizen && citizen && !citizen->militaryDeployed)
         {
             kind_ = SettlementInspectionKind::Citizen;
             citizenId_ = citizen->id;
@@ -121,7 +122,9 @@ namespace Paladin
         const SettlementCitizenState& citizenState
     ) const noexcept
     {
-        const auto* citizen = kind_ == SettlementInspectionKind::Citizen ? citizenState.citizen(citizenId_) : nullptr;
+        const auto* citizen = kind_ == SettlementInspectionKind::Citizen
+                                  ? citizenState.citizen(citizenId_)
+                                  : nullptr;
         return citizen && !citizen->militaryDeployed ? citizen : nullptr;
     }
 } // namespace Paladin

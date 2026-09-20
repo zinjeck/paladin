@@ -225,13 +225,26 @@ namespace Paladin
 
                 if (settlement)
                 {
+                    const auto citizen = cityRenderer_->citizenAtScreen(
+                        event.button.x,
+                        event.button.y,
+                        *settlementMap,
+                        settlement->simulationState().citizens()
+                    );
+                    if (citizen)
+                    {
+                        settlementInspectionController_->selectCitizen(citizen);
+                        settlementInspectionPanel_->clearLayout();
+                        return;
+                    }
                     static_cast<void>(settlementInspectionController_->selectAt(
                         *tile,
                         settlementMap->objectState(),
                         settlement->simulationState().citizens(),
                         event.button.x <
                             static_cast<float>(renderer_->outputWidth()) * 0.5F,
-                        &settlementMap->logistics
+                        &settlementMap->logistics,
+                        false
                     ));
                 }
             }

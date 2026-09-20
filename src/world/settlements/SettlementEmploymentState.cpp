@@ -10,6 +10,7 @@
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include "world/settlements/objects/jobs/pastureland/PasturelandJob.h"
 #include "world/settlements/objects/jobs/stockpile/StockpileJob.h"
+#include "world/settlements/objects/jobs/trade_depot/TradeDepotJob.h"
 #include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
 #include <algorithm>
 #include <array>
@@ -20,7 +21,12 @@ namespace Paladin
     namespace
     {
         // Reference-area capacities follow Godot; stockpile staffing is new.
-        constexpr std::array<WorkplaceDefinition, 9> definitions{
+        constexpr std::array<WorkplaceDefinition, 14> definitions{
+            WorkplaceDefinition{SettlementObjectTypes::CoalMine, 1, 1, 9, 80},
+            WorkplaceDefinition{SettlementObjectTypes::IronMine, 1, 1, 9, 80},
+            WorkplaceDefinition{SettlementObjectTypes::GoldMine, 1, 1, 9, 40},
+            WorkplaceDefinition{SettlementObjectTypes::Quarry, 1, 1, 9, 100},
+            TradeDepotWorkplace,
             MarketWorkplace,
             StockpileWorkplace,
             FisheryWorkplace,
@@ -29,7 +35,13 @@ namespace Paladin
             BakeryWorkplace,
             LoggingGroundsWorkplace,
             WorkplaceDefinition{SettlementObjectTypes::Barracks, 1, 4, 9, 100},
-            WorkplaceDefinition{SettlementObjectTypes::ArmySupplyDepot, 1, 1, 9, 150}
+            WorkplaceDefinition{
+                SettlementObjectTypes::ArmySupplyDepot,
+                1,
+                1,
+                9,
+                150
+            }
         };
     } // namespace
     std::span<const WorkplaceDefinition> workplaceDefinitions() noexcept

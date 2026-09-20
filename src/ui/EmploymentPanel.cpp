@@ -3,6 +3,7 @@
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -15,9 +16,26 @@ namespace Paladin
         void icon(
             Renderer& renderer,
             const UiRectangle& box,
-            std::string_view type
+            std::string_view type,
+            const SceneSpriteLibrary& art
         )
         {
+            if (const auto* sprite = art.find("ui.build." + std::string(type)))
+            {
+                const auto& icon = *sprite->texture;
+                renderer.drawTexture(
+                    icon,
+                    0,
+                    0,
+                    float(icon.width()),
+                    float(icon.height()),
+                    box.x + (box.width - icon.width()) * .5F,
+                    box.y + (box.height - icon.height()) * .5F,
+                    float(icon.width()),
+                    float(icon.height())
+                );
+                return;
+            }
             const auto* d = SettlementObjectCatalog::definition(type);
             if (!d)
             {
@@ -227,6 +245,19 @@ namespace Paladin
         if (hit.type == "previous")
         {
             scrollOffset_ = scrollOffset_ > 0 ? scrollOffset_ - 1 : 0;
+            return;
+        }
+        if (hit.type == "jobs_previous")
+        {
+            if (jobPage_)
+            {
+                --jobPage_;
+            }
+            return;
+        }
+        if (hit.type == "jobs_next")
+        {
+            ++jobPage_;
             return;
         }
         if (hit.type == "next")
@@ -715,7 +746,8 @@ namespace Paladin
         const auto adults = std::count_if(
             citizens.citizens().begin(),
             citizens.citizens().end(),
-            [](const auto& c) { return !c.child; }
+            [](const auto& c)
+            { return !c.child && !c.militaryDeployed && c.health > 0; }
         );
         const double percent =
             adults ? 100.0 * map.employment().unemployed(citizens) / adults : 0;
@@ -724,10 +756,16 @@ namespace Paladin
             population
                 ? "Population: " +
                       std::to_string(
-                          map.logistics.founded() ? citizens.citizens().size()
-                                                  : 0
+                          map.logistics.founded() ? citizens.residentCount() : 0
                       ) +
-                      "  |  Every 4 hours"
+                      "  |  Adults: " +
+                      std::to_string(map.logistics.founded() ? adults : 0) +
+                      "  |  Children: " +
+                      std::to_string(
+                          map.logistics.founded()
+                              ? citizens.residentCount() - adults
+                              : 0
+                      )
                 : "Unemployed: " +
                       std::to_string(map.employment().unemployed(citizens)) +
                       " / " + std::to_string(adults) + "  (" +
@@ -735,6 +773,16 @@ namespace Paladin
             left + 18,
             top + 47
         );
+        if (population)
+        {
+            ui.drawLabel(
+                renderer,
+                "Adults can work | Children cannot work",
+                left + 18,
+                top + 73,
+                1.25F
+            );
+        }
         const float summaryWidth = (width - 112) / 3;
         const UiRectangle graph{
             left + 88 + summaryWidth,
@@ -748,7 +796,8 @@ namespace Paladin
             std::size_t count = 0;
             for (const auto& citizen : citizens.citizens())
             {
-                if (citizen.health <= 0 || !map.logistics.founded())
+                if (citizen.health <= 0 || citizen.militaryDeployed ||
+                    !map.logistics.founded())
                 {
                     continue;
                 }
@@ -980,13 +1029,49 @@ namespace Paladin
             }
             return;
         }
+        jobIcons_.load(
+            renderer,
+            std::string(SDL_GetBasePath()) + "assets/sprites"
+        );
+        constexpr std::size_t pageSize = 6;
+        const auto pageCount =
+            (workplaceDefinitions().size() + pageSize - 1) / pageSize;
+        jobPage_ = std::min(jobPage_, pageCount - 1);
+        const float navigationY = graph.y + graph.height + 17;
+        ui.drawLabel(
+            renderer,
+            "Workplaces " + std::to_string(jobPage_ + 1) + "/" +
+                std::to_string(pageCount),
+            left + 18,
+            navigationY + 6,
+            1.5F
+        );
+        button(
+            {left + width - 88, navigationY, 30, 26},
+            "<",
+            {{}, "jobs_previous", {}, 0},
+            jobPage_ > 0
+        );
+        button(
+            {left + width - 52, navigationY, 30, 26},
+            ">",
+            {{}, "jobs_next", {}, 0},
+            jobPage_ + 1 < pageCount
+        );
         const float cardsTop = graph.y + graph.height + 53;
         const float cardWidth = (width - 48) / 3;
         const float cardHeight =
             std::max(65.0F, (bounds_.y + height - cardsTop - 16) / 2);
         std::size_t index = 0;
+        std::size_t ordinal = 0;
         for (const auto& d : workplaceDefinitions())
         {
+            const auto position = ordinal++;
+            if (position < jobPage_ * pageSize ||
+                position >= (jobPage_ + 1) * pageSize)
+            {
+                continue;
+            }
             const UiRectangle card{
                 left + 12 + float(index % 3) * (cardWidth + 12),
                 cardsTop + float(index / 3) * cardHeight,
@@ -1013,7 +1098,7 @@ namespace Paladin
                     {144, 149, 158, 255}
                 );
             }
-            icon(renderer, iconBox, d.objectTypeId);
+            icon(renderer, iconBox, d.objectTypeId, jobIcons_);
             std::size_t count = 0, capacity = 0, maximumCapacity = 0;
             for (const auto& w : map.employment().workplaces())
             {

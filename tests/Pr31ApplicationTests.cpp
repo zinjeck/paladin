@@ -587,6 +587,14 @@ namespace Paladin
                 );
             }
             world.realm(actor)->aiControlled = false;
+            PALADIN_CHECK(
+                MilitarySystem::setGarrison(world, actor, own, {}) ==
+                MilitaryResult::Success
+            );
+            PALADIN_CHECK(
+                MilitarySystem::setGarrison(world, foe, enemy, {}) ==
+                MilitaryResult::Success
+            );
             const auto records = world.soldiers().size();
             const auto cities = world.settlements().size();
             const auto assets = app.renderer_->compiledAssets();

@@ -23,6 +23,9 @@ namespace Paladin
         inline constexpr std::string_view Lumber = "lumber";
         inline constexpr std::string_view Wheat = "wheat";
         inline constexpr std::string_view Bread = "bread";
+        inline constexpr std::string_view Coal = "coal";
+        inline constexpr std::string_view Iron = "iron";
+        inline constexpr std::string_view Gold = "gold";
         inline constexpr std::string_view Rations = "rations";
     } // namespace SettlementResourceTypes
 

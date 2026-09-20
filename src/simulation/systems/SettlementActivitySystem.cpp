@@ -388,7 +388,9 @@ namespace Paladin
                          (shift && w && destination &&
                           (w->objectTypeId ==
                                SettlementObjectTypes::Stockpile ||
-                           w->objectTypeId == SettlementObjectTypes::Market) &&
+                           w->objectTypeId == SettlementObjectTypes::Market ||
+                           w->objectTypeId ==
+                               SettlementObjectTypes::TradeDepot) &&
                           w->objectId == destination->objectId));
                 }
             }
@@ -669,7 +671,9 @@ namespace Paladin
                 }
                 if ((workplace.objectTypeId ==
                          SettlementObjectTypes::Stockpile ||
-                     workplace.objectTypeId == SettlementObjectTypes::Market) &&
+                     workplace.objectTypeId == SettlementObjectTypes::Market ||
+                     workplace.objectTypeId ==
+                         SettlementObjectTypes::TradeDepot) &&
                     chooseHaul(
                         map,
                         citizens,
@@ -853,11 +857,11 @@ namespace Paladin
                     map.commerce.affordableTradeUnits(
                         *sourceInventory,
                         *destination,
-                        copy.amount
+                        copy.amount,
+                        &citizens
                     ) < copy.amount ||
                     (market && sourceInventory &&
-                     sourceInventory->kind == InventoryKind::Keep &&
-                     !map.commerce.keepFoodSalesEnabled))
+                     sourceInventory->kind == InventoryKind::Keep))
                 {
                     finish(map, c, minute);
                     return;
@@ -895,14 +899,27 @@ namespace Paladin
                 // inventories.
                 const auto sourceForTrade = *sourceInventory;
                 const auto destinationForTrade = *destination;
+                // The reservation and source are rechecked immediately before
+                // payment. Commerce changes no inventories, so pickup can then
+                // commit without granting goods on a failed purchase.
+                if (copy.pickedUp ||
+                    sourceForTrade.amount(copy.resource) < copy.amount ||
+                    !map.commerce.buyGoods(
+                        sourceForTrade,
+                        destinationForTrade,
+                        copy.amount,
+                        &citizens
+                    ))
+                {
+                    finish(map, c, minute);
+                    return;
+                }
                 if (!map.logistics.pickUp(c.id))
                 {
                     finish(map, c, minute);
                     return;
                 }
                 c.carriedResource = copy.resource;
-                map.commerce
-                    .buyGoods(sourceForTrade, destinationForTrade, copy.amount);
                 c.carriedAmount = copy.amount;
                 c.task.delivering = true;
             }
@@ -1370,6 +1387,41 @@ namespace Paladin
             {
                 finish(map, c, minute);
                 return;
+            }
+            if (const auto* mine = miningJob(object->objectTypeId))
+            {
+                const auto inventory = map.logistics.forObject(object->id);
+                const auto* site = map.mining.find(object->id);
+                if (map.logistics.receivable(inventory, mine->resource) > 0 &&
+                    (!site || !site->exhausted))
+                {
+                    c.activity = CitizenActivity::Mining;
+                }
+                const auto& footprint = object->footprint;
+                bool atEntrance = false;
+                for (int entrance = 0;
+                     entrance < quarryEntranceCount(footprint.width);
+                     ++entrance)
+                {
+                    atEntrance |= c.tilePosition == quarryEntrance(
+                                                        footprint.topLeft,
+                                                        footprint.width,
+                                                        entrance
+                                                    );
+                }
+                if (mine->tunnels && map.mining.depth(*object) >= .98 &&
+                    !atEntrance)
+                {
+                    finish(map, c, minute);
+                    return;
+                }
+                if (mine->tunnels && map.mining.depth(*object) >= .98)
+                {
+                    // Workers pass through a shared entrance to separate
+                    // subterranean work faces; they do not stack on the
+                    // surface.
+                    c.activity = CitizenActivity::UndergroundMining;
+                }
             }
             if (object->objectTypeId == SettlementObjectTypes::FishingGrounds)
             {

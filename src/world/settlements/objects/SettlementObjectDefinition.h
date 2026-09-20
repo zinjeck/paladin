@@ -13,7 +13,9 @@ namespace Paladin
         Roads,
         Housing,
         Logistics,
-        Food
+        Food,
+        Production,
+        Warfare
     };
 
     enum class SettlementFootprintSelectionMode : std::uint8_t
@@ -78,9 +80,14 @@ namespace Paladin
         inline constexpr std::string_view House = "house";
         inline constexpr std::string_view Stockpile = "stockpile";
         inline constexpr std::string_view Market = "market";
+        inline constexpr std::string_view TradeDepot = "trade_depot";
         inline constexpr std::string_view FishingGrounds = "fishing_grounds";
         inline constexpr std::string_view WheatFarm = "wheat_farm";
         inline constexpr std::string_view Pastureland = "pastureland";
+        inline constexpr std::string_view CoalMine = "coal_mine";
+        inline constexpr std::string_view IronMine = "iron_mine";
+        inline constexpr std::string_view GoldMine = "gold_mine";
+        inline constexpr std::string_view Quarry = "quarry";
         inline constexpr std::string_view Bakery = "bakery";
         inline constexpr std::string_view LoggingGrounds = "logging_grounds";
         inline constexpr std::string_view Barracks = "barracks";

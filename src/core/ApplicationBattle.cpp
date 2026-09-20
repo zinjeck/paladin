@@ -61,7 +61,8 @@ namespace Paladin
         for (const auto& unit : world.armies())
         {
             if (unit.ownerRealmId() == own->ownerRealmId() ||
-                unit.engagedOpponent() || !unit.soldierCount())
+                unit.garrisoned() || unit.engagedOpponent() ||
+                !unit.soldierCount())
             {
                 continue;
             }

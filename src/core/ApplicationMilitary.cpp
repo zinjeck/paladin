@@ -136,7 +136,12 @@ namespace Paladin
             std::vector<std::pair<double,ArmyId>> hits;
             for (const auto& unit:world.armies())
             {
-                if (unit.ownerRealmId()!=simulation_->playerRealmId() || unit.soldierCount()==0) continue;
+                if (unit.garrisoned() ||
+                    unit.ownerRealmId() != simulation_->playerRealmId() ||
+                    unit.soldierCount() == 0)
+                {
+                    continue;
+                }
                 const auto pos=WorldMapNavigation::annotationPosition(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),pixels,
                     worldRenderer_->globeEnabled,unit.visualX()+.5,unit.visualY()+.5);
                 if (!pos) continue;

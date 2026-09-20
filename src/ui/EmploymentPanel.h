@@ -1,5 +1,6 @@
 #pragma once
 #include "core/StrongId.h"
+#include "rendering/SceneSpriteLibrary.h"
 #include "ui/NormalFontRenderer.h"
 #include "ui/UiButton.h"
 #include <array>
@@ -156,6 +157,8 @@ namespace Paladin
         std::vector<Hit> hits_;
         int pressed_ = -1;
         std::size_t scrollOffset_ = 0;
+        std::size_t jobPage_ = 0;
+        SceneSpriteLibrary jobIcons_;
         NormalFontRenderer font_;
     };
 } // namespace Paladin

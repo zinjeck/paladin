@@ -1,5 +1,6 @@
 #pragma once
 #include "rendering/SceneSpriteLibrary.h"
+#include "rendering/WorkYardFoundation.h"
 #include "world/settlements/SettlementMap.h"
 namespace Paladin
 {
@@ -32,6 +33,7 @@ namespace Paladin
             false
         );
         q.setLayerFrom(floorStart, -2);
+        workYardFoundation(q, p, map, object, id, true);
         const double shedW = std::min(2.5, std::max(1., w - .3)),
                      shedH = std::min(1.2, h * .4);
         if (sprites.shadowsEnabled())

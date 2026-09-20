@@ -1,4 +1,5 @@
 #include "ui/FoundingPanel.h"
+#include "world/RealmFlagDesigns.h"
 
 #include "rendering/Renderer.h"
 #include "ui/GrayUiRenderer.h"
@@ -36,7 +37,8 @@ namespace Paladin
         cultureNameField_.clear();
         capitalNameField_.clear();
         selectedMapColor_ = {210, 54, 54};
-        flag_ = {};
+        flagPreset_ = 0;
+        flag_ = realmFlagDesign(flagPreset_);
         selectedOriginIndex_.reset();
         colorPickerTarget_ = ColorPickerTarget::None;
         showRealmStep();
@@ -105,6 +107,7 @@ namespace Paladin
         rightButton_.cancelPress();
         pickerDoneButton_.cancelPress();
         rulerReloadButton_.cancelPress();
+        flagPresetButton_.cancelPress();
         flagStrokeActive_ = false;
     }
 
@@ -157,6 +160,7 @@ namespace Paladin
         constexpr float flagCellSize = 20.0F;
         const float flagX = panelBounds_.x + 32.0F;
         const float flagY = panelBounds_.y + 304.0F;
+        flagPresetButton_.setBounds({flagX + 68, flagY - 39, 124, 30});
 
         for (std::size_t y = 0; y < RealmFlag::defaultHeight; ++y)
         {
@@ -253,6 +257,10 @@ namespace Paladin
             return;
         }
 
+        if (step_ == FoundingPanelStep::Realm)
+        {
+            flagPresetButton_.pointerMoved(x, y);
+        }
         leftButton_.pointerMoved(x, y);
         rightButton_.pointerMoved(x, y);
         if (mode_ == FoundingPanelMode::Founding &&
@@ -313,6 +321,7 @@ namespace Paladin
 
         if (step_ == FoundingPanelStep::Realm)
         {
+            static_cast<void>(flagPresetButton_.pointerPressed(x, y));
             realmNameField_.setFocused(realmNameField_.contains(x, y));
             cultureNameField_.setFocused(cultureNameField_.contains(x, y));
             capitalNameField_.setFocused(false);
@@ -400,6 +409,12 @@ namespace Paladin
         {
             rulerNameIndex_ = (rulerNameIndex_ + 1) % 100;
         }
+        if (step_ == FoundingPanelStep::Realm &&
+            flagPresetButton_.pointerReleased(x, y))
+        {
+            flagPreset_ = (flagPreset_ + 1) % RealmFlagDesignCount;
+            flag_ = realmFlagDesign(flagPreset_);
+        }
         pressedOriginIndex_.reset();
         const bool leftClicked = leftButton_.pointerReleased(x, y);
         const bool rightClicked = rightButton_.pointerReleased(x, y);
@@ -454,6 +469,7 @@ namespace Paladin
         draggedColorChannel_.reset();
         pickerDoneButton_.cancelPress();
         rulerReloadButton_.cancelPress();
+        flagPresetButton_.cancelPress();
         return true;
     }
 
@@ -616,6 +632,7 @@ namespace Paladin
                 panelBounds_.y + 272.0F,
                 2.5F
             );
+            flagPresetButton_.render(renderer, uiRenderer);
             for (std::size_t index = 0; index < flagCellCount; ++index)
             {
                 const FlagCell& cell = flag_.cells[index];

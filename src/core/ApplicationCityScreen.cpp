@@ -95,6 +95,9 @@ namespace Paladin
             simulation_->world().settlement(activeCitySettlementId_);
 
         const WorldTime& worldTime = simulation_->world().time();
+        const auto* hudRealm =
+            simulation_->world().realm(simulation_->playerRealmId());
+        cityHud_->setRealmFlag(hudRealm ? hudRealm->flag() : RealmFlag{});
 
         const double localMinute =
             citySettlement ? PlanetAstronomy::localMinute(
@@ -368,6 +371,15 @@ namespace Paladin
                 }
                 if (text.empty())
                 {
+                    if (const auto* ground = map->grid().tile(*tile);
+                        ground && ground->mineral != MineralDeposit::None)
+                    {
+                        text = ground->mineral == MineralDeposit::Coal
+                                   ? "Coal deposit"
+                               : ground->mineral == MineralDeposit::Iron
+                                   ? "Iron deposit"
+                                   : "Rare gold deposit";
+                    }
                     const auto feature = map->naturalFeatures().at(*tile).kind;
                     if (feature == NaturalFeatureKind::Tree)
                     {

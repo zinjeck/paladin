@@ -27,12 +27,33 @@ namespace Paladin
         bool handle(const SDL_Event&,World&,RealmId);
         bool chooseDestination(World&,RealmId,SettlementId);
         void render(Renderer&,const GrayUiRenderer&,const World&,RealmId) const;
+        bool takeMilitaryRequest() noexcept
+        {
+            const bool request = militaryRequest_;
+            militaryRequest_ = false;
+            return request;
+        }
         std::optional<UiRectangle> sendBounds(std::string_view) const;
         std::optional<UiRectangle> destinationBounds(SettlementId) const;
         std::optional<UiRectangle> stopBounds(ShipmentId) const;
     private:
         friend struct ApplicationSmokeTest;
-        enum class Kind { Close, Send, Amount, Adjust, All, Once, Repeat, Cancel, Destination, Stop, Up, Down };
+        enum class Kind
+        {
+            Garrison,
+            Close,
+            Send,
+            Amount,
+            Adjust,
+            All,
+            Once,
+            Repeat,
+            Cancel,
+            Destination,
+            Stop,
+            Up,
+            Down
+        };
         struct Control { UiRectangle bounds; Kind kind; std::string label; int value=0; std::uint64_t id=0; bool enabled=true; };
         void act(const Control&,World&,RealmId);
         int amount() const noexcept;
@@ -40,6 +61,7 @@ namespace Paladin
         SettlementId city_;
         UiRectangle bounds_, list_;
         int width_=0,height_=0,scroll_=0;
+        bool militaryRequest_ = false;
         bool repeating_=false,editing_=false,captured_=false;
         float mouseX_=-1,mouseY_=-1;
         std::string resource_, quantity_="1",message_;

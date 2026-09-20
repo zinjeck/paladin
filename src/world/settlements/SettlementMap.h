@@ -13,6 +13,7 @@
 #include "world/settlements/SettlementNaturalFeatures.h"
 #include "world/settlements/commands/SettlementCommandState.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/objects/jobs/mining/SettlementMiningState.h"
 
 #include <cstdint>
 
@@ -100,6 +101,7 @@ namespace Paladin
         {
             return PlanetAstronomy::latitude(planetV);
         }
+        SettlementMiningState mining;
         SettlementLogistics logistics;
         SettlementHomeHeating heating;
         SettlementCommerce commerce;

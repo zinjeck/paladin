@@ -1,7 +1,8 @@
 #pragma once
 
-#include "rendering/WorldPresentation.h"
 #include "core/StrongId.h"
+#include "rendering/WorldPresentation.h"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -40,5 +41,6 @@ namespace Paladin
     private:
         struct Cache;
         std::unique_ptr<Cache> cache_;
+        std::array<std::unique_ptr<Cache>, 3> parked_;
     };
 } // namespace Paladin

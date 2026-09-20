@@ -1,4 +1,5 @@
 #include "world/generation/WorldGenerator.h"
+#include "world/Geology.h"
 
 #include "world/WorldGrid.h"
 #include "world/generation/ClimateGenerator.h"
@@ -83,5 +84,6 @@ namespace Paladin
         generateWorldRelief(grid, settings.seaLevel, settings.seed);
         ClimateGenerator{}.generate(grid, settings);
         TerrainBiomeClassifier{}.classify(grid, settings);
+        generateGeology(grid, settings.seed);
     }
 } // namespace Paladin

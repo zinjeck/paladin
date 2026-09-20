@@ -265,6 +265,10 @@ namespace Paladin
         if (screen_ == Screen::World && controlsVisible &&
             worldSettlementPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
         {
+            if (worldSettlementPanel_->takeMilitaryRequest())
+            {
+                handleReportAction(CityHudAction::Military);
+            }
             if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
             return true;
         }

@@ -195,7 +195,7 @@ namespace Paladin
             std::shared_ptr<const WorldTribalSurfaceSource> influence;
             std::shared_ptr<WorldPoliticalSurfaceSource> surface;
             PoliticalPalette palette;
-            std::shared_ptr<const WorldPopulationField> population;
+            std::shared_ptr<WorldPopulationField> population;
         };
 
         struct DetailRequest
@@ -220,6 +220,7 @@ namespace Paladin
         WorldMapMode mode=WorldMapMode::Political;
         RealmId selected;
         std::uint64_t coarseGeneration=0;
+        std::uint64_t influenceSnapshotRevision = ~std::uint64_t(0);
         PoliticalTextures coarse;
         std::unordered_map<std::uint64_t, PoliticalTextures> detail;
         std::vector<float> distance;
@@ -296,7 +297,6 @@ namespace Paladin
             std::uint64_t next = 1469598103934665603ULL;
             const auto mix = [&](std::uint64_t value)
             { next = (next ^ value) * 1099511628211ULL; };
-            mix(std::uint64_t(mode));
             mix(world.grid().revision());
             mix(world.territory().revision());
             mix(world.grid().width());
@@ -307,6 +307,7 @@ namespace Paladin
                 mix(realm.usesTribalInfluence());
             }
             const auto topology = next;
+            mix(std::uint64_t(mode));
             if (mode==WorldMapMode::Population) mix(WorldPopulationField::fingerprint(world));
             mix(influence.revision());
             for (const auto& realm : world.realms())
@@ -367,8 +368,17 @@ namespace Paladin
             preparation->owners.resize(count);
             preparation->labelOwners.resize(count);
             preparation->distance.assign(count, 5.F);
-            preparation->influence =
-                std::make_shared<WorldTribalSurfaceSource>(influence);
+            if (presentedInfluence &&
+                influenceSnapshotRevision == influence.revision())
+            {
+                preparation->influence = presentedInfluence;
+            }
+            else
+            {
+                preparation->influence =
+                    std::make_shared<WorldTribalSurfaceSource>(influence);
+                influenceSnapshotRevision = influence.revision();
+            }
             if (topologyChanged || !surfaceSource)
             {
                 surfaceSource =
@@ -379,7 +389,11 @@ namespace Paladin
             {
                 preparation->stage = -1;
             }
-            if (mode==WorldMapMode::Population) preparation->population=std::make_shared<WorldPopulationField>(world);
+            if (mode == WorldMapMode::Population)
+            {
+                preparation->population =
+                    std::make_shared<WorldPopulationField>(world, true);
+            }
             for (const auto& realm : world.realms())
             {
                 preparation->byRealm[realm.id()] = preparation->labels.size();
@@ -417,6 +431,17 @@ namespace Paladin
             const double threshold =
                 world.territoryFoundationPolicy()
                     .tribalInfluence.visibleInfluenceThreshold;
+            if (job.population && !job.population->complete())
+            {
+                while (timeRemaining() && !job.population->complete())
+                {
+                    job.population->advance(world);
+                }
+                if (!job.population->complete())
+                {
+                    return;
+                }
+            }
             while (timeRemaining())
             {
                 if (job.stage == -1)
@@ -1382,6 +1407,7 @@ namespace Paladin
     void WorldRealmPresentationRenderer::reset()
     {
         cache_ = std::make_unique<Cache>();
+        parked_ = {};
     }
     void WorldRealmPresentationRenderer::configure(WorldMapMode mode, RealmId selected)
     {
@@ -1389,8 +1415,34 @@ namespace Paladin
         const auto cacheMode=mode==WorldMapMode::Terrain?WorldMapMode::Political:mode;
         if (cache_->mode!=cacheMode)
         {
-            cache_=std::make_unique<Cache>();
-            cache_->mode=cacheMode;
+            const auto slot = [](WorldMapMode m) -> std::size_t
+            {
+                return m == WorldMapMode::Government   ? 1
+                       : m == WorldMapMode::Population ? 2
+                                                       : 0;
+            };
+            // Keep only the coarse off-screen presentations; the active mode
+            // retains the existing bounded detail budget.
+            cache_->detail.clear();
+            cache_->detailRaster.reset();
+            const auto previous = slot(cache_->mode);
+            parked_[previous] = std::move(cache_);
+            cache_ = std::move(parked_[slot(cacheMode)]);
+            if (!cache_)
+            {
+                cache_ = std::make_unique<Cache>();
+                const auto& shared = *parked_[previous];
+                cache_->source = shared.source;
+                cache_->rendererOwner = shared.rendererOwner;
+                cache_->topologySignature = shared.topologySignature;
+                cache_->surfaceSource = shared.surfaceSource;
+                cache_->presentedInfluence = shared.preparation
+                                                 ? shared.preparation->influence
+                                                 : shared.presentedInfluence;
+                cache_->influenceSnapshotRevision =
+                    shared.influenceSnapshotRevision;
+            }
+            cache_->mode = cacheMode;
         }
         cache_->selected=selected;
     }

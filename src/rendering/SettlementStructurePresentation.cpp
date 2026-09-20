@@ -1,6 +1,8 @@
 #include "rendering/SettlementStructurePresentation.h"
 #include "rendering/BuildingView.h"
 #include "rendering/HomePresentation.h"
+#include "rendering/MiningPresentation.h"
+#include "rendering/MarketPresentation.h"
 #include "rendering/PasturePresentation.h"
 #include "rendering/SettlementEnvironmentDetails.h"
 #include "rendering/StockpilePresentation.h"
@@ -23,6 +25,7 @@ namespace Paladin
     ) const
     {
         const auto& state = map.objectState();
+        mineralOutcrops(queue, projection, map);
         ++commandFrame_;
         std::unordered_map<SettlementObjectId, unsigned, StrongIdHash>
             doubleRows;
@@ -251,6 +254,11 @@ namespace Paladin
                 };
             };
             const auto roof = rgb(style.fillRgb), wall = rgb(style.frameRgb);
+            if (miningJob(object.objectTypeId))
+            {
+                miningPresentation(queue, projection, sprites, map, object, id);
+                continue;
+            }
             if (object.objectTypeId == SettlementObjectTypes::Road &&
                 sprites.find("road.floor"))
             {
@@ -646,8 +654,25 @@ namespace Paladin
                 );
             }
             queue.setLayerFrom(floorStart, -2);
+            if (object.objectTypeId == SettlementObjectTypes::FishingGrounds ||
+                object.objectTypeId == SettlementObjectTypes::Market)
+            {
+                workYardFoundation(
+                    queue,
+                    projection,
+                    map,
+                    object,
+                    id,
+                    object.objectTypeId == SettlementObjectTypes::FishingGrounds
+                );
+            }
             if (style.mode != "enclosed")
             {
+                if (object.objectTypeId == SettlementObjectTypes::Market)
+                {
+                    marketStalls(queue, projection, sprites, f, id);
+                    continue;
+                }
                 if (style.mode == "ground")
                 {
                     if (object.objectTypeId ==

@@ -515,8 +515,11 @@ namespace Paladin
                                       : "Going to livestock";
             }
             return c.path.empty()
-                       ? (c.activity == CitizenActivity::Fishing ? "Fishing"
-                                                                 : "Working")
+                       ? ((c.activity == CitizenActivity::Mining ||
+                           c.activity == CitizenActivity::UndergroundMining)
+                              ? "Mining"
+                          : c.activity == CitizenActivity::Fishing ? "Fishing"
+                                                                   : "Working")
                        : "Going to work";
         case CitizenTaskKind::Break:
             return c.breakReturning ? "Returning from break" : "On break";

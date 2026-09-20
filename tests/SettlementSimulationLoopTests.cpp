@@ -577,9 +577,10 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(!map.heating.heated(home));
         map.heating.advance(map.logistics, occupied, 0, 1440);
         PALADIN_CHECK(
-            map.logistics.inventory(inventory)->amount("lumber") == 6
+            map.logistics.inventory(inventory)->amount("lumber") == 5
         );
         PALADIN_CHECK(map.heating.heated(home));
+        PALADIN_CHECK(map.logistics.add(inventory, "lumber", 3));
         map.heating.advance(map.logistics, occupied, 9 * 1440, 1440);
         PALADIN_CHECK(
             map.logistics.inventory(inventory)->amount("lumber") == 2
@@ -590,7 +591,9 @@ void runSettlementSimulationLoopTests()
             map.logistics.inventory(inventory)->amount("lumber") == 0
         );
         PALADIN_CHECK(!map.heating.heated(home));
-        PALADIN_CHECK(std::abs(map.heating.coldFraction(home) - .5) < 1e-9);
+        PALADIN_CHECK(
+            std::abs(map.heating.coldFraction(home) - 2. / 3.) < 1e-9
+        );
         map.heating.advance(map.logistics, occupied, 10 * 1440, 60);
         SettlementCitizen cold;
         cold.homeId = home;
@@ -1047,7 +1050,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(visual.renderX(3, .25) == 2.25);
         PALADIN_CHECK(visual.renderY(4, .75) == 3.75);
     }
-    // Default-rate food economy: two producers must support six residents,
+    // Two producers and founding supplies must sustain the first four days,
     // including travel, meals, sleep and hauling (not perfect attendance).
     for (bool livestock : {false, true})
     {
@@ -1102,7 +1105,7 @@ void runSettlementSimulationLoopTests()
             map.commerce.resourceTotals().at(livestock ? "meat" : "fish");
         std::cout << (livestock ? "Pasture" : "Fishery")
                   << " four-day production: " << totals.produced << '\n';
-        PALADIN_CHECK(totals.produced >= 48);
+        PALADIN_CHECK(totals.produced >= (livestock ? 48 : 24));
         PALADIN_CHECK(citizens.citizens().size() == 6);
         for (const auto& citizen : citizens.citizens())
         {
@@ -1149,8 +1152,8 @@ void runSettlementSimulationLoopTests()
         const FisheryJobPolicy policy;
         PALADIN_CHECK(fisheryReach({{0, 0}, 2, 2}) == 4);
         PALADIN_CHECK(fisheryReach({{0, 0}, 16, 16}) <= 12);
-        PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 18);
-        PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 9);
+        PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 9);
+        PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 4.5);
         PALADIN_CHECK(fisheryProductionPerMinute(0, 1, policy) == 0);
         PALADIN_CHECK(fisheryProductionPerMinute(120, 0, policy) == 0);
         const SceneProjection projection{0, 0, 10, 100, 100};
@@ -1667,6 +1670,21 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(site.resourceDeliveries[1].requiredAmount == 2);
         PALADIN_CHECK(marketStallCount(4, 6) == 2);
         PALADIN_CHECK(marketStallCount(6, 4) == 2);
+        for (const auto dimensions :
+            {std::pair{3, 3}, {4, 6}, {6, 4}, {7, 11}, {11, 7}})
+        {
+            std::set<std::pair<int, int>> workers;
+            for (int i = 0;
+                 i < marketStallCount(dimensions.first, dimensions.second);
+                 ++i)
+            {
+                const auto tile = marketStallTile({}, dimensions.first,
+                    dimensions.second, i);
+                PALADIN_CHECK(tile.x >= 0 && tile.x < dimensions.first);
+                PALADIN_CHECK(tile.y >= 0 && tile.y + 2 <= dimensions.second);
+                PALADIN_CHECK(workers.emplace(tile.x, tile.y).second);
+            }
+        }
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),
             *stockpile,
@@ -1698,24 +1716,27 @@ void runSettlementSimulationLoopTests()
                                   map.commerce.householdTotal() +
                                   map.commerce.businessTotal();
         PALADIN_CHECK(initialMoney == 100000);
-        PALADIN_CHECK(!map.commerce.keepFoodSalesEnabled);
-        // Keep food may not be collected for sale with the default switch off.
+        // Founding food remains citizen relief, never market wholesale stock.
         advance(map, citizens, 360, 50);
         PALADIN_CHECK(
             map.logistics.inventory(map.logistics.forObject(market))->used() ==
             0
         );
+        const auto bakery =
+            completed(map, SettlementObjectTypes::Bakery, {{18, 15}, 5, 5});
+        // Bakery output is a real wholesale source even when a stockpile
+        // exists.
         PALADIN_CHECK(
-            map.logistics.add(map.logistics.forObject(stockpile), "fish", 20)
+            map.logistics.add(map.logistics.forObject(bakery), "bread", 20)
         );
         advance(map, citizens, 410, 120);
         PALADIN_CHECK(
             map.logistics.inventory(map.logistics.forObject(market))
-                ->amount("fish") > 0
+                ->amount("bread") > 0
         );
         PALADIN_CHECK(
-            map.logistics.inventory(map.logistics.forObject(stockpile))
-                ->amount("fish") < 20
+            map.logistics.inventory(map.logistics.forObject(bakery))
+                ->amount("bread") < 20
         );
         PALADIN_CHECK(map.commerce.businessCash(market) < 3200);
         const auto cash = map.commerce.treasury->balance +
@@ -1742,14 +1763,14 @@ void runSettlementSimulationLoopTests()
         buyer.energy = 100;
         map.logistics.release(buyer.id);
         PALADIN_CHECK(
-            map.logistics.reserve(buyer.id, buyer.task.source, {}, "fish", 1)
+            map.logistics.reserve(buyer.id, buyer.task.source, {}, "bread", 1)
         );
         const auto wallet = map.commerce.savings(buyer.id);
-        const auto fish = map.logistics.total("fish");
+        const auto bread = map.logistics.total("bread");
         advance(map, citizens, 530, 1);
         PALADIN_CHECK(map.commerce.savings(buyer.id) < wallet - 98);
         PALADIN_CHECK(buyer.hunger < 25);
-        PALADIN_CHECK(map.logistics.total("fish") == fish - 1);
+        PALADIN_CHECK(map.logistics.total("bread") == bread - 1);
         PALADIN_CHECK(
             map.commerce.treasury->balance + map.commerce.householdTotal() +
                 map.commerce.businessTotal() ==
@@ -2753,10 +2774,11 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(map.logistics.total("lumber") == 44);
         PALADIN_CHECK(citizens.spawn(1));
         advance(map, citizens, 660, 180);
-        PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 44);
+        PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 40);
+        PALADIN_CHECK(map.logistics.total("lumber") == 44);
         PALADIN_CHECK(map.logistics.inventory(store)->used() == storeCapacity);
-        // Once its own storage has room, its employee delivers there, even
-        // when the keep is a closer possible destination.
+        // The founding cache never accepts hauling. Once the stockpile has
+        // space its worker collects the waiting piles there.
         PALADIN_CHECK(
             map.logistics.reserve(CitizenId{999999}, store, {}, "stone", 4)
         );
@@ -2765,7 +2787,8 @@ void runSettlementSimulationLoopTests()
         map.logistics.drop({9, 11}, "lumber", 4, 840);
         advance(map, citizens, 840, 115);
         PALADIN_CHECK(map.logistics.inventory(store)->amount("lumber") == 4);
-        PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 44);
+        PALADIN_CHECK(map.logistics.inventory(keep)->amount("lumber") == 40);
+        PALADIN_CHECK(map.logistics.total("lumber") == 48);
     }
     {
         auto map = land();

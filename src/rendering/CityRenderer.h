@@ -65,6 +65,13 @@ namespace Paladin
             std::span<const BattleSoldierView> battleSoldiers = {}
         ) const;
 
+        CitizenId citizenAtScreen(
+            float x,
+            float y,
+            const SettlementMap&,
+            const SettlementCitizenState&
+        ) const;
+
         void renderMinimap(
             Renderer& renderer,
             const SettlementMap& settlementMap,
@@ -74,6 +81,11 @@ namespace Paladin
         ) const;
 
     private:
+        mutable std::uint64_t pickedMap_ = 0;
+        mutable int pickedWidth_ = 0, pickedHeight_ = 0;
+        mutable double pickedScale_ = 1, pickedX_ = 0, pickedY_ = 0,
+                       pickedPitch_ = 1;
+        mutable bool pickedSoftware_ = false, pickedPixelScene_ = false;
         CityDistantObjects distantObjects_;
         CityClouds clouds_;
         GrassPresentation grass_;

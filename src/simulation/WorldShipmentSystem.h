@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/StrongId.h"
+#include <cstdint>
 #include <string_view>
 
 namespace Paladin
@@ -11,7 +12,13 @@ namespace Paladin
     enum class ShipmentResult
     {
         Success, InvalidSettlement, NotOwned, SameSettlement, InvalidResource,
-        InvalidAmount, InsufficientGoods, NoLandRoute, RouteLimit, InvalidRoute
+        InvalidAmount,
+        InsufficientGoods,
+        NoLandRoute,
+        RouteLimit,
+        InvalidRoute,
+        MissingTradeDepot,
+        TradeAgreementRequired
     };
     std::string_view shipmentResultText(ShipmentResult) noexcept;
 
@@ -24,9 +31,20 @@ namespace Paladin
         // construction, market and factory inputs are not requisitioned.
         static double total(const Settlement&, std::string_view resource);
         static int available(const Settlement&, std::string_view resource);
-        static ShipmentResult create(World&, RealmId, SettlementId source,
-            SettlementId destination, std::string_view resource, int amount,
-            bool repeating, ShipmentId* created = nullptr, bool aiManaged = false);
+        static bool hasTradeDepot(const Settlement&);
+        static ShipmentResult create(
+            World&,
+            RealmId,
+            SettlementId source,
+            SettlementId destination,
+            std::string_view resource,
+            int amount,
+            bool repeating,
+            ShipmentId* created = nullptr,
+            bool aiManaged = false,
+            RealmId buyer = {},
+            std::int64_t unitPrice = 0
+        );
         // In-flight goods finish their delivery/return; stopping cannot delete cargo.
         static ShipmentResult stop(World&, RealmId, ShipmentId);
         static void tick(World&, double minute, double elapsed);

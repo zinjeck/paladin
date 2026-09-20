@@ -12,6 +12,14 @@ namespace Paladin
         Hills,
         Mountain
     };
+    enum class MineralDeposit : std::uint8_t
+    {
+        None,
+        Coal,
+        Iron,
+        Gold
+    };
+
     struct WorldTile
     {
         TerrainType terrain = TerrainType::Water;
@@ -24,5 +32,6 @@ namespace Paladin
         // Landform is independent of climate: tundra and polar slopes may
         // still be hills even though their biome remains cold.
         ReliefType relief = ReliefType::Lowland;
+        MineralDeposit mineral = MineralDeposit::None;
     };
 } // namespace Paladin

@@ -11,7 +11,7 @@ namespace Paladin
     {
     public:
         // The burn fraction persists through season changes. Empty houses do
-        // not burn fuel. A delivered log supplies 12 hours, or 6 in winter.
+        // not burn fuel. A delivered log supplies 8 hours, or 4 in winter.
         void advance(
             SettlementLogistics& logistics,
             const std::unordered_set<SettlementObjectId, StrongIdHash>&
@@ -42,7 +42,7 @@ namespace Paladin
                     continue;
                 }
                 const double duration =
-                    seasonAtMinute(minute) == Season::Winter ? 360 : 720;
+                    seasonAtMinute(minute) == Season::Winter ? 240 : 480;
                 double remaining = elapsed / duration;
                 while (remaining > 1e-9)
                 {

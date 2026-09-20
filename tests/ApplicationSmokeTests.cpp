@@ -248,6 +248,70 @@ namespace Paladin
             app.settlementInspectionPanel_->clearLayout();
             app.simulationClock_->setPaused(true); sim.setSpeed(SimulationSpeed::Paused); app.simulationClock_->setPaused(true);
             PALADIN_CHECK(sim.setPresentedSettlement(city));
+            // Actual city mouse routing prefers the visible person over the
+            // keep, and transparent space in that same tile selects the keep.
+            auto& people = world.settlement(city)->simulationState().citizens();
+            int offset = 0;
+            for (const auto& record : people.citizens())
+            {
+                auto& resident = const_cast<SettlementCitizen&>(record);
+                resident.tilePosition = {25 + offset++, 25};
+                resident.path.clear();
+                resident.hasVisualSnapshot = false;
+            }
+            auto& resident =
+                const_cast<SettlementCitizen&>(people.citizens().front());
+            resident.tilePosition = {4, 5};
+            app.screen_ = Application::Screen::City;
+            app.activeCitySettlementId_ = city;
+            app.camera_->setPosition(4.5, 5.5);
+            app.camera_->setZoom(16);
+            const bool roofs = app.cityRenderer_->presentation.roofsVisible;
+            app.cityRenderer_->presentation.roofsVisible = false;
+            frame(app);
+            const double citizenPixels =
+                app.tileRenderMetrics_->scaledTilePixels(app.camera_->zoom());
+            const float cx = float(
+                app.renderer_->outputWidth() * .5 +
+                (4.5 - app.camera_->tileX()) * citizenPixels
+            );
+            const float cy = float(
+                app.renderer_->outputHeight() * .5 +
+                (5.5 - app.camera_->tileY()) * citizenPixels
+            );
+            bool selected = false;
+            for (int dy = -60; dy < 15 && !selected; ++dy)
+            {
+                for (int dx = -30; dx < 30 && !selected; ++dx)
+                {
+                    if (app.cityRenderer_->citizenAtScreen(
+                            cx + dx + .5F,
+                            cy + dy + .5F,
+                            map,
+                            people
+                        ) == resident.id)
+                    {
+                        PALADIN_CHECK(click(app, cx + dx + .5F, cy + dy + .5F));
+                        selected = true;
+                    }
+                }
+            }
+            PALADIN_CHECK(
+                selected &&
+                app.settlementInspectionController_->selectedCitizen(people)
+                        ->id == resident.id
+            );
+            app.settlementInspectionPanel_->clearLayout();
+            PALADIN_CHECK(
+                !app.cityRenderer_
+                     ->citizenAtScreen(cx + 28, cy + 20, map, people)
+            );
+            PALADIN_CHECK(click(app, cx + 28, cy + 20));
+            PALADIN_CHECK(
+                app.settlementInspectionController_->kind() ==
+                SettlementInspectionKind::CompletedObject
+            );
+            app.cityRenderer_->presentation.roofsVisible = roofs;
             PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
             frame(app);
             using A=MilitaryPanel::Action;
@@ -256,7 +320,16 @@ namespace Paladin
                 const auto b=app.militaryPanel_->controlBounds(action,id); PALADIN_CHECK(b);
                 PALADIN_CHECK(click(app,b->x+b->width*.5F,b->y+b->height*.5F));
             };
-            button(A::Hire); button(A::Hire); button(A::New);
+            PALADIN_CHECK(
+                MilitarySystem::recruit(world, sim.playerRealmId(), city, 1) ==
+                MilitaryResult::Success
+            );
+            PALADIN_CHECK(
+                MilitarySystem::recruit(world, sim.playerRealmId(), city, 1) ==
+                MilitaryResult::Success
+            );
+            frame(app);
+            button(A::New);
             const auto first=app.militaryPanel_->selection(); PALADIN_CHECK(first);
             button(A::New); const auto second=app.militaryPanel_->selection(); PALADIN_CHECK(second && first!=second);
             button(A::Row,first); button(A::Focus);
@@ -307,10 +380,20 @@ namespace Paladin
             PALADIN_CHECK(std::abs(world.army(first)->visualX()-(initial+.5))<1.e-8);
             frame(app); capture(app,"pr27-army-half-tile-march.bmp");
             PALADIN_CHECK(app.handleReportAction(CityHudAction::Military));
-            frame(app); button(A::Local);
-            PALADIN_CHECK(!app.militaryPanel_->controlBounds(A::Row,first));
-            PALADIN_CHECK(app.militaryPanel_->controlBounds(A::Row,second));
-            button(A::World); PALADIN_CHECK(app.militaryPanel_->controlBounds(A::Row,first));
+            frame(app);
+            PALADIN_CHECK(app.militaryPanel_->controlBounds(A::Row, first));
+            button(A::Row, first);
+            button(A::ToGarrison);
+            PALADIN_CHECK(!world.army(first)->garrisoned()); // moving: disabled
+            button(A::Row, second);
+            button(A::ToGarrison);
+            PALADIN_CHECK(world.army(second)->garrisonSettlementId() == city);
+            PALADIN_CHECK(
+                app.militaryPanel_->controlBounds(A::Row, second)->x >
+                app.militaryPanel_->controlBounds(A::Row, first)->x
+            );
+            button(A::ToField);
+            PALADIN_CHECK(!world.army(second)->garrisoned());
             key(app,SDL_SCANCODE_ESCAPE); key(app,SDL_SCANCODE_ESCAPE);
             PALADIN_CHECK(!app.selectedWorldArmy_ && !app.militaryPanel_->isOpen());
             std::cout<<"Military actual event routing: portrait creation, large sprite/head/count picking, overlap cycling, rolled-globe tile order, pause and city detachment passed\n";
@@ -406,6 +489,26 @@ namespace Paladin
             SettlementId destination;
             for(const auto& city:world.settlements()) if(city.ownerRealmId()==actor && city.id()!=source) { destination=city.id(); break; }
             PALADIN_CHECK(source && destination);
+            for (const auto id : {source, destination})
+            {
+                auto* map = sim.settlementMap(id);
+                if (!map) continue;
+                auto depot = *SettlementObjectCatalog::definition("trade_depot");
+                depot.bypassesConstruction = true;
+                bool placed = false;
+                for (int y = 1; y + 5 < map->grid().height() && !placed; ++y)
+                {
+                    for (int x = 1; x + 5 < map->grid().width() && !placed; ++x)
+                    {
+                        const SettlementObjectFootprint f{{x,y},5,5};
+                        if (!map->objectState().canPlace(map->grid(),depot,f)) continue;
+                        placed = map->objectState().placeCompletedObject(map->grid(),depot,f);
+                        if (placed) map->naturalFeatures().clear(f);
+                    }
+                }
+                PALADIN_CHECK(placed);
+                map->logistics.synchronize(map->objectState(),world.time().totalGameMinutes());
+            }
             const auto width=app.renderer_->outputWidth(),height=app.renderer_->outputHeight();
             app.selectedWorldArmy_={}; app.militaryPanel_->close(); app.diplomacyPanel_->close(); app.employmentPanel_->close();
             sim.setSpeed(SimulationSpeed::Paused); app.simulationClock_->setPaused(true);
@@ -984,8 +1087,11 @@ namespace Paladin
             PALADIN_CHECK(red.red == 255 && red.green == 0);
             PALADIN_CHECK(transparent.red == 18 && transparent.green == 20);
             renderer.endFrame();
-            SettlementGrid galleryGrid(48, 48);
-            for (int y = 0; y < 48; ++y)
+            const int galleryHeight = 8 + 12 * int(
+                (SettlementObjectCatalog::definitions().size() + 2) / 3
+            );
+            SettlementGrid galleryGrid(48, galleryHeight);
+            for (int y = 0; y < galleryHeight; ++y)
             {
                 for (int x = 0; x < 48; ++x)
                 {
@@ -1001,17 +1107,33 @@ namespace Paladin
                 definition.bypassesConstruction = true;
                 const bool fixed = definition.selectionMode ==
                                    SettlementFootprintSelectionMode::Fixed;
+                const SettlementObjectFootprint footprint{
+                    {4 + (slot % 3) * 12, 4 + (slot / 3) * 12},
+                    fixed ? definition.previewWidth : 6,
+                    fixed ? definition.previewHeight : 6
+                };
+                if (const auto* mine = miningJob(definition.id))
+                {
+                    for (int y = 0; y < footprint.height; ++y)
+                    {
+                        for (int x = 0; x < footprint.width; ++x)
+                        {
+                            gallery.grid().tile({footprint.topLeft.x + x,
+                                footprint.topLeft.y + y})->mineral =
+                                mine->deposit;
+                        }
+                    }
+                    gallery.objectState().invalidateTerrainCache();
+                }
                 PALADIN_CHECK(gallery.objectState().placeCompletedObject(
                     gallery.grid(),
                     definition,
-                    {{4 + (slot % 3) * 12, 4 + (slot / 3) * 12},
-                     fixed ? definition.previewWidth : 6,
-                     fixed ? definition.previewHeight : 6}
+                    footprint
                 ));
                 ++slot;
             }
-            Camera2D galleryCamera(21, 20);
-            galleryCamera.setZoom(4);
+            Camera2D galleryCamera(22, galleryHeight * .5);
+            galleryCamera.setZoom(2);
             SettlementCitizenState noPeople;
             renderer.beginFrame();
             city.render(
@@ -1339,10 +1461,22 @@ namespace Paladin
                 // motion raster tests; there is no world.settlement sprite.
                 // The bakery is a user-sized footprint: its roof must cover
                 // the complete 6x6 gallery building, preserving its overhang.
+                const auto bakery = std::find_if(
+                    gallery.objectState().completedObjects().begin(),
+                    gallery.objectState().completedObjects().end(),
+                    [](const auto& object)
+                    {
+                        return object.objectTypeId ==
+                            SettlementObjectTypes::Bakery;
+                    }
+                );
+                PALADIN_CHECK(
+                    bakery != gallery.objectState().completedObjects().end()
+                );
                 SceneDrawQueue fitted;
                 const SceneProjection fittedView{
-                    21,
-                    20,
+                    bakery->footprint.topLeft.x + 3.,
+                    bakery->footprint.topLeft.y + 3.,
                     20,
                     renderer.outputWidth(),
                     renderer.outputHeight()
@@ -1375,10 +1509,10 @@ namespace Paladin
                 for (const auto& item : fitted.items())
                 {
                     if (bakeryRoofs.contains(item.texture) &&
-                        item.groundDepth == 34)
+                        item.stableId == ((bakery->id.value() << 3) | 2) &&
+                        item.bounds.width > 120 && item.bounds.width < 140)
                     {
-                        bakeryCovered =
-                            item.bounds.width > 120 && item.bounds.width < 140;
+                        bakeryCovered = true;
                         roofTop = std::min(roofTop, item.bounds.y);
                         roofBottom = std::max(
                             roofBottom,

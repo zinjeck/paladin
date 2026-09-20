@@ -1,5 +1,6 @@
 #include "ui/CityHud.h"
 #include "rendering/SceneSpriteLibrary.h"
+#include "ui/RealmFlagRenderer.h"
 #include "ui/SimulationSpeedControls.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementCommerce.h"
@@ -38,10 +39,15 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 18> menuOptions{
+        constexpr std::array<MenuOptionDefinition, 23> menuOptions{
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
-             {0, SettlementObjectTypes::Barracks, "", "", "Barracks", ""},
-             {0, SettlementObjectTypes::ArmySupplyDepot, "", "", "Army Supply", "Depot"},
+             {6, SettlementObjectTypes::Barracks, "", "", "Barracks", ""},
+             {6,
+              SettlementObjectTypes::ArmySupplyDepot,
+              "",
+              "",
+              "Army Supply",
+              "Depot"},
              {1, SettlementObjectTypes::Road, "", "", "Road", ""},
              {2, SettlementObjectTypes::House, "", "", "House", ""},
              {3,
@@ -59,14 +65,19 @@ namespace Paladin
               "Logging",
               "Grounds"},
              {4, SettlementObjectTypes::Bakery, "", "", "Bakery", ""},
+             {4, SettlementObjectTypes::Quarry, "", "", "Quarry", ""},
+             {4, SettlementObjectTypes::GoldMine, "", "", "Gold", "Mine"},
+             {4, SettlementObjectTypes::IronMine, "", "", "Iron", "Mine"},
+             {4, SettlementObjectTypes::CoalMine, "", "", "Coal", "Mine"},
              {5, SettlementObjectTypes::Stockpile, "", "", "Stockpile", ""},
              {5, SettlementObjectTypes::Market, "", "", "Market", ""},
-             {6, "", SettlementCommandTypes::Cancel, "Cancel Task", "", ""},
-             {6, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
-             {6, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
-             {6, "", SettlementCommandTypes::Gather, "Gather", "", ""},
-             {6, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
-             {6,
+             {5, SettlementObjectTypes::TradeDepot, "", "", "Trade", "Depot"},
+             {7, "", SettlementCommandTypes::Cancel, "Cancel Task", "", ""},
+             {7, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
+             {7, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
+             {7, "", SettlementCommandTypes::Gather, "Gather", "", ""},
+             {7, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
+             {7,
               "",
               SettlementCommandTypes::CollectRock,
               "Collect Rocks",
@@ -105,6 +116,7 @@ namespace Paladin
               UiButton("Agriculture"),
               UiButton("Production"),
               UiButton("Logistics"),
+              UiButton("Warfare"),
               UiButton("Command")
           }
     {
@@ -154,7 +166,12 @@ namespace Paladin
 
         for (std::size_t index = 0; index < menuOptions.size(); ++index)
         {
-            const std::size_t category = menuOptions[index].category;
+            const std::size_t category =
+                displayCategory(menuOptions[index].category);
+            if (category >= CategoryCount)
+            {
+                continue;
+            }
             const std::size_t stackOffset = ++stackOffsets[category];
 
             optionBounds_[index] = {
@@ -177,6 +194,7 @@ namespace Paladin
 
         cityNamePanel_ = {0.0F, 0.0F, informationWidth, informationTopHeight};
 
+        flagPanel_ = {informationWidth, 44, 48, 64};
         seasonBounds_ = {
             cityNamePanel_.x + cityNamePanel_.width - 44,
             cityNamePanel_.y + (cityNamePanel_.height - 36) * .5F,
@@ -430,7 +448,7 @@ namespace Paladin
 
     bool CityHud::containsInteractivePoint(float x, float y) const noexcept
     {
-        if (eventsButton_.containsPoint(x, y) ||
+        if (flagPanel_.contains(x, y) || eventsButton_.containsPoint(x, y) ||
             ledgerButton_.containsPoint(x, y))
         {
             return true;
@@ -625,25 +643,64 @@ namespace Paladin
         const GrayUiRenderer& uiRenderer
     ) const
     {
+        if (!goodsIconsLoaded_)
+        {
+            goodsIconsLoaded_ = true;
+            SceneSpriteLibrary icons;
+            icons.load(
+                renderer,
+                std::string(SDL_GetBasePath()) + "assets/sprites"
+            );
+            const char* names[] = {
+                "ui.goods.stone",
+                "ui.goods.lumber",
+                "ui.goods.fish",
+                "ui.goods.meat",
+                "ui.goods.gold"
+            };
+            for (int i = 0; i < 5; ++i)
+            {
+                if (auto* sprite = icons.find(names[i]))
+                {
+                    goodsIcons_[i] = sprite->texture;
+                }
+            }
+            for (const auto& option : menuOptions)
+            {
+                if (option.objectTypeId.empty())
+                {
+                    continue;
+                }
+                if (auto* sprite = icons.find(
+                        "ui.build." + std::string(option.objectTypeId)
+                    ))
+                {
+                    optionIcons_[std::string(option.objectTypeId)] =
+                        sprite->texture;
+                }
+            }
+        }
+
         uiRenderer.drawPanel(renderer, cityNamePanel_);
+        uiRenderer.drawPanel(renderer, flagPanel_);
+        drawRealmFlag(renderer, flag_, flagPanel_.x + 10, flagPanel_.y + 14, 4);
         uiRenderer.drawPanel(renderer, dayTimePanel_);
         uiRenderer.drawPanel(renderer, treasuryPanel_);
         uiRenderer.drawPanel(renderer, extensionPanel_);
-        // Temporary gold-token artwork; the panel layout does not depend on it.
-        renderer.fillRectangle(
-            treasuryPanel_.x + 12,
-            treasuryPanel_.y + 10,
-            15,
-            16,
-            {124, 85, 19, 255}
-        );
-        renderer.fillRectangle(
-            treasuryPanel_.x + 14,
-            treasuryPanel_.y + 9,
-            11,
-            14,
-            {239, 192, 57, 255}
-        );
+        if (const auto& icon = goodsIcons_[4])
+        {
+            renderer.drawTexture(
+                *icon,
+                0,
+                0,
+                float(icon->width()),
+                float(icon->height()),
+                treasuryPanel_.x + 6,
+                treasuryPanel_.y + 6,
+                float(icon->width()),
+                float(icon->height())
+            );
+        }
         uiRenderer.drawLabel(
             renderer,
             goldText(treasuryGold_),
@@ -863,28 +920,6 @@ namespace Paladin
         }
         uiRenderer.drawPanel(renderer, minimapPanel_);
         goodsButton_.render(renderer, uiRenderer);
-        if (!goodsIconsLoaded_)
-        {
-            goodsIconsLoaded_ = true;
-            SceneSpriteLibrary icons;
-            icons.load(
-                renderer,
-                std::string(SDL_GetBasePath()) + "assets/sprites"
-            );
-            const char* names[] = {
-                "ui.goods.stone",
-                "ui.goods.lumber",
-                "ui.goods.fish",
-                "ui.goods.meat"
-            };
-            for (int i = 0; i < 4; ++i)
-            {
-                if (auto* sprite = icons.find(names[i]))
-                {
-                    goodsIcons_[i] = sprite->texture;
-                }
-            }
-        }
 
         if (goodsOpen_)
         {
@@ -975,6 +1010,36 @@ namespace Paladin
             }
 
             const UiRectangle& bounds = optionBounds_[index];
+            if (const auto art =
+                    optionIcons_.find(std::string(definition.objectTypeId));
+                art != optionIcons_.end())
+            {
+                const auto& icon = *art->second;
+                renderer.drawTexture(
+                    icon,
+                    0,
+                    0,
+                    float(icon.width()),
+                    float(icon.height()),
+                    bounds.x + (bounds.width - icon.width()) * .5F,
+                    bounds.y + 5,
+                    float(icon.width()),
+                    float(icon.height())
+                );
+                const auto label = [&](std::string_view value, float y)
+                {
+                    uiRenderer.drawLabel(
+                        renderer,
+                        value,
+                        centeredLabelX(bounds, value, 1.25F),
+                        y,
+                        1.25F
+                    );
+                };
+                label(definition.firstLine, bounds.y + 34);
+                label(definition.secondLine, bounds.y + 47);
+                continue;
+            }
             const bool isWorkplaceCategory =
                 definition.category == 3 || definition.category == 4;
             const bool isRoad = definition.category == 1;
@@ -1082,8 +1147,10 @@ namespace Paladin
     bool CityHud::optionIsVisible(std::size_t optionIndex) const noexcept
     {
         return optionIndex < menuOptions.size() &&
-               menuOptions[optionIndex].category < visibleCategoryCount() &&
-               menuOptions[optionIndex].category == openCategory_;
+               displayCategory(menuOptions[optionIndex].category) <
+                   visibleCategoryCount() &&
+               displayCategory(menuOptions[optionIndex].category) ==
+                   openCategory_;
     }
 
     void CityHud::closeCategoryMenus() noexcept

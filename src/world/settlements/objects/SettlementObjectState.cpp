@@ -1,5 +1,6 @@
 #include "world/settlements/objects/SettlementObjectState.h"
 #include "world/settlements/objects/SettlementDoor.h"
+#include "world/settlements/objects/jobs/mining/MiningJob.h"
 
 #include "world/SettlementGrid.h"
 #include "world/TerrainType.h"
@@ -283,6 +284,15 @@ namespace Paladin
         const std::size_t total = static_cast<std::size_t>(footprint.width) *
                                   static_cast<std::size_t>(footprint.height);
 
+        if (const auto* mine = miningJob(definition.id);
+            mine && mine->deposit != MineralDeposit::None &&
+            blockedTileCountIn(
+                mineralPrefix_[std::size_t(mine->deposit) - 1],
+                footprint
+            ) == 0)
+        {
+            return {0, total, false};
+        }
         return {total - blocked, blocked, true};
     }
 
@@ -806,8 +816,21 @@ namespace Paladin
             0
         );
 
+        const bool rebuildMinerals = cachedPlacementGrid_ != &grid ||
+            mineralPrefix_[0].size() != structureBlockedPrefix_.size();
+        // Construction changes occupancy, not geology. Reuse the deposit
+        // tables while roads and buildings complete instead of rebuilding
+        // three map-sized arrays with every placement revision.
+        if (rebuildMinerals)
+        {
+            for (auto& prefix : mineralPrefix_)
+            {
+                prefix.assign(structureBlockedPrefix_.size(), 0);
+            }
+        }
         for (std::int32_t y = 0; y < mapHeight_; ++y)
         {
+            std::array<std::uint32_t, 3> mineralRow{};
             std::uint32_t structureRow = 0;
             std::uint32_t infrastructureRow = 0;
 
@@ -833,6 +856,17 @@ namespace Paladin
                         [static_cast<std::size_t>(y) * prefixWidth +
                          static_cast<std::size_t>(x + 1)] +
                     structureRow;
+                for (std::size_t ore = 0; rebuildMinerals && ore < mineralPrefix_.size(); ++ore)
+                {
+                    mineralRow[ore] +=
+                        !invalidTerrain &&
+                                std::size_t(worldTile->mineral) == ore + 1
+                            ? 1U
+                            : 0U;
+                    mineralPrefix_[ore][prefixIndex] =
+                        mineralPrefix_[ore][prefixIndex - prefixWidth] +
+                        mineralRow[ore];
+                }
                 infrastructureBlockedPrefix_[prefixIndex] =
                     infrastructureBlockedPrefix_
                         [static_cast<std::size_t>(y) * prefixWidth +

@@ -19,7 +19,8 @@ namespace Paladin
         Workplace,
         Market,
         Construction,
-        Home
+        Home,
+        TradeDepot
     };
 
     inline bool countsAsCityStorage(InventoryKind kind)
@@ -27,7 +28,8 @@ namespace Paladin
         return kind == InventoryKind::Keep ||
                kind == InventoryKind::Stockpile ||
                kind == InventoryKind::Workplace ||
-               kind == InventoryKind::Market;
+               kind == InventoryKind::Market ||
+               kind == InventoryKind::TradeDepot;
     }
     struct ResourceAmount
     {

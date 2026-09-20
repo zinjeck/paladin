@@ -16,7 +16,8 @@ namespace Paladin
         for(const auto& soldier:world.soldiers()) if(soldier.homeSettlementId()==city.id()) ++serving;
         const double people=double(city.population())+serving;
         const double fraction=(.025+.065*realm.ruler.personality.militarism.first())*(city.isFortress()?1.5:1.);
-        const int demographic=int(std::clamp(std::floor(people*fraction),0.,96.));
+        const int demographic =
+            int(std::clamp(std::floor(people * fraction), 0., 384.));
         const auto& stock=city.simulationState().stockpile();
         // Shrink an unsustainable guard instead of feeding it invented rations.
         double packs=0;
@@ -29,7 +30,13 @@ namespace Paladin
             packs+=double(unit.rations())*fromHome/unit.soldierCount();
         }
         const double excess=std::max(0.,stock.amount("food")-2.*city.population())+stock.amount("rations")+packs;
-        return std::min(demographic,int(std::min(96.,std::floor(excess/MilitarySystem::RationsPerSoldier))));
+        return std::min(
+            demographic,
+            int(std::min(
+                384.,
+                std::floor(excess / MilitarySystem::RationsPerSoldier)
+            ))
+        );
     }
     void AiRealmSystem::tick(World& world,double minute,double elapsed)
     {

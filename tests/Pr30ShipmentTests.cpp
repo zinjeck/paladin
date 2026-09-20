@@ -1,7 +1,8 @@
 #include "TestFramework.h"
-#include "simulation/WorldShipmentSystem.h"
-#include "simulation/WorldLandNavigation.h"
+#include "simulation/DiplomacySystem.h"
 #include "simulation/Simulation.h"
+#include "simulation/WorldLandNavigation.h"
+#include "simulation/WorldShipmentSystem.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -55,6 +56,22 @@ namespace
             PALADIN_CHECK(map.objectState().placeCompletedObject(map.grid(),definition,{{2,2},5,7}));
             map.naturalFeatures().clear({{2,2},5,7}); map.logistics.synchronize(map.objectState(),360);
             return map;
+        }
+        InventoryId depot(SettlementMap& map)
+        {
+            auto definition =
+                *SettlementObjectCatalog::definition("trade_depot");
+            definition.bypassesConstruction = true;
+            PALADIN_CHECK(map.objectState().placeCompletedObject(
+                map.grid(),
+                definition,
+                {{10, 10}, 5, 5}
+            ));
+            map.naturalFeatures().clear({{10, 10}, 5, 5});
+            map.logistics.synchronize(map.objectState(), 360);
+            return map.logistics.forObject(
+                map.objectState().completedObjects().back().id
+            );
         }
     };
     void oneOffAndRepeat()
@@ -113,24 +130,146 @@ namespace
         PALADIN_CHECK(path && path->size()==2);
         std::cout<<"[shipments] ownership, quantities, blocked routes, captured targets and longitude seam passed\n";
     }
+    void crossRealmTrade()
+    {
+        Fixture f;
+        // Keep the foreign partner within the real diplomatic range.
+        PALADIN_CHECK(f.world.setSettlementPosition(f.destination, {36, 32}));
+        PALADIN_CHECK(
+            f.world.assignSettlementToRealm(f.destination, f.foreign)
+        );
+        auto& relations = const_cast<DiplomacyState&>(f.world.diplomacy());
+        relations.relations.push_back({f.owner, f.foreign, false, true, false});
+        f.world.realm(f.foreign)->treasury->balance = 10000;
+        const auto sellerCash = f.world.realm(f.owner)->treasury->balance;
+        const auto total = f.goods();
+        ShipmentId id;
+        const auto send = [&]()
+        {
+            return WorldShipmentSystem::create(
+                f.world,
+                f.owner,
+                f.source,
+                f.destination,
+                "lumber",
+                20,
+                false,
+                &id,
+                false,
+                f.foreign,
+                25
+            );
+        };
+        PALADIN_CHECK(send() == ShipmentResult::Success);
+        PALADIN_CHECK(f.world.realm(f.foreign)->treasury->balance == 9500);
+        PALADIN_CHECK(
+            f.world.shipment(id)->escrow == 500 && f.goods() == total
+        );
+        WorldShipmentSystem::tick(f.world, 360, 120);
+        PALADIN_CHECK(f.world.shipment(id)->deliveries == 1);
+        PALADIN_CHECK(f.world.shipment(id)->escrow == 0);
+        PALADIN_CHECK(
+            f.world.realm(f.owner)->treasury->balance == sellerCash + 500
+        );
+        PALADIN_CHECK(f.goods() == total);
+        WorldShipmentSystem::tick(f.world, 480, 120);
+        PALADIN_CHECK(send() == ShipmentResult::Success);
+        relations.relations.back().trading = false;
+        WorldShipmentSystem::tick(f.world, 600, 240);
+        PALADIN_CHECK(
+            f.world.shipment(id)->deliveries == 0 && f.goods() == total
+        );
+        PALADIN_CHECK(f.world.realm(f.foreign)->treasury->balance == 9500);
+        PALADIN_CHECK(f.world.shipment(id)->escrow == 0);
+        PALADIN_CHECK(send() == ShipmentResult::TradeAgreementRequired);
+        relations.relations.back().trading = true;
+        f.world.realm(f.foreign)->treasury->balance = 499;
+        PALADIN_CHECK(send() == ShipmentResult::InsufficientGoods);
+        PALADIN_CHECK(
+            f.world.realm(f.foreign)->treasury->balance == 499 &&
+            f.goods() == total
+        );
+        // Quotes leave a food reserve and limit individual purchases/sales.
+        SettlementEconomy economy;
+        PALADIN_CHECK(
+            economy.configure(std::vector<ResourceFlowRate>{{"food", 2, 2, 1}})
+        );
+        ResourceStockpile stock;
+        PALADIN_CHECK(stock.setAmount("food", 2000));
+        const auto offer = economy.quote(stock, 100, "food");
+        PALADIN_CHECK(
+            offer.reserve == 1200 && offer.offered == 200 && offer.wanted == 0
+        );
+        PALADIN_CHECK(stock.setAmount("food", 0));
+        const auto demand = economy.quote(stock, 100, "food");
+        PALADIN_CHECK(
+            demand.offered == 0 && demand.wanted == 300 &&
+            demand.unitPrice > offer.unitPrice
+        );
+        std::cout << "[trade] escrow, payment, treaty loss, affordability and "
+                     "protected reserves passed\n";
+    }
     void localInventoriesAndOverflow()
     {
         Fixture f; auto& from=f.physical(f.source); auto& to=f.physical(f.destination);
         const auto keep=from.logistics.forObject(from.objectState().completedObjects().front().id);
-        const auto reserve=from.logistics.drop({10,10},"lumber",5,360);
-        PALADIN_CHECK(from.logistics.reserve(CitizenId{999},keep,reserve,"lumber",10));
-        PALADIN_CHECK(WorldShipmentSystem::available(*f.world.settlement(f.source),"lumber")==35);
-        const auto total=f.goods(); const auto id=f.send(false,35);
-        PALADIN_CHECK(from.logistics.inventory(keep)->amount("lumber")==10); // claimed goods stay put
+        PALADIN_CHECK(
+            WorldShipmentSystem::create(
+                f.world,
+                f.owner,
+                f.source,
+                f.destination,
+                "lumber",
+                1,
+                false
+            ) == ShipmentResult::MissingTradeDepot
+        );
+        const auto sourceDepot = f.depot(from), destinationDepot = f.depot(to);
+        PALADIN_CHECK(
+            from.logistics.moveAvailable(keep, sourceDepot, "lumber", 40) == 40
+        );
+        // Emptying the founding cache must never make it a receiving container.
+        PALADIN_CHECK(from.logistics.freeSpace(keep) == 0);
+        PALADIN_CHECK(!from.logistics.add(keep, "lumber", 1));
+        PALADIN_CHECK(
+            from.logistics.moveAvailable(sourceDepot, keep, "lumber", 1) == 0
+        );
+        const auto reserve = from.logistics.drop({8, 8}, "lumber", 5, 360);
+        PALADIN_CHECK(
+            !from.logistics
+                 .reserve(CitizenId{998}, sourceDepot, keep, "lumber", 1)
+        );
+        PALADIN_CHECK(
+            from.logistics
+                .reserve(CitizenId{999}, sourceDepot, reserve, "lumber", 10)
+        );
+        PALADIN_CHECK(
+            WorldShipmentSystem::available(
+                *f.world.settlement(f.source),
+                "lumber"
+            ) == 30
+        );
+        PALADIN_CHECK(to.logistics.add(
+            destinationDepot,
+            "stone",
+            to.logistics.freeSpace(destinationDepot)
+        ));
+        const auto total = f.goods();
+        const auto id = f.send(false, 30);
+        PALADIN_CHECK(
+            from.logistics.inventory(sourceDepot)->amount("lumber") == 10
+        ); // claimed goods stay put
         WorldShipmentSystem::tick(f.world,360,240);
         PALADIN_CHECK(f.goods()==total && f.world.shipment(id)->deliveries==1);
         int piles=0;
         for(const auto& inventory:to.logistics.inventories()) if(inventory.kind==InventoryKind::Groundpile)
         {
             piles+=inventory.amount("lumber");
-            PALADIN_CHECK(inventory.footprint.topLeft.y>=9); // outside and near the keep
+            PALADIN_CHECK(
+                inventory.footprint.topLeft.x >= 9
+            ); // near the receiving depot
         }
-        PALADIN_CHECK(piles==35); // the founding keep is full
+        PALADIN_CHECK(piles == 30); // the depot is full; cargo remains physical
         PALADIN_CHECK(WorldShipmentSystem::create(f.world,f.owner,f.source,f.destination,"lumber",1,true)==ShipmentResult::InsufficientGoods); // reserved 10 cannot be taken
     }
     void cadenceAndWaiting()
@@ -153,5 +292,9 @@ namespace
 }
 void runPr30ShipmentTests()
 {
-    oneOffAndRepeat(); authorizationAndFailures(); localInventoriesAndOverflow(); cadenceAndWaiting();
+    oneOffAndRepeat();
+    authorizationAndFailures();
+    crossRealmTrade();
+    localInventoriesAndOverflow();
+    cadenceAndWaiting();
 }

@@ -341,7 +341,8 @@ namespace Paladin
                 name.starts_with("home.bed.") ||
                 name.starts_with("furniture.") || name == "home.detail.jars" ||
                 name == "home.detail.basket" || name == "stockpile.crate" ||
-                name == "stockpile.stack" || name == "fishing_grounds.station";
+                name == "stockpile.stack" || name == "fishing_grounds.station" ||
+                name == "market.stall";
             const bool mounted = name == "home.detail.shutters" ||
                                  name == "home.detail.hide" ||
                                  name.ends_with(".door");

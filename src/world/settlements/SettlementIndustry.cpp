@@ -1,6 +1,7 @@
 #include "world/settlements/SettlementIndustry.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -9,8 +10,10 @@ namespace Paladin
 {
     bool isIndustry(std::string_view type) noexcept
     {
-        return type == SettlementObjectTypes::WheatFarm || type == SettlementObjectTypes::Bakery ||
-               type == SettlementObjectTypes::ArmySupplyDepot || type == SettlementObjectTypes::Barracks;
+        return miningJob(type) || type == SettlementObjectTypes::WheatFarm ||
+               type == SettlementObjectTypes::Bakery ||
+               type == SettlementObjectTypes::ArmySupplyDepot ||
+               type == SettlementObjectTypes::Barracks;
     }
     bool produceIndustry(SettlementMap& map, SettlementObjectId objectId,
                          int workers, double minute, double elapsed)
@@ -22,6 +25,23 @@ namespace Paladin
         const auto destinationId = map.logistics.forObject(objectId);
         const auto* inventory = map.logistics.inventory(destinationId);
         if (!inventory) return true;
+        if (const auto* job = miningJob(type))
+        {
+            map.mining.synchronize(map.objectState());
+            const int room =
+                map.logistics.receivable(destinationId, job->resource);
+            const int produced =
+                map.mining.work(map.grid(), *object, workers, elapsed, room);
+            if (produced > 0)
+            {
+                if (map.logistics
+                        .add(destinationId, job->resource, produced, minute))
+                {
+                    map.commerce.recordProduction(job->resource, produced);
+                }
+            }
+            return true;
+        }
         const int capacity = inventory->capacity;
         // Keep room for output. Shared input targets, not one target per food.
         const int target = std::max(1, std::min({60, workers * 8, capacity / 2}));
@@ -77,8 +97,18 @@ namespace Paladin
             const int ready = map.objectState().prepareGrainHarvest(objectId, minute);
             const int room = map.logistics.receivable(destinationId, SettlementResourceTypes::Wheat);
             if (ready <= 0 || room <= 0) return true;
-            const int amount = std::min({ready, room, int(std::min(1000000.0,
-                map.objectState().accrueProduction(objectId, elapsed * workers / 2.0)))});
+            const int amount = std::min(
+                {ready,
+                 room,
+                 int(std::min(
+                     1000000.0,
+                     map.objectState().accrueProduction(
+                         objectId,
+                         elapsed * workers /
+                             WheatFarmPolicy::HarvestMinutesPerUnit
+                     )
+                 ))}
+            );
             if (amount > 0 && map.logistics.add(destinationId, SettlementResourceTypes::Wheat, amount, minute))
             {
                 map.objectState().takeGrainHarvest(objectId, amount, minute);

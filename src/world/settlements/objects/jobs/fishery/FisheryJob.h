@@ -9,9 +9,9 @@ namespace Paladin
         FisheryWorkplace{SettlementObjectTypes::FishingGrounds, 4, 4, 9, 50};
     struct FisheryJobPolicy
     {
-        // 18 meals per uninterrupted 12-hour shift; travel, meals and breaks
-        // bring practical output closer to 8-10 (an adult eats about 2/day).
-        double minutesPerFish = 40;
+        // Nine fish per uninterrupted twelve-hour shift. Travel and needs reduce
+        // this further: one fisher supports roughly two to three adults.
+        double minutesPerFish = 80;
         int waterTilesPerWorker = 12;
         int baseReach = 4;
         int referenceArea = 4;

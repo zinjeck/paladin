@@ -355,7 +355,11 @@ namespace Paladin
             // Settlement sprawl is removed. Only universal native map symbols remain.
             for (const auto& army : world.armies())
             {
-                if (army.soldierCount() == 0 || armyVisibility <= .001F) continue;
+                if (army.garrisoned() || army.soldierCount() == 0 ||
+                    armyVisibility <= .001F)
+                {
+                    continue;
+                }
                 // One strategic representative, regardless of roster size.
                 // Actual strength is the native-screen count below the sprite.
                 const auto* sprite = worldArmySprite(*artwork,world,army);
@@ -448,7 +452,11 @@ namespace Paladin
             if (artwork)
                 for (const auto& army : world.armies())
                 {
-                    if (!army.soldierCount() || armyVisibility <= .001F) continue;
+                    if (army.garrisoned() || !army.soldierCount() ||
+                        armyVisibility <= .001F)
+                    {
+                        continue;
+                    }
                     const auto point=annotationProject(army.visualX()+.5,army.visualY()+.5);
                     const auto* sprite=worldArmySprite(*artwork,world,army);
                     if (point && sprite && sprite->texture && !outside(*point,renderer,256))
@@ -483,7 +491,11 @@ namespace Paladin
 
             for (const Army& army : world.armies())
             {
-                if (army.soldierCount() == 0 || armyVisibility <= .001F) continue;
+                if (army.garrisoned() || army.soldierCount() == 0 ||
+                    armyVisibility <= .001F)
+                {
+                    continue;
+                }
                 const auto point = annotationProject(
                     army.visualX() + 0.5,
                     army.visualY() + 0.5

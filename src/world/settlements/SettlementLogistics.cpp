@@ -52,7 +52,11 @@ namespace Paladin
     {
         const auto* result = SettlementResourceCatalog::definition(output);
         auto* entry = edit(id);
-        if (!entry || !result || input == output || requested <= 0) return 0;
+        if (!entry || entry->kind == InventoryKind::Keep || !result ||
+            input == output || requested <= 0)
+        {
+            return 0;
+        }
         int amount = std::min(requested, available(id, input));
         if (!entry->resourceLimits.empty())
         {
@@ -199,7 +203,9 @@ namespace Paladin
     int SettlementLogistics::freeSpace(InventoryId id) const
     {
         const auto* entry = inventory(id);
-        int amount = entry ? entry->capacity - entry->used() : 0;
+        int amount = entry && entry->kind != InventoryKind::Keep
+                         ? entry->capacity - entry->used()
+                         : 0;
         for (const auto& claim : reservations_)
         {
             if (claim.destination == id)
@@ -436,7 +442,8 @@ namespace Paladin
             return false;
         }
         auto* entry = edit(claim->destination);
-        if (!entry || entry->capacity - entry->used() < claim->amount)
+        if (!entry || entry->kind == InventoryKind::Keep ||
+            entry->capacity - entry->used() < claim->amount)
         {
             return false;
         }
@@ -568,6 +575,8 @@ namespace Paladin
                 {id,
                  keep        ? InventoryKind::Keep
                  : stockpile ? InventoryKind::Stockpile
+                 : object.objectTypeId == SettlementObjectTypes::TradeDepot
+                     ? InventoryKind::TradeDepot
                  : object.objectTypeId == SettlementObjectTypes::Market
                      ? InventoryKind::Market
                      : InventoryKind::Workplace,
@@ -595,9 +604,10 @@ namespace Paladin
             if (keep && !foundingGoodsGranted_)
             {
                 foundingGoodsGranted_ = true;
-                add(id, SettlementResourceTypes::Lumber, 40);
-                add(id, SettlementResourceTypes::Stone, 40);
-                add(id, SettlementResourceTypes::Fish, 20);
+                auto& cache = inventories_.back();
+                change(cache, SettlementResourceTypes::Lumber, 40);
+                change(cache, SettlementResourceTypes::Stone, 40);
+                change(cache, SettlementResourceTypes::Fish, 20);
             }
         }
         for (const auto& site : objects.constructionSites())

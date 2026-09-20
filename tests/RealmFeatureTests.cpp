@@ -346,11 +346,12 @@ void runRealmFeatureTests()
             simulation.simulationTier() == SettlementSimulationTier::Strategic
         );
         PALADIN_CHECK(
-            settlement.population() >= 24 && settlement.population() < 650
+            settlement.population() >= 48 && settlement.population() < 160000
         );
         populations.insert(settlement.population());
     }
     PALADIN_CHECK(populations.size() > 12);
+    PALADIN_CHECK(*populations.rbegin() > *populations.begin() * 20);
     PALADIN_CHECK(ai.armyCount() == 0 && ai.worldRoadCount() == 0);
     WorldSimulationPipeline pipeline;
     const auto opening =

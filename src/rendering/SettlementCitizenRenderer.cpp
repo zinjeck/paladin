@@ -52,7 +52,11 @@ namespace Paladin
 
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
-            if (citizen.militaryDeployed) continue;
+            if (citizen.militaryDeployed ||
+                citizen.activity == CitizenActivity::UndergroundMining)
+            {
+                continue;
+            }
             const double sleepOffset =
                 citizen.activity == CitizenActivity::Sleeping &&
                         citizen.insideHome
@@ -91,8 +95,18 @@ namespace Paladin
                     else if (type == "logging_grounds") role = "logger";
                     else if (type == "pastureland") role = "herder";
                     else if (type == "bakery") role = "baker";
+                    else if (
+                        type == "coal_mine" || type == "iron_mine" ||
+                        type == "gold_mine" || type == "quarry"
+                    )
+                    {
+                        role = "miner";
+                    }
                     else if (type == "market") role = "merchant";
-                    else if (type == "stockpile") role = "porter";
+                    else if (type == "stockpile" || type == "trade_depot")
+                    {
+                        role = "porter";
+                    }
                     else if (type == "barracks") role = "militia";
                     else if (type == "army_supply_depot") role = "porter";
                 }
@@ -109,7 +123,10 @@ namespace Paladin
                 (north ? "back" : "front");
             const bool walking = citizen.pathIndex < citizen.path.size();
             const bool gathering = citizen.task.kind == CitizenTaskKind::Gather && !walking;
-            const bool working = !walking && (gathering || citizen.task.kind == CitizenTaskKind::Build);
+            const bool working =
+                !walking &&
+                (gathering || citizen.task.kind == CitizenTaskKind::Build ||
+                 citizen.activity == CitizenActivity::Mining);
             const int pose = walking ? int(std::fmod(citizen.walkDistance, 1.0) * 4.0)
                 : working ? int(std::fmod(citizen.workAnimationMinutes, 8.0) * .5) : 0;
             if ((walking || working) && sprites && sprites->find(spriteId + ".walk")) spriteId += ".walk";
@@ -144,7 +161,44 @@ namespace Paladin
                 for(int i=0;i<=steps;++i)
                     pixel(std::round(3+(tx-3)*float(i)/std::max(1,steps)),
                           std::round(-3+(ty+3)*float(i)/std::max(1,steps)),1,1,{136,96,68,255},2);
-                pixel(float(tx-1),float(ty-1),3,2,{154,167,175,255},3);
+                if (citizen.activity == CitizenActivity::Mining)
+                {
+                    pixel(
+                        float(tx - 2),
+                        float(ty - 1),
+                        5,
+                        1,
+                        {154, 167, 175, 255},
+                        3
+                    );
+                    pixel(
+                        float(tx - 3),
+                        float(ty),
+                        1,
+                        1,
+                        {108, 116, 122, 255},
+                        3
+                    );
+                    pixel(
+                        float(tx + 3),
+                        float(ty),
+                        1,
+                        1,
+                        {108, 116, 122, 255},
+                        3
+                    );
+                }
+                else
+                {
+                    pixel(
+                        float(tx - 1),
+                        float(ty - 1),
+                        3,
+                        2,
+                        {154, 167, 175, 255},
+                        3
+                    );
+                }
                 pixel(float(tx-1),float(ty-1),2,1,{215,224,227,255},4);
                 if (pose==2)
                 {

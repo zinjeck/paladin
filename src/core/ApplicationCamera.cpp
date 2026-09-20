@@ -69,6 +69,10 @@ namespace Paladin
             baseTilePixels;
 
         const bool keyboardMoving = directionX != 0.0 || directionY != 0.0;
+        if (keyboardMoving && screen_ == Screen::World)
+        {
+            panSpeedTilesPerSecondAtZoomOne *= 1.20;
+        }
 
         if (keyboardMoving)
         {

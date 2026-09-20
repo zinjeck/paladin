@@ -591,7 +591,8 @@ namespace Paladin
         amount = map.commerce.affordableTradeUnits(
             *sourceInventory,
             *targetInventory,
-            amount
+            amount,
+            &citizens
         );
         if (amount <= 0)
         {
@@ -669,9 +670,11 @@ namespace Paladin
         std::vector<Opportunity> opportunities;
         const auto* assigned = map.logistics.inventory(assignedDestination);
         const bool market = assigned && assigned->kind == InventoryKind::Market;
+        const bool depot =
+            assigned && assigned->kind == InventoryKind::TradeDepot;
         const bool homeDelivery =
             assigned && assigned->kind == InventoryKind::Home;
-        if (!market)
+        if (!market && !depot)
         {
             std::unordered_set<SettlementObjectId, StrongIdHash> occupiedHomes;
             for (const auto& resident : citizens.citizens())
@@ -703,6 +706,12 @@ namespace Paladin
                     }
                     const int amount = std::min(
                         {policy.carryingCapacity,
+                         map.commerce.affordableTradeUnits(
+                             source,
+                             home,
+                             policy.carryingCapacity,
+                             &citizens
+                         ),
                          map.logistics.available(
                              source.id,
                              SettlementResourceTypes::Lumber
@@ -720,6 +729,8 @@ namespace Paladin
                              std::string(SettlementResourceTypes::Lumber),
                              amount,
                              -10000 +
+                                 (source.kind == InventoryKind::Market ? -500
+                                                                       : 0) +
                                  distance(c.tilePosition, source.footprint) +
                                  distance(
                                      source.footprint.topLeft,
@@ -730,33 +741,21 @@ namespace Paladin
                 }
             }
         }
-        const bool hasStockpile = std::any_of(
-            map.logistics.inventories().begin(),
-            map.logistics.inventories().end(),
-            [](const auto& i) { return i.kind == InventoryKind::Stockpile; }
-        );
-        const auto* marketJob =
-            market ? map.employment().workplace(c.workplaceId) : nullptr;
-        if (market &&
-            assigned->used() >= map.commerce.policy.restockUnitsPerWorker *
-                                    int(marketJob ? marketJob->capacity : 1))
-        {
-            return false;
-        }
         for (const auto& source : map.logistics.inventories())
         {
             if (homeDelivery)
             {
                 break;
             }
-            if ((market ? !(source.kind == InventoryKind::Stockpile ||
-                            (!hasStockpile &&
-                             (source.kind == InventoryKind::Workplace ||
-                              source.kind == InventoryKind::Groundpile)) ||
-                            (source.kind == InventoryKind::Keep &&
-                             map.commerce.keepFoodSalesEnabled))
-                        : (source.kind != InventoryKind::Groundpile &&
-                           source.kind != InventoryKind::Workplace)) ||
+            const bool wholesaleSource =
+                source.kind == InventoryKind::Stockpile ||
+                source.kind == InventoryKind::Workplace ||
+                source.kind == InventoryKind::Groundpile ||
+                (market && source.kind == InventoryKind::TradeDepot);
+            if (((market || depot)
+                     ? !wholesaleSource
+                     : (source.kind != InventoryKind::Groundpile &&
+                        source.kind != InventoryKind::Workplace)) ||
                 source.used() <= 0)
             {
                 continue;
@@ -808,7 +807,8 @@ namespace Paladin
             {
                 if (destination.id == source.id ||
                     !(publicStorage(destination) ||
-                      (market && destination.id == assignedDestination)) ||
+                      ((market || depot) &&
+                       destination.id == assignedDestination)) ||
                     (assignedDestination &&
                      destination.id != assignedDestination) ||
                     distance(source.footprint.topLeft, destination.footprint) >
@@ -821,20 +821,56 @@ namespace Paladin
                     if (!map.logistics.mayExport(map.objectState(), source, goods.resource)) continue;
                     const auto* resource =
                         SettlementResourceCatalog::definition(goods.resource);
-                    if (market && (!resource || !resource->edible))
+                    if (market &&
+                        (!resource ||
+                         (!resource->edible &&
+                          goods.resource != SettlementResourceTypes::Lumber) ||
+                         resource->emergencyOnly))
                     {
                         continue;
                     }
                     const int affordable = map.commerce.affordableTradeUnits(
                         source,
                         destination,
-                        policy.carryingCapacity
+                        policy.carryingCapacity,
+                        &citizens
                     );
+                    const int target =
+                        depot ? std::max(8, destination.capacity / 12)
+                        : market
+                            ? (goods.resource == SettlementResourceTypes::Lumber
+                                   ? std::max(2, destination.capacity / 4)
+                                   : std::max(4, destination.capacity * 3 / 4))
+                            : destination.capacity;
+                    int held = destination.amount(goods.resource);
+                    if (market && resource && resource->edible)
+                    {
+                        held = 0;
+                        for (const auto& item : destination.goods)
+                        {
+                            if (const auto* food =
+                                    SettlementResourceCatalog::definition(
+                                        item.resource
+                                    );
+                                food && food->edible)
+                            {
+                                held += item.amount;
+                            }
+                        }
+                    }
+                    const int incoming = std::max(
+                        0,
+                        destination.capacity - destination.used() -
+                            map.logistics.freeSpace(destination.id)
+                    );
+                    const int needed = std::max(0, target - held - incoming);
                     const int amount = std::min(
                         {policy.carryingCapacity,
+                         needed,
                          affordable,
                          map.logistics.available(source.id, goods.resource),
-                         map.logistics.freeSpace(destination.id)}
+                         map.logistics
+                             .receivable(destination.id, goods.resource)}
                     );
                     if (amount > 0)
                     {
@@ -1294,6 +1330,70 @@ namespace Paladin
             return false;
         }
         const auto workplace = *job;
+        if (const auto* mine = miningJob(workplace.objectTypeId))
+        {
+            const auto* object =
+                map.objectState().completedObject(workplace.objectId);
+            if (!object)
+            {
+                return false;
+            }
+            auto& site = map.mining.prepare(map.grid(), *object);
+            if (site.exhausted || site.cursor >= site.columns.size())
+            {
+                return false;
+            }
+            const auto& f = object->footprint;
+            const bool tunnel =
+                mine->tunnels && map.mining.depth(*object) >= .98;
+            for (std::size_t attempt = 0; attempt < 16; ++attempt)
+            {
+                const auto i =
+                    site.cursor + (c.id.value() + attempt) %
+                                      (site.columns.size() - site.cursor);
+                auto target = site.columns[i];
+                if (tunnel)
+                {
+                    target = quarryEntrance(
+                        f.topLeft,
+                        f.width,
+                        c.id.value() + attempt
+                    );
+                }
+                if (!tunnel &&
+                    std::any_of(
+                        citizens.citizens().begin(),
+                        citizens.citizens().end(),
+                        [&](const auto& other)
+                        {
+                            return other.id != c.id &&
+                                   other.task.kind == CitizenTaskKind::Work &&
+                                   other.task.object == workplace.objectId &&
+                                   other.task.workTile == target;
+                        }
+                    ))
+                {
+                    continue;
+                }
+                if (!route(map, citizens, c, {target, 1, 1}, true) ||
+                    c.destination != target)
+                {
+                    if (!pathsRemaining_)
+                    {
+                        break;
+                    }
+                    continue;
+                }
+                c.task = {};
+                c.task.kind = CitizenTaskKind::Work;
+                c.task.object = workplace.objectId;
+                c.task.workTile = target;
+                c.task.startedMinute = minute;
+                c.activity = CitizenActivity::TravelingToWork;
+                return true;
+            }
+            return false;
+        }
         if (workplace.objectTypeId == SettlementObjectTypes::LoggingGrounds)
         {
             int slot = 0;

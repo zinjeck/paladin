@@ -1,12 +1,13 @@
 #include "world/WorldPopulationField.h"
 #include "world/World.h"
+#include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <numeric>
+#include <unordered_map>
 #include <unordered_set>
-#include "world/generation/GenerationNoise.h"
 
 namespace Paladin
 {
@@ -23,79 +24,220 @@ namespace Paladin
         }
         return hash;
     }
-    WorldPopulationField::WorldPopulationField(const World& world)
-        :width_(world.grid().width()),height_(world.grid().height()),people_(world.grid().tileCount(),0)
+    WorldPopulationField::WorldPopulationField(
+        const World& world,
+        bool deferred
+    )
+        : cityCount_(world.settlements().size()), width_(world.grid().width()),
+          height_(world.grid().height()), people_(world.grid().tileCount(), 0)
     {
-        if(width_<=0 || height_<=0) return;
-        const auto index=[&](WorldTilePosition p){return std::size_t(p.y)*width_+p.x;};
-        const auto dry=[&](WorldTilePosition p){const auto* t=world.grid().tile(p); return t && t->terrain==TerrainType::Land;};
-        const auto deposit=[&](WorldTilePosition p,double count)
-        { p.x=(p.x%width_+width_)%width_; if(dry(p)) people_[index(p)]+=float(count); };
-        std::unordered_set<std::size_t> roadCells;
-        for (const auto& road : world.worldRoads()) for (const auto p : road.points())
-            if (world.grid().isValidPosition(p)) roadCells.insert(index(p));
-        for(const auto& city:world.settlements())
+        for (const auto& road : world.worldRoads())
         {
-            if(!city.population()) continue;
-            const auto centre=city.position();
-            if(const auto* map=city.simulationState().localMap())
+            for (const auto p : road.points())
             {
-                const auto& citizens=city.simulationState().citizens();
-                const double residents=double(citizens.residentCount());
-                if(residents>0)
+                if (world.grid().isValidPosition(p))
                 {
-                    for(const auto& person:citizens.citizens())
+                    roads_.insert(std::size_t(p.y) * width_ + p.x);
+                }
+            }
+        }
+        if (!deferred)
+        {
+            while (!complete())
+            {
+                advance(world);
+            }
+        }
+    }
+
+    void WorldPopulationField::advance(const World& world)
+    {
+        if (complete() || width_ <= 0 || height_ <= 0 ||
+            nextCity_ >= world.settlements().size())
+        {
+            nextCity_ = cityCount_;
+            return;
+        }
+        // One bounded catchment per renderer work slice. No world pointer is
+        // retained, and a topology change replaces this in-progress estimate.
+        const auto& city = world.settlements()[nextCity_++];
+        if (!city.population())
+        {
+            return;
+        }
+        const auto centre = city.position();
+        const auto dry = [&](WorldTilePosition p)
+        {
+            const auto* t = world.grid().tile(p);
+            return t && t->terrain == TerrainType::Land;
+        };
+        const auto index = [&](WorldTilePosition p)
+        { return std::size_t(p.y) * width_ + p.x; };
+        const auto deposit = [&](WorldTilePosition p, double count)
+        {
+            p.x = (p.x % width_ + width_) % width_;
+            if (dry(p))
+            {
+                people_[index(p)] += float(count);
+            }
+        };
+        if (const auto* map = city.simulationState().localMap())
+        {
+            const auto& citizens = city.simulationState().citizens();
+            const double residents = double(citizens.residentCount());
+            if (residents > 0)
+            {
+                std::unordered_map<
+                    SettlementObjectId,
+                    SettlementTilePosition,
+                    StrongIdHash>
+                    homes;
+                SettlementTilePosition keep{};
+                for (const auto& object : map->objectState().completedObjects())
+                {
+                    const auto& f = object.footprint;
+                    SettlementTilePosition p{
+                        f.topLeft.x + f.width / 2,
+                        f.topLeft.y + f.height / 2
+                    };
+                    homes.emplace(object.id, p);
+                    if (object.objectTypeId == SettlementObjectTypes::CityKeep)
                     {
-                        if(person.health<=0 || person.militaryDeployed) continue;
-                        // Residence is stable while someone walks to work. This
-                        // prevents roads flashing with an unrelated live heatmap.
-                        auto local=person.tilePosition;
-                        for(const auto& object:map->objectState().completedObjects())
-                            if(object.id==person.homeId || (!person.homeId && object.objectTypeId==SettlementObjectTypes::CityKeep))
-                            { local={object.footprint.topLeft.x+object.footprint.width/2,object.footprint.topLeft.y+object.footprint.height/2}; break; }
-                        WorldTilePosition tile{map->sourceRegionCenter().x-map->sourceRegionWidth()/2+
-                            int(std::floor((local.x+.5)/map->localTilesPerWorldTile())),
-                            map->sourceRegionCenter().y-map->sourceRegionHeight()/2+
-                            int(std::floor((local.y+.5)/map->localTilesPerWorldTile()))};
-                        tile.x=(tile.x%width_+width_)%width_;
-                        if(!dry(tile)) tile=centre;
-                        deposit(tile,double(city.population())/residents);
+                        keep = p;
                     }
+                }
+                for (const auto& person : citizens.citizens())
+                {
+                    if (person.health <= 0 || person.militaryDeployed)
+                    {
+                        continue;
+                    }
+                    auto local = person.homeId ? person.tilePosition : keep;
+                    if (const auto it = homes.find(person.homeId);
+                        it != homes.end())
+                    {
+                        local = it->second;
+                    }
+                    WorldTilePosition tile{
+                        map->sourceRegionCenter().x -
+                            map->sourceRegionWidth() / 2 +
+                            int(std::floor(
+                                (local.x + .5) / map->localTilesPerWorldTile()
+                            )),
+                        map->sourceRegionCenter().y -
+                            map->sourceRegionHeight() / 2 +
+                            int(std::floor(
+                                (local.y + .5) / map->localTilesPerWorldTile()
+                            ))
+                    };
+                    tile.x = (tile.x % width_ + width_) % width_;
+                    deposit(
+                        dry(tile) ? tile : centre,
+                        double(city.population()) / residents
+                    );
+                }
+                return;
+            }
+        }
+        // The census includes hinterland residents, rather than inventing
+        // people to tint ownership. Paths may reach unclaimed countryside but
+        // never cross water. Ownership changes do not relocate residents.
+        const int radius =
+            city.isFortress()
+                ? 1
+                : std::clamp(
+                      int(9 +
+                          std::log2(1 + double(city.population()) / 200) * 2),
+                      9,
+                      28
+                  );
+        const int side = radius * 2 + 1;
+        std::vector<bool> visited(std::size_t(side * side), false);
+        std::vector<WorldTilePosition> offsets{{0, 0}};
+        visited[std::size_t(radius * side + radius)] = true;
+        constexpr std::array<WorldTilePosition, 4> steps{
+            {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+        };
+        std::vector<WorldTilePosition> cells;
+        std::vector<double> urban, rural;
+        double urbanSum = 0, ruralSum = 0;
+        for (std::size_t cursor = 0; cursor < offsets.size(); ++cursor)
+        {
+            const auto offset = offsets[cursor];
+            WorldTilePosition p{
+                (centre.x + offset.x + width_) % width_,
+                centre.y + offset.y
+            };
+            const auto* tile = world.grid().tile(p);
+            if (!tile || tile->terrain == TerrainType::Water)
+            {
+                continue;
+            }
+            if (dry(p))
+            {
+                const double d2 =
+                    double(offset.x * offset.x + offset.y * offset.y);
+                const double fertility =
+                    tile->biome == BiomeType::Polar    ? 0
+                    : tile->biome == BiomeType::Desert ? .035
+                    : tile->biome == BiomeType::Tundra ? .09
+                    : tile->biome == BiomeType::Taiga  ? .35
+                                                       : 1;
+                const double relief = tile->relief == ReliefType::Mountain
+                                          ? .003
+                                      : tile->relief == ReliefType::Hills ? .45
+                                                                          : 1;
+                const double field = GenerationNoise::fractal(
+                    p.x * .19,
+                    p.y * .19,
+                    world.generationSeed() ^ 0xCE115ULL,
+                    3
+                );
+                const double patch =
+                    .05 + std::pow(std::clamp((field + 1) * .5, 0., 1.), 3) * 3;
+                const double access = roads_.contains(index(p)) ? 2.5 : 1;
+                const double u =
+                    std::exp(-d2 / (city.isFortress() ? .7 : 3.8)) *
+                    std::max(.1, fertility * relief);
+                const double v = fertility * relief * patch * access *
+                                 std::exp(-d2 / (radius * radius * .42));
+                cells.push_back(p);
+                urban.push_back(u);
+                rural.push_back(v);
+                urbanSum += u;
+                ruralSum += v;
+            }
+            for (const auto d : steps)
+            {
+                const WorldTilePosition q{offset.x + d.x, offset.y + d.y};
+                if (std::abs(q.x) > radius || std::abs(q.y) > radius ||
+                    q.x * q.x + q.y * q.y > radius * radius)
+                {
                     continue;
                 }
-            }
-            // A compact connected footprint, never the realm's entire colored
-            // territory. About 40 people per urban world tile, with a denser
-            // centre and terrain-dependent, reproducible edges. Fortress zones
-            // occupy at most one third the width and height of city zones.
-            const int radius=city.isFortress()?1:4;
-            const std::size_t desired=std::size_t(std::clamp(std::ceil(double(city.population())/40.),1.,double((radius*2+1)*(radius*2+1))));
-            std::vector<WorldTilePosition> cells{centre};
-            constexpr std::array<WorldTilePosition,4> offsets{{{1,0},{0,1},{-1,0},{0,-1}}};
-            for(std::size_t cursor=0;cursor<cells.size() && cells.size()<desired;++cursor)
-                for(int direction=0;direction<4 && cells.size()<desired;++direction)
+                const auto i =
+                    std::size_t((q.y + radius) * side + q.x + radius);
+                if (!visited[i])
                 {
-                    const auto d=offsets[(direction+city.id().value()%4)%4];
-                    WorldTilePosition p{(cells[cursor].x+d.x+width_)%width_,cells[cursor].y+d.y};
-                    const int dx=std::min(std::abs(p.x-centre.x),width_-std::abs(p.x-centre.x));
-                    if(dx>radius || std::abs(p.y-centre.y)>radius || !dry(p) || std::find(cells.begin(),cells.end(),p)!=cells.end()) continue;
-                    cells.push_back(p);
+                    visited[i] = true;
+                    offsets.push_back(q);
                 }
-            double sum=0; std::vector<double> weights;
-            for(const auto p:cells)
-            {
-                const int dx=std::min(std::abs(p.x-centre.x),width_-std::abs(p.x-centre.x)),dy=p.y-centre.y;
-                const auto* terrain=world.grid().tile(p);
-                const auto noise=GenerationNoise::mix(city.id().value()*7307ULL+index(p)*9176ULL);
-                const double texture=.65+double(noise%1000)/1000.;
-                const double access=roadCells.contains(index(p))?1.6:1.;
-                const double slope=terrain?1.+2.*std::abs(double(terrain->elevation.value())-.5):1.;
-                // Census is conserved below: this is a cartographic estimate of
-                // where aggregate residents live, not new simulated population.
-                const double weight=texture*access/(slope*(1.+.5*(dx*dx+dy*dy)));
-                weights.push_back(weight); sum+=weight;
             }
-            for(std::size_t i=0;i<cells.size();++i) deposit(cells[i],double(city.population())*weights[i]/sum);
+        }
+        if (urbanSum <= 0)
+        {
+            deposit(centre, double(city.population()));
+            return;
+        }
+        const double urbanShare = city.isFortress() || ruralSum <= 0 ? 1 : .58;
+        for (std::size_t i = 0; i < cells.size(); ++i)
+        {
+            deposit(
+                cells[i],
+                double(city.population()) *
+                    (urbanShare * urban[i] / urbanSum +
+                     (1 - urbanShare) * rural[i] / std::max(1e-30, ruralSum))
+            );
         }
     }
     float WorldPopulationField::at(WorldTilePosition p) const noexcept

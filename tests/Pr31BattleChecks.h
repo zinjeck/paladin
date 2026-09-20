@@ -20,6 +20,21 @@ inline void runPr31BattleChecks()
     PALADIN_CHECK(home && foe);
     const auto first=MilitarySystem::maintainStrategicGarrison(world,a,home,8),second=MilitarySystem::maintainStrategicGarrison(world,b,foe,4);
     PALADIN_CHECK(first && second);
+    PALADIN_CHECK(
+        world.army(first)->garrisoned() && world.army(second)->garrisoned()
+    );
+    PALADIN_CHECK(
+        BattleSystem::orderAttack(world, a, first, second) ==
+        MilitaryResult::InvalidUnit
+    );
+    PALADIN_CHECK(
+        MilitarySystem::setGarrison(world, a, first, {}) ==
+        MilitaryResult::Success
+    );
+    PALADIN_CHECK(
+        MilitarySystem::setGarrison(world, b, second, {}) ==
+        MilitaryResult::Success
+    );
     PALADIN_CHECK(BattleSystem::orderAttack(world,b,first,second)==MilitaryResult::NotOwned);
     PALADIN_CHECK(BattleSystem::orderAttack(world,a,first,first)==MilitaryResult::InvalidUnit);
     PALADIN_CHECK(!world.diplomacy().between(a,b));

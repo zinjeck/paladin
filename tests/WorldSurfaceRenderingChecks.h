@@ -4,11 +4,12 @@
 #include "rendering/CelestialSun.h"
 #include "rendering/LocalTangentWorldView.h"
 #include "rendering/WorldObjectRenderer.h"
+#include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPoliticalSurface.h"
 #include "rendering/WorldRealmPresentationRenderer.h"
 #include "rendering/WorldRenderer.h"
-#include "rendering/WorldPixelStability.h"
 #include "rendering/WorldThematicPalette.h"
+#include "world/generation/AiRealmGenerator.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <algorithm>
@@ -18,8 +19,8 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <vector>
 #include <set>
+#include <vector>
 
 namespace Paladin::Test
 {
@@ -301,7 +302,10 @@ namespace Paladin::Test
             const auto color=reviewPixel(noInk.get(),x+2,y+2);
             PALADIN_CHECK(!color.red && !color.green && !color.blue);
         }
-        PALADIN_CHECK(std::abs(worldPresentationState(256).realmFillWeight-.18F)<.0001F);
+        PALADIN_CHECK(
+            std::abs(worldPresentationState(256).realmFillWeight - .52F) <
+            .0001F
+        );
         weights.realmFillWeight=1; weights.realmBorderWeight=1;
 
         for (int i=0;i<8;++i) { camera.move(.005,0); drawMask(); }
@@ -742,6 +746,77 @@ namespace Paladin::Test
                 native,
                 std::string("tweak-territory-") + origin + ".png"
             );
+        }
+        {
+            WorldGenerationSettings largeSettings;
+            largeSettings.width = 600;
+            largeSettings.height = 300;
+            largeSettings.seed = 9202026;
+            World large(largeSettings);
+            AiRealmGenerator{}.generate(large);
+            PALADIN_CHECK(large.settlementCount() > 20);
+            WorldRealmPresentationRenderer themes;
+            Camera2D overview(300, 150);
+            overview.setWorldZoom(1);
+            TileRenderMetrics overviewMetrics;
+            overviewMetrics.tilePixels = 1.5;
+            for (const auto mode :
+                 {WorldMapMode::Political,
+                  WorldMapMode::Government,
+                  WorldMapMode::Population})
+            {
+                themes.configure(mode);
+                bool ready = false;
+                double worst = 0;
+                const auto deadline = SDL_GetTicks() + 60000;
+                do
+                {
+                    renderer.beginFrame();
+                    const auto start = std::chrono::steady_clock::now();
+                    ready = themes.prepare(renderer, large);
+                    worst = std::max(
+                        worst,
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - start
+                        )
+                            .count()
+                    );
+                    renderer.endFrame();
+                } while (!ready && SDL_GetTicks() < deadline);
+                PALADIN_CHECK(ready);
+                std::cout << "600x300 thematic preparation mode=" << int(mode)
+                          << " worst_slice_ms=" << worst << '\n';
+                if (mode != WorldMapMode::Political)
+                {
+                    PALADIN_CHECK(worst < 80);
+                }
+                renderer.beginFrame();
+                renderer.fillRectangle(0, 0, 960, 640, PopulationWater);
+                themes.renderFlat(
+                    renderer,
+                    large,
+                    overview,
+                    overviewMetrics,
+                    worldPresentationState(1.5),
+                    WorldPresentationPolicy{}
+                );
+                saveWorldReview(
+                    native,
+                    "next-generated-world-mode-" + std::to_string(int(mode)) +
+                        ".png"
+                );
+                renderer.endFrame();
+            }
+            for (const auto mode :
+                 {WorldMapMode::Political,
+                  WorldMapMode::Government,
+                  WorldMapMode::Population})
+            {
+                renderer.beginFrame();
+                themes.configure(mode);
+                PALADIN_CHECK(themes.prepare(renderer, large));
+                renderer.endFrame();
+            }
         }
         std::cout<<"PR25 world-surface, marker, map-mode and solar raster checks passed\n";
     }

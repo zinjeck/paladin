@@ -1,28 +1,35 @@
-#include <limits>
 #include "TestFramework.h"
+#include "interaction/SettlementCommandController.h"
+#include "interaction/SettlementInspectionController.h"
+#include "interaction/SettlementObjectPlacementController.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityRenderer.h"
+#include "rendering/GlobeView.h"
 #include "rendering/Renderer.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/TileRenderMetrics.h"
-#include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldArmyPresentation.h"
-#include "rendering/GlobeView.h"
-#include "ui/CityHud.h"
+#include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelGrid.h"
-#include "simulation/MilitarySystem.h"
 #include "simulation/DiplomacySystem.h"
+#include "simulation/MilitarySystem.h"
 #include "simulation/Simulation.h"
+#include "ui/CityHud.h"
+#include "ui/DiplomacyPanel.h"
 #include "ui/GrayUiRenderer.h"
 #include "ui/MilitaryPanel.h"
-#include "ui/DiplomacyPanel.h"
+#include "ui/RealmFlagRenderer.h"
+#include "world/RealmFlagDesigns.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <set>
 #include <vector>
@@ -51,8 +58,45 @@ namespace
         }
         return result;
     }
-    void requireBlocks(const std::vector<std::uint32_t>& pixels, int width, int height, int pitch)
+    void requireBlocks(
+        const std::vector<std::uint32_t>& pixels,
+        int width,
+        int height,
+        int pitch,
+        bool translated = false
+    )
     {
+        if (translated)
+        {
+            // CityPixelView shifts the entire lattice by a physical-pixel
+            // residual. Every layer must still share one pitch and phase.
+            bool aligned = false;
+            for (int py = 0; py < pitch && !aligned; ++py)
+            {
+                for (int px = 0; px < pitch && !aligned; ++px)
+                {
+                    bool matches = true;
+                    for (int y = 0; y < height && matches; ++y)
+                    {
+                        for (int x = 0; x < width && matches; ++x)
+                        {
+                            const int bx =
+                                std::max(0, x - (x + pitch - px) % pitch);
+                            const int by =
+                                std::max(0, y - (y + pitch - py) % pitch);
+                            matches = pixels[y * width + x] ==
+                                      pixels[by * width + bx];
+                        }
+                    }
+                    aligned = matches;
+                }
+            }
+            PALADIN_CHECK(aligned);
+            PALADIN_CHECK(
+                std::set<std::uint32_t>(pixels.begin(), pixels.end()).size() > 8
+            );
+            return;
+        }
         std::set<std::uint32_t> colors;
         for (int y=0;y<height;y+=pitch)
             for (int x=0;x<width;x+=pitch)
@@ -120,6 +164,147 @@ namespace
         const auto absent=render("pr26-deployed-hidden.png");
         PALADIN_CHECK(std::all_of(absent.begin(),absent.end(),[&](auto p){return p==absent.front();}));
     }
+    void citizenPicking(Renderer& renderer, SDL_Window* window)
+    {
+        SettlementGrid grid(32, 32);
+        for (int y = 0; y < 32; ++y)
+        {
+            for (int x = 0; x < 32; ++x)
+            {
+                auto& t = *grid.tile({x, y});
+                t.terrain = TerrainType::Land;
+                t.biome = BiomeType::Plain;
+            }
+        }
+        SettlementMap map(std::move(grid), {0, 0}, 1, 1, 32, 3301);
+        auto house = *SettlementObjectCatalog::definition("house");
+        house.bypassesConstruction = true;
+        PALADIN_CHECK(map.objectState().placeCompletedObject(
+            map.grid(),
+            house,
+            {{8, 8}, 5, 5}
+        ));
+        map.naturalFeatures().clear({{8, 8}, 5, 5});
+        SettlementCitizenState people;
+        PALADIN_CHECK(people.initialize(1, 47));
+        auto& person =
+            const_cast<SettlementCitizen&>(people.citizens().front());
+        person.tilePosition = {10, 10};
+        person.insideHome = true;
+        person.hasVisualSnapshot = false;
+        CityRenderer city;
+        city.presentation.roofsVisible = false;
+        city.presentation.shadowsVisible = false;
+        city.presentation.cloudsEnabled = false;
+        city.animationTimeOverride = 42;
+        SettlementInspectionController inspection;
+        SettlementCommandController commands;
+        SettlementObjectPlacementController placement;
+        Camera2D camera(10.52, 10.49);
+        TileRenderMetrics metrics;
+        const auto draw = [&](const std::string& name)
+        {
+            renderer.beginFrame();
+            city.render(
+                renderer,
+                map,
+                camera,
+                metrics,
+                placement,
+                commands,
+                people,
+                inspection,
+                1,
+                12
+            );
+            auto image = capture(window, name);
+            renderer.endFrame();
+            return image;
+        };
+        for (double zoom : {4., 13.3, 16.})
+        {
+            camera.setZoom(zoom);
+            for (bool child : {false, true})
+            {
+                person.child = child;
+                person.militaryDeployed = true;
+                const auto until = SDL_GetTicks() + 500;
+                do
+                {
+                    renderer.beginFrame();
+                    city.render(
+                        renderer,
+                        map,
+                        camera,
+                        metrics,
+                        placement,
+                        commands,
+                        people,
+                        inspection,
+                        1,
+                        12
+                    );
+                    renderer.endFrame();
+                    SDL_Delay(1);
+                } while (SDL_GetTicks() < until);
+                const auto backdrop = draw("citizen-pick-backdrop.png");
+                person.militaryDeployed = false;
+                const auto shown = draw(
+                    "citizen-pick-" + std::to_string(zoom) +
+                    (child ? "-child.png" : "-adult.png")
+                );
+                int hits = 0, misses = 0;
+                for (int y = 230; y < 342; ++y)
+                {
+                    for (int x = 400; x < 560; ++x)
+                    {
+                        const bool changed =
+                            backdrop[y * 960 + x] != shown[y * 960 + x];
+                        const auto picked = city.citizenAtScreen(
+                            float(x) + .5F,
+                            float(y) + .5F,
+                            map,
+                            people
+                        );
+                        if (bool(picked) != changed)
+                        {
+                            std::cerr << "pick mismatch zoom=" << zoom
+                                      << " child=" << child << " x=" << x
+                                      << " y=" << y << " hit=" << bool(picked)
+                                      << " changed=" << changed << "\n";
+                        }
+                        PALADIN_CHECK(bool(picked) == changed);
+                        if (picked)
+                        {
+                            ++hits;
+                            PALADIN_CHECK(picked == person.id);
+                        }
+                        else
+                        {
+                            ++misses;
+                        }
+                    }
+                }
+                PALADIN_CHECK(hits > 0 && misses > 0);
+                // The tile still selects its house when no sprite pixel is hit.
+                PALADIN_CHECK(inspection.selectAt(
+                    {10, 10},
+                    map.objectState(),
+                    people,
+                    true,
+                    nullptr,
+                    false
+                ));
+                PALADIN_CHECK(
+                    inspection.kind() ==
+                    SettlementInspectionKind::CompletedObject
+                );
+                inspection.clear();
+            }
+        }
+        std::cout << "Citizen alpha picking: adult/child bodies, three zooms, "
+                     "camera residual and house pass-through passed\n";
+    }
     void militaryAndCities(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
     {
         WorldGenerationSettings settings;
@@ -168,11 +353,20 @@ namespace
         };
         using A=MilitaryPanel::Action;
         click(A::New); PALADIN_CHECK(!panel.selection() && world.armies().empty());
-        click(A::Hire); click(A::Hire);
+        PALADIN_CHECK(
+            MilitarySystem::recruit(world, sim.playerRealmId(), city, 1) ==
+            MilitaryResult::Success
+        );
+        PALADIN_CHECK(
+            MilitarySystem::recruit(world, sim.playerRealmId(), city, 1) ==
+            MilitaryResult::Success
+        );
+        panel.layout(960, 640, world, sim.playerRealmId());
         PALADIN_CHECK(MilitarySystem::available(world,city)==2);
         click(A::New); const auto unit=panel.selection(); PALADIN_CHECK(unit);
         PALADIN_CHECK(world.army(unit)->soldierCount()==1);
-        click(A::AddFive); PALADIN_CHECK(world.army(unit)->soldierCount()==2);
+        click(A::AddOne);
+        PALADIN_CHECK(world.army(unit)->soldierCount() == 2);
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
         panel.render(renderer,ui,world,sim.playerRealmId(),&art);
         capture(window,"pr26-military-panel.png"); renderer.endFrame();
@@ -188,7 +382,40 @@ namespace
         // PR30 discharge returns an unemployed civilian, not an automatic
         // barracks reserve. Rehire explicitly for the count-only render check.
         PALADIN_CHECK(MilitarySystem::recruit(world,sim.playerRealmId(),city,1)==MilitaryResult::Success);
-        click(A::Row,unit); click(A::Local); click(A::World); click(A::Focus);
+        click(A::Row, unit);
+        const auto soldier = world.army(unit)->soldiers().front();
+        const auto origin = world.soldier(soldier)->homeSettlementId();
+        const auto person = world.soldier(soldier)->sourceCitizenId();
+        const auto age = world.settlement(origin)
+                             ->simulationState()
+                             .citizens()
+                             .citizen(person)
+                             ->ageYears;
+        click(A::ToGarrison);
+        PALADIN_CHECK(world.army(unit)->garrisonSettlementId() == city);
+        // Controls on the other side must not resize this selected garrison.
+        click(A::AddOne);
+        PALADIN_CHECK(world.army(unit)->soldierCount() == 1);
+        click(A::GarrisonAddOne);
+        PALADIN_CHECK(world.army(unit)->soldierCount() == 2);
+        click(A::GarrisonRemoveOne);
+        PALADIN_CHECK(world.army(unit)->soldierCount() == 1);
+        PALADIN_CHECK(world.soldier(soldier)->homeSettlementId() == origin);
+        PALADIN_CHECK(
+            world.settlement(origin)
+                ->simulationState()
+                .citizens()
+                .citizen(person)
+                ->ageYears == age
+        );
+        renderer.beginFrame();
+        renderer.fillRectangle(0, 0, 960, 640, {35, 87, 71, 255});
+        panel.render(renderer, ui, world, sim.playerRealmId(), &art);
+        capture(window, "military-field-garrison.png");
+        renderer.endFrame();
+        click(A::ToField);
+        PALADIN_CHECK(!world.army(unit)->garrisoned());
+        click(A::Focus);
         PALADIN_CHECK(panel.takeFocus()==unit && !panel.isOpen());
         // Universal markers do not grow or acquire sprawl with population.
         WorldObjectRenderer objects; Camera2D camera(32.5,33.5); camera.setWorldZoom(16);
@@ -303,18 +530,19 @@ namespace
         for (const bool fortress : {false,true})
         {
             hud.setFortress(fortress); hud.setSettlementStatus(true,8); hud.layout(960,640);
-            const float x=(960.F-76.F*(fortress?3:7))*.5F+38;
+            const float x = (960.F - 76.F * (fortress ? 4 : 8)) * .5F +
+                            76 * (fortress ? 3 : 6) + 38;
             const auto press=[&](float px,float py)
             { PALADIN_CHECK(hud.pointerPressed(px,py)); return hud.pointerReleased(px,py); };
             press(x,608);
             renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{35,87,71,255});
             hud.render(renderer,ui);
             capture(window,fortress?"pr27-fortress-rule-buildings.png":"pr27-rule-buildings.png"); renderer.endFrame();
-            PALADIN_CHECK(hud.containsInteractivePoint(x,468));
-            PALADIN_CHECK(press(x,468)==CityHudAction::BeginObjectPlacement);
+            PALADIN_CHECK(hud.containsInteractivePoint(x, 538));
+            PALADIN_CHECK(press(x, 538) == CityHudAction::BeginObjectPlacement);
             PALADIN_CHECK(hud.selectedObjectTypeId()==SettlementObjectTypes::Barracks);
             hud.closeCategoryMenus(); press(x,608);
-            PALADIN_CHECK(press(x,398)==CityHudAction::BeginObjectPlacement);
+            PALADIN_CHECK(press(x, 468) == CityHudAction::BeginObjectPlacement);
             PALADIN_CHECK(hud.selectedObjectTypeId()==SettlementObjectTypes::ArmySupplyDepot);
             hud.closeCategoryMenus();
         }
@@ -401,10 +629,15 @@ namespace
         using A=MilitaryPanel::Action;
         const auto first=military.controlBounds(A::Row,armies.front());
         PALADIN_CHECK(first && first->width==76 && first->height==88);
-        PALADIN_CHECK(military.controlBounds(A::Row,armies[13]) && !military.controlBounds(A::Row,armies[14]));
-        PALADIN_CHECK(military.controlBounds(A::Row,armies[7])->y>first->y);
-        PALADIN_CHECK(military.controlBounds(A::World)->y>military.controlBounds(A::Row,armies[13])->y+88);
-        PALADIN_CHECK(military.controlBounds(A::New)->y>military.controlBounds(A::World)->y);
+        PALADIN_CHECK(
+            military.controlBounds(A::Row, armies[8]) &&
+            !military.controlBounds(A::Row, armies[9])
+        );
+        PALADIN_CHECK(military.controlBounds(A::Row, armies[3])->y > first->y);
+        PALADIN_CHECK(
+            military.controlBounds(A::New)->y >
+            military.controlBounds(A::Row, armies[8])->y + 88
+        );
         renderer.beginFrame(); renderer.fillRectangle(0,0,960,640,{32,44,67,255});
         military.render(renderer,ui,world,actor,&art); capture(window,"pr29-military-overflow-top.png"); renderer.endFrame();
         event={}; event.type=SDL_EVENT_MOUSE_WHEEL; event.wheel.x=0; event.wheel.y=-20;
@@ -415,12 +648,17 @@ namespace
         military.render(renderer,ui,world,actor,&art); capture(window,"pr29-military-overflow-bottom.png"); renderer.endFrame();
         const auto mb=military.bounds();
         event={}; event.type=SDL_EVENT_MOUSE_BUTTON_DOWN; event.button.button=SDL_BUTTON_LEFT;
-        event.button.x=mb.x+mb.width-22; event.button.y=mb.y+44+178;
+        event.button.x = first->x + (mb.width - 88) * .5F - 6;
+        event.button.y = mb.y + 94 + 270;
         PALADIN_CHECK(military.handle(event,world,actor));
-        event={}; event.type=SDL_EVENT_MOUSE_MOTION; event.motion.x=mb.x+mb.width-22; event.motion.y=mb.y+44;
+        event = {};
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        event.motion.x = first->x + (mb.width - 88) * .5F - 6;
+        event.motion.y = mb.y + 94;
         PALADIN_CHECK(military.handle(event,world,actor));
         event={}; event.type=SDL_EVENT_MOUSE_BUTTON_UP; event.button.button=SDL_BUTTON_LEFT;
-        event.button.x=mb.x+mb.width-22; event.button.y=mb.y+44;
+        event.button.x = first->x + (mb.width - 88) * .5F - 6;
+        event.button.y = mb.y + 94;
         PALADIN_CHECK(military.handle(event,world,actor));
         PALADIN_CHECK(military.controlBounds(A::Row,armies.front()) && !military.selection());
         // Exercise all five sorts and a list longer than the left viewport.
@@ -433,6 +671,344 @@ namespace
         PALADIN_CHECK(panel.handle(event,world,actor));
         PALADIN_CHECK(panel.realmBounds(actor) && panel.realmBounds(target));
         std::cout<<"Diplomacy UI: blank/selected states, ordered actions, conserved gift, tributary toggle, five sorts, scroll and compact army overflow passed\n";
+    }
+
+    void workYards(Renderer& renderer, SDL_Window* window)
+    {
+        SettlementGrid grid(60, 60);
+        for (int y = 0; y < 60; ++y)
+        {
+            for (int x = 0; x < 60; ++x)
+            {
+                auto& tile = *grid.tile({x, y});
+                tile.terrain = x >= 40 ? TerrainType::Water : TerrainType::Land;
+                tile.biome = BiomeType::Plain;
+                tile.temperature = Temperature{.5};
+                tile.rainfall = Rainfall{.7};
+            }
+        }
+        SettlementMap map(std::move(grid), {0, 0}, 1, 1, 60, 3349);
+        const std::array<std::string_view, 4>
+            types{"market", "stockpile", "fishing_grounds", "trade_depot"};
+        const std::array<SettlementObjectFootprint, 4> footprints{
+            {{{10, 10}, 6, 6},
+             {{22, 10}, 6, 6},
+             {{34, 10}, 6, 6},
+             {{22, 23}, 6, 6}}
+        };
+        for (std::size_t i = 0; i < types.size(); ++i)
+        {
+            auto definition = *SettlementObjectCatalog::definition(types[i]);
+            definition.bypassesConstruction = true;
+            PALADIN_CHECK(map.objectState().placeCompletedObject(
+                map.grid(),
+                definition,
+                footprints[i]
+            ));
+            map.naturalFeatures().clear(footprints[i]);
+        }
+        map.logistics.synchronize(map.objectState(), 360);
+        for (const auto& object : map.objectState().completedObjects())
+        {
+            const auto inventory = map.logistics.forObject(object.id);
+            PALADIN_CHECK(map.logistics.add(inventory, "lumber", 12));
+            PALADIN_CHECK(map.logistics.add(inventory, "bread", 8));
+        }
+        CityRenderer city;
+        city.animationTimeOverride = 42;
+        city.presentation.cloudsEnabled = false;
+        city.artRootOverride =
+            std::string(PALADIN_TEST_SOURCE_ROOT) + "/assets/sprites";
+        SettlementInspectionController inspection;
+        SettlementCommandController commands;
+        SettlementObjectPlacementController placement;
+        SettlementCitizenState people;
+        TileRenderMetrics metrics;
+        Camera2D camera(25, 18);
+        PALADIN_CHECK(people.initialize(2, 3350));
+        map.employment().synchronize(map.objectState(), people);
+        const auto market = map.objectState().completedObjects().front().id;
+        const auto job = map.employment().forObject(market);
+        PALADIN_CHECK(map.employment().adjust(job, 2, people));
+        int stall = 0;
+        for (const auto& record : people.citizens())
+        {
+            auto& person = const_cast<SettlementCitizen&>(record);
+            person.tilePosition = person.destination = marketStallTile(
+                footprints[0].topLeft, footprints[0].width,
+                footprints[0].height, stall++
+            );
+            person.hasVisualSnapshot = false;
+            person.insideHome = false;
+            person.path.clear();
+            person.activity = CitizenActivity::AtWork;
+            person.task.kind = CitizenTaskKind::Work;
+            person.task.object = market;
+            person.task.workTile = person.tilePosition;
+        }
+        const auto draw = [&](const std::string& name, double hour)
+        {
+            renderer.beginFrame();
+            city.render(
+                renderer,
+                map,
+                camera,
+                metrics,
+                placement,
+                commands,
+                people,
+                inspection,
+                1,
+                hour
+            );
+            const auto result = name.empty() ? std::vector<std::uint32_t>{}
+                                             : capture(window, name);
+            renderer.endFrame();
+            return result;
+        };
+        camera.setZoom(4);
+        for (int warm = 0; warm < 12; ++warm)
+        {
+            draw("", 12);
+        }
+        draw("next-workyards-normal-day.png", 12);
+        draw("next-workyards-normal-night.png", 0);
+        camera.setZoom(16);
+        for (std::size_t i = 0; i < types.size(); ++i)
+        {
+            const auto& f = footprints[i];
+            camera.setPosition(
+                f.topLeft.x + f.width * .5,
+                f.topLeft.y + f.height * .5
+            );
+            for (int warm = 0; warm < 4; ++warm)
+            {
+                draw("", 12);
+            }
+            requireBlocks(
+                draw("next-" + std::string(types[i]) + "-close-day.png", 12),
+                960,
+                640,
+                4,
+                true
+            );
+            draw("next-" + std::string(types[i]) + "-close-night.png", 0);
+        }
+        // The actual placement controller draws the same two counters as the
+        // completed market, including while dragging and after release.
+        PALADIN_CHECK(map.objectState().placeCompletedObject(
+            map.grid(),
+            *SettlementObjectCatalog::definition("city_keep"),
+            {{2, 42}, 5, 7}
+        ));
+        map.logistics.synchronize(map.objectState(), 360);
+        map.naturalFeatures().clear({{10, 23}, 6, 6});
+        PALADIN_CHECK(placement.beginPlacement("market"));
+        camera.setPosition(13, 26);
+        placement.pointerMoved(SettlementTilePosition{10, 23});
+        PALADIN_CHECK(!placement.hasDrawablePreview());
+        PALADIN_CHECK(placement.pointerPressed(
+            SettlementTilePosition{10, 23}, map
+        ) == SettlementPlacementCommitResult::None);
+        placement.pointerMoved(SettlementTilePosition{15, 28});
+        PALADIN_CHECK(placement.hasDrawablePreview());
+        draw("next-market-drag-preview.png", 12);
+        PALADIN_CHECK(placement.pointerReleased(
+            SettlementTilePosition{15, 28}, map
+        ));
+        PALADIN_CHECK(placement.visibleFootprintIsValid(map));
+        draw("next-market-locked-preview.png", 12);
+        placement.cancelPlacement();
+    }
+
+    void miningAndFlags(Renderer& renderer, SDL_Window* window)
+    {
+        SettlementGrid grid(40, 40);
+        for (int y = 0; y < 40; ++y)
+        {
+            for (int x = 0; x < 40; ++x)
+            {
+                auto& tile = *grid.tile({x, y});
+                tile.terrain = TerrainType::Land;
+                tile.biome = BiomeType::Plain;
+                tile.temperature = Temperature{.5};
+                tile.rainfall = Rainfall{.7};
+            }
+        }
+        SettlementMap map(std::move(grid), {0, 0}, 1, 1, 40, 3347);
+        std::vector<SettlementObjectId> sites;
+        for (int i = 0; i < 4; ++i)
+        {
+            const auto& job = MiningJobs[i];
+            const SettlementObjectFootprint footprint{
+                {8 + (i % 2) * 15, 8 + (i / 2) * 15},
+                7,
+                7
+            };
+            for (int y = 0; y < 7; ++y)
+            {
+                for (int x = 0; x < 7; ++x)
+                {
+                    map.grid()
+                        .tile(
+                            {footprint.topLeft.x + x, footprint.topLeft.y + y}
+                        )
+                        ->mineral = job.deposit;
+                }
+            }
+            map.objectState().invalidateTerrainCache();
+            auto definition = *SettlementObjectCatalog::definition(job.type);
+            definition.bypassesConstruction = true;
+            PALADIN_CHECK(map.objectState().placeCompletedObject(
+                map.grid(),
+                definition,
+                footprint
+            ));
+            sites.push_back(map.objectState().completedObjects().back().id);
+            map.naturalFeatures().clear(footprint);
+        }
+        map.logistics.synchronize(map.objectState(), 360);
+        SettlementCitizenState people;
+        PALADIN_CHECK(people.initialize(4, 3348));
+        map.employment().synchronize(map.objectState(), people);
+        for (int i = 0; i < 4; ++i)
+        {
+            PALADIN_CHECK(map.employment().adjust(
+                map.employment().forObject(sites[i]),
+                1,
+                people
+            ));
+        }
+        for (const auto& record : people.citizens())
+        {
+            auto& person = const_cast<SettlementCitizen&>(record);
+            const auto* job = map.employment().workplace(person.workplaceId);
+            PALADIN_CHECK(job);
+            const auto& f =
+                map.objectState().completedObject(job->objectId)->footprint;
+            person.tilePosition = {f.topLeft.x + 3, f.topLeft.y + 3};
+            person.hasVisualSnapshot = false;
+            person.insideHome = false;
+            person.activity = CitizenActivity::Mining;
+            person.task.kind = CitizenTaskKind::Work;
+            person.task.object = job->objectId;
+            person.path.clear();
+        }
+        CityRenderer city;
+        city.animationTimeOverride = 42;
+        city.presentation.cloudsEnabled = false;
+        city.artRootOverride =
+            std::string(PALADIN_TEST_SOURCE_ROOT) + "/assets/sprites";
+        SettlementInspectionController inspection;
+        SettlementCommandController commands;
+        SettlementObjectPlacementController placement;
+        TileRenderMetrics metrics;
+        Camera2D camera(19, 19);
+        camera.setZoom(4);
+        const auto draw = [&](const std::string& name, double hour)
+        {
+            renderer.beginFrame();
+            city.render(
+                renderer,
+                map,
+                camera,
+                metrics,
+                placement,
+                commands,
+                people,
+                inspection,
+                1,
+                hour
+            );
+            const auto result = capture(window, name);
+            renderer.endFrame();
+            return result;
+        };
+        draw("next-mines-untouched.png", 12);
+        for (int stage = 1; stage <= 4; ++stage)
+        {
+            for (const auto id : sites)
+            {
+                map.mining.work(
+                    map.grid(),
+                    *map.objectState().completedObject(id),
+                    1,
+                    49 * 720 / 4,
+                    100000
+                );
+            }
+            draw("next-mines-progress-" + std::to_string(stage) + ".png", 12);
+        }
+        draw("next-mines-normal-night.png", 0);
+        camera.setPosition(11.5, 11.5);
+        camera.setZoom(16);
+        for (int warm = 0; warm < 3; ++warm)
+        {
+            draw("next-miner-warming.png", 12);
+        }
+        const auto still = draw("next-miner-close-day.png", 12);
+        requireBlocks(still, 960, 640, 4, true);
+        const auto actorPixels = [](const auto& frame)
+        {
+            // Terrain pages may finish streaming while paused. Isolate the
+            // miner and its excavated floor, so neither streaming nor ambient
+            // grass can falsely pass the animation or pause assertion.
+            std::vector<std::uint32_t> actor;
+            for (int y = 230; y < 350; ++y)
+            {
+                actor.insert(
+                    actor.end(), frame.begin() + y * 960 + 420,
+                    frame.begin() + y * 960 + 540
+                );
+            }
+            return actor;
+        };
+        PALADIN_CHECK(
+            actorPixels(still) ==
+            actorPixels(draw("next-miner-paused.png", 12))
+        );
+        for (const auto& record : people.citizens())
+        {
+            const_cast<SettlementCitizen&>(record).workAnimationMinutes = 4;
+        }
+        PALADIN_CHECK(
+            actorPixels(still) !=
+            actorPixels(draw("next-miner-swing.png", 12))
+        );
+        draw("next-miner-close-night.png", 0);
+        camera.setPosition(26.5, 26.5);
+        draw("next-quarry-close-day.png", 12);
+        draw("next-quarry-close-night.png", 0);
+        renderer.beginFrame();
+        renderer.fillRectangle(0, 0, 960, 640, {57, 70, 88, 255});
+        std::set<std::vector<std::uint32_t>> designs;
+        for (std::size_t i = 0; i < RealmFlagDesignCount; ++i)
+        {
+            const auto flag = realmFlagDesign(i);
+            std::vector<std::uint32_t> key;
+            for (const auto& cell : flag.cells)
+            {
+                key.push_back(
+                    (cell.color.red << 16) | (cell.color.green << 8) |
+                    cell.color.blue
+                );
+            }
+            PALADIN_CHECK(designs.insert(key).second);
+            if (i < 96)
+            {
+                drawRealmFlag(
+                    renderer,
+                    flag,
+                    20 + float(i % 16) * 58,
+                    16 + float(i / 16) * 100,
+                    6
+                );
+            }
+        }
+        capture(window, "next-flag-designs.png");
+        renderer.endFrame();
+        std::cout << "Mine render: continuous excavation, native day/night "
+                     "pixels, miner swing, pause and unique flags passed\n";
     }
 
     void uprightSettlements(Renderer& renderer, SDL_Window* window, SceneSpriteLibrary& art)
@@ -493,10 +1069,13 @@ int main()
         SceneSpriteLibrary art; art.load(renderer,std::string(PALADIN_TEST_SOURCE_ROOT)+"/assets/sprites");
         PALADIN_CHECK(art.find("citizen.militia.male.front.walk"));
         actors(renderer,window.nativeHandle(),art);
+        citizenPicking(renderer, window.nativeHandle());
         militaryAndCities(renderer,window.nativeHandle(),art);
         selectionAndConstruction(renderer,window.nativeHandle());
         diplomacyAndOverflow(renderer,window.nativeHandle(),art);
         uprightSettlements(renderer,window.nativeHandle(),art);
+        miningAndFlags(renderer, window.nativeHandle());
+        workYards(renderer, window.nativeHandle());
         std::cout<<"Military UI, universal markers, walking/gathering, sleep pixel blocks and pause checks passed.\n";
     }
     catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; result=1; }

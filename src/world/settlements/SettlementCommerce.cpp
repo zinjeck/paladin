@@ -243,9 +243,15 @@ namespace Paladin
                     {requested,
                      map.logistics.available(source.id, flow.resource),
                      map.logistics.receivable(destination.id, flow.resource),
-                     affordableTradeUnits(source, destination, requested)}
+                     affordableTradeUnits(
+                         source,
+                         destination,
+                         requested,
+                         &people
+                     )}
                 );
-                if (amount > 0 && buyGoods(source, destination, amount))
+                if (amount > 0 &&
+                    buyGoods(source, destination, amount, &people))
                 {
                     map.logistics.moveAvailable(
                         source.id,
@@ -311,6 +317,20 @@ namespace Paladin
         {
             return 0;
         }
+        if (destination.kind == InventoryKind::Home)
+        {
+            return source.kind == InventoryKind::Keep ||
+                           source.kind == InventoryKind::Groundpile
+                       ? 0
+                       : policy.retailLumberPrice +
+                             (source.kind == InventoryKind::Market
+                                  ? 0
+                                  : policy.bypassPremium);
+        }
+        if (destination.kind == InventoryKind::TradeDepot)
+        {
+            return policy.wholesaleFoodPrice;
+        }
         if (destination.kind == InventoryKind::Construction ||
             destination.kind == InventoryKind::Keep)
         {
@@ -348,16 +368,40 @@ namespace Paladin
     int SettlementCommerce::affordableTradeUnits(
         const SettlementInventory& source,
         const SettlementInventory& destination,
-        int requested
+        int requested,
+        const SettlementCitizenState* households
     ) const
     {
         const auto price = tradePrice(source, destination);
-        const auto payer = businessAccounts_.find(destination.objectId);
+        if (destination.kind == InventoryKind::Home && price > 0)
+        {
+            if (!households)
+            {
+                return 0;
+            }
+            Money cash = 0;
+            for (const auto& person : households->citizens())
+            {
+                if (person.homeId == destination.objectId && !person.child &&
+                    person.health > 0 && !person.militaryDeployed)
+                {
+                    cash += std::min(
+                        savings(person.id),
+                        std::numeric_limits<Money>::max() - cash
+                    );
+                }
+            }
+            return int(std::min<Money>(requested, cash / price));
+        }
+        const auto payer = destination.kind == InventoryKind::TradeDepot
+                               ? businessAccounts_.end()
+                               : businessAccounts_.find(destination.objectId);
         const Money cash =
             payer != businessAccounts_.end()
                 ? payer->second
                 : ((destination.kind == InventoryKind::Construction ||
-                    destination.kind == InventoryKind::Keep)
+                    destination.kind == InventoryKind::Keep ||
+                    destination.kind == InventoryKind::TradeDepot)
                        ? treasury->balance
                        : 0);
         return price > 0 ? int(std::min<Money>(requested, cash / price))
@@ -366,21 +410,59 @@ namespace Paladin
     bool SettlementCommerce::buyGoods(
         const SettlementInventory& source,
         const SettlementInventory& destination,
-        int amount
+        int amount,
+        const SettlementCitizenState* households
     )
     {
         if (amount <= 0 ||
-            affordableTradeUnits(source, destination, amount) < amount)
+            affordableTradeUnits(source, destination, amount, households) <
+                amount)
         {
             return false;
         }
-        auto buyer = businessAccounts_.find(destination.objectId),
-             seller = businessAccounts_.find(source.objectId);
+        auto buyer = destination.kind == InventoryKind::TradeDepot
+                         ? businessAccounts_.end()
+                         : businessAccounts_.find(destination.objectId),
+             seller = source.kind == InventoryKind::TradeDepot
+                          ? businessAccounts_.end()
+                          : businessAccounts_.find(source.objectId);
         Money& from = buyer == businessAccounts_.end() ? treasury->balance
                                                        : buyer->second;
         Money& to = seller == businessAccounts_.end() ? treasury->balance
                                                       : seller->second;
-        return transfer(from, to, tradePrice(source, destination) * amount);
+        const Money price = tradePrice(source, destination);
+        if (price > std::numeric_limits<Money>::max() / amount)
+        {
+            return false;
+        }
+        Money payment = price * amount;
+        if (destination.kind == InventoryKind::Home && payment > 0)
+        {
+            if (!households || to > std::numeric_limits<Money>::max() - payment)
+            {
+                return false;
+            }
+            for (const auto& person : households->citizens())
+            {
+                if (person.homeId != destination.objectId || person.child ||
+                    person.health <= 0 || person.militaryDeployed)
+                {
+                    continue;
+                }
+                const auto share = std::min(payment, savings(person.id));
+                if (share > 0)
+                {
+                    transfer(citizens_.at(person.id).cash, to, share);
+                }
+                payment -= share;
+                if (!payment)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return transfer(from, to, payment);
     }
     Money SettlementCommerce::mealPrice(
         const SettlementMap& map,
@@ -406,7 +488,8 @@ namespace Paladin
             map.logistics.inventories().end(),
             [](const auto& i) { return i.kind == InventoryKind::Market; }
         );
-        if (source.kind == InventoryKind::Workplace &&
+        if ((source.kind == InventoryKind::Workplace ||
+             source.kind == InventoryKind::TradeDepot) &&
             (marketExists || stockpileExists))
         {
             return -1;

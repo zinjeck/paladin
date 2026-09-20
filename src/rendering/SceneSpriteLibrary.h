@@ -78,6 +78,17 @@ namespace Paladin
             double doorOpen = 0
         ) const;
         const SceneSprite* find(const std::string& id) const;
+        bool opaqueAt(const SceneDrawItem& item, int x, int y) const
+        {
+            for (const auto& [id, sprite] : sprites_)
+            {
+                if (sprite.texture.get() == item.texture)
+                {
+                    return sprite.selectionMask.opaque(x, y);
+                }
+            }
+            return false;
+        }
         bool renderSelection(Renderer& renderer, const SceneDrawItem& item) const
         {
             for (const auto& [id, sprite] : sprites_)

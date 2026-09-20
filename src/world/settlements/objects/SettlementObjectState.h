@@ -4,6 +4,7 @@
 #include "world/SettlementGrid.h"
 #include "world/SettlementTilePosition.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -183,6 +184,12 @@ namespace Paladin
         double accrueProduction(SettlementObjectId, double amount);
         int prepareGrainHarvest(SettlementObjectId, double minute);
         void takeGrainHarvest(SettlementObjectId, int amount, double minute);
+        // Terrain is fixed after generation. Editors changing terrain or ore
+        // must invalidate these spatial queries before the next placement.
+        void invalidateTerrainCache() const noexcept
+        {
+            cachedPlacementGrid_ = nullptr;
+        }
         void rebuildOccupancy();
         std::size_t cancelConstructionWithin(
             const SettlementObjectFootprint& area
@@ -255,6 +262,7 @@ namespace Paladin
         mutable const SettlementGrid* cachedPlacementGrid_ = nullptr;
         mutable std::uint64_t cachedPlacementVersion_ =
             static_cast<std::uint64_t>(-1);
+        mutable std::array<std::vector<std::uint32_t>, 3> mineralPrefix_;
         mutable std::vector<std::uint32_t> structureBlockedPrefix_;
         mutable std::vector<std::uint32_t> infrastructureBlockedPrefix_;
     };

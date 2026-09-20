@@ -41,7 +41,9 @@ namespace Paladin
         Sleeping,
         OnBreak,
         Talking,
-        Fishing
+        Fishing,
+        Mining,
+        UndergroundMining
     };
 
     struct CitizenIdlePolicy

@@ -33,6 +33,7 @@ namespace Paladin
     {
         if (action == CityHudAction::FocusActiveSettlement && screen_ == Screen::World)
         { focusWorldSettlement(simulation_->presentedSettlementId()); return true; }
+        const auto inspectedCity = worldSettlementPanel_->selection();
         if (action != CityHudAction::None) caravanPanel_->close();
         if (action != CityHudAction::None) worldSettlementPanel_->close();
         if (action == CityHudAction::Diplomacy && screen_ == Screen::World)
@@ -52,7 +53,11 @@ namespace Paladin
             settlementObjectPlacementController_->cancelPlacement();
             settlementCommandController_->cancel();
             SDL_StopTextInput(window_->nativeHandle());
-            militaryPanel_->toggle(screen_ == Screen::City ? activeCitySettlementId_ : simulation_->presentedSettlementId());
+            militaryPanel_->toggle(
+                screen_ == Screen::City ? activeCitySettlementId_
+                : inspectedCity         ? inspectedCity
+                                        : simulation_->presentedSettlementId()
+            );
             militaryPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), simulation_->world(), simulation_->playerRealmId());
             return true;
         }

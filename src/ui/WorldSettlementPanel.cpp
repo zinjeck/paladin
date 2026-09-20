@@ -14,7 +14,15 @@ namespace Paladin
     void WorldSettlementPanel::open(SettlementId city)
     { close(); city_=city; scroll_=0; repeating_=false; quantity_="1"; message_.clear(); }
     void WorldSettlementPanel::close() noexcept
-    { city_={}; resource_.clear(); controls_.clear(); editing_=captured_=false; pressed_.reset(); drag_.cancel(); }
+    {
+        city_ = {};
+        militaryRequest_ = false;
+        resource_.clear();
+        controls_.clear();
+        editing_ = captured_ = false;
+        pressed_.reset();
+        drag_.cancel();
+    }
     int WorldSettlementPanel::amount() const noexcept
     { int value=0; const auto r=std::from_chars(quantity_.data(),quantity_.data()+quantity_.size(),value); return r.ec==std::errc{}?value:0; }
     void WorldSettlementPanel::layout(int width,int height,const World& world,RealmId actor)
@@ -30,14 +38,36 @@ namespace Paladin
         { controls_.push_back({b,k,std::move(label),value,id,enabled}); };
         add({x+w-54,y+10,28,26},Kind::Close,"X");
         if(w<300 || h<480) return;
-        const float pitch=std::clamp((h-360.F)/9.F,19.F,27.F);
+        const float pitch = std::clamp(
+            (h - 360.F) /
+                float(SettlementResourceCatalog::definitions().size()),
+            14.F,
+            27.F
+        );
+        if (own)
+        {
+            add({x + w - 126, y + 88, 102, 24}, Kind::Garrison, "Garrison");
+        }
         int index=0;
         for(const auto& res:SettlementResourceCatalog::definitions())
         {
-            if(own) add({x,y+121+index*pitch,46,pitch-3},Kind::Send,"Send",index,0,WorldShipmentSystem::available(*city,res.id)>0 || resource_==res.id);
+            if (own)
+            {
+                add({x, y + 143 + index * pitch, 46, pitch - 3},
+                    Kind::Send,
+                    "Send",
+                    index,
+                    0,
+                    WorldShipmentSystem::available(*city, res.id) > 0 ||
+                        resource_ == res.id);
+            }
             ++index;
         }
-        const float start=y+133+9*pitch, side=w-24;
+        const float start =
+                        y + 155 +
+                        float(SettlementResourceCatalog::definitions().size()) *
+                            pitch,
+                    side = w - 24;
         if(!resource_.empty())
         {
             add({x,start+21,32,26},Kind::Adjust,"-",-1);
@@ -85,6 +115,9 @@ namespace Paladin
         const auto* city=world.settlement(city_);
         switch(c.kind)
         {
+        case Kind::Garrison:
+            militaryRequest_ = true;
+            break;
         case Kind::Close: close(); return;
         case Kind::Send:
         {
@@ -174,19 +207,82 @@ namespace Paladin
         const auto* realm=world.realm(city->ownerRealmId());
         text(realm?std::string(realm->name()):"Unclaimed settlement",x,y+47,side);
         std::size_t garrison=MilitarySystem::available(world,city_);
-        for(const auto& army:world.armies()) if(army.ownerRealmId()==city->ownerRealmId() && MilitarySystem::presentAt(world,army,city_)) garrison+=army.soldierCount();
+        for (const auto& army : world.armies())
+        {
+            if (army.ownerRealmId() == city->ownerRealmId() &&
+                army.garrisonSettlementId() == city_)
+            {
+                garrison += army.soldierCount();
+            }
+        }
         text("Population: "+std::to_string(city->population())+" | Garrison: "+std::to_string(garrison),x,y+69,side);
-        text("Resources                     Total / available",x,y+103,side,1);
-        const float pitch=std::clamp((h-360.F)/9.F,19.F,27.F);
+        std::string units;
+        for (const auto& army : world.armies())
+        {
+            if (army.ownerRealmId() == city->ownerRealmId() &&
+                army.garrisonSettlementId() == city_)
+            {
+                if (!units.empty())
+                {
+                    units += ", ";
+                }
+                units += army.name() + " (" +
+                         std::to_string(army.soldierCount()) + ")";
+            }
+        }
+        text(
+            units.empty() ? "No garrison units" : units,
+            x,
+            y + 92,
+            side - 110,
+            1
+        );
+        text(
+            "Resources                     Total / in depot",
+            x,
+            y + 125,
+            side,
+            1
+        );
+        const float pitch = std::clamp(
+            (h - 360.F) /
+                float(SettlementResourceCatalog::definitions().size()),
+            14.F,
+            27.F
+        );
         int index=0;
         for(const auto& resource:SettlementResourceCatalog::definitions())
         {
-            text(std::string(resource.displayName),x+54,y+124+index*pitch,side-190,1.5F);
-            text(std::to_string(std::int64_t(std::clamp(WorldShipmentSystem::total(*city,resource.id),0.,9e15)))+" / "+
-                std::to_string(WorldShipmentSystem::available(*city,resource.id)),x+side-130,y+124+index*pitch,130,1.25F);
+            text(
+                std::string(resource.displayName),
+                x + 54,
+                y + 146 + index * pitch,
+                side - 190,
+                1.25F
+            );
+            text(
+                std::to_string(
+                    std::int64_t(
+                        std::clamp(
+                            WorldShipmentSystem::total(*city, resource.id),
+                            0.,
+                            9e15
+                        )
+                    )
+                ) + " / " +
+                    std::to_string(
+                        WorldShipmentSystem::available(*city, resource.id)
+                    ),
+                x + side - 130,
+                y + 146 + index * pitch,
+                130,
+                1.25F
+            );
             ++index;
         }
-        const float start=y+133+9*pitch;
+        const float start =
+            y + 155 +
+            float(SettlementResourceCatalog::definitions().size()) * pitch;
         if(choosingDestination())
         {
             text("Send "+resource_+" per trip",x,start,side,1.5F);
@@ -207,7 +303,32 @@ namespace Paladin
             }
             if(count==0) text(actor==city->ownerRealmId()?"Use Send beside a resource to dispatch a caravan.":"No outgoing caravans.",x,list_.y,side,1);
         }
-        text(message_,x,y+h-33,side,1);
-        text("Spare storage fills first; overflow goes near the keep.",x,y+h-17,side,1);
+        std::string hint = message_;
+        if (!city->simulationState().hasLocalMap() && mouseX_ >= x &&
+            mouseX_ <= x + side)
+        {
+            const int hovered = int(std::floor((mouseY_ - (y + 143)) / pitch));
+            const auto definitions = SettlementResourceCatalog::definitions();
+            if (hovered >= 0 && hovered < int(definitions.size()))
+            {
+                const auto quote = city->simulationState().economy().quote(
+                    city->simulationState().stockpile(),
+                    city->population(),
+                    definitions[hovered].id
+                );
+                hint = "Daily +" + std::to_string(int(quote.dailyOutput)) +
+                       " / -" + std::to_string(int(quote.dailyNeed)) +
+                       " | Sell " + std::to_string(int(quote.offered)) +
+                       " | Buy " + std::to_string(int(quote.wanted));
+            }
+        }
+        text(hint, x, y + h - 33, side, 1);
+        text(
+            "Caravans load and unload at Trade Depots.",
+            x,
+            y + h - 17,
+            side,
+            1
+        );
     }
 }

@@ -29,8 +29,8 @@ bakery.wall.north tribal-v10/back.png 3 0.75 0 1 0 0
 bakery.cap.south tribal-v10/mud.png 3 .125 0 1 0 0
 bakery.cap.west tribal-v10/mud.png .125 3 0 1 0 0
 bakery.cap.east tribal-v10/mud.png .125 3 1 1 0 0
-market.floor environment-v4/nature/paving.png 1 1 0 0 0 0
-market.stall environment-v4/props/market-stall.png 2 2 .5 1 0 0
+market.floor structures/market-road-v1.png 1 1 0 0 0 0
+market.stall structures/market-stall-v2.png 1.5 1.25 .5 1 0 0
 stockpile.floor environment-v4/nature/planks.png 1 1 0 0 0 0
 stockpile.stack environment-v4/props/stockpile-stack.png 1.5 1.25 .5 1 0 0
 fishing_grounds.floor environment-v4/nature/planks.png 1 1 0 0 0 0
@@ -382,3 +382,28 @@ world.settlement ui-military-v1/settlement.png 3 2.25 .5 0 0 0
 world.town ui-military-v1/town.png 3 2.25 .5 0 0 0
 world.city ui-military-v1/city.png 3 2.25 .5 0 0 0
 world.fortress ui-military-v1/fortress.png 3 2.25 .5 0 0 0
+
+# Resource and mining exports, approved palette and native scene grid.
+resource.wheat mining-v1/wheat.png .75 .75 .5 1 0 0
+resource.bread mining-v1/bread.png .75 .75 .5 1 0 0
+resource.iron mining-v1/iron.png .75 .75 .5 1 0 0
+resource.coal mining-v1/coal.png .75 .75 .5 1 0 0
+resource.gold mining-v1/gold.png .75 .75 .5 1 0 0
+ui.goods.gold mining-v1/gold.png 1 1 0 0 0 0
+mine.hoist mining-v1/mine.hoist.png 1.5 1.5 .5 1 0 0
+mine.strata mining-v1/mine.strata.png 2 2 0 0 0 0
+citizen.miner.male.front mining-v1/miner.male.front.png 1 1.25 .5 .9 0 0
+citizen.miner.male.front.walk mining-v1/miner.male.front.walk.png 1 1.25 .5 .9 0 0 4 0
+citizen.miner.male.back mining-v1/miner.male.back.png 1 1.25 .5 .9 0 0
+citizen.miner.male.back.walk mining-v1/miner.male.back.walk.png 1 1.25 .5 .9 0 0 4 0
+citizen.miner.female.front mining-v1/miner.female.front.png 1 1.25 .5 .9 0 0
+citizen.miner.female.front.walk mining-v1/miner.female.front.walk.png 1 1.25 .5 .9 0 0 4 0
+citizen.miner.female.back mining-v1/miner.female.back.png 1 1.25 .5 .9 0 0
+citizen.miner.female.back.walk mining-v1/miner.female.back.walk.png 1 1.25 .5 .9 0 0 4 0
+ui.build.coal_mine mining-v1/coal.png 1 1 0 0 0 0
+ui.build.iron_mine mining-v1/iron.png 1 1 0 0 0 0
+ui.build.gold_mine mining-v1/gold.png 1 1 0 0 0 0
+ui.build.quarry mining-v1/mine.hoist.png 1 1 0 0 0 0
+
+trade_depot.station mining-v1/trade_depot.png 4 3.5 .5 1 0 0
+ui.build.trade_depot mining-v1/trade_depot.icon.png 1 1 .5 .5 0 0

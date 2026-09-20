@@ -18,6 +18,9 @@ namespace Paladin
         static constexpr double MinutesPerTile = 10.0;
         ShipmentId id;
         RealmId owner;
+        RealmId buyer; // Empty for ordinary own-settlement logistics.
+        std::int64_t unitPrice = 0;
+        std::int64_t escrow = 0; // Buyer cash retained until delivery/return.
         SettlementId source, destination;
         std::string resource;
         int amount = 1;

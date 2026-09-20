@@ -340,6 +340,19 @@ namespace Paladin
                 output->terrain = mountainWeight > mountainThreshold
                                       ? TerrainType::Mountain
                                       : TerrainType::Land;
+                // Coherent local veins inherit the strategic deposit instead of
+                // rolling unrelated resources when a city is opened.
+                const int nearest = (tx >= .5 ? 1 : 0) + (ty >= .5 ? 2 : 0);
+                const double vein = GenerationNoise::fractal(
+                    x * .14,
+                    y * .14,
+                    seed ^ 0x0AEULL,
+                    2
+                );
+                if (output->terrain == TerrainType::Land && vein > -.12)
+                {
+                    output->mineral = samples[nearest]->mineral;
+                }
                 output->relief = output->terrain == TerrainType::Mountain
                                      ? ReliefType::Mountain
                                  : hillWeight > .5 ? ReliefType::Hills

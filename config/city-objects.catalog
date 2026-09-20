@@ -18,7 +18,7 @@
 city_keep enclosed city_keep.floor wall.adobe roof.thatch - 3 5 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
 house enclosed house.floor wall.adobe roof.thatch - 3 3 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
 bakery enclosed bakery.floor wall.adobe roof.thatch - 3 3 .75 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
-market modules market.floor - - market.stall 3 4 .65 .12 30 65 32 65 1 ca7e48 683724 .6 .45
+market modules market.floor - - market.stall 3 4 .65 .12 30 65 32 65 1 a78d72 74513f .6 .45
 stockpile ground stockpile.floor - - - 2 2 .35 .12 30 65 32 50 1 d1a352 754d1f .6 .45
 fishing_grounds modules fishing_grounds.floor - - fishing_grounds.station 4 4 .3 .12 30 65 32 45 1 bd864c 633e4b .6 .45
 wheat_farm modules wheat_farm.floor - - wheat_farm.crop 1 1 .18 .08 0 0 0 0 0 d6b02e 73570f .6 .45
@@ -28,3 +28,11 @@ logging_grounds ground logging_grounds.floor - - logging_grounds.stack 3 3 0 .08
 
 barracks enclosed city_keep.floor wall.adobe roof.thatch - 3 5 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
 army_supply_depot enclosed stockpile.floor wall.adobe roof.thatch - 3 3 .75 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+
+# Excavation shape/depth is driven by actual mining labor. No floor slab.
+coal_mine ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
+iron_mine ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
+gold_mine ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
+quarry ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
+
+trade_depot modules - - - trade_depot.station 5 5 .65 .01 30 65 32 45 1 BD864C 633E4B .6 .45

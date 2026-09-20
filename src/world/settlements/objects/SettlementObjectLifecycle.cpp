@@ -1,6 +1,7 @@
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
 #include <algorithm>
 #include <cmath>
 
@@ -252,8 +253,9 @@ namespace Paladin
             if (object.id != id || object.objectTypeId != SettlementObjectTypes::WheatFarm) continue;
             if (object.cropReadyMinute < 0)
             {
-                object.cropReadyMinute = minute + 3 * 1440.0;
-                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height);
+                object.cropReadyMinute =
+                    minute + WheatFarmPolicy::GrowthMinutes;
+                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height * WheatFarmPolicy::GrainPerTile);
             }
             return minute >= object.cropReadyMinute ? object.grainRemaining : 0;
         }
@@ -267,8 +269,9 @@ namespace Paladin
             object.grainRemaining = std::max(0, object.grainRemaining - amount);
             if (object.grainRemaining == 0)
             {
-                object.cropReadyMinute = minute + 3 * 1440.0;
-                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height);
+                object.cropReadyMinute =
+                    minute + WheatFarmPolicy::GrowthMinutes;
+                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height * WheatFarmPolicy::GrainPerTile);
             }
             return;
         }

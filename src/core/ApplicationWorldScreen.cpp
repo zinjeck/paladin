@@ -1,7 +1,4 @@
 #include "core/Application.h"
-#include "ui/WorldSettlementPanel.h"
-#include "ui/CaravanPanel.h"
-#include "ui/DiplomacyPanel.h"
 #include "core/SimulationClock.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
@@ -9,13 +6,17 @@
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/BitmapFontRenderer.h"
+#include "ui/CaravanPanel.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
+#include "ui/DiplomacyPanel.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
 #include "ui/GrayUiRenderer.h"
+#include "ui/RealmFlagRenderer.h"
 #include "ui/SimulationSpeedControls.h"
 #include "ui/WorldHud.h"
+#include "ui/WorldSettlementPanel.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
@@ -208,6 +209,24 @@ namespace Paladin
             diplomacyPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
             worldSettlementPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
         }
+        if (!foundingPanel_->isOpen() &&
+            !settlementPlacementController_->isActive())
+        {
+            const auto selected = worldRenderer_->selectedRealm;
+            if (selected && selected != simulation_->playerRealmId())
+            {
+                if (const auto* realm = simulation_->world().realm(selected))
+                {
+                    drawRealmFlag(
+                        *renderer_,
+                        realm->flag(),
+                        157,
+                        float(renderer_->outputHeight()) - 104,
+                        6
+                    );
+                }
+            }
+        }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
     }
 
@@ -237,6 +256,7 @@ namespace Paladin
         }
         cityHud_->setSettlementStatus(true, population);
         cityHud_->setTreasuryGold(realm ? realm->treasury->balance : 0);
+        cityHud_->setRealmFlag(realm ? realm->flag() : RealmFlag{});
         cityHud_->setCityInformation(
             realm ? std::string(realm->name()) : "",
             world.time().day(),

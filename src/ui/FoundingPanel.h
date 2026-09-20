@@ -106,6 +106,8 @@ namespace Paladin
         UiButton leftButton_;
         UiButton rightButton_;
         UiButton pickerDoneButton_;
+        UiButton flagPresetButton_{"Next design"};
+        std::size_t flagPreset_ = 0;
         UiButton rulerReloadButton_{"Reload name"};
         UiRectangle rulerBounds_;
         std::array<UiRectangle, 2> settlementKindBounds_{};

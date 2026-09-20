@@ -1,8 +1,9 @@
 #pragma once
 
 #include "rendering/Texture.h"
-#include "world/settlements/ResourceFlowHistory.h"
 #include "ui/UiButton.h"
+#include "world/FoundingIdentity.h"
+#include "world/settlements/ResourceFlowHistory.h"
 #include <memory>
 
 #include <array>
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace Paladin
@@ -41,6 +43,10 @@ namespace Paladin
     {
     public:
         CityHud();
+        void setRealmFlag(const RealmFlag& flag)
+        {
+            flag_ = flag;
+        }
         bool roofControlAt(float x, float y) const
         {
             return artButton_.containsPoint(x, y) ||
@@ -81,6 +87,7 @@ namespace Paladin
             {
                 closeCategoryMenus();
                 fortress_ = value;
+                bottomButtons_[3].setText(value ? "Warfare" : "Agriculture");
             }
         }
         void closeCategoryMenus() noexcept;
@@ -141,13 +148,24 @@ namespace Paladin
         std::string_view selectedCommandTypeId() const noexcept;
 
         void render(Renderer& renderer, const GrayUiRenderer& uiRenderer) const;
-        void reloadArt() { goodsIconsLoaded_ = false; goodsIcons_ = {}; }
+        void reloadArt()
+        {
+            goodsIconsLoaded_ = false;
+            goodsIcons_ = {};
+            optionIcons_.clear();
+        }
 
     private:
         bool fortress_ = false;
         std::size_t visibleCategoryCount() const noexcept
         {
-            return fortress_ ? 3 : CategoryCount;
+            return fortress_ ? 4 : CategoryCount;
+        }
+        std::size_t displayCategory(std::size_t category) const noexcept
+        {
+            return !fortress_ || category < 3 ? category
+                   : category == 6            ? 3
+                                              : CategoryCount;
         }
         bool worldMode_ = false;
         std::string activeSettlementName_;
@@ -156,7 +174,7 @@ namespace Paladin
         UiRectangle treasuryPanel_, extensionPanel_;
         std::int64_t treasuryGold_ = 0;
 
-        static constexpr std::size_t CategoryCount = 7;
+        static constexpr std::size_t CategoryCount = 8;
 
         [[nodiscard]]
         bool optionIsVisible(std::size_t optionIndex) const noexcept;
@@ -171,7 +189,9 @@ namespace Paladin
         UiRectangle minimapPanel_;
         UiButton goodsButton_{"Goods"};
         mutable bool goodsIconsLoaded_ = false;
-        mutable std::array<std::shared_ptr<Texture>, 4> goodsIcons_;
+        mutable std::array<std::shared_ptr<Texture>, 5> goodsIcons_;
+        mutable std::unordered_map<std::string, std::shared_ptr<Texture>>
+            optionIcons_;
         std::array<UiRectangle, 6> goodsCells_{};
         bool goodsOpen_ = true;
         bool hasKeep_ = false;
@@ -187,6 +207,8 @@ namespace Paladin
         std::vector<UiButton> optionButtons_;
         std::vector<UiRectangle> optionBounds_;
         std::size_t openCategory_ = CategoryCount;
+        RealmFlag flag_;
+        UiRectangle flagPanel_;
         UiRectangle cityNamePanel_;
         UiRectangle seasonBounds_;
         UiRectangle dayTimePanel_;

@@ -89,7 +89,6 @@ namespace Paladin
         bool showingKeep_ = false;
         bool showingHouse_ = false;
         UiButton homeUpgradeButton_{""};
-        UiButton keepSalesButton_{"Market supply: Off"};
         UiButton nameButton_{""};
         UiButton spouseButton_{""};
         CitizenId spouseId_, navigateCitizen_;

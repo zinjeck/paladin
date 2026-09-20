@@ -10,3 +10,19 @@ environment-v4/nature/planks.png A99478 EBC46B
 modular-v1/hall-floor.png 7A5038 D5A454
 modular-v1/hall-floor.png 886044 C18B5A
 modular-v1/hall-floor.png 49352F 886044
+
+# Cooler green leaf highlights; preserve source texture and palette membership.
+tribal-v13/grass.png A6CD59 79B56D
+tribal-v13/grass-jungle.png A6CD59 79B56D
+tribal-v13/grass-cold.png A6CD59 79B56D
+environment-v6/tree-crown-1.png A6CD59 79B56D
+environment-v6/tree-crown-2.png A6CD59 79B56D
+environment-v6/tree-crown-3.png A6CD59 79B56D
+
+# Market reuses the road grain, with its own lighter compacted-earth palette.
+# Keep the original road export intact; only this material changes on import.
+structures/market-road-v1.png 4E3B39 A78D72
+structures/market-road-v1.png 74513F A99478
+structures/market-road-v1.png 7A5038 886044
+structures/market-road-v1.png 874D50 74513F
+structures/market-road-v1.png 95655F C18B5A

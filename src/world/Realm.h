@@ -22,6 +22,8 @@ namespace Paladin
         // Persisted strategic scheduling, separate from ruler genealogy RNG.
         double nextStrategyMinute=360, nextDiplomacyMinute=360;
         std::uint64_t strategyDecisions=0;
+        double nextMarketMinute = 720;
+        std::uint64_t marketCityCursor = 0;
         RealmScale scale = RealmScale::Small;
         RealmRuler ruler;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();

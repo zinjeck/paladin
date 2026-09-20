@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <queue>
 #include <span>
 #include <vector>
@@ -49,7 +50,7 @@ namespace Paladin
         {
             return {};
         }
-        constexpr int Padding = 8;
+        constexpr int Padding = 14;
         const int minX = std::min(0, dx) - Padding;
         const int minY = std::min(0, dy) - Padding;
         const int width = std::abs(dx) + 2 * Padding + 1;
@@ -101,7 +102,7 @@ namespace Paladin
             }
             resistance[i] = tile->terrain == TerrainType::Mountain ||
                                     tile->relief == ReliefType::Mountain
-                                ? 2.4F
+                                ? (control ? 1.3F : 2.4F)
                             : tile->relief == ReliefType::Hills ? 1.25F
                                                                 : 1.F;
             // Low-amplitude coherent terrain variation avoids identical tubes.
@@ -186,7 +187,12 @@ namespace Paladin
             cost[i] = 0;
             queue.push({0.F, i});
         }
-        const float reach = (a.isFortress() || b.isFortress()) ? 6.5F : 5.F;
+        // Civic land belongs to a connected district, not just its road.
+        // Modest mountain resistance keeps enclosed ridges within that
+        // district.
+        const float reach = control ? std::max(10.F, separation * .48F)
+                            : (a.isFortress() || b.isFortress()) ? 6.5F
+                                                                 : 5.F;
         std::vector<RealmLinkCell> result;
         while (!queue.empty())
         {
@@ -212,5 +218,213 @@ namespace Paladin
             );
         }
         return result;
+    }
+
+    template<class Claim>
+    inline void consolidateCivicDistrict(
+        const WorldGrid& grid,
+        const TerritoryMap& control,
+        RealmId realm,
+        std::span<const Settlement> settlements,
+        Claim claim
+    )
+    {
+        std::optional<WorldTilePosition> anchor;
+        int left = 0, right = 0, top = grid.height(), bottom = -1;
+        const auto wrappedDelta = [&](int x)
+        {
+            int dx = x - anchor->x;
+            if (dx > grid.width() / 2)
+            {
+                dx -= grid.width();
+            }
+            if (dx < -grid.width() / 2)
+            {
+                dx += grid.width();
+            }
+            return dx;
+        };
+        for (const auto& city : settlements)
+        {
+            if (city.ownerRealmId() != realm)
+            {
+                continue;
+            }
+            if (!anchor)
+            {
+                anchor = city.position();
+            }
+            const int dx = wrappedDelta(city.position().x);
+            left = std::min(left, dx - 16);
+            right = std::max(right, dx + 16);
+            top = std::min(top, city.position().y - 16);
+            bottom = std::max(bottom, city.position().y + 16);
+        }
+        if (!anchor)
+        {
+            return;
+        }
+        top = std::max(0, top);
+        bottom = std::min(grid.height() - 1, bottom);
+        const int width = std::min(grid.width(), right - left + 1);
+        const int height = bottom - top + 1;
+        const auto position = [&](int i)
+        {
+            return WorldTilePosition{
+                (anchor->x + left + i % width + grid.width()) % grid.width(),
+                top + i / width
+            };
+        };
+        std::vector<std::uint8_t> cells(std::size_t(width) * height, 0);
+        for (int i = 0; i < int(cells.size()); ++i)
+        {
+            const auto p = position(i);
+            const auto owner = control.controllerAt(p);
+            cells[i] = owner == realm ? 1
+                       : owner || grid.tile(p)->terrain == TerrainType::Water
+                           ? 2
+                           : 0;
+        }
+        // Foreign population centers remain protected even without binary
+        // tribal ownership. A cosmetic consolidation must not annex them.
+        for (const auto& city : settlements)
+        {
+            if (city.ownerRealmId() == realm)
+            {
+                continue;
+            }
+            const int cx = wrappedDelta(city.position().x) - left;
+            const int cy = city.position().y - top;
+            for (int y = std::max(0, cy - 4); y <= std::min(height - 1, cy + 4);
+                 ++y)
+            {
+                for (int x = std::max(0, cx - 4);
+                     x <= std::min(width - 1, cx + 4);
+                     ++x)
+                {
+                    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= 16 &&
+                        cells[y * width + x] != 1)
+                    {
+                        cells[y * width + x] = 2;
+                    }
+                }
+            }
+        }
+        const auto neighbors = [&](int i, auto visit)
+        {
+            if (i % width > 0)
+            {
+                visit(i - 1);
+            }
+            if (i % width + 1 < width)
+            {
+                visit(i + 1);
+            }
+            if (i >= width)
+            {
+                visit(i - width);
+            }
+            if (i + width < int(cells.size()))
+            {
+                visit(i + width);
+            }
+        };
+        std::vector<int> distance(cells.size(), -1), previous(cells.size(), -1),
+            queue;
+        for (int i = 0; i < int(cells.size()); ++i)
+        {
+            if (cells[i] == 1)
+            {
+                distance[i] = 0;
+                queue.push_back(i);
+            }
+        }
+        for (std::size_t cursor = 0; cursor < queue.size(); ++cursor)
+        {
+            const int i = queue[cursor];
+            if (distance[i] >= 3)
+            {
+                continue;
+            }
+            neighbors(
+                i,
+                [&](int n)
+                {
+                    if (cells[n] == 0 && distance[n] < 0)
+                    {
+                        distance[n] = distance[i] + 1;
+                        previous[n] = i;
+                        queue.push_back(n);
+                    }
+                }
+            );
+        }
+        for (int i : queue)
+        {
+            if (cells[i] != 0)
+            {
+                continue;
+            }
+            bool coast = false;
+            neighbors(
+                i,
+                [&](int n)
+                {
+                    coast |=
+                        grid.tile(position(n))->terrain == TerrainType::Water;
+                }
+            );
+            if (!coast)
+            {
+                continue;
+            }
+            for (int n = i; n >= 0 && cells[n] == 0; n = previous[n])
+            {
+                static_cast<void>(claim(position(n)));
+                cells[n] = 1;
+            }
+        }
+        std::vector<bool> visited(cells.size(), false);
+        for (int start = 0; start < int(cells.size()); ++start)
+        {
+            if (cells[start] != 0 || visited[start])
+            {
+                continue;
+            }
+            queue = {start};
+            visited[start] = true;
+            bool enclosed = true;
+            for (std::size_t cursor = 0; cursor < queue.size(); ++cursor)
+            {
+                const int i = queue[cursor];
+                if (i % width == 0 || i % width == width - 1 || i < width ||
+                    i >= int(cells.size()) - width)
+                {
+                    enclosed = false;
+                }
+                neighbors(
+                    i,
+                    [&](int n)
+                    {
+                        if (cells[n] == 2)
+                        {
+                            enclosed = false;
+                        }
+                        else if (cells[n] == 0 && !visited[n])
+                        {
+                            visited[n] = true;
+                            queue.push_back(n);
+                        }
+                    }
+                );
+            }
+            if (enclosed && queue.size() <= 256)
+            {
+                for (int i : queue)
+                {
+                    static_cast<void>(claim(position(i)));
+                }
+            }
+        }
     }
 } // namespace Paladin

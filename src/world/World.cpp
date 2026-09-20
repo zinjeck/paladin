@@ -737,6 +737,14 @@ namespace Paladin
                 }
             }
         }
+        consolidateCivicDistrict(
+            grid_,
+            territory_,
+            realmId,
+            all,
+            [&](WorldTilePosition position)
+            { return territory_.claimIfUncontrolled(position, realmId); }
+        );
     }
 
     bool World::relocateSoleCapital(RealmId realmId, WorldTilePosition position)

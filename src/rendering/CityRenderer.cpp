@@ -2,6 +2,7 @@
 #include "rendering/BuildingView.h"
 #include "rendering/CityPixelView.h"
 #include "rendering/GrassPresentation.h"
+#include "rendering/MarketPresentation.h"
 #include "rendering/SelectionOutline.h"
 #include "rendering/WorldPixelGrid.h"
 #include "ui/UiTypes.h"
@@ -106,13 +107,8 @@ namespace Paladin
             outline
         );
         renderer.fillRectangle(left, top, stroke, bottom - top, outline);
-        renderer.fillRectangle(
-            right - stroke,
-            top,
-            stroke,
-            bottom - top,
-            outline
-        );
+        renderer
+            .fillRectangle(right - stroke, top, stroke, bottom - top, outline);
     }
 
     void CityRenderer::render(
@@ -158,6 +154,15 @@ namespace Paladin
             view.offsetX,
             view.offsetY
         );
+        pickedMap_ = settlementMap.instanceId();
+        pickedWidth_ = renderer.outputWidth();
+        pickedHeight_ = renderer.outputHeight();
+        pickedScale_ = view.scale;
+        pickedX_ = view.offsetX;
+        pickedY_ = view.offsetY;
+        pickedPitch_ = renderer.currentPixelPitch();
+        pickedPixelScene_ = renderer.pixelSceneActive();
+        pickedSoftware_ = renderer.usesSoftwareRasterizer();
         sprites_.setTime(
             animationTimeOverride >= 0 ? animationTimeOverride
                                        : animationSeconds
@@ -169,13 +174,8 @@ namespace Paladin
             renderTimings[index] = (now - timing) / 1e6;
             timing = now;
         };
-        gridRenderer_.render(
-            renderer,
-            settlementMap.grid(),
-            camera,
-            metrics,
-            &sprites_
-        );
+        gridRenderer_
+            .render(renderer, settlementMap.grid(), camera, metrics, &sprites_);
         stage(0);
         raised_.clear();
         const SceneProjection projection{
@@ -233,12 +233,8 @@ namespace Paladin
         );
         if (objectDetail == 0)
         {
-            structures_.prewarmGround(
-                renderer,
-                projection,
-                settlementMap,
-                sprites_
-            );
+            structures_
+                .prewarmGround(renderer, projection, settlementMap, sprites_);
         }
         if (objectDetail > 0)
         {
@@ -273,16 +269,29 @@ namespace Paladin
                 // that undersized tile to a recipe that expands a barracks to
                 // its minimum dimensions, creating a detached carpet beside it.
                 const auto first = raised_.size();
-                tribalBuilding(
-                    raised_,
-                    projection,
-                    sprites_,
-                    presentation,
-                    std::string(definition->id),
-                    *footprint,
-                    placementController.visibleDoor(),
-                    ~std::uint64_t(0)
-                );
+                if (definition->id == SettlementObjectTypes::Market)
+                {
+                    marketStalls(
+                        raised_,
+                        projection,
+                        sprites_,
+                        *footprint,
+                        ~std::uint64_t(0)
+                    );
+                }
+                else
+                {
+                    tribalBuilding(
+                        raised_,
+                        projection,
+                        sprites_,
+                        presentation,
+                        std::string(definition->id),
+                        *footprint,
+                        placementController.visibleDoor(),
+                        ~std::uint64_t(0)
+                    );
+                }
                 raised_.setOpacityFrom(first, .65);
             }
         }
@@ -297,7 +306,9 @@ namespace Paladin
             &sprites_,
             &presentation,
             &settlementMap.employment(),
-            inspection.selectedCitizen(citizens) ? inspection.selectedCitizen(citizens)->id : CitizenId{}
+            inspection.selectedCitizen(citizens)
+                ? inspection.selectedCitizen(citizens)->id
+                : CitizenId{}
         );
         for (const auto& soldier : battleSoldiers)
         {
@@ -332,10 +343,7 @@ namespace Paladin
         if (SDL_getenv("PALADIN_CAMERA_PROFILE") &&
             SDL_GetTicksNS() - drawStart > 10000000)
         {
-            SDL_Log(
-                "queue draw_ms=%.2f",
-                (SDL_GetTicksNS() - drawStart) / 1e6
-            );
+            SDL_Log("queue draw_ms=%.2f", (SDL_GetTicksNS() - drawStart) / 1e6);
         }
         const double weatherTime = animationTimeOverride >= 0
                                        ? animationTimeOverride
@@ -399,9 +407,7 @@ namespace Paladin
             metrics.scaledTilePixels(camera.zoom())
         );
         const auto highlight = [&](const RenderRectangle& b)
-        {
-            drawSelectionBorder(renderer, b, {235,196,107,255});
-        };
+        { drawSelectionBorder(renderer, b, {235, 196, 107, 255}); };
         const auto footprintHighlight = [&](const auto& f)
         {
             highlight(projection.bounds(
@@ -435,15 +441,140 @@ namespace Paladin
         }
         else if (const auto* c = inspection.selectedCitizen(citizens))
         {
-            const std::uint64_t actorKey = c->soldierId
-                ? (std::uint64_t(3) << 61) | c->soldierId.value()
-                : (std::uint64_t(1) << 62) | c->id.value();
+            const std::uint64_t actorKey =
+                c->soldierId ? (std::uint64_t(3) << 61) | c->soldierId.value()
+                             : (std::uint64_t(1) << 62) | c->id.value();
             for (const auto& item : raised_.items())
-                if (item.stableId == actorKey && item.layer == 0 && item.part == 0 && item.texture)
+            {
+                if (item.stableId == actorKey && item.layer == 0 &&
+                    item.part == 0 && item.texture)
                 {
                     sprites_.renderSelection(renderer, item);
                     break;
                 }
+            }
         }
+    }
+    CitizenId CityRenderer::citizenAtScreen(
+        float x,
+        float y,
+        const SettlementMap& map,
+        const SettlementCitizenState& citizens
+    ) const
+    {
+        if (pickedMap_ != map.instanceId())
+        {
+            return {};
+        }
+        // Invert the exact last-frame composite, then sample its snapped scene
+        // lattice. Use the submitted body frame, never tile occupancy or
+        // shadows.
+        const auto sceneSample = [&](double screen, int extent, double offset)
+        {
+            const double source = std::ceil(extent / pickedPitch_);
+            const float destination =
+                float(source * pickedPitch_ * pickedScale_);
+            const float start =
+                float(extent * (1 - pickedScale_) * .5 + offset);
+            if (pickedPixelScene_ && pickedSoftware_)
+            {
+                const auto width = std::max(1, int(destination));
+                const auto step =
+                    (std::uint64_t(source) << 16) / std::uint64_t(width);
+                const auto pixel =
+                    std::int64_t(std::floor(screen)) - int(start);
+                return double(
+                           (std::int64_t(step) * pixel +
+                            std::int64_t(step / 2)) >>
+                           16
+                       ) +
+                       .5;
+            }
+            return std::floor((screen - start) / destination * source) + .5;
+        };
+        const double sx = sceneSample(x, pickedWidth_, pickedX_);
+        const double sy = sceneSample(y, pickedHeight_, pickedY_);
+        const auto endpoint = [&](float value)
+        {
+            if (pickedPixelScene_)
+            {
+                return std::floor(value / pickedPitch_ + .50001);
+            }
+            return pickedSoftware_ ? std::trunc(double(value)) : double(value);
+        };
+        for (auto it = raised_.items().rbegin(); it != raised_.items().rend();
+             ++it)
+        {
+            const auto& item = *it;
+            const auto category = item.stableId >> 61;
+            if ((category != 2 && category != 3) || item.part != 0 ||
+                item.layer != 0)
+            {
+                continue;
+            }
+            const double x0 = endpoint(item.bounds.x),
+                         y0 = endpoint(item.bounds.y);
+            const double x1 = endpoint(item.bounds.x + item.bounds.width),
+                         y1 = endpoint(item.bounds.y + item.bounds.height);
+            if (sx < x0 || sy < y0 || sx >= x1 || sy >= y1 || x1 <= x0 ||
+                y1 <= y0)
+            {
+                continue;
+            }
+            if (item.texture)
+            {
+                const auto sample =
+                    [&](double pos, double start, double extent, float source)
+                {
+                    if (pickedSoftware_)
+                    {
+                        const auto step = (std::uint64_t(source) << 16) /
+                                          std::uint64_t(extent);
+                        return int(
+                            (step * std::uint64_t(pos - start - .5) +
+                             step / 2) >>
+                            16
+                        );
+                    }
+                    return std::min(
+                        int(source) - 1,
+                        int((pos - start) * source / extent)
+                    );
+                };
+                const int tx = int(item.atlasFrame.x) +
+                               sample(sx, x0, x1 - x0, item.atlasFrame.width);
+                const int ty = int(item.atlasFrame.y) +
+                               sample(sy, y0, y1 - y0, item.atlasFrame.height);
+                if (!sprites_.opaqueAt(item, tx, ty))
+                {
+                    continue;
+                }
+            }
+            else if (item.color.alpha < 128)
+            {
+                continue;
+            }
+            const auto id = item.stableId & ((std::uint64_t(1) << 61) - 1);
+            if (category == 2)
+            {
+                const auto* person = citizens.citizen(CitizenId{id});
+                if (person && !person->militaryDeployed && person->health > 0)
+                {
+                    return person->id;
+                }
+            }
+            else
+            {
+                for (const auto& person : citizens.citizens())
+                {
+                    if (person.soldierId == SoldierId{id} &&
+                        !person.militaryDeployed && person.health > 0)
+                    {
+                        return person.id;
+                    }
+                }
+            }
+        }
+        return {};
     }
 } // namespace Paladin

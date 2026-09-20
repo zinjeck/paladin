@@ -53,6 +53,7 @@ namespace Paladin
     {
         Money startingSavings = 0;
         Money retailFoodPrice = 100;
+        Money retailLumberPrice = 60;
         Money wholesaleFoodPrice = 60;
         Money productionPrice = 40;
         Money bypassPremium = 20;
@@ -97,7 +98,6 @@ namespace Paladin
         ) const;
         CommercePolicy policy;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
-        bool keepFoodSalesEnabled = false;
         IncomeTaxPolicy cityIncomeTax{10, 40, 10};
         bool cityTaxOverride = false;
         bool usesMoney() const
@@ -185,12 +185,14 @@ namespace Paladin
         int affordableTradeUnits(
             const SettlementInventory& source,
             const SettlementInventory& destination,
-            int requested
+            int requested,
+            const SettlementCitizenState* households = nullptr
         ) const;
         bool buyGoods(
             const SettlementInventory& source,
             const SettlementInventory& destination,
-            int amount
+            int amount,
+            const SettlementCitizenState* households = nullptr
         );
         Money mealPrice(const SettlementMap&, const SettlementInventory&) const;
         bool canBuyMeal(

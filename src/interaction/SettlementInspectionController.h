@@ -30,7 +30,8 @@ namespace Paladin
             const SettlementObjectState& objectState,
             const SettlementCitizenState& citizenState,
             bool placePanelOnRight,
-            const SettlementLogistics* logistics = nullptr
+            const SettlementLogistics* logistics = nullptr,
+            bool selectTileCitizen = true
         ) noexcept;
 
         const SettlementInventory* selectedInventory(
