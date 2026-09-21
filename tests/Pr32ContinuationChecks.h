@@ -6,6 +6,7 @@
 #include "simulation/WorldLandNavigation.h"
 #include "simulation/WorldMarketSystem.h"
 #include "simulation/WorldShipmentSystem.h"
+#include "simulation/systems/SettlementEconomySystem.h"
 #include "world/settlements/SettlementSimulationPolicy.h"
 #include "world/settlements/StrategicFood.h"
 #include <set>
@@ -124,6 +125,115 @@ namespace Paladin::Test::Pr32
         }
     }
 
+    inline void blockedSupplierRecovery()
+    {
+        Fixture f;
+        constexpr auto resource = "lumber";
+        auto& demand = f.world.settlement(f.destination)->simulationState();
+        auto& supply = f.world.settlement(f.source)->simulationState();
+        PALADIN_CHECK(demand.economy().configure({{resource, 0, 1, 0}}));
+        PALADIN_CHECK(supply.economy().configure({{resource, 2, .1, 0}}));
+        PALADIN_CHECK(supply.stockpile().setAmount(resource, 1000));
+        SettlementId alternative;
+        for (const auto& city : f.world.settlements())
+            if (city.position() == WorldTilePosition{40, 32}) alternative = city.id();
+        PALADIN_CHECK(alternative);
+        auto& backup = f.world.settlement(alternative)->simulationState();
+        PALADIN_CHECK(backup.economy().configure({{resource, 2, .1, 0}}));
+        PALADIN_CHECK(backup.stockpile().setAmount(resource, 120));
+        // The richer seller wins quote ranking but has no traversable exit.
+        // Failing it must not take gold/cargo or forever mask the weaker offer.
+        for (int y = 31; y <= 33; ++y)
+            for (int x = 43; x <= 45; ++x)
+                if (x != 44 || y != 32)
+                    f.world.grid().tile({x, y})->terrain = TerrainType::Water;
+        f.world.grid().terrainChanged();
+        const auto goods = f.goods(resource);
+        const auto money = f.world.realm(f.buyer)->treasury->balance;
+        WorldMarketSystem::tick(f.world);
+        const auto failed = std::pair{f.source, f.destination};
+        PALADIN_CHECK(f.world.shipments().empty());
+        PALADIN_CHECK(f.world.realm(f.buyer)->unreachableMarketRoutes.size() == 1);
+        PALADIN_CHECK(f.world.realm(f.buyer)->unreachableMarketRoutes.front() == failed);
+        PALADIN_CHECK(f.goods(resource) == goods);
+        PALADIN_CHECK(f.world.realm(f.buyer)->treasury->balance == money);
+        PALADIN_CHECK(f.world.realm(f.seller)->treasury->balance == 0);
+        const auto retry = f.world.realm(f.buyer)->nextMarketMinute;
+        WorldMarketSystem::tick(f.world); // Paused time cannot repeatedly retry.
+        PALADIN_CHECK(f.world.shipments().empty());
+        PALADIN_CHECK(f.world.realm(f.buyer)->nextMarketMinute == retry);
+        f.world.time().advanceMinutes(15);
+        WorldMarketSystem::tick(f.world);
+        PALADIN_CHECK(f.world.shipments().size() == 1);
+        const auto first = f.world.shipments().front().id;
+        PALADIN_CHECK(f.world.shipment(first)->source == alternative);
+        PALADIN_CHECK(f.goods(resource) == goods);
+        WorldShipmentSystem::tick(f.world, double(f.world.time().totalGameMinutes()), 170);
+        PALADIN_CHECK(f.world.shipment(first)->deliveries == 1);
+        PALADIN_CHECK(f.goods(resource) == goods);
+        PALADIN_CHECK(f.world.realm(f.buyer)->treasury->balance +
+                      f.world.realm(f.seller)->treasury->balance == money);
+        // Reopening terrain must invalidate the failed-route cache rather than
+        // blacklisting a now-reachable trading partner for the whole game.
+        for (int y = 31; y <= 33; ++y)
+            for (int x = 43; x <= 45; ++x)
+                f.world.grid().tile({x, y})->terrain = TerrainType::Land;
+        f.world.grid().terrainChanged();
+        f.world.realm(f.buyer)->nextMarketMinute = 0;
+        WorldMarketSystem::tick(f.world);
+        PALADIN_CHECK(f.world.realm(f.buyer)->unreachableMarketRoutes.empty());
+        // Creating a new route may prune completed history, but IDs never repeat.
+        PALADIN_CHECK(!f.world.shipments().empty());
+        const auto second = f.world.shipments().back().id;
+        PALADIN_CHECK(second != first);
+        PALADIN_CHECK(f.world.shipment(second)->source == f.source);
+        WorldShipmentSystem::tick(f.world, double(f.world.time().totalGameMinutes()), 250);
+        PALADIN_CHECK(f.world.shipment(second)->deliveries == 1);
+        PALADIN_CHECK(f.goods(resource) == goods);
+        PALADIN_CHECK(f.world.realm(f.buyer)->treasury->balance +
+                      f.world.realm(f.seller)->treasury->balance == money);
+    }
+
+    inline void geographicDemand()
+    {
+        Fixture f;
+        f.world.realm(f.buyer)->nextMarketMinute = 100000;
+        auto& home = *f.world.grid().tile({32, 32});
+        auto& source = *f.world.grid().tile({44, 32});
+        home.temperature = Temperature{.5};
+        source.temperature = Temperature{.5};
+        home.mineral = MineralDeposit::None;
+        source.mineral = MineralDeposit::Coal;
+        source.biome = BiomeType::Forest;
+        f.world.grid().terrainChanged();
+        SettlementEconomySystem economy;
+        economy.tick(f.world, {1, {}});
+        const auto* buyer = f.world.settlement(f.destination);
+        const auto* seller = f.world.settlement(f.source);
+        for (const auto resource : {"lumber", "stone", "coal", "iron", "bread", "fish"})
+        {
+            // Exercise the real geographic forecast, not only hand-written
+            // rates. Any named good can become scarce as its stock is used.
+            const auto scarce = WorldMarketSystem::quote(f.world, *buyer, resource);
+            PALADIN_CHECK(scarce.dailyNeed > 0 && scarce.wanted > 0);
+            auto& stock = f.world.settlement(f.destination)->simulationState().stockpile();
+            PALADIN_CHECK(stock.setAmount(resource, 10000));
+            const auto full = WorldMarketSystem::quote(f.world, *buyer, resource);
+            PALADIN_CHECK(full.wanted == 0 && full.offered > 0);
+            PALADIN_CHECK(full.unitPrice < scarce.unitPrice);
+            PALADIN_CHECK(stock.setAmount(resource, 0));
+            PALADIN_CHECK(WorldMarketSystem::quote(f.world, *buyer, resource).wanted > 0);
+        }
+        PALADIN_CHECK(WorldMarketSystem::quote(f.world, *buyer, "coal").dailyOutput == 0);
+        PALADIN_CHECK(WorldMarketSystem::quote(f.world, *seller, "coal").dailyOutput > 0);
+        source.mineral = MineralDeposit::Iron;
+        f.world.grid().terrainChanged();
+        // The bounded cursor must eventually revisit the changed settlement.
+        for (int i = 0; i < 3; ++i) economy.tick(f.world, {1, {}});
+        PALADIN_CHECK(WorldMarketSystem::quote(f.world, *seller, "coal").dailyOutput == 0);
+        PALADIN_CHECK(WorldMarketSystem::quote(f.world, *seller, "iron").dailyOutput > 0);
+    }
+
     inline void patrolNavigation(bool seam)
     {
         Fixture f;
@@ -196,6 +306,8 @@ namespace Paladin::Test::Pr32
         PALADIN_CHECK(policies.inactive.minimumStepMinutes == 60);
         PALADIN_CHECK(policies.strategic.minimumStepMinutes == 60);
         namedGoodsBeyondEight();
+        blockedSupplierRecovery();
+        geographicDemand();
         patrolNavigation(false);
         patrolNavigation(true);
     }
