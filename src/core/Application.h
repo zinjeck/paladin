@@ -80,6 +80,7 @@ namespace Paladin
         // handleEvent and handleMainMenuEvent return false only on exit.
         bool simulationControlsVisible() const noexcept;
         void layoutFrame();
+        void clearSettlementInspection() noexcept;
         void updateFrame();
         void renderFrame();
         bool handleEvent(const SDL_Event& event, bool controlsVisible);

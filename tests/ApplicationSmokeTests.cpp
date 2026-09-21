@@ -232,6 +232,87 @@ namespace Paladin
             app.renderFrame();
         }
 
+        static void depotDismissalChecks(
+            Application& app, SettlementId city, SettlementObjectId depot)
+        {
+            PALADIN_CHECK(app.screen_ == Application::Screen::World);
+            app.enterPresentedSettlement();
+            PALADIN_CHECK(app.screen_ == Application::Screen::City);
+            PALADIN_CHECK(app.activeCitySettlementId_ == city);
+            auto& map = *app.simulation_->settlementMap(city);
+            const auto* object = map.objectState().completedObject(depot);
+            PALADIN_CHECK(object);
+            const auto oldCityCamera = *app.camera_;
+            app.camera_->setPosition(object->footprint.topLeft.x + 4.,
+                                     object->footprint.topLeft.y + 2.5);
+            const auto reopen = [&]()
+            {
+                app.settlementInspectionController_->selectWorkplace(depot, {});
+                app.tradeDepotPanel_->open(city, depot);
+                frame(app);
+                const auto area = app.settlementInspectionPanel_->tradeContentBounds();
+                PALADIN_CHECK(area.width > 0 && area.height > 0);
+                PALADIN_CHECK(app.tradeDepotPanel_->isOpen());
+                PALADIN_CHECK(app.tradeDepotPanel_->contains(
+                    area.x + area.width / 2, area.y + area.height / 2));
+                return area;
+            };
+            const auto closed = [&](UiRectangle area)
+            {
+                // No layout/render has happened since the dismissing event.
+                PALADIN_CHECK(!app.tradeDepotPanel_->isOpen());
+                PALADIN_CHECK(!app.tradeDepotPanel_->wantsKeyboard());
+                PALADIN_CHECK(!app.tradeDepotPanel_->contains(
+                    area.x + area.width / 2, area.y + area.height / 2));
+                PALADIN_CHECK(!app.settlementInspectionController_->selectedObject(map.objectState()));
+                PALADIN_CHECK(app.settlementInspectionPanel_->tradeContentBounds().width == 0);
+            };
+            auto area = reopen();
+            capture(app, "pr32-depot-selected.bmp");
+            PALADIN_CHECK(click(app, area.x + area.width / 2,
+                area.y + 199 * area.height / 515));
+            PALADIN_CHECK(app.tradeDepotPanel_->wantsKeyboard());
+            key(app, SDL_SCANCODE_2);
+            // Capture a standing-order press, then dismiss before its release.
+            SDL_Event event{};
+            event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            event.button.button = SDL_BUTTON_LEFT;
+            event.button.x = area.x + area.width / 2;
+            event.button.y = area.y + 431 * area.height / 515;
+            PALADIN_CHECK(send(app, event));
+            const auto orders = map.trade.orders.size();
+            const auto shipments = app.simulation_->world().shipments().size();
+            SDL_Event cancel{};
+            cancel.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            cancel.button.button = SDL_BUTTON_RIGHT;
+            cancel.button.x = event.button.x;
+            cancel.button.y = event.button.y;
+            PALADIN_CHECK(send(app, cancel));
+            closed(area);
+            event.type = SDL_EVENT_MOUSE_BUTTON_UP;
+            PALADIN_CHECK(send(app, event));
+            PALADIN_CHECK(map.trade.orders.size() == orders);
+            PALADIN_CHECK(app.simulation_->world().shipments().size() == shipments);
+            frame(app);
+            capture(app, "pr32-depot-dismissed.bmp");
+
+            area = reopen();
+            PALADIN_CHECK(app.handleReportAction(CityHudAction::Ledger));
+            closed(area);
+            frame(app);
+            capture(app, "pr32-depot-ledger.bmp");
+            app.ledgerPanel_->close();
+            area = reopen();
+            key(app, SDL_SCANCODE_ESCAPE);
+            closed(area);
+            PALADIN_CHECK(app.screen_ == Application::Screen::World);
+            frame(app);
+            capture(app, "pr32-depot-world-exit.bmp");
+            // Restore the prior saved local view without changing the world view.
+            for (auto& saved : app.cityCameras_)
+                if (saved.first == city) *saved.second = oldCityCamera;
+        }
+
         static void militaryRoutingChecks(Application& app)
         {
             auto& sim = *app.simulation_;
@@ -955,6 +1036,7 @@ namespace Paladin
                     world.setSettlementPosition(enemy, previousPosition)
                 );
                 world.diplomacy().relations = savedRelations;
+                depotDismissalChecks(app, source, depot);
             }
             const auto focus = [&](SettlementId id, bool globe)
             {
