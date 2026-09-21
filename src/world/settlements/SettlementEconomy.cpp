@@ -178,6 +178,45 @@ namespace Paladin
             }
         }
 
+        if (geographyRevision != ~std::uint64_t(0))
+        {
+            double required = 0, eaten = 0, output = 0;
+            for (const auto& flow : lastFlows_)
+            {
+                const auto* food =
+                    SettlementResourceCatalog::definition(flow.resourceId);
+                if (food && food->edible && !food->emergencyOnly)
+                {
+                    required += flow.requestedAmount;
+                    eaten += flow.consumedAmount;
+                    output += flow.producedAmount;
+                }
+            }
+            double missing = std::max(0., required - eaten);
+            for (auto& flow : lastFlows_)
+            {
+                const auto* food =
+                    SettlementResourceCatalog::definition(flow.resourceId);
+                if (!food || !food->edible || food->emergencyOnly)
+                {
+                    continue;
+                }
+                const double extra =
+                    std::min(missing, stockpile.amount(flow.resourceId));
+                static_cast<void>(stockpile.addAmount(flow.resourceId, -extra));
+                flow.consumedAmount += extra;
+                flow.closingAmount -= extra;
+                missing -= extra;
+            }
+            if (required > 0)
+            {
+                totalNeedWeight = 1;
+                weightedFulfillment =
+                    std::clamp(1 - missing / required, 0., 1.);
+                weightedSupplyRatio = std::clamp(output / required, 0., 2.);
+            }
+        }
+
         if (totalNeedWeight > 0.0)
         {
             populationNeedFulfillment_ = weightedFulfillment / totalNeedWeight;

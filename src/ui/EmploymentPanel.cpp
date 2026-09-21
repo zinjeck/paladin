@@ -701,8 +701,8 @@ namespace Paladin
             {
                 const auto resources = SettlementResourceCatalog::definitions();
                 const auto& markets = marketWorld->marketHistory.resources;
-                const float gx = left + width * .46F, gy = top + 78;
-                const float gw = width * .54F - 34, gh = 100;
+                const float gx = left + width * .46F, gy = top + 88;
+                const float gw = width * .54F - 34, gh = 90;
                 const float cw = (width * .43F - 30) / 3,
                             ch = (informationHeight - 18) / 4;
                 for (std::size_t i = 0; i < resources.size(); ++i)

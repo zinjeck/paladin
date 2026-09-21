@@ -5,6 +5,7 @@
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/World.h"
 #include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/StrategicFood.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -175,10 +176,14 @@ namespace Paladin
         {
             return false;
         }
-        if (shipment.aiManaged && shipment.resource == "food" &&
-            (available(*source, "food") - shipment.amount <
-                 2. * source->population() ||
-             total(*target, "food") > 12. * target->population() + 120))
+        const auto* cargoDefinition =
+            SettlementResourceCatalog::definition(shipment.resource);
+        if (shipment.aiManaged && cargoDefinition && cargoDefinition->edible &&
+            !cargoDefinition->emergencyOnly &&
+            !source->simulationState().hasLocalMap() &&
+            civilianFood(source->simulationState().stockpile()) -
+                    shipment.amount <
+                2. * source->population())
         {
             return false;
         }

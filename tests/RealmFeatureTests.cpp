@@ -355,10 +355,10 @@ void runRealmFeatureTests()
     PALADIN_CHECK(ai.armyCount() == 0 && ai.worldRoadCount() == 0);
     WorldSimulationPipeline pipeline;
     const auto opening =
-        ai.settlements().front().simulationState().stockpile().amount("food");
+        ai.settlements().front().simulationState().stockpile().amount("bread");
     pipeline.tick(ai, 1440 * 30);
     PALADIN_CHECK(
-        ai.settlements().front().simulationState().stockpile().amount("food") !=
+        ai.settlements().front().simulationState().stockpile().amount("bread") !=
         opening
     );
     // Identical total elapsed time yields identical reigns and dynasty choices.

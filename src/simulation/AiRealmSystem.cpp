@@ -1,10 +1,12 @@
 #include "simulation/AiRealmSystem.h"
 #include "simulation/DiplomacySystem.h"
 #include "simulation/MilitarySystem.h"
+#include "simulation/WorldMarketSystem.h"
 #include "simulation/WorldShipmentSystem.h"
 #include "world/World.h"
 #include "world/WorldGeography.h"
 #include "world/generation/GenerationNoise.h"
+#include "world/settlements/StrategicFood.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -52,8 +54,7 @@ namespace Paladin
             packs += double(unit.rations()) * fromHome / unit.soldierCount();
         }
         const double excess =
-            std::max(0., stock.amount("food") - 2. * city.population()) +
-            stock.amount("rations") + packs;
+            militaryFood(stock, double(city.population())) + packs;
         return std::min(
             demographic,
             int(std::min(
@@ -69,6 +70,7 @@ namespace Paladin
             return;
         }
         std::size_t decisions = 0;
+        int patrolBudget = 1;
         int shippingBudget = 1; // Never run one path search per city per frame.
         for (const auto& record : world.realms())
         {
@@ -92,19 +94,120 @@ namespace Paladin
                 if (city.ownerRealmId() == actor &&
                     !city.simulationState().localMap())
                 {
+                    int fieldSoldiers = 0;
+                    for (const auto& unit : world.armies())
+                    {
+                        if (unit.ownerRealmId() != actor || unit.garrisoned())
+                        {
+                            continue;
+                        }
+                        for (const auto id : unit.soldiers())
+                        {
+                            const auto* soldier = world.soldier(id);
+                            fieldSoldiers +=
+                                soldier &&
+                                soldier->homeSettlementId() == city.id();
+                        }
+                    }
                     MilitarySystem::maintainStrategicGarrison(
                         world,
                         actor,
                         city.id(),
-                        garrisonTarget(world, *realm, city)
+                        std::max(
+                            0,
+                            garrisonTarget(world, *realm, city) - fieldSoldiers
+                        )
                     );
+                }
+            }
+            // One small supplied field patrol per realm. All personnel come
+            // from the real garrison; routes use ordinary land navigation.
+            if (patrolBudget > 0)
+            {
+                ArmyId patrol, guard;
+                for (const auto& unit : world.armies())
+                {
+                    if (unit.ownerRealmId() != actor || !unit.soldierCount())
+                    {
+                        continue;
+                    }
+                    if (!unit.garrisoned())
+                    {
+                        patrol = unit.id();
+                        break;
+                    }
+                    if (!guard && unit.soldierCount() >= 8)
+                    {
+                        guard = unit.id();
+                    }
+                }
+                if (!patrol && guard)
+                {
+                    patrol = MilitarySystem::formStrategicPatrol(
+                        world,
+                        actor,
+                        guard
+                    );
+                }
+                const auto* unit = world.army(patrol);
+                if (unit && !unit->moving() && !unit->engagedOpponent())
+                {
+                    const auto origin = unit->position();
+                    WorldTilePosition destination = origin;
+                    double nearest = 33;
+                    for (const auto& city : world.settlements())
+                    {
+                        const double distance = std::hypot(
+                            double(city.position().x - origin.x),
+                            double(city.position().y - origin.y)
+                        );
+                        if (city.ownerRealmId() == actor && distance > 1 &&
+                            distance < nearest)
+                        {
+                            nearest = distance;
+                            destination = city.position();
+                        }
+                    }
+                    if (destination == origin)
+                    {
+                        const auto choice = GenerationNoise::mix(
+                            actor.value() ^ std::uint64_t(minute / 1440)
+                        );
+                        constexpr WorldTilePosition
+                            directions[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+                        for (int i = 0; i < 4; ++i)
+                        {
+                            const auto d = directions[(choice + i) % 4];
+                            const WorldTilePosition candidate{
+                                origin.x + d.x * 3,
+                                origin.y + d.y * 3
+                            };
+                            const auto* tile = world.grid().tile(candidate);
+                            if (tile && tile->terrain == TerrainType::Land)
+                            {
+                                destination = candidate;
+                                break;
+                            }
+                        }
+                    }
+                    if (destination != origin)
+                    {
+                        --patrolBudget;
+                        static_cast<void>(MilitarySystem::orderMove(
+                            world,
+                            actor,
+                            patrol,
+                            destination
+                        ));
+                    }
                 }
             }
             // Stop wasteful, lost or depleted standing routes without deleting
             // the cargo of a caravan already away from its source.
             for (const auto& route : world.shipments())
             {
-                if (route.owner != actor || !route.aiManaged || !route.active())
+                if (route.owner != actor || !route.aiManaged || route.buyer ||
+                    !route.active())
                 {
                     continue;
                 }
@@ -112,7 +215,9 @@ namespace Paladin
                 const auto* target = world.settlement(route.destination);
                 if (!source || !target || source->ownerRealmId() != actor ||
                     target->ownerRealmId() != actor ||
-                    WorldShipmentSystem::available(*source, route.resource) <
+                    WorldShipmentSystem::available(*source, route.resource) <=
+                        0 ||
+                    civilianFood(source->simulationState().stockpile()) <
                         2. * source->population() ||
                     WorldShipmentSystem::total(*target, route.resource) >
                         10. * target->population() + 120)
@@ -125,66 +230,75 @@ namespace Paladin
             if (shippingBudget > 0)
             {
                 SettlementId needy, donor;
-                double bestNeed = 0;
-                for (const auto& city : world.settlements())
+                std::string resource;
+                int amount = 0;
+                double priority = 0;
+                for (const auto& target : world.settlements())
                 {
-                    if (city.ownerRealmId() != actor)
+                    if (target.ownerRealmId() != actor)
                     {
                         continue;
                     }
-                    const double target = double(city.population()) *
-                                          (city.isFortress() ? 10. : 6.);
-                    const double shortage =
-                        target - WorldShipmentSystem::total(city, "food");
-                    const bool supplied = std::any_of(
-                        world.shipments().begin(),
-                        world.shipments().end(),
-                        [&](const auto& s)
-                        {
-                            return s.owner == actor &&
-                                   s.destination == city.id() &&
-                                   s.resource == "food" && s.active();
-                        }
-                    );
-                    if (!supplied && shortage > bestNeed)
+                    for (const auto& food :
+                         SettlementResourceCatalog::definitions())
                     {
-                        needy = city.id();
-                        bestNeed = shortage;
-                    }
-                }
-                double nearest = std::numeric_limits<double>::max();
-                int amount = 0;
-                const auto* target = world.settlement(needy);
-                if (target)
-                {
-                    for (const auto& city : world.settlements())
-                    {
-                        if (city.ownerRealmId() != actor || city.id() == needy)
+                        if (!food.edible || food.emergencyOnly)
                         {
                             continue;
                         }
-                        const double surplus =
-                            WorldShipmentSystem::available(city, "food") -
-                            double(city.population()) * 5.;
-                        if (surplus < 10)
+                        const auto demand =
+                            WorldMarketSystem::quote(world, target, food.id);
+                        if (demand.wanted < 1)
                         {
                             continue;
                         }
-                        const double d = geographicDistance(
-                            city.position(),
-                            target->position(),
-                            world.grid().width(),
-                            world.grid().height()
+                        const bool supplied = std::any_of(
+                            world.shipments().begin(),
+                            world.shipments().end(),
+                            [&](const auto& route)
+                            {
+                                return route.owner == actor &&
+                                       route.destination == target.id() &&
+                                       route.resource == food.id &&
+                                       route.active();
+                            }
                         );
-                        if (d < nearest)
+                        if (supplied)
                         {
-                            nearest = d;
-                            donor = city.id();
-                            amount = int(std::clamp(
-                                std::min(bestNeed, surplus * .25),
-                                1.,
-                                500.
-                            ));
+                            continue;
+                        }
+                        for (const auto& source : world.settlements())
+                        {
+                            if (source.ownerRealmId() != actor ||
+                                source.id() == target.id())
+                            {
+                                continue;
+                            }
+                            const double surplus = std::min(
+                                double(WorldShipmentSystem::available(
+                                    source,
+                                    food.id
+                                )),
+                                WorldMarketSystem::quote(world, source, food.id)
+                                    .offered
+                            );
+                            const double distance = geographicDistance(
+                                source.position(),
+                                target.position(),
+                                world.grid().width(),
+                                world.grid().height()
+                            );
+                            const int load =
+                                int(std::min({demand.wanted, surplus, 500.}));
+                            const double score = load / (1 + distance);
+                            if (load > 0 && score > priority)
+                            {
+                                needy = target.id();
+                                donor = source.id();
+                                resource = food.id;
+                                amount = load;
+                                priority = score;
+                            }
                         }
                     }
                 }
@@ -196,7 +310,7 @@ namespace Paladin
                         actor,
                         donor,
                         needy,
-                        "food",
+                        resource,
                         amount,
                         true,
                         nullptr,

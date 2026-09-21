@@ -21,9 +21,11 @@ namespace Paladin
             {
                 return false;
             }
-            const auto revision = world.grid().revision() * 1000003ULL +
-                                  world.territory().revision() * 9176ULL +
-                                  world.settlementCount();
+            const auto revision =
+                world.grid().revision() * 1000003ULL +
+                world.territory().revision() * 9176ULL +
+                world.settlementCount() +
+                (world.time().totalGameMinutes() / 4320) * 999983ULL;
             if (economy.geographyRevision == revision)
             {
                 return false;
@@ -59,30 +61,57 @@ namespace Paladin
                     10000
                 ) /
                 9999.;
-            const double food =
-                2 * (.83 + .23 * fertile / denominator + .12 * development);
-            const double population = std::max(1., double(city.population()));
+            const auto capacity = [&](std::uint64_t sector)
+            {
+                return .35 + 1.4 *
+                                 double(
+                                     GenerationNoise::mix(
+                                         world.generationSeed() ^
+                                         city.id().value() * 9176ULL ^ sector
+                                     ) %
+                                     10000
+                                 ) /
+                                 9999.;
+            };
+            // Construction and industry ebb independently of local deposits.
+            // Resource-poor cities import; well-equipped producers can export.
+            const double phase = double(world.time().totalGameMinutes() / 4320);
+            const double building =
+                .6 + .8 * (.5 + .5 * std::sin(phase * .9 + city.id().value()));
+            const double grain = fertile / denominator * capacity(11);
+            const double baking = grain * (1.4 + development);
             std::vector<ResourceFlowRate> flows{
-                {"food", food * .72, 1.44, 1},
-                {"materials", .028 + development * .035, .035, 0},
-                {"lumber", forest / denominator * .10, .025, 0},
-                {"stone", rugged / denominator * .25, .018, 0},
-                {"wheat", fertile / denominator * .025, .012, 0},
+                {"lumber",
+                 forest / denominator * .20 * capacity(21),
+                 .06 * building,
+                 0},
+                {"stone",
+                 rugged / denominator * .30 * capacity(22),
+                 .035 * building,
+                 0},
+                {"wheat", grain * .45 + baking, .10 + baking, 0},
                 {"fish",
-                 survey.amount("fish") / std::max(1., survey.tiles) * .75,
-                 .18,
+                 survey.amount("fish") / std::max(1., survey.tiles) * 3.5 *
+                     capacity(31),
+                 .45,
+                 1},
+                {"bread", baking, 1.15, 1},
+                {"meat",
+                 survey.amount("meat") / denominator * 2.8 * capacity(32),
+                 .40,
+                 1},
+                {"rations", .025 + development * .04, .02, 0},
+                {"coal",
+                 ore[1] / denominator * .18 * capacity(41),
+                 .009 * (.5 + development) * building,
                  0},
-                {"bread",
-                 fertile / denominator * (.20 + development * .35),
-                 .24,
+                {"iron",
+                 ore[2] / denominator * .14 * capacity(42),
+                 .006 * (.5 + development) * building,
                  0},
-                {"meat", survey.amount("meat") / denominator * .3, .14, 0},
-                {"rations", development * .016, .012, 0},
-                {"coal", std::min(.04, ore[1] * 2 / population), .012, 0},
-                {"iron", std::min(.025, ore[2] * 1.25 / population), .007, 0},
                 {"gold",
-                 std::min(.0000005, ore[3] * .0005 / population),
-                 .00000002,
+                 ore[3] / denominator * .018 * capacity(43),
+                 .001 * (.5 + development),
                  0}
             };
             if (economy.configure(flows))
@@ -99,7 +128,20 @@ namespace Paladin
     )
     {
         constexpr double gameMinutesPerDay = 24.0 * 60.0;
-        bool surveyed = false;
+        // Forecasts must not wait for a settlement's aggregate simulation step.
+        // Four small surveys per world tick keep initialization and refresh
+        // bounded.
+        const auto cities = world.settlements();
+        for (std::size_t n = 0; n < std::min<std::size_t>(4, cities.size());
+             ++n)
+        {
+            const auto id = cities[forecastCursor_++ % cities.size()].id();
+            auto* city = world.settlement(id);
+            if (city && !city->simulationState().hasLocalMap())
+            {
+                forecastGeographicEconomy(world, *city);
+            }
+        }
 
         for (const SettlementSimulationStep& settlementStep :
              step.settlementSteps)
@@ -119,10 +161,6 @@ namespace Paladin
                 continue;
             }
 
-            if (!surveyed)
-            {
-                surveyed = forecastGeographicEconomy(world, *settlement);
-            }
             state.economy().simulate(
                 state.stockpile(),
                 state.population().residents(),

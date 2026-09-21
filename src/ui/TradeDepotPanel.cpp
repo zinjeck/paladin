@@ -44,6 +44,7 @@ namespace Paladin
         city_ = {};
         depot_ = {};
         controls_.clear();
+        bounds_ = embedded_ = {};
         message_.clear();
         editing_ = captured_ = false;
         pressed_.reset();
@@ -177,6 +178,7 @@ namespace Paladin
         width_ = width;
         height_ = height;
         bounds_ = embedded_;
+        controls_.clear();
         if (bounds_.width <= 0 || bounds_.height <= 0)
         {
             return;
@@ -195,12 +197,13 @@ namespace Paladin
             );
         };
         const auto definitions = SettlementResourceCatalog::definitions();
-        const float cell = (span - 15) / 6;
+        const int columns = int((definitions.size() + 1) / 2);
+        const float cell = (span - 3 * (columns - 1)) / columns;
         for (std::size_t i = 0; i < definitions.size(); ++i)
         {
             controls_.push_back(
-                {{x + float(i % 6) * (cell + 3),
-                  y + (24 + float(i / 6) * 49) * verticalScale,
+                {{x + float(i % columns) * (cell + 3),
+                  y + (24 + float(i / columns) * 49) * verticalScale,
                   cell,
                   45 * verticalScale},
                  Kind(int(Kind::ResourceFirst) + int(i)),
@@ -478,7 +481,7 @@ namespace Paladin
     {
         const auto* city = world.settlement(city_);
         const auto* map = city ? city->simulationState().localMap() : nullptr;
-        if (!map || !isOpen())
+        if (!map || !isOpen() || bounds_.width <= 0 || bounds_.height <= 0)
         {
             return;
         }

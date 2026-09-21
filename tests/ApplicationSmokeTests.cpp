@@ -943,6 +943,9 @@ namespace Paladin
                     &world
                 );
                 capture(app, "terrain-pass-world-economy.bmp");
+                trade.embed({});
+                PALADIN_CHECK(!trade.isOpen());
+                PALADIN_CHECK(!trade.contains(press.button.x, press.button.y));
                 foreignEconomy = previousEconomy;
                 world.time() = previousTime;
                 world.marketHistory = previousHistory;
@@ -989,7 +992,7 @@ namespace Paladin
             {
                 focus(enemy, globe);
                 PALADIN_CHECK(
-                    !panel.sendBounds("food") && !sim.settlementMap(enemy)
+                    !panel.sendBounds("bread") && !sim.settlementMap(enemy)
                 );
                 PALADIN_CHECK(
                     sim.presentedSettlementId() == source
@@ -3339,7 +3342,7 @@ namespace Paladin
                     ));
                     PALADIN_CHECK(map.logistics.add(
                         map.logistics.forObject(stockpile),
-                        "food",
+                        "bread",
                         25
                     ));
                     goods.clear();

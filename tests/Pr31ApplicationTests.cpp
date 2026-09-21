@@ -187,7 +187,7 @@ namespace Paladin
             auto profile = defaultSettlementFoundationProfile();
             profile.initialPopulation = 4000;
             profile.initialDetailedCitizenCount = 0;
-            profile.initialResources = {{"food", 5000}, {"lumber", 1000}};
+            profile.initialResources = {{"bread", 5000}, {"lumber", 1000}};
             const auto source =
                 world.foundSettlement({8, 12}, sim.playerRealmId(), profile);
             const auto destination =
@@ -547,7 +547,7 @@ namespace Paladin
             auto profile = defaultSettlementFoundationProfile();
             profile.initialPopulation = 1000;
             profile.initialDetailedCitizenCount = 0;
-            profile.initialResources = {{"food", 10000}};
+            profile.initialResources = {{"bread", 10000}};
             const auto home = world.foundSettlement({24, 8}, actor, profile);
             const auto foreign = world.foundCapitalSettlement(
                 {44, 8},

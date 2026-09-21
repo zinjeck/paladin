@@ -1,4 +1,5 @@
 #include "TestFramework.h"
+#include "simulation/AiRealmSystem.h"
 #include "simulation/DiplomacySystem.h"
 #include "simulation/Simulation.h"
 #include "simulation/WorldLandNavigation.h"
@@ -374,16 +375,16 @@ namespace
         // Quotes leave a food reserve and limit individual purchases/sales.
         SettlementEconomy economy;
         PALADIN_CHECK(
-            economy.configure(std::vector<ResourceFlowRate>{{"food", 2, 2, 1}})
+            economy.configure(std::vector<ResourceFlowRate>{{"bread", 2, 2, 1}})
         );
         ResourceStockpile stock;
-        PALADIN_CHECK(stock.setAmount("food", 2000));
-        const auto offer = economy.quote(stock, 100, "food");
+        PALADIN_CHECK(stock.setAmount("bread", 2000));
+        const auto offer = economy.quote(stock, 100, "bread");
         PALADIN_CHECK(
             offer.reserve == 1200 && offer.offered == 200 && offer.wanted == 0
         );
-        PALADIN_CHECK(stock.setAmount("food", 0));
-        const auto demand = economy.quote(stock, 100, "food");
+        PALADIN_CHECK(stock.setAmount("bread", 0));
+        const auto demand = economy.quote(stock, 100, "bread");
         PALADIN_CHECK(
             demand.offered == 0 && demand.wanted == 300 &&
             demand.unitPrice > offer.unitPrice
@@ -749,6 +750,10 @@ namespace
 void runPr30ShipmentTests()
 {
     {
+        PALADIN_CHECK(SettlementResourceCatalog::definition("food") == nullptr);
+        PALADIN_CHECK(
+            SettlementResourceCatalog::definition("materials") == nullptr
+        );
         Fixture f;
         auto* buyer = f.world.realm(f.owner);
         buyer->aiControlled = true;
@@ -783,6 +788,42 @@ void runPr30ShipmentTests()
         );
     }
 
+    {
+        Fixture f;
+        PALADIN_CHECK(f.world.setSettlementPosition(f.destination, {36, 32}));
+        PALADIN_CHECK(
+            f.world.assignSettlementToRealm(f.destination, f.foreign)
+        );
+        f.world.realm(f.owner)->aiControlled = true;
+        f.world.realm(f.foreign)->aiControlled = true;
+        f.world.realm(f.owner)->nextMarketMinute = 100000;
+        f.world.realm(f.foreign)->nextMarketMinute = 0;
+        f.world.realm(f.owner)->nextDiplomacyMinute = 100000;
+        f.world.realm(f.foreign)->nextDiplomacyMinute = 100000;
+        f.world.realm(f.foreign)->treasury->balance = 100000;
+        f.world.diplomacy().relations.push_back(
+            {f.owner, f.foreign, false, true, false}
+        );
+        auto& source = f.world.settlement(f.source)->simulationState();
+        auto& destination =
+            f.world.settlement(f.destination)->simulationState();
+        PALADIN_CHECK(source.economy().configure({{"fish", 2, .1, 1}}));
+        PALADIN_CHECK(source.stockpile().setAmount("fish", 1000));
+        PALADIN_CHECK(destination.economy().configure({{"fish", 0, 1, 1}}));
+        PALADIN_CHECK(destination.stockpile().setAmount("fish", 0));
+        const auto before = f.world.realm(f.foreign)->treasury->balance;
+        WorldMarketSystem::tick(f.world);
+        PALADIN_CHECK(!f.world.shipments().empty());
+        const auto route = f.world.shipments().back().id;
+        PALADIN_CHECK(f.world.shipment(route)->resource == "fish");
+        PALADIN_CHECK(f.world.shipment(route)->cargo > 0);
+        // AI housekeeping must retain an authorized cross-realm shipment.
+        AiRealmSystem::tick(f.world, 360, 1);
+        WorldShipmentSystem::tick(f.world, 360, 120);
+        PALADIN_CHECK(f.world.shipment(route)->deliveries == 1);
+        PALADIN_CHECK(destination.stockpile().amount("fish") > 0);
+        PALADIN_CHECK(f.world.realm(f.foreign)->treasury->balance < before);
+    }
     oneOffAndRepeat();
     authorizationAndFailures();
     crossRealmTrade();

@@ -62,7 +62,7 @@ inline void runPr31AnimalNavigationChecks()
     auto profile = defaultSettlementFoundationProfile();
     profile.initialPopulation = 100;
     profile.initialDetailedCitizenCount = 0;
-    profile.initialResources = {{"food", 1000}};
+    profile.initialResources = {{"bread", 1000}};
     const auto home = world.foundCapitalSettlement(
         {16, 16},
         realm,

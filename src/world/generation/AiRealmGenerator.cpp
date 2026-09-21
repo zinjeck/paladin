@@ -212,17 +212,20 @@ namespace Paladin
                 profile.initialPopulation = std::uint64_t(
                     std::max(48.0, mean * variation * prosperity * fertility)
                 );
+                const double people = double(profile.initialPopulation);
+                const double reserve = .6 + double(next(rng) % 10000) / 10000.;
                 profile.initialResources = {
-                    {std::string(SettlementResourceTypes::Food),
-                     double(profile.initialPopulation) * 16},
-                    {std::string(SettlementResourceTypes::Materials),
-                     double(profile.initialPopulation) * 2}
+                    {"bread", people * 8 * reserve},
+                    {"fish", people * 2 * reserve},
+                    {"meat", people * 2 * reserve},
+                    {"rations", people * .5},
+                    {"wheat", people * 2 * reserve},
+                    {"lumber", people * .4 * reserve},
+                    {"stone", people * .3 * reserve},
+                    {"coal", people * .04 * reserve},
+                    {"iron", people * .03 * reserve},
+                    {"gold", people * .002 * reserve}
                 };
-                // Strategic output represents the settlement's existing supply
-                // economy. No local farms, citizens, routes or inter-settlement
-                // transfers are created.
-                profile.resourceFlowRates[0].dailyProductionPerResident =
-                    1.02 + (next(rng) % 80) / 1000.0;
                 return profile;
             };
             const auto capitalId = world.foundCapitalSettlement(

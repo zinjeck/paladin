@@ -29,15 +29,14 @@ namespace Paladin
         profile.demographicRates = {0.025, 0.015, 0.0, 0.20, 0.005};
 
         profile.initialResources = {
-            {std::string(SettlementResourceTypes::Food), 600.0},
-            {std::string(SettlementResourceTypes::Materials), 120.0},
-            {std::string(SettlementResourceTypes::Stone), 0.0},
+            {std::string(SettlementResourceTypes::Bread), 600.0},
+            {std::string(SettlementResourceTypes::Stone), 120.0},
             {std::string(SettlementResourceTypes::Lumber), 0.0}
         };
 
         profile.resourceFlowRates = {
-            {std::string(SettlementResourceTypes::Food), 1.05, 1.0, 1.0},
-            {std::string(SettlementResourceTypes::Materials), 0.08, 0.02, 0.0}
+            {std::string(SettlementResourceTypes::Bread), 1.05, 1.0, 1.0},
+            {std::string(SettlementResourceTypes::Stone), 0.08, 0.02, 0.0}
         };
 
         profile.initialSimulationTier = SettlementSimulationTier::Inactive;

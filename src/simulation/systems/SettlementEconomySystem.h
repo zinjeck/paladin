@@ -1,6 +1,7 @@
 #pragma once
 
 #include "simulation/WorldSimulationSystem.h"
+#include <cstddef>
 
 namespace Paladin
 {
@@ -8,5 +9,8 @@ namespace Paladin
     {
     public:
         void tick(World& world, const WorldSimulationStep& step) override;
+
+    private:
+        std::size_t forecastCursor_ = 0;
     };
 } // namespace Paladin

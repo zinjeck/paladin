@@ -14,7 +14,7 @@ inline void runPr31BattleChecks()
     for(int y=0;y<64;++y) for(int x=0;x<64;++x) world.grid().tile({x,y})->terrain=TerrainType::Land;
     const auto a=world.createRealm(),b=world.createRealm();
     world.realm(a)->aiControlled=world.realm(b)->aiControlled=true;
-    auto profile=defaultSettlementFoundationProfile();profile.initialPopulation=100;profile.initialDetailedCitizenCount=0;profile.initialResources={{"food",1000}};
+    auto profile=defaultSettlementFoundationProfile();profile.initialPopulation=100;profile.initialDetailedCitizenCount=0;profile.initialResources={{"bread",1000}};
     const auto home=world.foundCapitalSettlement({16,24},a,{"West","West Folk","West",{},"civic"},profile);
     const auto foe=world.foundCapitalSettlement({32,24},b,{"East","East Folk","East",{},"civic"},profile);
     PALADIN_CHECK(home && foe);

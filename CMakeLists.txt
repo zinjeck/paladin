@@ -81,6 +81,12 @@ add_custom_target(PaladinCompileAssets
  COMMAND $<TARGET_FILE:PaladinAssetCompiler> compile ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/assets/packages
  DEPENDS PaladinAssetCompiler VERBATIM)
 
+if(WIN32)
+    enable_language(RC)
+    set(PALADIN_WINDOWS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/paladin.ico")
+    configure_file(assets/icons/paladin.rc.in "${CMAKE_CURRENT_BINARY_DIR}/paladin.rc" @ONLY)
+endif()
+
 add_executable(Paladin
     src/debug/CrashReporter.cpp
     src/main.cpp
@@ -214,6 +220,12 @@ add_executable(Paladin
     src/ui/SimulationSpeedControls.cpp
     src/ui/WorldHud.cpp
 )
+
+if(WIN32)
+    target_sources(Paladin PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/paladin.rc")
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/paladin.rc" PROPERTIES
+        OBJECT_DEPENDS "${PALADIN_WINDOWS_ICON}")
+endif()
 
 target_include_directories(Paladin PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

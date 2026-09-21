@@ -2,14 +2,15 @@
 
 #include "core/StrongId.h"
 #include "world/FoundingIdentity.h"
-#include "world/RealmRuler.h"
 #include "world/RealmLaws.h"
+#include "world/RealmRuler.h"
 #include "world/settlements/SettlementCommerce.h"
 
 #include <algorithm>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace Paladin
 {
@@ -20,10 +21,13 @@ namespace Paladin
         bool citizenshipResearched = false;
         bool aiControlled = false;
         // Persisted strategic scheduling, separate from ruler genealogy RNG.
-        double nextStrategyMinute=360, nextDiplomacyMinute=360;
-        std::uint64_t strategyDecisions=0;
+        double nextStrategyMinute = 360, nextDiplomacyMinute = 360;
+        std::uint64_t strategyDecisions = 0;
         double nextMarketMinute = 720;
         std::uint64_t marketCityCursor = 0;
+        std::uint64_t marketRouteRevision = ~std::uint64_t(0);
+        std::vector<std::pair<SettlementId, SettlementId>>
+            unreachableMarketRoutes;
         RealmScale scale = RealmScale::Small;
         RealmRuler ruler;
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();

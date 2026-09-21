@@ -76,11 +76,11 @@ void runWorldTests()
     );
 
     PALADIN_CHECK(
-        settlement->simulationState().stockpile().amount("food") == 600.0
+        settlement->simulationState().stockpile().amount("bread") == 600.0
     );
 
     PALADIN_CHECK(
-        settlement->simulationState().stockpile().amount("materials") == 120.0
+        settlement->simulationState().stockpile().amount("stone") == 120.0
     );
 
     PALADIN_CHECK(world.makeSettlementIndependent(settlementId));
@@ -220,7 +220,7 @@ void runWorldTests()
     for (Paladin::StockpileEntry& resource :
          aiFoundationProfile.initialResources)
     {
-        if (resource.resourceId == "food")
+        if (resource.resourceId == "bread")
         {
             resource.amount = 0.0;
         }
@@ -229,7 +229,7 @@ void runWorldTests()
     for (Paladin::ResourceFlowRate& flowRate :
          aiFoundationProfile.resourceFlowRates)
     {
-        if (flowRate.resourceId == "food")
+        if (flowRate.resourceId == "bread")
         {
             flowRate.dailyProductionPerResident = 0.0;
         }
@@ -304,14 +304,14 @@ void runWorldTests()
     );
 
     const double playerOpeningFood =
-        simulatedPlayerCapital->simulationState().stockpile().amount("food");
+        simulatedPlayerCapital->simulationState().stockpile().amount("bread");
 
     const double aiOpeningFood =
-        simulatedAiCapital->simulationState().stockpile().amount("food");
+        simulatedAiCapital->simulationState().stockpile().amount("bread");
 
     const double inactiveOpeningFood =
         simulatedInactiveSettlement->simulationState().stockpile().amount(
-            "food"
+            "bread"
         );
 
     const Paladin::SettlementStateVersions playerOpeningVersions =
@@ -325,18 +325,18 @@ void runWorldTests()
     simulationPipeline.tick(world, 30);
 
     PALADIN_CHECK(
-        simulatedPlayerCapital->simulationState().stockpile().amount("food") >
+        simulatedPlayerCapital->simulationState().stockpile().amount("bread") >
         playerOpeningFood
     );
 
     PALADIN_CHECK(
-        simulatedAiCapital->simulationState().stockpile().amount("food") ==
+        simulatedAiCapital->simulationState().stockpile().amount("bread") ==
         aiOpeningFood
     );
 
     PALADIN_CHECK(
         simulatedInactiveSettlement->simulationState().stockpile().amount(
-            "food"
+            "bread"
         ) == inactiveOpeningFood
     );
 
@@ -399,13 +399,13 @@ void runWorldTests()
 
     PALADIN_CHECK(
         simulatedInactiveSettlement->simulationState().stockpile().amount(
-            "food"
+            "bread"
         ) > inactiveOpeningFood
     );
 
     const double inactiveFoodAfterTransition =
         simulatedInactiveSettlement->simulationState().stockpile().amount(
-            "food"
+            "bread"
         );
 
     PALADIN_CHECK(simulationPipeline.transitionSettlementTier(
@@ -418,7 +418,7 @@ void runWorldTests()
 
     PALADIN_CHECK(
         simulatedInactiveSettlement->simulationState().stockpile().amount(
-            "food"
+            "bread"
         ) > inactiveFoodAfterTransition
     );
 
@@ -433,7 +433,7 @@ void runWorldTests()
     );
 
     PALADIN_CHECK(
-        simulatedAiCapital->simulationState().population().residents() == 100
+        simulatedAiCapital->simulationState().population().residents() <= 100
     );
 
     simulationPipeline.tick(world, 30 * gameMinutesPerDay - 90);

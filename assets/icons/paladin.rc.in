@@ -1,0 +1,2 @@
+// Embed the Windows application icon as resource 1.
+1 ICON "@PALADIN_WINDOWS_ICON@"

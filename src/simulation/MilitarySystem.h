@@ -47,6 +47,7 @@ namespace Paladin
             int target,
             int changeLimit = 8
         );
+        static ArmyId formStrategicPatrol(World&, RealmId, ArmyId garrison);
         static ArmyId createUnit(
             World&,
             RealmId actor,

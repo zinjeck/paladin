@@ -48,7 +48,7 @@ namespace
             auto p = defaultSettlementFoundationProfile();
             p.initialPopulation = startingPopulation;
             p.initialDetailedCitizenCount = 0;
-            p.initialResources = {{"food", 2000}, {"lumber", 1000}};
+            p.initialResources = {{"bread", 2000}, {"lumber", 1000}};
             p.citizenSeed = 303032;
             home = world.foundCapitalSettlement(
                 {32, 32},
@@ -76,7 +76,7 @@ namespace
             );
             p.kind = SettlementKind::Fortress;
             p.initialPopulation = 80;
-            p.initialResources = {{"food", 40}};
+            p.initialResources = {{"bread", 40}};
             fort = world.foundSettlement({32, 44}, owner, p);
             PALADIN_CHECK(home && fort && other && remote && playerCity);
             for (auto id : {owner, neighbor, far})
@@ -91,7 +91,7 @@ namespace
             double total = 0;
             for (const auto& city : world.settlements())
             {
-                total += WorldShipmentSystem::total(city, "food") +
+                total += WorldShipmentSystem::total(city, "bread") +
                          WorldShipmentSystem::total(city, "rations");
             }
             for (const auto& unit : world.armies())
@@ -100,7 +100,7 @@ namespace
             }
             for (const auto& route : world.shipments())
             {
-                if (route.resource == "food" || route.resource == "rations")
+                if (route.resource == "bread" || route.resource == "rations")
                 {
                     total += route.cargo;
                 }
@@ -208,7 +208,7 @@ namespace
             MilitaryResult::Success
         );
         PALADIN_CHECK(
-            city->simulationState().stockpile().setAmount("food", 400)
+            city->simulationState().stockpile().setAmount("bread", 400)
         );
         PALADIN_CHECK(
             city->simulationState().stockpile().setAmount("rations", 0)
@@ -282,6 +282,14 @@ namespace
             !world.armies().empty()
         );
         PALADIN_CHECK(
+            std::any_of(
+                world.armies().begin(),
+                world.armies().end(),
+                [](const auto& unit)
+                { return !unit.garrisoned() && unit.soldierCount() > 0; }
+            )
+        );
+        PALADIN_CHECK(
             world.realm(f.player)->strategyDecisions == 0 &&
             world.settlement(f.playerCity)->population() == 200
         );
@@ -318,8 +326,10 @@ namespace
         // repeats.
         WorldShipmentSystem::tick(world, 481, 100000);
         PALADIN_CHECK(
-            WorldShipmentSystem::available(*world.settlement(f.home), "food") >=
-            2 * world.settlement(f.home)->population()
+            WorldShipmentSystem::available(
+                *world.settlement(f.home),
+                "bread"
+            ) >= 2 * world.settlement(f.home)->population()
         );
         PALADIN_CHECK(f.food() == supplies);
         PALADIN_CHECK(world.assignSettlementToRealm(f.fort, f.player));
@@ -334,7 +344,7 @@ namespace
         Fixture f{20200};
         auto& world = f.world;
         auto& state = world.settlement(f.home)->simulationState();
-        PALADIN_CHECK(state.stockpile().setAmount("food", 1000000));
+        PALADIN_CHECK(state.stockpile().setAmount("bread", 1000000));
         ArmyId guard;
         for (int day = 0; day < 68; ++day)
         {

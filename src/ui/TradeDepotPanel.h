@@ -18,6 +18,10 @@ namespace Paladin
         void embed(UiRectangle bounds)
         {
             embedded_ = bounds;
+            if (bounds.width <= 0 || bounds.height <= 0)
+            {
+                close();
+            }
         }
         void open(SettlementId city, SettlementObjectId depot);
         void close() noexcept;

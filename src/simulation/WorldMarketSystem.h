@@ -528,13 +528,18 @@ namespace Paladin
             tickOrders(world, minute);
             for (const auto& record : world.realms())
             {
-                if (minute < record.nextMarketMinute)
+                if (!record.aiControlled || minute < record.nextMarketMinute)
                 {
                     continue;
                 }
                 auto* buyer = world.realm(record.id());
                 buyer->nextMarketMinute =
                     minute + 360 + record.id().value() % 31;
+                if (buyer->marketRouteRevision != world.grid().revision())
+                {
+                    buyer->marketRouteRevision = world.grid().revision();
+                    buyer->unreachableMarketRoutes.clear();
+                }
                 std::vector<SettlementId> cities;
                 for (const auto& city : world.settlements())
                 {
@@ -548,7 +553,7 @@ namespace Paladin
                 }
                 if (cities.empty() || buyer->treasury->balance <= 0)
                 {
-                    return;
+                    continue;
                 }
                 const auto cityId =
                     cities[buyer->marketCityCursor++ % cities.size()];
@@ -577,7 +582,13 @@ namespace Paladin
                         world.grid().width(),
                         world.grid().height()
                     );
-                    if (distance <= DiplomacySystem::RangeRadians)
+                    const auto route = std::pair{city.id(), cityId};
+                    if (distance <= DiplomacySystem::RangeRadians &&
+                        std::find(
+                            buyer->unreachableMarketRoutes.begin(),
+                            buyer->unreachableMarketRoutes.end(),
+                            route
+                        ) == buyer->unreachableMarketRoutes.end())
                     {
                         candidates.emplace_back(distance, city.id());
                     }
@@ -673,7 +684,7 @@ namespace Paladin
                 {
                     const auto sellerRealm =
                         world.settlement(best.seller)->ownerRealmId();
-                    static_cast<void>(WorldShipmentSystem::create(
+                    const auto result = WorldShipmentSystem::create(
                         world,
                         sellerRealm,
                         best.seller,
@@ -685,7 +696,21 @@ namespace Paladin
                         true,
                         buyer->id(),
                         best.price
-                    ));
+                    );
+                    if (result == ShipmentResult::NoLandRoute)
+                    {
+                        if (buyer->unreachableMarketRoutes.size() >= 256)
+                        {
+                            buyer->unreachableMarketRoutes.erase(
+                                buyer->unreachableMarketRoutes.begin()
+                            );
+                        }
+                        buyer->unreachableMarketRoutes.emplace_back(
+                            best.seller,
+                            cityId
+                        );
+                        buyer->nextMarketMinute = minute + 15;
+                    }
                 }
                 // One buyer and at most one bounded route search per tick.
                 return;

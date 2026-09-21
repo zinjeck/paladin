@@ -38,14 +38,13 @@ namespace Paladin
     SettlementSimulationPolicies defaultSettlementSimulationPolicies() noexcept
     {
         constexpr std::uint64_t minutesPerHour = 60;
-        constexpr std::uint64_t minutesPerDay = 24 * minutesPerHour;
 
         return {
             {SettlementSimulationResolution::DetailedLocal, 1},
             {SettlementSimulationResolution::InactiveLocalAggregate,
              minutesPerHour},
             {SettlementSimulationResolution::StrategicAggregate,
-             30 * minutesPerDay}
+             minutesPerHour}
         };
     }
 } // namespace Paladin

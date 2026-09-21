@@ -17,8 +17,6 @@ namespace Paladin
     {
         inline constexpr std::string_view Fish = "fish";
         inline constexpr std::string_view Meat = "meat";
-        inline constexpr std::string_view Food = "food";
-        inline constexpr std::string_view Materials = "materials";
         inline constexpr std::string_view Stone = "stone";
         inline constexpr std::string_view Lumber = "lumber";
         inline constexpr std::string_view Wheat = "wheat";

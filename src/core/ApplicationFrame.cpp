@@ -1,6 +1,7 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
 #include "debug/CrashContext.h"
+#include "interaction/SettlementInspectionController.h"
 #include "rendering/BattleScene.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
@@ -17,6 +18,7 @@
 #include "ui/SimulationSpeedControls.h"
 #include "ui/TradeDepotPanel.h"
 #include "ui/WorldSettlementPanel.h"
+#include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
 #include <cmath>
 
@@ -59,8 +61,18 @@ namespace Paladin
         }
         if (tradeDepotPanel_ && simulation_)
         {
+            const auto* city =
+                simulation_->world().settlement(activeCitySettlementId_);
+            const auto* map =
+                city ? city->simulationState().localMap() : nullptr;
+            const auto* selected =
+                map ? settlementInspectionController_->selectedObject(
+                          map->objectState()
+                      )
+                    : nullptr;
             if (screen_ != Screen::City ||
-                tradeDepotPanel_->city() != activeCitySettlementId_)
+                tradeDepotPanel_->city() != activeCitySettlementId_ ||
+                !selected || selected->id != tradeDepotPanel_->depot())
             {
                 tradeDepotPanel_->close();
             }

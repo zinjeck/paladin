@@ -7,6 +7,7 @@
 #include "world/settlements/SettlementIndustry.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
+#include "world/settlements/StrategicFood.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include <algorithm>
 #include <cmath>
@@ -205,6 +206,58 @@ namespace Paladin
         }
         return count;
     }
+    ArmyId MilitarySystem::formStrategicPatrol(
+        World& world,
+        RealmId actor,
+        ArmyId garrison
+    )
+    {
+        const auto* realm = world.realm(actor);
+        const auto* guard = world.army(garrison);
+        if (!realm || !realm->aiControlled || !guard ||
+            guard->ownerRealmId() != actor || !guard->garrisoned() ||
+            guard->soldierCount() < 8 || guard->engagedOpponent())
+        {
+            return {};
+        }
+        const auto home = guard->garrisonSettlementId();
+        if (map(world, home))
+        {
+            return {};
+        }
+        if (std::count_if(
+                world.armies().begin(),
+                world.armies().end(),
+                [&](const auto& unit) { return unit.ownerRealmId() == actor; }
+            ) >= MaximumUnitsPerRealm)
+        {
+            return {};
+        }
+        const auto position = guard->position();
+        const auto id = world.createArmy(position);
+        world.assignArmyToRealm(id, actor);
+        auto* source = world.army(garrison);
+        auto* patrol = world.army(id);
+        patrol->station_ = home;
+        patrol->name_ = "Patrol " + std::to_string(id.value());
+        for (int i = 0; i < 4; ++i)
+        {
+            const auto personId = source->soldiers_.back();
+            source->soldiers_.pop_back();
+            patrol->soldiers_.push_back(personId);
+            auto* soldier = world.soldiers_.find(personId);
+            soldier->unit_ = id;
+            if (auto* citizen = person(world, *soldier))
+            {
+                citizen->militaryUnitId = id;
+            }
+        }
+        const double minute = double(world.time().totalGameMinutes());
+        returnSurplus(world, *source, minute);
+        resupply(world, *patrol, minute);
+        return id;
+    }
+
     MilitaryResult MilitarySystem::setGarrison(
         World& world,
         RealmId actor,
@@ -583,12 +636,8 @@ namespace Paladin
         {
             // Protect two civilian days of food and provision the new person
             // with an actual field pack. No abstract food or phantom recruits.
-            const double spare = state.stockpile().amount("rations") +
-                                 std::max(
-                                     0.,
-                                     state.stockpile().amount("food") -
-                                         2. * double(city->population())
-                                 );
+            const double spare =
+                militaryFood(state.stockpile(), double(city->population()));
             if (spare < RationsPerSoldier)
             {
                 break;
@@ -1277,16 +1326,27 @@ namespace Paladin
             {
                 auto& supply =
                     world.settlement(city.id())->simulationState().stockpile();
-                for (const auto* resource : {"rations", "food"})
+                for (const auto& definition :
+                     SettlementResourceCatalog::definitions())
                 {
-                    const double reserve = std::string_view(resource) == "food"
-                                               ? 2. * double(city.population())
-                                               : 0.;
-                    const int load = int(std::clamp(
-                        std::floor(supply.amount(resource) - reserve),
-                        0.,
-                        double(needed)
-                    ));
+                    if (!definition.edible)
+                    {
+                        continue;
+                    }
+                    const auto resource = definition.id;
+                    const double usable =
+                        definition.emergencyOnly
+                            ? supply.amount(resource)
+                            : std::min(
+                                  supply.amount(resource),
+                                  std::max(
+                                      0.,
+                                      civilianFood(supply) -
+                                          2. * double(city.population())
+                                  )
+                              );
+                    const int load =
+                        int(std::clamp(std::floor(usable), 0., double(needed)));
                     if (load > 0 && supply.addAmount(resource, -load))
                     {
                         unit.rations_ += load;
