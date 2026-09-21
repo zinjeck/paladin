@@ -34,6 +34,10 @@ namespace Paladin
         resourceIndex_ = 0;
         quantity_ = "10";
         direction_ = TradeDirection::Import;
+        const auto count = SettlementResourceCatalog::definitions().size();
+        directions_.assign(count, TradeDirection::Import);
+        quantities_.assign(count, 10);
+        restoreOrders_ = true;
     }
     void TradeDepotPanel::close() noexcept
     {
@@ -43,7 +47,6 @@ namespace Paladin
         message_.clear();
         editing_ = captured_ = false;
         pressed_.reset();
-        drag_.cancel();
         quoteSignature_ = ~std::uint64_t(0);
         offer_ = {};
     }
@@ -78,6 +81,28 @@ namespace Paladin
         {
             close();
             return;
+        }
+        if (restoreOrders_)
+        {
+            const auto resources = SettlementResourceCatalog::definitions();
+            for (const auto& order : map->trade.orders)
+            {
+                if (order.depot != depot_)
+                {
+                    continue;
+                }
+                for (std::size_t i = 0; i < resources.size(); ++i)
+                {
+                    if (resources[i].id == order.resource)
+                    {
+                        directions_[i] = order.direction;
+                        quantities_[i] = order.quantity;
+                    }
+                }
+            }
+            direction_ = directions_[resourceIndex_];
+            quantity_ = std::to_string(quantities_[resourceIndex_]);
+            restoreOrders_ = false;
         }
         // Revision fingerprinting is cheap and keeps pause-time treaty,
         // inventory and money changes visible without repeatedly forecasting
@@ -151,10 +176,12 @@ namespace Paladin
         }
         width_ = width;
         height_ = height;
-        const float w = std::min(500.F, std::max(280.F, float(width) - 24));
-        const float h = std::min(515.F, std::max(340.F, float(height) - 100));
-        bounds_ =
-            drag_.place({float(width) - w - 160, 150, w, h}, width, height);
+        bounds_ = embedded_;
+        if (bounds_.width <= 0 || bounds_.height <= 0)
+        {
+            return;
+        }
+        const float w = bounds_.width, h = bounds_.height;
         controls_.clear();
         const float x = bounds_.x + 14, y = bounds_.y, span = w - 28;
         const float verticalScale = h / 515.F;
@@ -167,9 +194,19 @@ namespace Paladin
                  std::move(label)}
             );
         };
-        add(x + span - 28, y + 10, 28, Kind::Close, "X");
-        add(x, y + 91, 32, Kind::Previous, "<");
-        add(x + span - 32, y + 91, 32, Kind::Next, ">");
+        const auto definitions = SettlementResourceCatalog::definitions();
+        const float cell = (span - 15) / 6;
+        for (std::size_t i = 0; i < definitions.size(); ++i)
+        {
+            controls_.push_back(
+                {{x + float(i % 6) * (cell + 3),
+                  y + (24 + float(i / 6) * 49) * verticalScale,
+                  cell,
+                  45 * verticalScale},
+                 Kind(int(Kind::ResourceFirst) + int(i)),
+                 ""}
+            );
+        }
         add(x, y + 132, span / 2 - 4, Kind::Import, "Import");
         add(x + span / 2 + 4, y + 132, span / 2 - 4, Kind::Export, "Export");
         add(x, y + 185, 38, Kind::LessTen, "-10");
@@ -191,6 +228,32 @@ namespace Paladin
         quoteSignature_ = ~std::uint64_t(0);
         editing_ = kind == Kind::Quantity;
         const auto count = SettlementResourceCatalog::definitions().size();
+        if (int(kind) >= int(Kind::ResourceFirst))
+        {
+            quantities_[resourceIndex_] = std::max(1, amount());
+            directions_[resourceIndex_] = direction_;
+            resourceIndex_ =
+                std::size_t(int(kind) - int(Kind::ResourceFirst)) % count;
+            quantity_ = std::to_string(quantities_[resourceIndex_]);
+            direction_ = directions_[resourceIndex_];
+            const auto* city = world.settlement(city_);
+            const auto* map =
+                city ? city->simulationState().localMap() : nullptr;
+            if (map)
+            {
+                for (const auto& order : map->trade.orders)
+                {
+                    if (order.depot == depot_ && order.resource == resource())
+                    {
+                        direction_ = order.direction;
+                        quantity_ = std::to_string(order.quantity);
+                    }
+                }
+            }
+            message_.clear();
+            layout(width_, height_, world, actor);
+            return;
+        }
         switch (kind)
         {
         case Kind::Close:
@@ -293,24 +356,15 @@ namespace Paladin
         {
             return false;
         }
-        if (drag_.handle(event, bounds_))
-        {
-            captured_ = false;
-            pressed_.reset();
-            layout(width_, height_, world, actor);
-            return true;
-        }
         if (event.type == SDL_EVENT_KEY_DOWN &&
             event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
-            close();
-            return true;
+            return false;
         }
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event.button.button == SDL_BUTTON_RIGHT)
         {
-            close();
-            return true;
+            return false;
         }
         if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
         {
@@ -428,7 +482,10 @@ namespace Paladin
         {
             return;
         }
-        ui.drawPanel(renderer, bounds_);
+        icons_.load(
+            renderer,
+            std::string(SDL_GetBasePath()) + "assets/sprites"
+        );
         const float x = bounds_.x + 14, y = bounds_.y,
                     span = bounds_.width - 28;
         const float verticalScale = bounds_.height / 515.F;
@@ -443,36 +500,17 @@ namespace Paladin
             }
             ui.drawLabel(renderer, label, x, yy, size);
         };
-        text("WORLD TRADE", y + 15, 2);
+        text("Resources", y + 5, 1.5F);
         const auto& offer = offer_;
         const bool activeAgreement = hasActiveTradeAgreement(world, actor);
-        text(
-            offer.treatyPartners ? "Treaty partner cities: " +
-                                       std::to_string(offer.treatyPartners)
-            : activeAgreement
-                ? "Trade agreement active; no nearby eligible depots."
-                : "Make a trade agreement in Diplomacy.",
-            y + 56,
-            activeAgreement && !offer.treatyPartners ? 1.F : 1.5F
-        );
-        const auto* definition =
-            SettlementResourceCatalog::definition(resource());
-        const std::string label = definition
-                                      ? std::string(definition->displayName)
-                                      : std::string(resource());
-        ui.drawLabel(
-            renderer,
-            label,
-            x + span / 2 -
-                font.measureWidth(label, std::max(1.F, 2 * verticalScale)) / 2,
-            y + 96 * verticalScale,
-            std::max(1.F, 2 * verticalScale)
-        );
         text("Quantity per shipment", y + 167, 1);
         const auto* partner = world.settlement(offer.partner);
         text(
             partner ? "Nearest partner: " + std::string(partner->name())
-                    : "No eligible partner stock or demand.",
+            : !activeAgreement ? "Make a trade agreement in Diplomacy."
+            : offer.treatyPartners == 0
+                ? "Trade pact active; no nearby eligible depot."
+                : "No eligible partner stock or demand.",
             y + 233
         );
         text(
@@ -481,7 +519,11 @@ namespace Paladin
             y + 259
         );
         text(
-            "Order value: " + goldText(offer.unitPrice * amount()) + " gold",
+            std::string(
+                direction_ == TradeDirection::Export ? "Sale proceeds: "
+                                                     : "Purchase cost: "
+            ) + goldText(offer.unitPrice * amount()) +
+                " gold",
             y + 285
         );
         const auto* exports =
@@ -511,8 +553,7 @@ namespace Paladin
         const float bottom = y + 417;
         text(status, bottom + 38, 1);
         text(
-            "Imports are sold locally. Exports buy from producers and "
-            "stockpiles.",
+            "Exports need resources, not gold. The foreign buyer pays you.",
             bottom + 58,
             1
         );
@@ -531,6 +572,53 @@ namespace Paladin
                     quantity_,
                     "Quantity",
                     editing_
+                );
+                continue;
+            }
+            if (int(control.kind) >= int(Kind::ResourceFirst))
+            {
+                const auto index =
+                    std::size_t(int(control.kind) - int(Kind::ResourceFirst));
+                const auto& resource =
+                    SettlementResourceCatalog::definitions()[index];
+                ui.drawButton(
+                    renderer,
+                    control.bounds,
+                    "",
+                    control.bounds.contains(mouseX_, mouseY_),
+                    pressed_ && *pressed_ == control.kind,
+                    index == resourceIndex_,
+                    true
+                );
+                if (const auto* icon =
+                        icons_.find("ui.goods." + std::string(resource.id));
+                    icon && icon->texture)
+                {
+                    const auto frame = icons_.frame(*icon, false);
+                    renderer.drawTexture(
+                        *icon->texture,
+                        frame.x,
+                        frame.y,
+                        frame.width,
+                        frame.height,
+                        control.bounds.x +
+                            (control.bounds.width - frame.width) * .5F,
+                        control.bounds.y + 3,
+                        frame.width,
+                        frame.height
+                    );
+                }
+                const float scale = std::min(
+                    1.F,
+                    (control.bounds.width - 4) /
+                        font.measureWidth(resource.displayName, 1)
+                );
+                ui.drawLabel(
+                    renderer,
+                    resource.displayName,
+                    control.bounds.x + 3,
+                    control.bounds.y + control.bounds.height - 10,
+                    scale
                 );
                 continue;
             }

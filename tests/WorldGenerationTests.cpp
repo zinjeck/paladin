@@ -1,4 +1,5 @@
 #include "TestFramework.h"
+#include "world/Geology.h"
 
 #include "rendering/GlobeLighting.h"
 #include "rendering/WorldReliefPlacement.h"
@@ -360,6 +361,35 @@ namespace
 
 void runWorldGenerationTests()
 {
+    {
+        Paladin::WorldGrid grid(128, 128);
+        for (int y = 0; y < 128; ++y)
+        {
+            for (int x = 0; x < 128; ++x)
+            {
+                auto* t = grid.tile({x, y});
+                t->biome = Paladin::BiomeType::Plain;
+                t->terrain = x < 64 ? Paladin::TerrainType::Mountain
+                                    : Paladin::TerrainType::Land;
+                t->relief = x < 64 ? Paladin::ReliefType::Mountain
+                                   : Paladin::ReliefType::Lowland;
+            }
+        }
+        Paladin::generateGeology(grid, 98172);
+        int upland = 0, lowland = 0;
+        for (int y = 0; y < 128; ++y)
+        {
+            for (int x = 0; x < 128; ++x)
+            {
+                if (grid.tile({x, y})->mineral != Paladin::MineralDeposit::None)
+                {
+                    (x < 64 ? upland : lowland)++;
+                }
+            }
+        }
+        PALADIN_CHECK(upland > lowland * 8);
+    }
+
     PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Hills) == "Hills");
     PALADIN_CHECK(Paladin::biomeName(Paladin::BiomeType::Polar) == "Polar");
     PALADIN_CHECK(
@@ -437,9 +467,16 @@ void runWorldGenerationTests()
                 if (t.biome == Paladin::BiomeType::Polar ||
                     t.biome == Paladin::BiomeType::Tundra)
                 {
-                    PALADIN_CHECK(!w.canFoundSettlementAt({x, y}));
-                    PALADIN_CHECK(!w.foundSettlement({x, y}, {}).isValid());
+                    if (t.biome == Paladin::BiomeType::Polar)
+                    {
+                        PALADIN_CHECK(!w.canFoundSettlementAt({x, y}));
+                        PALADIN_CHECK(!w.foundSettlement({x, y}, {}).isValid());
+                    }
                     polar += t.biome == Paladin::BiomeType::Polar;
+                    PALADIN_CHECK(
+                        !t.polarContinent ||
+                        t.biome == Paladin::BiomeType::Polar
+                    );
                     tundra += t.biome == Paladin::BiomeType::Tundra;
                 }
             }

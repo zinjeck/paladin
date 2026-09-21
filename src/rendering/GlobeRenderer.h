@@ -1,6 +1,5 @@
 #pragma once
 #include "rendering/GlobeLighting.h"
-#include "rendering/WorldPoliticalSurface.h"
 #include "rendering/GlobeView.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/OverlayRenderer.h"
@@ -8,6 +7,7 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldFoliage.h"
 #include "rendering/WorldGridRenderer.h"
+#include "rendering/WorldPoliticalSurface.h"
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <chrono>
@@ -211,196 +211,231 @@ namespace Paladin
                     }
                 }
             }
-            // Independent rows share immutable source data; stamps remain ordered.
+            // Independent rows share immutable source data; stamps remain
+            // ordered.
             std::atomic<int> nextRow{0}, completedRows{0};
             const auto paintRows = [&]()
             {
-            for (int py; (py = nextRow.fetch_add(1)) < a.h;)
-            {
-                if (cancelled->load())
+                for (int py; (py = nextRow.fetch_add(1)) < a.h;)
                 {
-                    return;
-                }
-                for (int px = 0; px < a.w; ++px)
-                {
-                    const double xx = left + (px + .5) / density,
-                                 yy = top + (py + .5) / density;
-                    const double longitude = xx / w * 6.283185307179586,
-                                 polarDistance = std::min(yy, double(h) - yy);
-                    const double polarBlend =
-                        1 - detailBlend(polarDistance / double(h), .12, .24);
-                    const double radius = std::sin(yy / h * 3.141592653589793) *
-                                          h / 3.141592653589793;
-                    const double polarX = w * .5 + std::cos(longitude) * radius,
-                                 polarY = h * .5 + std::sin(longitude) * radius;
-                    // Mix material samples, never interpolate coordinate
-                    // systems: interpolating UVs stretches noise into streaks
-                    // in the blend band.
-                    const bool polarSample =
-                        landscapeField(polarX * 3, polarY * 3, 1409) <
-                        polarBlend;
-                    const double gx = polarSample ? polarX : xx,
-                                 gy = polarSample ? polarY : yy;
-                    const auto sample = coastSample(xx, yy, true);
-                    const auto occupied = [&](int x, int y)
+                    if (cancelled->load())
                     {
-                        return grid.tile({(x % w + w) % w,
-                                          std::clamp(y, 0, h - 1)})
-                                   ->terrain != TerrainType::Water;
-                    };
-                    const double land =
-                        worldLandField(grid, sample.x, sample.y);
-                    const int ix = int(std::floor(sample.x - .5)),
-                              iy = int(std::floor(sample.y - .5));
-                    const bool dry = land >= .5;
-                    int x = (int(std::floor(xx)) % w + w) % w,
-                        y = std::clamp(int(yy), 0, h - 1);
-                    double u = sample.x - .5 - ix, v = sample.y - .5 - iy;
-                    u = u * u * (3 - 2 * u);
-                    v = v * v * (3 - 2 * v);
-                    const double choose =
-                        landscapeField(gx * 2.1, gy * 2.1, 193) *
-                        (dry ? land : 1 - land);
-                    double cumulative = 0, exposure = 0, rock = 0, ice = 0;
-                    bool chosen = false;
-                    for (int j = 0; j < 2; ++j)
+                        return;
+                    }
+                    for (int px = 0; px < a.w; ++px)
                     {
-                        for (int i = 0; i < 2; ++i)
+                        const double xx = left + (px + .5) / density,
+                                     yy = top + (py + .5) / density;
+                        const double longitude = xx / w * 6.283185307179586,
+                                     polarDistance =
+                                         std::min(yy, double(h) - yy);
+                        const double polarBlend =
+                            1 -
+                            detailBlend(polarDistance / double(h), .12, .24);
+                        const double radius =
+                            std::sin(yy / h * 3.141592653589793) * h /
+                            3.141592653589793;
+                        const double polarX =
+                                         w * .5 + std::cos(longitude) * radius,
+                                     polarY =
+                                         h * .5 + std::sin(longitude) * radius;
+                        // Mix material samples, never interpolate coordinate
+                        // systems: interpolating UVs stretches noise into
+                        // streaks in the blend band.
+                        const bool polarSample =
+                            landscapeField(polarX * 3, polarY * 3, 1409) <
+                            polarBlend;
+                        const double gx = polarSample ? polarX : xx,
+                                     gy = polarSample ? polarY : yy;
+                        const auto sample = coastSample(xx, yy, true);
+                        const auto occupied = [&](int x, int y)
                         {
-                            const int nx = ((ix + i) % w + w) % w,
-                                      ny = std::clamp(iy + j, 0, h - 1);
-                            const auto& n = *grid.tile({nx, ny});
-                            const double weight =
-                                (i ? u : 1 - u) * (j ? v : 1 - v);
-                            rock +=
-                                weight *
-                                (n.terrain == TerrainType::Mountain ? 1 : 0);
-                            ice +=
-                                weight * (n.biome == BiomeType::Polar ? 1 : 0);
-                            exposure +=
-                                weight * (n.terrain == TerrainType::Mountain
-                                              ? .88
-                                          : (n.biome == BiomeType::Hills ||
-                                             n.relief == ReliefType::Hills)
-                                              ? .68
-                                              : 0);
-                            if (occupied(nx, ny) != dry)
+                            return grid.tile({(x % w + w) % w,
+                                              std::clamp(y, 0, h - 1)})
+                                       ->terrain != TerrainType::Water;
+                        };
+                        const double land =
+                            worldLandField(grid, sample.x, sample.y);
+                        const int ix = int(std::floor(sample.x - .5)),
+                                  iy = int(std::floor(sample.y - .5));
+                        const bool dry = land >= .5;
+                        int x = (int(std::floor(xx)) % w + w) % w,
+                            y = std::clamp(int(yy), 0, h - 1);
+                        double u = sample.x - .5 - ix, v = sample.y - .5 - iy;
+                        u = u * u * (3 - 2 * u);
+                        v = v * v * (3 - 2 * v);
+                        const double choose =
+                            landscapeField(gx * 2.1, gy * 2.1, 193) *
+                            (dry ? land : 1 - land);
+                        double cumulative = 0, exposure = 0, rock = 0, ice = 0;
+                        bool chosen = false;
+                        for (int j = 0; j < 2; ++j)
+                        {
+                            for (int i = 0; i < 2; ++i)
                             {
-                                continue;
-                            }
-                            cumulative += weight;
-                            if (!chosen && choose < cumulative)
-                            {
-                                chosen = true;
-                                x = nx;
-                                y = ny;
+                                const int nx = ((ix + i) % w + w) % w,
+                                          ny = std::clamp(iy + j, 0, h - 1);
+                                const auto& n = *grid.tile({nx, ny});
+                                const double weight =
+                                    (i ? u : 1 - u) * (j ? v : 1 - v);
+                                rock +=
+                                    weight * (n.terrain == TerrainType::Mountain
+                                                  ? 1
+                                                  : 0);
+                                ice += weight *
+                                       (n.biome == BiomeType::Polar ? 1 : 0);
+                                exposure +=
+                                    weight * (n.terrain == TerrainType::Mountain
+                                                  ? .88
+                                              : (n.biome == BiomeType::Hills ||
+                                                 n.relief == ReliefType::Hills)
+                                                  ? .68
+                                                  : 0);
+                                if (occupied(nx, ny) != dry)
+                                {
+                                    continue;
+                                }
+                                cumulative += weight;
+                                if (!chosen && choose < cumulative)
+                                {
+                                    chosen = true;
+                                    x = nx;
+                                    y = ny;
+                                }
                             }
                         }
-                    }
-                    const auto& t = *grid.tile({(x % w + w) % w, y});
-                    auto color = baseColors[y * w + x];
-                    if (dry && materials[y * w + x])
-                    {
-                        color =
-                            landscapePaint(*materials[y * w + x], gx, gy, true);
-                    }
-                    const double patch =
-                        .55 * landscapeField(gx * .38, gy * .38, 931) +
-                        .45 * landscapeField(gx * 5, gy * 5, 981);
-                    if (dry && patch < exposure)
-                    {
-                        double grain = landscapeField(gx * 4, gy * 4, 713);
-                        color = grain < .24   ? RenderColor{116, 81, 63, 255}
-                                : grain > .79 ? RenderColor{113, 109, 112, 255}
-                                              : RenderColor{78, 59, 57, 255};
-                    }
-                    if (dry && patch < rock * .92)
-                    {
-                        const double grain =
-                            landscapeField(gx * 3, gy * 3, 811);
-                        color = grain < .25   ? RenderColor{57, 70, 88, 255}
-                                : grain > .76 ? RenderColor{154, 167, 175, 255}
-                                              : RenderColor{108, 116, 122, 255};
-                    }
-                    // Sparse low moss and lichen retain tundra's exposed soil;
-                    // this is a small palette shift, not a grassland carpet.
-                    if (dry && t.biome == BiomeType::Tundra && rock < .3 &&
-                        landscapeField(gx * .45, gy * .45, 824) > .60 &&
-                        landscapeField(gx * 3, gy * 3, 831) > .56)
-                    {
-                        color = {79, 140, 122, 255};
-                    }
-                    if (dry && patch < ice)
-                    {
-                        const double drift =
-                            landscapeField(gx * .8, gy * 1.5, 519);
-                        color = drift < .26   ? RenderColor{126, 156, 170, 255}
+                        const auto& t = *grid.tile({(x % w + w) % w, y});
+                        auto color = baseColors[y * w + x];
+                        if (dry && materials[y * w + x])
+                        {
+                            color = landscapePaint(
+                                *materials[y * w + x],
+                                gx,
+                                gy,
+                                true
+                            );
+                        }
+                        const double patch =
+                            .55 * landscapeField(gx * .38, gy * .38, 931) +
+                            .45 * landscapeField(gx * 5, gy * 5, 981);
+                        if (dry && patch < exposure)
+                        {
+                            double grain = landscapeField(gx * 4, gy * 4, 713);
+                            color = grain < .24 ? RenderColor{116, 81, 63, 255}
+                                    : grain > .79
+                                        ? RenderColor{113, 109, 112, 255}
+                                        : RenderColor{78, 59, 57, 255};
+                        }
+                        if (dry && patch < rock * .92)
+                        {
+                            const double grain =
+                                landscapeField(gx * 3, gy * 3, 811);
+                            color = grain < .25 ? RenderColor{57, 70, 88, 255}
+                                    : grain > .76
+                                        ? RenderColor{154, 167, 175, 255}
+                                        : RenderColor{108, 116, 122, 255};
+                        }
+                        // Sparse low moss and lichen retain tundra's exposed
+                        // soil; this is a small palette shift, not a grassland
+                        // carpet.
+                        if (dry && t.biome == BiomeType::Tundra && rock < .3 &&
+                            landscapeField(gx * .45, gy * .45, 824) > .60 &&
+                            landscapeField(gx * 3, gy * 3, 831) > .56)
+                        {
+                            color = {79, 140, 122, 255};
+                        }
+                        if (dry && patch < ice)
+                        {
+                            const double drift =
+                                landscapeField(gx * .8, gy * 1.5, 519);
+                            color =
+                                drift < .26   ? RenderColor{126, 156, 170, 255}
                                 : drift > .72 ? RenderColor{244, 243, 232, 255}
                                               : RenderColor{215, 224, 227, 255};
-                    }
-                    if (!dry)
-                    {
-                        const auto distanceAt = [&](int x, int y)
+                        }
+                        if (!dry)
                         {
-                            return std::sqrt(
-                                double(shore
-                                           [std::clamp(y, 0, h - 1) * w +
-                                            (x % w + w) % w])
-                            );
-                        };
-                        const double distance =
-                            (1 - v) * ((1 - u) * distanceAt(ix, iy) +
-                                       u * distanceAt(ix + 1, iy)) +
-                            v * ((1 - u) * distanceAt(ix, iy + 1) +
-                                 u * distanceAt(ix + 1, iy + 1));
-                        const double shelf =
-                            1.5 + 1.2 * landscapeField(xx * .04, yy * .04, 518);
-                        const double basin =
-                            distance / shelf +
-                            .35 * landscapeField(xx * .18, yy * .18, 631);
-                        // Water depth is a lighting gradient between palette
-                        // anchors, not a set of hard contour bands.
-                        const auto blendWater =
-                            [](RenderColor a, RenderColor b, double t)
-                        {
-                            t = std::clamp(t, 0., 1.);
-                            t = t * t * (3 - 2 * t);
-                            return RenderColor{
-                                std::uint8_t(a.red + (b.red - a.red) * t),
-                                std::uint8_t(a.green + (b.green - a.green) * t),
-                                std::uint8_t(a.blue + (b.blue - a.blue) * t),
-                                255
+                            const auto distanceAt = [&](int x, int y)
+                            {
+                                return std::sqrt(
+                                    double(shore
+                                               [std::clamp(y, 0, h - 1) * w +
+                                                (x % w + w) % w])
+                                );
                             };
-                        };
-                        color = basin < 1.5 ? blendWater(
-                                                  {70, 98, 125, 255},
-                                                  {48, 69, 93, 255},
-                                                  basin / 1.5
-                                              )
-                                            : blendWater(
-                                                  {48, 69, 93, 255},
-                                                  {32, 44, 67, 255},
-                                                  (basin - 1.5) / 2.5
-                                              );
+                            const double distance =
+                                (1 - v) * ((1 - u) * distanceAt(ix, iy) +
+                                           u * distanceAt(ix + 1, iy)) +
+                                v * ((1 - u) * distanceAt(ix, iy + 1) +
+                                     u * distanceAt(ix + 1, iy + 1));
+                            const double shelf =
+                                1.5 +
+                                1.2 * landscapeField(xx * .04, yy * .04, 518);
+                            const double basin =
+                                distance / shelf +
+                                .35 * landscapeField(xx * .18, yy * .18, 631);
+                            // Water depth is a lighting gradient between
+                            // palette anchors, not a set of hard contour bands.
+                            const auto blendWater =
+                                [](RenderColor a, RenderColor b, double t)
+                            {
+                                t = std::clamp(t, 0., 1.);
+                                t = t * t * (3 - 2 * t);
+                                return RenderColor{
+                                    std::uint8_t(a.red + (b.red - a.red) * t),
+                                    std::uint8_t(
+                                        a.green + (b.green - a.green) * t
+                                    ),
+                                    std::uint8_t(
+                                        a.blue + (b.blue - a.blue) * t
+                                    ),
+                                    255
+                                };
+                            };
+                            color = basin < 1.5 ? blendWater(
+                                                      {70, 98, 125, 255},
+                                                      {48, 69, 93, 255},
+                                                      basin / 1.5
+                                                  )
+                                                : blendWater(
+                                                      {48, 69, 93, 255},
+                                                      {32, 44, 67, 255},
+                                                      (basin - 1.5) / 2.5
+                                                  );
+                        }
+                        if (!detailOnly)
+                        {
+                            a.pixels[2][std::size_t(py) * a.w + px] =
+                                {255, 255, 255, std::uint8_t(dry ? 0 : 255)};
+                        }
+                        a.pixels[detailOnly ? 1 : 0]
+                                [std::size_t(py) * a.w + px] = color;
                     }
-                    if (!detailOnly)
+                    const int done = completedRows.fetch_add(1) + 1;
+                    if (progress)
                     {
-                        a.pixels[2][std::size_t(py) * a.w + px] =
-                            {255, 255, 255, std::uint8_t(dry ? 0 : 255)};
+                        progress->store(.75F * done / a.h);
                     }
-                    a.pixels[detailOnly ? 1 : 0][std::size_t(py) * a.w + px] =
-                        color;
                 }
-                const int done = completedRows.fetch_add(1) + 1;
-                if (progress) { progress->store(.75F * done / a.h); }
-            }
             };
-            const unsigned workers = detailOnly ? std::clamp(std::thread::hardware_concurrency() / 2, 1u, 8u) : 1u;
+            const unsigned workers =
+                detailOnly ? std::clamp(
+                                 std::thread::hardware_concurrency() / 2,
+                                 1u,
+                                 8u
+                             )
+                           : 1u;
             std::vector<std::jthread> painters;
-            for (unsigned i = 1; i < workers; ++i) { painters.emplace_back(paintRows); }
+            for (unsigned i = 1; i < workers; ++i)
+            {
+                painters.emplace_back(paintRows);
+            }
             paintRows();
             painters.clear(); // Join before ordered overlapping relief stamps.
-            if (cancelled->load()) { return Atlas{}; }
+            if (cancelled->load())
+            {
+                return Atlas{};
+            }
             if (!detailOnly)
             {
                 a.pixels[1] = a.pixels[0];
@@ -627,6 +662,7 @@ namespace Paladin
         }
 
     public:
+        double solarSecondsOffset = 0;
         ~GlobeRenderer()
         {
             if (cancelled_)
@@ -817,8 +853,10 @@ namespace Paladin
                     patchUploadRow_ = 0;
                 }
             }
-            const auto uploadDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(4);
-            while (patchReady_.w && std::chrono::steady_clock::now() < uploadDeadline)
+            const auto uploadDeadline =
+                std::chrono::steady_clock::now() + std::chrono::milliseconds(4);
+            while (patchReady_.w &&
+                   std::chrono::steady_clock::now() < uploadDeadline)
             {
                 const int density = patchReady_.density;
                 const int tileW =
@@ -1071,15 +1109,21 @@ namespace Paladin
                                   double th,
                                   double opacity = 1)
             {
-                // Fixed map-space mesh nodes, not viewport-dependent tessellation.
+                // Fixed map-space mesh nodes, not viewport-dependent
+                // tessellation.
                 const double x0 = std::max({std::floor(left / 2) * 2, tx, 0.}),
                              y0 = std::max({std::floor(top / 2) * 2, ty, 0.});
-                const double x1 = std::min(
-                                 {std::ceil((left + r.outputWidth() / pixels) / 2) * 2, tx + tw, gw}
-                             ),
-                             y1 = std::min(
-                                 {std::ceil((top + r.outputHeight() / pixels) / 2) * 2, ty + th, gh}
-                             );
+                const double
+                    x1 = std::min(
+                        {std::ceil((left + r.outputWidth() / pixels) / 2) * 2,
+                         tx + tw,
+                         gw}
+                    ),
+                    y1 = std::min(
+                        {std::ceil((top + r.outputHeight() / pixels) / 2) * 2,
+                         ty + th,
+                         gh}
+                    );
                 if (x1 <= x0 || y1 <= y0)
                 {
                     return;
@@ -1089,9 +1133,8 @@ namespace Paladin
                 const int nx = std::clamp(int(std::ceil((x1 - x0) / 2)), 1, 96),
                           ny = std::clamp(int(std::ceil((y1 - y0) / 2)), 1, 96);
                 const double pitch = r.currentPixelPitch();
-                const auto screen = [pitch](double position) {
-                    return float(std::round(position / pitch) * pitch);
-                };
+                const auto screen = [pitch](double position)
+                { return float(std::round(position / pitch) * pitch); };
                 for (int j = 0; j <= ny; ++j)
                 {
                     for (int i = 0; i <= nx; ++i)
@@ -1106,7 +1149,8 @@ namespace Paladin
                              globeLight(
                                  x / gw,
                                  y / gh,
-                                 world.time().secondsIntoDay(),
+                                 (world.time().secondsIntoDay() +
+                                  solarSecondsOffset),
                                  1
                              )}
                         );
@@ -1249,7 +1293,8 @@ namespace Paladin
             };
             const auto& g = world.grid();
             const int gridWidth = g.width(), gridHeight = g.height();
-            const double seconds = world.time().secondsIntoDay();
+            const double seconds =
+                (world.time().secondsIntoDay() + solarSecondsOffset);
             const auto shadeVertex = [&](const V& v)
             {
                 auto light = globeLight(v.u, v.v, seconds, v.p.z);
@@ -1318,9 +1363,11 @@ namespace Paladin
                 }
                 return result;
             };
-            const float viewportGuard = float(std::max(1., r.currentPixelPitch()));
+            const float viewportGuard =
+                float(std::max(1., r.currentPixelPitch()));
             const float viewportRight = float(r.outputWidth()) + viewportGuard;
-            const float viewportBottom = float(r.outputHeight()) + viewportGuard;
+            const float viewportBottom =
+                float(r.outputHeight()) + viewportGuard;
             const auto triangle = [&](const V& a, const V& b, const V& c)
             {
                 std::array<const V*, 5> poly{};
@@ -1357,8 +1404,9 @@ namespace Paladin
                 // At regional zoom most of the visible hemisphere is outside
                 // the viewport. Reject only fully off-screen polygons before
                 // handing them to SDL's software triangle pipeline. Keep a
-                // one-lattice-cell guard so edge coverage and raster rounding stay
-                // identical; no visible triangles or source detail are lost.
+                // one-lattice-cell guard so edge coverage and raster rounding
+                // stay identical; no visible triangles or source detail are
+                // lost.
                 bool left = true, right = true, above = true, below = true;
                 for (int i = 0; i < count; ++i)
                 {
@@ -1368,7 +1416,10 @@ namespace Paladin
                     above = above && point.y < -viewportGuard;
                     below = below && point.y > viewportBottom;
                 }
-                if (left || right || above || below) return;
+                if (left || right || above || below)
+                {
+                    return;
+                }
                 const int first = int(vertices_.size());
                 for (int i = 0; i < count; ++i)
                 {
@@ -1457,7 +1508,7 @@ namespace Paladin
                     const double shine = oceanSunGlint(
                         u,
                         vv,
-                        world.time().secondsIntoDay(),
+                        (world.time().secondsIntoDay() + solarSecondsOffset),
                         camera.tileX() / world.grid().width(),
                         camera.tileY() / world.grid().height()
                     );
@@ -1548,13 +1599,19 @@ namespace Paladin
                     indices_.clear();
                     const auto& a = region.area;
                     const int width = a.w / a.density, height = a.h / a.density;
-                    gridMesh((width + 1) / 2, (height + 1) / 2, [&](int x, int y)
-                    {
-                        return vertex(
-                            double(a.left + std::min(x * 2, width)) / gridWidth,
-                            double(a.top + std::min(y * 2, height)) / gridHeight
-                        );
-                    });
+                    gridMesh(
+                        (width + 1) / 2,
+                        (height + 1) / 2,
+                        [&](int x, int y)
+                        {
+                            return vertex(
+                                double(a.left + std::min(x * 2, width)) /
+                                    gridWidth,
+                                double(a.top + std::min(y * 2, height)) /
+                                    gridHeight
+                            );
+                        }
+                    );
                     for (auto& v : vertices_)
                     {
                         const double x = v.u * world.grid().width() - a.left,
@@ -1602,7 +1659,8 @@ namespace Paladin
                                  (globeSunDot(
                                       uv->u,
                                       uv->v,
-                                      world.time().secondsIntoDay()
+                                      (world.time().secondsIntoDay() +
+                                       solarSecondsOffset)
                                   ) +
                                   .16) /
                                      .75,

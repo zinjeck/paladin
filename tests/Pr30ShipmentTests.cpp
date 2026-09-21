@@ -4,6 +4,7 @@
 #include "simulation/WorldLandNavigation.h"
 #include "simulation/WorldMarketSystem.h"
 #include "simulation/WorldShipmentSystem.h"
+#include "simulation/systems/SettlementEconomySystem.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
@@ -319,6 +320,8 @@ namespace
         auto& relations = const_cast<DiplomacyState&>(f.world.diplomacy());
         relations.relations.push_back({f.owner, f.foreign, false, true, false});
         f.world.realm(f.foreign)->treasury->balance = 10000;
+        // An exporter needs cargo, never startup gold. Only the buyer pays.
+        f.world.realm(f.owner)->treasury->balance = 0;
         const auto sellerCash = f.world.realm(f.owner)->treasury->balance;
         const auto total = f.goods();
         ShipmentId id;
@@ -339,6 +342,7 @@ namespace
             );
         };
         PALADIN_CHECK(send() == ShipmentResult::Success);
+        PALADIN_CHECK(f.world.realm(f.owner)->treasury->balance == 0);
         PALADIN_CHECK(f.world.realm(f.foreign)->treasury->balance == 9500);
         PALADIN_CHECK(
             f.world.shipment(id)->escrow == 500 && f.goods() == total
@@ -744,6 +748,41 @@ namespace
 } // namespace
 void runPr30ShipmentTests()
 {
+    {
+        Fixture f;
+        auto* buyer = f.world.realm(f.owner);
+        buyer->aiControlled = true;
+        const std::array<SettlementSimulationStep, 1> cities{
+            {{f.destination,
+              SettlementSimulationTier::Inactive,
+              SettlementSimulationResolution::InactiveLocalAggregate,
+              1}}
+        };
+        SettlementEconomySystem{}.tick(f.world, {1, cities});
+        const auto* city = f.world.settlement(f.destination);
+        const auto bread = WorldMarketSystem::quote(f.world, *city, "bread");
+        const auto fish = WorldMarketSystem::quote(f.world, *city, "fish");
+        PALADIN_CHECK(bread.dailyNeed > 0 && bread.wanted > 0);
+        PALADIN_CHECK(fish.dailyNeed > 0 && fish.wanted > 0);
+        for (int i = 0; i < 4; ++i)
+        {
+            WorldMarketSystem::updateHistory(f.world);
+        }
+        PALADIN_CHECK(
+            f.world.marketHistory.resources.size() ==
+            SettlementResourceCatalog::definitions().size()
+        );
+        PALADIN_CHECK(!f.world.marketHistory.resources.front().history.empty());
+        PALADIN_CHECK(
+            DiplomacySystem::apply(
+                f.world,
+                f.owner,
+                f.foreign,
+                DiplomaticAction::Trade
+            ) == DiplomaticResult::OutOfRange
+        );
+    }
+
     oneOffAndRepeat();
     authorizationAndFailures();
     crossRealmTrade();

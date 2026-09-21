@@ -5,12 +5,22 @@
 
 namespace Paladin
 {
-    enum class DiplomaticAction { Alliance, Gift, Tribute, Trade, War, Peace };
+    enum class DiplomaticAction
+    {
+        Alliance,
+        Gift,
+        Tribute,
+        Trade,
+        War,
+        Peace,
+        RevokeTrade
+    };
     struct DiplomaticRelation
     {
         RealmId first, second;
         bool allied = false, trading = false, atWar = false;
-        // The subject may have only one overlord. This never changes land ownership.
+        // The subject may have only one overlord. This never changes land
+        // ownership.
         RealmId overlord, tributary;
         // Opinions are directional even though treaties are shared.
         int firstOpinion = 0, secondOpinion = 0;
@@ -21,13 +31,25 @@ namespace Paladin
         const DiplomaticRelation* between(RealmId a, RealmId b) const noexcept
         {
             for (const auto& r : relations)
-                if ((r.first == a && r.second == b) || (r.first == b && r.second == a)) return &r;
+            {
+                if ((r.first == a && r.second == b) ||
+                    (r.first == b && r.second == a))
+                {
+                    return &r;
+                }
+            }
             return nullptr;
         }
         RealmId overlordOf(RealmId subject) const noexcept
         {
-            for (const auto& r : relations) if (r.tributary == subject) return r.overlord;
+            for (const auto& r : relations)
+            {
+                if (r.tributary == subject)
+                {
+                    return r.overlord;
+                }
+            }
             return {};
         }
     };
-}
+} // namespace Paladin

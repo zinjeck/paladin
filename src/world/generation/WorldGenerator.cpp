@@ -18,64 +18,18 @@ namespace Paladin
     {
         void markPolarContinents(WorldGrid& grid)
         {
-            std::vector<bool> visited(grid.tileCount(), false);
-            std::vector<WorldTilePosition> land;
+            // Only actual polar ice is excluded. A land bridge must never
+            // disqualify temperate settlements on the same continent.
             for (int y = 0; y < grid.height(); ++y)
             {
                 for (int x = 0; x < grid.width(); ++x)
                 {
-                    const auto index = std::size_t(y) * grid.width() + x;
-                    if (visited[index] ||
-                        grid.tile({x, y})->terrain == TerrainType::Water)
-                    {
-                        continue;
-                    }
-                    land.clear();
-                    land.push_back({x, y});
-                    visited[index] = true;
-                    std::size_t cold = 0;
-                    double latitude = 0;
-                    for (std::size_t head = 0; head < land.size(); ++head)
-                    {
-                        const auto p = land[head];
-                        const auto* tile = grid.tile(p);
-                        cold += tile->biome == BiomeType::Polar ||
-                                tile->biome == BiomeType::Tundra;
-                        latitude += (p.y + .5) / grid.height();
-                        for (const auto d :
-                             {WorldTilePosition{1, 0},
-                              {-1, 0},
-                              {0, 1},
-                              {0, -1}})
-                        {
-                            const WorldTilePosition q{
-                                (p.x + d.x + grid.width()) % grid.width(),
-                                p.y + d.y
-                            };
-                            const auto* next = grid.tile(q);
-                            if (!next || next->terrain == TerrainType::Water)
-                            {
-                                continue;
-                            }
-                            const auto i =
-                                std::size_t(q.y) * grid.width() + q.x;
-                            if (!visited[i])
-                            {
-                                visited[i] = true;
-                                land.push_back(q);
-                            }
-                        }
-                    }
-                    const double center = latitude / land.size();
-                    const bool polar = (center < .16 || center > .84) &&
-                                       cold * 2 >= land.size();
-                    for (const auto p : land)
-                    {
-                        grid.tile(p)->polarContinent = polar;
-                    }
+                    auto* tile = grid.tile({x, y});
+                    tile->polarContinent = tile->biome == BiomeType::Polar;
                 }
             }
         }
+
         void validateSettings(
             const WorldGrid& grid,
             const WorldGenerationSettings& settings

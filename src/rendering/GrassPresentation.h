@@ -166,7 +166,8 @@ namespace Paladin
                         y + int((hash >> 9) & 1)
                     };
                     const auto* tile = grid.tile(at);
-                    if (!tile || tile->terrain != TerrainType::Land ||
+                    if (!tile || tile->rockFloor ||
+                        tile->terrain != TerrainType::Land ||
                         (tile->biome != BiomeType::Plain &&
                          tile->biome != BiomeType::Forest &&
                          tile->biome != BiomeType::Jungle &&

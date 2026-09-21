@@ -26,9 +26,24 @@ namespace Paladin
     void Application::layoutWorldScreen()
     {
         worldHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
-        caravanPanel_->layout(renderer_->outputWidth(), renderer_->outputHeight(), simulation_->world(), simulation_->playerRealmId());
-        worldSettlementPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
-        diplomacyPanel_->layout(renderer_->outputWidth(),renderer_->outputHeight(),simulation_->world(),simulation_->playerRealmId());
+        caravanPanel_->layout(
+            renderer_->outputWidth(),
+            renderer_->outputHeight(),
+            simulation_->world(),
+            simulation_->playerRealmId()
+        );
+        worldSettlementPanel_->layout(
+            renderer_->outputWidth(),
+            renderer_->outputHeight(),
+            simulation_->world(),
+            simulation_->playerRealmId()
+        );
+        diplomacyPanel_->layout(
+            renderer_->outputWidth(),
+            renderer_->outputHeight(),
+            simulation_->world(),
+            simulation_->playerRealmId()
+        );
 
         const Realm* playerRealm =
             simulation_->world().realm(simulation_->playerRealmId());
@@ -54,11 +69,17 @@ namespace Paladin
 
         if (!foundingPanel_->isOpen())
         {
-            const double frameDeltaSeconds = simulationClock_->frameDeltaSeconds();
-            if (!worldSettlementPanel_->wantsKeyboard()) updateCameraMovement(frameDeltaSeconds);
+            const double frameDeltaSeconds =
+                simulationClock_->frameDeltaSeconds();
+            if (!worldSettlementPanel_->wantsKeyboard())
+            {
+                updateCameraMovement(frameDeltaSeconds);
+            }
             updateCameraZoom(frameDeltaSeconds);
 
-            if (!debugConsole_->wantsKeyboard() && !worldSettlementPanel_->wantsKeyboard() && worldRenderer_->globeEnabled)
+            if (!debugConsole_->wantsKeyboard() &&
+                !worldSettlementPanel_->wantsKeyboard() &&
+                worldRenderer_->globeEnabled)
             {
                 const bool* keyboardState = SDL_GetKeyboardState(nullptr);
                 double rollDirection = 0.0;
@@ -151,7 +172,8 @@ namespace Paladin
                 )
                     ? RenderColor{121, 181, 109, 235}
                     : RenderColor{215, 80, 86, 235};
-            placementMarker = WorldPlacementMarker{*hoveredPosition, markerColor};
+            placementMarker =
+                WorldPlacementMarker{*hoveredPosition, markerColor};
         }
         else if (lockedPosition && !foundingOriginChosen)
         {
@@ -169,6 +191,14 @@ namespace Paladin
             };
         }
 
+        worldRenderer_->solarSecondsOffset =
+            60 * (simulation_->fractionalGameMinutes() +
+                  (simulationClock_->isPaused()
+                       ? 0
+                       : simulationClock_->interpolationAlpha() *
+                             simulation_->gameMinutesPerTick(
+                                 simulationClock_->fixedDeltaSeconds()
+                             )));
         worldRenderer_->animationSeconds =
             simulationClock_->presentationSeconds();
         worldRenderer_->render(
@@ -205,9 +235,20 @@ namespace Paladin
         if (!foundingPanel_->isOpen() &&
             !settlementPlacementController_->isActive())
         {
-            caravanPanel_->render(*renderer_, *grayUiRenderer_, simulation_->world());
-            diplomacyPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
-            worldSettlementPanel_->render(*renderer_,*grayUiRenderer_,simulation_->world(),simulation_->playerRealmId());
+            caravanPanel_
+                ->render(*renderer_, *grayUiRenderer_, simulation_->world());
+            diplomacyPanel_->render(
+                *renderer_,
+                *grayUiRenderer_,
+                simulation_->world(),
+                simulation_->playerRealmId()
+            );
+            worldSettlementPanel_->render(
+                *renderer_,
+                *grayUiRenderer_,
+                simulation_->world(),
+                simulation_->playerRealmId()
+            );
         }
         if (!foundingPanel_->isOpen() &&
             !settlementPlacementController_->isActive())
@@ -230,18 +271,24 @@ namespace Paladin
         if (settlementPlacementController_->isSelecting() && hoveredPosition &&
             !foundingPanel_->isOpen())
         {
-            const auto& policy = simulation_->world().territoryFoundationPolicy();
+            const auto& policy =
+                simulation_->world().territoryFoundationPolicy();
             const auto kind = foundingPanel_->settlementKind();
             float x = 0, y = 0;
             SDL_GetMouseState(&x, &y);
-            worldRenderer_->renderRegionSurvey(*renderer_, *grayUiRenderer_,
-                simulation_->world(), *hoveredPosition,
+            worldRenderer_->renderRegionSurvey(
+                *renderer_,
+                *grayUiRenderer_,
+                simulation_->world(),
+                *hoveredPosition,
                 settlementRegionDimension(policy.settlementRegionWidth, kind),
-                settlementRegionDimension(policy.settlementRegionHeight, kind), x, y);
+                settlementRegionDimension(policy.settlementRegionHeight, kind),
+                x,
+                y
+            );
         }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
     }
-
 
 
     void Application::renderWorldManagement()
@@ -284,14 +331,17 @@ namespace Paladin
             );
             map && active)
         {
-            if (const auto* realm=world.realm(simulation_->playerRealmId()))
+            if (const auto* realm = world.realm(simulation_->playerRealmId()))
+            {
                 employmentPanel_->setRealmWorkDayHours(realm->workDayHours());
+            }
             employmentPanel_->render(
                 *renderer_,
                 *grayUiRenderer_,
                 *map,
                 active->simulationState().citizens(),
-                world.time().totalGameMinutes()
+                world.time().totalGameMinutes(),
+                &world
             );
         }
     }

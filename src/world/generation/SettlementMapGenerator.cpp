@@ -337,29 +337,108 @@ namespace Paladin
                                2.0
                            ) * settings.biomeBoundaryNoiseStrength;
 
-                output->terrain = mountainWeight > mountainThreshold
-                                      ? TerrainType::Mountain
-                                      : TerrainType::Land;
-                // Coherent local veins inherit the strategic deposit instead of
-                // rolling unrelated resources when a city is opened.
+                // Anisotropic ridges leave connected valleys through uplands.
+                // Hills use narrower, broken ranges rather than a flat biome.
+                const double ridge = std::abs(
+                    GenerationNoise::simplexFractal(
+                        x * .025,
+                        y * .055,
+                        seed + 7411,
+                        2,
+                        .5,
+                        2.0
+                    )
+                );
+                const bool hills = hillWeight > .45;
+                const bool mountain = mountainWeight > mountainThreshold;
+                const bool rock =
+                    (mountain && ridge > .09) || (hills && ridge > .32);
+                output->terrain =
+                    rock ? TerrainType::Mountain : TerrainType::Land;
+                output->relief = hills      ? ReliefType::Hills
+                                 : mountain ? ReliefType::Mountain
+                                            : ReliefType::Lowland;
                 const int nearest = (tx >= .5 ? 1 : 0) + (ty >= .5 ? 2 : 0);
                 const double vein = GenerationNoise::fractal(
-                    x * .14,
-                    y * .14,
+                    x * .32,
+                    y * .32,
                     seed ^ 0x0AEULL,
                     2
                 );
-                if (output->terrain == TerrainType::Land && vein > -.12)
+                output->mineral = MineralDeposit::None;
+                if (vein > (rock ? .22 : hills ? .32 : .48))
                 {
                     output->mineral = samples[nearest]->mineral;
                 }
-                output->relief = output->terrain == TerrainType::Mountain
-                                     ? ReliefType::Mountain
-                                 : hillWeight > .5 ? ReliefType::Hills
-                                                   : ReliefType::Lowland;
             }
         }
 
+        // Sparse connected caves: one bounded candidate per 64-tile district.
+        // Cardinal tunnels stay navigable; occasional small chambers give
+        // them shape without hollowing out whole mountain ranges.
+        constexpr SettlementTilePosition
+            caveSteps[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+        for (int by = 0; by < cityGrid.height(); by += 64)
+        {
+            for (int bx = 0; bx < cityGrid.width(); bx += 64)
+            {
+                auto hash = GenerationNoise::mix(
+                    seed ^ std::uint64_t(bx) * 73856093ULL ^
+                    std::uint64_t(by) * 19349663ULL
+                );
+                if (hash % 4 != 0)
+                {
+                    continue;
+                }
+                const SettlementTilePosition origin{
+                    bx + int((hash >> 8) % 64),
+                    by + int((hash >> 16) % 64)
+                };
+                const auto* start = cityGrid.tile(origin);
+                if (!start || start->terrain != TerrainType::Mountain ||
+                    start->relief == ReliefType::Hills)
+                {
+                    continue;
+                }
+                for (int branch = 0; branch < 2; ++branch)
+                {
+                    auto p = origin;
+                    int direction = int((hash + branch * 2) % 4);
+                    const int length = 18 + int((hash >> 24) % 28);
+                    for (int step = 0; step < length; ++step)
+                    {
+                        auto* tile = cityGrid.tile(p);
+                        if (!tile || (tile->terrain != TerrainType::Mountain &&
+                                      !tile->rockFloor))
+                        {
+                            break;
+                        }
+                        hash = GenerationNoise::mix(hash);
+                        const int radius = step % 13 == 0 ? 1 : 0;
+                        for (int dy = -radius; dy <= radius; ++dy)
+                        {
+                            for (int dx = -radius; dx <= radius; ++dx)
+                            {
+                                auto* floor =
+                                    cityGrid.tile({p.x + dx, p.y + dy});
+                                if (floor &&
+                                    floor->terrain == TerrainType::Mountain)
+                                {
+                                    floor->terrain = TerrainType::Land;
+                                    floor->rockFloor = true;
+                                }
+                            }
+                        }
+                        if (step % 4 == 0 && hash % 3 == 0)
+                        {
+                            direction = (direction + (hash % 2 ? 1 : 3)) % 4;
+                        }
+                        p.x += caveSteps[direction].x;
+                        p.y += caveSteps[direction].y;
+                    }
+                }
+            }
+        }
         cityGrid.classifyCoast(seed);
         auto result = std::make_unique<SettlementMap>(
             std::move(cityGrid),

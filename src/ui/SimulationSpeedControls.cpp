@@ -52,7 +52,7 @@ namespace Paladin
         buttons_[1].setSelected(!paused && nearlyEqual(speedMultiplier, 2.0));
         buttons_[2].setSelected(
             !paused && (nearlyEqual(speedMultiplier, 3.0) ||
-                        nearlyEqual(speedMultiplier, 5.0))
+                        nearlyEqual(speedMultiplier, 9.0))
         );
     }
 

@@ -13,6 +13,7 @@
 #include "ui/DiplomacyPanel.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/LedgerPanel.h"
+#include "ui/SettlementInspectionPanel.h"
 #include "ui/SimulationSpeedControls.h"
 #include "ui/TradeDepotPanel.h"
 #include "ui/WorldSettlementPanel.h"
@@ -136,7 +137,7 @@ namespace Paladin
                             std::abs(
                                 simulationClock_->speedMultiplier() - 3.0
                             ) < 0.001
-                        ? 5.0
+                        ? 9.0
                         : 3.0;
 
                 simulationClock_->setSpeedMultiplier(nextFastSpeed);
@@ -243,6 +244,15 @@ namespace Paladin
         {
             if (screen_ == Screen::City && tradeDepotPanel_)
             {
+                tradeDepotPanel_->embed(
+                    settlementInspectionPanel_->tradeContentBounds()
+                );
+                tradeDepotPanel_->layout(
+                    renderer_->outputWidth(),
+                    renderer_->outputHeight(),
+                    simulation_->world(),
+                    simulation_->playerRealmId()
+                );
                 tradeDepotPanel_->render(
                     *renderer_,
                     *grayUiRenderer_,

@@ -6,7 +6,7 @@ namespace Paladin
 {
     namespace
     {
-        constexpr std::array<SettlementCommandDefinition, 5> commandDefinitions{
+        constexpr std::array<SettlementCommandDefinition, 6> commandDefinitions{
             {{SettlementCommandTypes::ChopTree,
               "Chop Trees",
               CommandTargetKind::Tree},
@@ -16,6 +16,9 @@ namespace Paladin
              {SettlementCommandTypes::Gather,
               "Gather",
               CommandTargetKind::Gatherable},
+             {SettlementCommandTypes::MineMountain,
+              "Mine Mountain",
+              CommandTargetKind::Mountain},
              {SettlementCommandTypes::Hunt, "Hunt", CommandTargetKind::Animal},
              {SettlementCommandTypes::Demolish,
               "Demolish",

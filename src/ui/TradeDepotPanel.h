@@ -1,6 +1,7 @@
 #pragma once
 #include "core/StrongId.h"
-#include "ui/PanelDrag.h"
+#include "rendering/SceneSpriteLibrary.h"
+#include "ui/UiTypes.h"
 #include "world/settlements/SettlementTradeState.h"
 #include <optional>
 #include <string>
@@ -14,6 +15,10 @@ namespace Paladin
     class TradeDepotPanel
     {
     public:
+        void embed(UiRectangle bounds)
+        {
+            embedded_ = bounds;
+        }
         void open(SettlementId city, SettlementObjectId depot);
         void close() noexcept;
         bool isOpen() const noexcept
@@ -60,7 +65,8 @@ namespace Paladin
             Quantity,
             Dispatch,
             Start,
-            Stop
+            Stop,
+            ResourceFirst = 100
         };
         struct Control
         {
@@ -71,8 +77,11 @@ namespace Paladin
         void act(Kind, World&, RealmId);
         int amount() const;
         std::string_view resource() const;
-        PanelDrag drag_;
-        UiRectangle bounds_;
+        UiRectangle bounds_, embedded_;
+        mutable SceneSpriteLibrary icons_;
+        std::vector<TradeDirection> directions_;
+        std::vector<int> quantities_;
+        bool restoreOrders_ = false;
         SettlementId city_;
         SettlementObjectId depot_;
         int width_ = 0, height_ = 0;

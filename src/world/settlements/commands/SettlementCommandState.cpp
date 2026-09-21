@@ -56,7 +56,10 @@ namespace Paladin
                 ++selectionVersion_;
             }
             animalsChanged = changed > 0;
-            if (type == SettlementCommandTypes::Hunt) return animalsChanged;
+            if (type == SettlementCommandTypes::Hunt)
+            {
+                return animalsChanged;
+            }
         }
         SettlementCommand command;
         command.commandTypeId = type;
@@ -109,6 +112,21 @@ namespace Paladin
                 }
             }
         }
+        else if (definition->targetKind == CommandTargetKind::Mountain)
+        {
+            for (int y = area.topLeft.y; y < area.topLeft.y + area.height; ++y)
+            {
+                for (int x = area.topLeft.x; x < area.topLeft.x + area.width;
+                     ++x)
+                {
+                    if (map.grid().tile({x, y})->terrain ==
+                        TerrainType::Mountain)
+                    {
+                        append({{{x, y}, 1, 1}, {}, {}});
+                    }
+                }
+            }
+        }
         else if (
             definition->targetKind == CommandTargetKind::Tree ||
             definition->targetKind == CommandTargetKind::Rock ||
@@ -118,8 +136,9 @@ namespace Paladin
             const auto expected =
                 definition->targetKind == CommandTargetKind::Tree
                     ? NaturalFeatureKind::Tree
-                    : definition->targetKind == CommandTargetKind::Gatherable
-                        ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
+                : definition->targetKind == CommandTargetKind::Gatherable
+                    ? NaturalFeatureKind::Wheat
+                    : NaturalFeatureKind::Rock;
             for (int y = area.topLeft.y; y < area.topLeft.y + area.height; ++y)
             {
                 for (int x = area.topLeft.x; x < area.topLeft.x + area.width;
@@ -144,7 +163,8 @@ namespace Paladin
             {
                 // Preserve the stable command-state bit used by simulation and
                 // tests. Presentation no longer derives the yellow strip from
-                // this flag; SettlementCommandRenderer owns the visible outline.
+                // this flag; SettlementCommandRenderer owns the visible
+                // outline.
                 map.naturalFeatures().mark(target.footprint.topLeft, true);
             }
         }
@@ -266,10 +286,18 @@ namespace Paladin
                             target.constructionId
                         );
                     }
-                    const auto expected = kind == CommandTargetKind::Tree
-                                              ? NaturalFeatureKind::Tree
-                                              : kind == CommandTargetKind::Gatherable
-                                                  ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
+                    if (kind == CommandTargetKind::Mountain)
+                    {
+                        return map.grid()
+                                   .tile(target.footprint.topLeft)
+                                   ->terrain != TerrainType::Mountain;
+                    }
+                    const auto expected =
+                        kind == CommandTargetKind::Tree
+                            ? NaturalFeatureKind::Tree
+                        : kind == CommandTargetKind::Gatherable
+                            ? NaturalFeatureKind::Wheat
+                            : NaturalFeatureKind::Rock;
                     return map.naturalFeatures()
                                .at(target.footprint.topLeft)
                                .kind != expected;
@@ -344,11 +372,16 @@ namespace Paladin
             {
                 return map.objectState().constructionSite(site) != nullptr;
             }
+            if (command.commandTypeId == SettlementCommandTypes::MineMountain)
+            {
+                return map.grid().tile(tile)->terrain == TerrainType::Mountain;
+            }
             const auto expected =
                 command.commandTypeId == SettlementCommandTypes::ChopTree
                     ? NaturalFeatureKind::Tree
-                    : command.commandTypeId == SettlementCommandTypes::Gather
-                        ? NaturalFeatureKind::Wheat : NaturalFeatureKind::Rock;
+                : command.commandTypeId == SettlementCommandTypes::Gather
+                    ? NaturalFeatureKind::Wheat
+                    : NaturalFeatureKind::Rock;
             return map.naturalFeatures().at(tile).kind == expected;
         }
         return false;

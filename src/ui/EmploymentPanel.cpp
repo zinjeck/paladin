@@ -1,5 +1,7 @@
 #include "ui/EmploymentPanel.h"
 #include "ui/GrayUiRenderer.h"
+#include "ui/RealmFlagRenderer.h"
+#include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -102,10 +104,10 @@ namespace Paladin
                 break;
             }
         }
-        techPointer_=section_=="Technology" && techCanvas_.contains(x,y);
-        techPanned_=false;
-        techStartX_=techViews_[techTab_].panX;
-        techStartY_=techViews_[techTab_].panY;
+        techPointer_ = section_ == "Technology" && techCanvas_.contains(x, y);
+        techPanned_ = false;
+        techStartX_ = techViews_[techTab_].panX;
+        techStartY_ = techViews_[techTab_].panY;
         dragCandidate_ = !techPointer_;
         pressX_ = x;
         pressY_ = y;
@@ -117,13 +119,18 @@ namespace Paladin
     {
         if (techPointer_)
         {
-            if (std::hypot(x-pressX_,y-pressY_)>=4) techPanned_=true;
+            if (std::hypot(x - pressX_, y - pressY_) >= 4)
+            {
+                techPanned_ = true;
+            }
             if (techPanned_)
             {
-                pressed_=-1;
-                auto& view=techViews_[techTab_];
-                view.panX=std::clamp(techStartX_+x-pressX_,-1400.F,1400.F);
-                view.panY=std::clamp(techStartY_+y-pressY_,-1400.F,1400.F);
+                pressed_ = -1;
+                auto& view = techViews_[techTab_];
+                view.panX =
+                    std::clamp(techStartX_ + x - pressX_, -1400.F, 1400.F);
+                view.panY =
+                    std::clamp(techStartY_ + y - pressY_, -1400.F, 1400.F);
             }
             return true;
         }
@@ -155,8 +162,13 @@ namespace Paladin
     )
     {
         dragCandidate_ = false;
-        techPointer_=false;
-        if (techPanned_) { techPanned_=false; pressed_=-1; return; }
+        techPointer_ = false;
+        if (techPanned_)
+        {
+            techPanned_ = false;
+            pressed_ = -1;
+            return;
+        }
         if (dragging_)
         {
             dragging_ = false;
@@ -185,13 +197,34 @@ namespace Paladin
             close();
             return;
         }
-        if (hit.type=="techTab") { techTab_=std::clamp(hit.delta,0,3); return; }
-        if (hit.type=="citizenship")
-        { if (!citizens.citizenshipResearched()) citizenshipRequest_=true; return; }
-        if (worldMode_ && section_!="Laws") return;
+        if (hit.type == "techTab")
+        {
+            techTab_ = std::clamp(hit.delta, 0, 3);
+            return;
+        }
+        if (hit.type == "citizenship")
+        {
+            if (!citizens.citizenshipResearched())
+            {
+                citizenshipRequest_ = true;
+            }
+            return;
+        }
+        if (hit.type == "marketResource")
+        {
+            marketResource_ = hit.delta;
+            return;
+        }
+        if (worldMode_ && section_ != "Laws")
+        {
+            return;
+        }
         if (hit.type == "migrate")
         {
-            if (!immigrationOriginAvailable_) return;
+            if (!immigrationOriginAvailable_)
+            {
+                return;
+            }
             admissionCount_ =
                 std::min(admissionCount_, map.immigration.available());
             if (hit.delta > 0 && admissionCount_ < map.immigration.available())
@@ -283,14 +316,15 @@ namespace Paladin
     }
     void EmploymentPanel::scroll(float amount)
     {
-        if (section_=="Technology" && std::isfinite(amount))
+        if (section_ == "Technology" && std::isfinite(amount))
         {
-            auto& view=techViews_[techTab_];
-            const float previous=view.zoom;
-            view.zoom=std::clamp(previous*std::pow(1.15F,amount),.5F,2.5F);
-            const float anchorY=techCanvas_.height*.5F-20;
-            view.panX*=view.zoom/previous;
-            view.panY=anchorY-(anchorY-view.panY)*view.zoom/previous;
+            auto& view = techViews_[techTab_];
+            const float previous = view.zoom;
+            view.zoom =
+                std::clamp(previous * std::pow(1.15F, amount), .5F, 2.5F);
+            const float anchorY = techCanvas_.height * .5F - 20;
+            view.panX *= view.zoom / previous;
+            view.panY = anchorY - (anchorY - view.panY) * view.zoom / previous;
             return;
         }
         if (!selectedType_.empty())
@@ -305,7 +339,8 @@ namespace Paladin
         const GrayUiRenderer& ui,
         const SettlementMap& map,
         const SettlementCitizenState& citizens,
-        double minute
+        double minute,
+        const World* marketWorld
     )
     {
         if (!open_)
@@ -320,17 +355,27 @@ namespace Paladin
             admissionCount_ = 0;
             admissionRequest_.reset();
         }
+        jobIcons_.load(
+            renderer,
+            std::string(SDL_GetBasePath()) + "assets/sprites"
+        );
         const bool laws = section_ == "Laws";
         const float width =
-            std::max(0.F,std::min(730.0F, float(renderer.outputWidth()) - 24));
-        const float height =
-            std::max(0.F,std::min(540.0F, float(renderer.outputHeight()) - 92));
+            std::max(0.F, std::min(730.0F, float(renderer.outputWidth()) - 24));
+        const float height = std::max(
+            0.F,
+            std::min(540.0F, float(renderer.outputHeight()) - 92)
+        );
         viewportWidth_ = float(renderer.outputWidth());
         viewportHeight_ = float(renderer.outputHeight());
         if (!positioned_)
         {
             positionX_ = std::max(8.0F, (viewportWidth_ - width - 292) * .5F);
-            positionY_ = std::clamp(110.F,8.F,std::max(8.F,viewportHeight_-height-8));
+            positionY_ = std::clamp(
+                110.F,
+                8.F,
+                std::max(8.F, viewportHeight_ - height - 8)
+            );
             positioned_ = true;
         }
         if (!dragging_)
@@ -645,13 +690,193 @@ namespace Paladin
             );
             return;
         }
-        if (worldMode_ && !laws && section_!="Technology")
+        if (worldMode_ && !laws && section_ != "Technology")
         {
             const float informationHeight = (height - 90) * .62F;
             ui.drawPanel(
                 renderer,
                 {left + 18, top + 54, width - 36, informationHeight}
             );
+            if (section_ == "Economy" && marketWorld)
+            {
+                const auto resources = SettlementResourceCatalog::definitions();
+                const auto& markets = marketWorld->marketHistory.resources;
+                const float gx = left + width * .46F, gy = top + 78;
+                const float gw = width * .54F - 34, gh = 100;
+                const float cw = (width * .43F - 30) / 3,
+                            ch = (informationHeight - 18) / 4;
+                for (std::size_t i = 0; i < resources.size(); ++i)
+                {
+                    const auto& resource = resources[i];
+                    const UiRectangle cell{
+                        left + 24 + float(i % 3) * (cw + 3),
+                        top + 61 + float(i / 3) * ch,
+                        cw,
+                        ch - 3
+                    };
+                    button(cell, "", {{}, "marketResource", {}, int(i)});
+                    if (int(i) == marketResource_)
+                    {
+                        renderer.fillRectangle(
+                            cell.x + 2,
+                            cell.y + cell.height - 2,
+                            cell.width - 4,
+                            2,
+                            {235, 196, 107, 255}
+                        );
+                    }
+                    if (const auto* icon = jobIcons_.find(
+                            "ui.goods." + std::string(resource.id)
+                        );
+                        icon && icon->texture)
+                    {
+                        const auto frame = jobIcons_.frame(*icon, false);
+                        renderer.drawTexture(
+                            *icon->texture,
+                            frame.x,
+                            frame.y,
+                            frame.width,
+                            frame.height,
+                            cell.x + (cell.width - frame.width) * .5F,
+                            cell.y + 4,
+                            frame.width,
+                            frame.height
+                        );
+                    }
+                    double price = 0;
+                    for (const auto& market : markets)
+                    {
+                        if (market.resource == resource.id)
+                        {
+                            price = market.price;
+                        }
+                    }
+                    ui.drawLabel(
+                        renderer,
+                        goldText(std::int64_t(std::lround(price))),
+                        cell.x + 6,
+                        cell.y + cell.height - 14,
+                        1.25F
+                    );
+                }
+                const auto& definition =
+                    resources[std::size_t(marketResource_) % resources.size()];
+                const WorldResourceMarket* selected = nullptr;
+                for (const auto& market : markets)
+                {
+                    if (market.resource == definition.id)
+                    {
+                        selected = &market;
+                    }
+                }
+                ui.drawLabel(
+                    renderer,
+                    std::string(definition.displayName) + " - gold/unit",
+                    gx,
+                    top + 61,
+                    1.25F
+                );
+                double maximum = 1;
+                if (selected)
+                {
+                    for (const auto& sample : selected->history)
+                    {
+                        maximum = std::max(maximum, sample.price / 100.);
+                    }
+                }
+                maximum = std::ceil(maximum * 1.1 * 10) / 10;
+                for (int i = 0; i <= 4; ++i)
+                {
+                    const float yy = gy + gh - i * gh / 4;
+                    renderer.drawLine(gx, yy, gx + gw, yy, {57, 70, 88, 255});
+                    ui.drawLabel(
+                        renderer,
+                        goldText(std::int64_t(maximum * 100 * i / 4)),
+                        gx + 3,
+                        yy - 9,
+                        1
+                    );
+                }
+                if (selected && selected->history.size() > 1)
+                {
+                    const double start = std::max(
+                        0.,
+                        selected->history.back().minute - 16 * 1440
+                    );
+                    const double span =
+                        std::max(240., selected->history.back().minute - start);
+                    for (std::size_t i = 1; i < selected->history.size(); ++i)
+                    {
+                        const auto& a = selected->history[i - 1];
+                        const auto& b = selected->history[i];
+                        renderer.drawLine(
+                            gx + float((a.minute - start) / span) * gw,
+                            gy + gh - float(a.price / 100 / maximum) * gh,
+                            gx + float((b.minute - start) / span) * gw,
+                            gy + gh - float(b.price / 100 / maximum) * gh,
+                            {235, 196, 107, 255}
+                        );
+                    }
+                    ui.drawLabel(
+                        renderer,
+                        "Day " + std::to_string(int(start / 1440) + 1),
+                        gx,
+                        gy + gh + 3,
+                        1
+                    );
+                    ui.drawLabel(
+                        renderer,
+                        "Day " +
+                            std::to_string(
+                                int(selected->history.back().minute / 1440) + 1
+                            ),
+                        gx + gw - 54,
+                        gy + gh + 3,
+                        1
+                    );
+                }
+                ui.drawLabel(
+                    renderer,
+                    "Top producers / day",
+                    gx,
+                    gy + gh + 20,
+                    1.25F
+                );
+                if (selected)
+                {
+                    int rank = 0;
+                    for (const auto& producer : selected->producers)
+                    {
+                        const auto* realm = marketWorld->realm(producer.realm);
+                        if (!realm)
+                        {
+                            continue;
+                        }
+                        const float yy = gy + gh + 44 + rank++ * 22;
+                        drawRealmFlag(
+                            renderer,
+                            realm->flag(),
+                            gx + 5,
+                            yy + 2,
+                            1
+                        );
+                        std::string name(realm->name());
+                        while (titleFont.measureWidth(name, 1.25F) > gw - 78 &&
+                               !name.empty())
+                        {
+                            name.pop_back();
+                        }
+                        ui.drawLabel(renderer, name, gx + 30, yy, 1.25F);
+                        ui.drawLabel(
+                            renderer,
+                            std::to_string(int(producer.dailyOutput)),
+                            gx + gw - 46,
+                            yy,
+                            1.25F
+                        );
+                    }
+                }
+            }
             const float rowY = top + 66 + informationHeight;
             const float cellWidth = (width - 52) / 5;
             for (int i = 0; i < 5; ++i)
@@ -694,8 +919,16 @@ namespace Paladin
             }
             return;
         }
-        if (laws) { renderLaws(renderer,ui,citizens); return; }
-        if (section_=="Technology") { renderTechnology(renderer,ui,citizens); return; }
+        if (laws)
+        {
+            renderLaws(renderer, ui, citizens);
+            return;
+        }
+        if (section_ == "Technology")
+        {
+            renderTechnology(renderer, ui, citizens);
+            return;
+        }
         const bool population = section_ == "Population";
         if (section_ != "Employment" && !population)
         {

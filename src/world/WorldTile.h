@@ -33,7 +33,8 @@ namespace Paladin
         // still be hills even though their biome remains cold.
         ReliefType relief = ReliefType::Lowland;
         MineralDeposit mineral = MineralDeposit::None;
-        // Set once from connected landmasses, rather than local climate.
+        // Local polar ice exclusion; connected habitable land remains eligible.
         bool polarContinent = false;
+        bool rockFloor = false;
     };
 } // namespace Paladin

@@ -22,15 +22,14 @@ namespace Paladin
     {
         constexpr double Pi = 3.14159265358979323846;
         constexpr double TwoPi = Pi * 2.0;
-    }
+    } // namespace
 
-    WorldRenderer::WorldRenderer()
-        : WorldRenderer(WorldPresentationPolicy{})
-    {
-    }
+    WorldRenderer::WorldRenderer() : WorldRenderer(WorldPresentationPolicy{}) {}
 
 
-    WorldRenderer::WorldRenderer(WorldPresentationPolicy worldPresentationPolicy)
+    WorldRenderer::WorldRenderer(
+        WorldPresentationPolicy worldPresentationPolicy
+    )
         : worldPresentationPolicy_(std::move(worldPresentationPolicy))
     {
     }
@@ -57,7 +56,8 @@ namespace Paladin
         // cap keeps event/render cadence responsive, while CPU atlas generation
         // remains asynchronous and all final pixels/textures are unchanged.
         constexpr auto preparationSlice = std::chrono::milliseconds(12);
-        const auto deadline = std::chrono::steady_clock::now() + preparationSlice;
+        const auto deadline =
+            std::chrono::steady_clock::now() + preparationSlice;
         for (int pass = 0;
              pass < 3 && std::chrono::steady_clock::now() < deadline;
              ++pass)
@@ -68,14 +68,19 @@ namespace Paladin
                 break;
             }
         }
-        if (!globe_.detailReady()) return false;
+        if (!globe_.detailReady())
+        {
+            return false;
+        }
         // Complete the initial country overview during loading. Subsequent
         // demographic and ownership changes refresh inside render's bounded
         // work budget, without interrupting interaction with a loading screen.
         if (preparedPoliticalWorld_ != &world)
         {
             if (!territoryPresentationRenderer_.prepare(renderer, world))
+            {
                 return false;
+            }
             preparedPoliticalWorld_ = &world;
         }
         return true;
@@ -119,10 +124,17 @@ namespace Paladin
         std::optional<WorldPlacementMarker> placementMarker
     ) const
     {
-        if (profileRendering) renderTimings.fill(0);
+        if (profileRendering)
+        {
+            renderTimings.fill(0);
+        }
         auto stamp = profileRendering ? SDL_GetTicksNS() : 0;
-        const auto stage = [&](int index) {
-            if (!profileRendering) return;
+        const auto stage = [&](int index)
+        {
+            if (!profileRendering)
+            {
+                return;
+            }
             const auto now = SDL_GetTicksNS();
             renderTimings[index] += (now - stamp) / 1e6;
             stamp = now;
@@ -173,25 +185,39 @@ namespace Paladin
         }
 
         territoryPresentationRenderer_.configure(
-            mapMode_ == WorldMapMode::Resources ? WorldMapMode::Terrain : mapMode_,
-            selectedRealm);
-        if (thematicMapMode(mapMode_) && !territoryPresentationRenderer_.preparationReady() &&
-            !territoryPresentationRenderer_.prepare(renderer,world))
+            mapMode_ == WorldMapMode::Resources ? WorldMapMode::Terrain
+                                                : mapMode_,
+            selectedRealm
+        );
+        if (thematicMapMode(mapMode_) &&
+            !territoryPresentationRenderer_.preparationReady() &&
+            !territoryPresentationRenderer_.prepare(renderer, world))
         {
-            renderer.fillRectangle(0,0,float(renderer.outputWidth()),float(renderer.outputHeight()),ThematicWater);
-            BitmapFontRenderer{}.drawText(renderer,"Preparing thematic map",20,78,2,{239,226,207,255});
+            renderer.fillRectangle(
+                0,
+                0,
+                float(renderer.outputWidth()),
+                float(renderer.outputHeight()),
+                ThematicWater
+            );
+            BitmapFontRenderer{}.drawText(
+                renderer,
+                "Preparing thematic map",
+                20,
+                78,
+                2,
+                {239, 226, 207, 255}
+            );
             return;
         }
         artwork_.setTime(animationSeconds);
+        globe_.solarSecondsOffset = solarSecondsOffset;
         stage(0);
 
         if (globeEnabled)
         {
-            const float localWeight = std::clamp(
-                presentation.localWorldWeight,
-                0.0F,
-                1.0F
-            );
+            const float localWeight =
+                std::clamp(presentation.localWorldWeight, 0.0F, 1.0F);
 
             WorldSurface::Point3 objectResidual{};
             // Keep the true sphere through the far/regional scales and beneath
@@ -221,13 +247,14 @@ namespace Paladin
             stage(2);
             if (localWeight > 0.001F)
             {
-                const LocalTangentWorldView tangent = LocalTangentWorldView::from(
-                    renderCamera,
-                    world.grid(),
-                    renderer.outputWidth(),
-                    renderer.outputHeight(),
-                    presentationTilePixels
-                );
+                const LocalTangentWorldView tangent =
+                    LocalTangentWorldView::from(
+                        renderCamera,
+                        world.grid(),
+                        renderer.outputWidth(),
+                        renderer.outputHeight(),
+                        presentationTilePixels
+                    );
 
                 // The source camera moves only on canonical 1/16-tile art-pixel
                 // boundaries. Put the authoritative sub-art-pixel motion back
@@ -235,11 +262,10 @@ namespace Paladin
                 // Internal mountain/terrain pixels therefore remain identical
                 // from frame to frame instead of boiling or waiting several
                 // physical pixels and then jumping.
-                const auto residual = tangent.rigidOffsetToCenter(
-                    camera.tileX(),
-                    camera.tileY()
-                );
-                objectResidual = {residual.x * localWeight, residual.y * localWeight, 0};
+                const auto residual =
+                    tangent.rigidOffsetToCenter(camera.tileX(), camera.tileY());
+                objectResidual =
+                    {residual.x * localWeight, residual.y * localWeight, 0};
 
                 // A rotated rectangle must CONTAIN a widescreen viewport. The
                 // old square-only |cos|+|sin| overscan left the exact opposite
@@ -254,13 +280,12 @@ namespace Paladin
                 const Camera2D planarCamera = tangent.planarCamera();
                 TileRenderMetrics planarMetrics;
                 planarMetrics.tilePixels = planarTilePixels;
-                const std::uint8_t opacity = static_cast<std::uint8_t>(
-                    std::clamp(
+                const std::uint8_t opacity =
+                    static_cast<std::uint8_t>(std::clamp(
                         std::lround(255.0 * double(localWeight)),
                         0L,
                         255L
-                    )
-                );
+                    ));
                 const double rotationDegrees =
                     tangent.rollRadians() * 180.0 / Pi;
 
@@ -298,12 +323,8 @@ namespace Paladin
                     presentation,
                     worldPresentationPolicy_
                 );
-                overlayRenderer_.render(
-                    renderer,
-                    overlays,
-                    planarCamera,
-                    planarMetrics
-                );
+                overlayRenderer_
+                    .render(renderer, overlays, planarCamera, planarMetrics);
                 overlayRenderer_.renderOutlines(
                     renderer,
                     outlines,
@@ -319,11 +340,8 @@ namespace Paladin
             // over the edge. Optical effects remain outside the
             // nearest-neighbor world lattice. Fade them out before the local
             // tangent presentation becomes dominant.
-            const float celestialWeight = std::clamp(
-                (.55F - localWeight) / .45F,
-                0.0F,
-                1.0F
-            );
+            const float celestialWeight =
+                std::clamp((.55F - localWeight) / .45F, 0.0F, 1.0F);
             if (celestialWeight > .001F)
             {
                 const auto sunView = GlobeView::from(
@@ -335,7 +353,7 @@ namespace Paladin
                 sunRenderer_.render(
                     renderer,
                     sunView,
-                    world.time().secondsIntoDay(),
+                    world.time().secondsIntoDay() + solarSecondsOffset,
                     celestialWeight,
                     animationSeconds
                 );
@@ -354,12 +372,21 @@ namespace Paladin
                 pixelStabilityActive_,
                 sprites,
                 placementMarker,
-                objectResidual, &artwork_, selectedArmy, selectedCaravan
+                objectResidual,
+                &artwork_,
+                selectedArmy,
+                selectedCaravan
             );
             if (mapMode_ == WorldMapMode::Resources)
             {
-                resourceMap_.render(renderer, world, camera,
-                    presentationTilePixels, true, artwork_);
+                resourceMap_.render(
+                    renderer,
+                    world,
+                    camera,
+                    presentationTilePixels,
+                    true,
+                    artwork_
+                );
             }
             stage(7);
             return;
@@ -367,20 +394,20 @@ namespace Paladin
 
         const double flatTilePixels =
             metrics.scaledTilePixels(renderCamera.zoom());
-        const double flatResidualX = pixelStabilityActive_
-                                         ? std::round(
-                                               (renderCamera.tileX() -
-                                                camera.tileX()) *
-                                               presentationTilePixels
-                                           )
-                                         : 0.0;
-        const double flatResidualY = pixelStabilityActive_
-                                         ? std::round(
-                                               (renderCamera.tileY() -
-                                                camera.tileY()) *
-                                               presentationTilePixels
-                                           )
-                                         : 0.0;
+        const double flatResidualX =
+            pixelStabilityActive_
+                ? std::round(
+                      (renderCamera.tileX() - camera.tileX()) *
+                      presentationTilePixels
+                  )
+                : 0.0;
+        const double flatResidualY =
+            pixelStabilityActive_
+                ? std::round(
+                      (renderCamera.tileY() - camera.tileY()) *
+                      presentationTilePixels
+                  )
+                : 0.0;
         {
             WorldPixelScene flatScene(
                 renderer,
@@ -415,12 +442,8 @@ namespace Paladin
                 worldPresentationPolicy_
             );
             overlayRenderer_.render(renderer, overlays, renderCamera, metrics);
-            overlayRenderer_.renderOutlines(
-                renderer,
-                outlines,
-                renderCamera,
-                metrics
-            );
+            overlayRenderer_
+                .renderOutlines(renderer, outlines, renderCamera, metrics);
         }
 
         worldObjectRenderer_.render(
@@ -433,12 +456,21 @@ namespace Paladin
             pixelStabilityActive_,
             sprites,
             placementMarker,
-            {flatResidualX, flatResidualY, 0}, &artwork_, selectedArmy, selectedCaravan
+            {flatResidualX, flatResidualY, 0},
+            &artwork_,
+            selectedArmy,
+            selectedCaravan
         );
         if (mapMode_ == WorldMapMode::Resources)
         {
-            resourceMap_.render(renderer, world, camera,
-                presentationTilePixels, false, artwork_);
+            resourceMap_.render(
+                renderer,
+                world,
+                camera,
+                presentationTilePixels,
+                false,
+                artwork_
+            );
         }
     }
 
@@ -507,10 +539,11 @@ namespace Paladin
             WorldMapNavigation::mapBounds(r.outputWidth(), r.outputHeight());
         ui.drawPanel(r, {b.x - 3, b.y - 3, b.width + 6, b.height + 6});
 
-        const auto politicalButton = WorldMapNavigation::politicalModeButtonBounds(
-            r.outputWidth(),
-            r.outputHeight()
-        );
+        const auto politicalButton =
+            WorldMapNavigation::politicalModeButtonBounds(
+                r.outputWidth(),
+                r.outputHeight()
+            );
         const auto terrainButton = WorldMapNavigation::terrainModeButtonBounds(
             r.outputWidth(),
             r.outputHeight()
@@ -534,33 +567,89 @@ namespace Paladin
             true
         );
 
-        ui.drawButton(r, WorldMapNavigation::resourceModeButtonBounds(r.outputWidth(), r.outputHeight()),
-            "R", false, false, mapMode_ == WorldMapMode::Resources, true);
-        ui.drawButton(r,WorldMapNavigation::governmentModeButtonBounds(r.outputWidth(),r.outputHeight()),"G",false,false,mapMode_==WorldMapMode::Government,true);
-        ui.drawButton(r,WorldMapNavigation::populationModeButtonBounds(r.outputWidth(),r.outputHeight()),"N",false,false,mapMode_==WorldMapMode::Population,true);
-        const auto nav=WorldMapNavigation::buttonBounds(r.outputWidth(),r.outputHeight());
-        const float legendX=WorldMapNavigation::mapBounds(r.outputWidth(),r.outputHeight()).x;
-        const float legendY=nav.y-32;
+        ui.drawButton(
+            r,
+            WorldMapNavigation::resourceModeButtonBounds(
+                r.outputWidth(),
+                r.outputHeight()
+            ),
+            "R",
+            false,
+            false,
+            mapMode_ == WorldMapMode::Resources,
+            true
+        );
+        ui.drawButton(
+            r,
+            WorldMapNavigation::governmentModeButtonBounds(
+                r.outputWidth(),
+                r.outputHeight()
+            ),
+            "G",
+            false,
+            false,
+            mapMode_ == WorldMapMode::Government,
+            true
+        );
+        ui.drawButton(
+            r,
+            WorldMapNavigation::populationModeButtonBounds(
+                r.outputWidth(),
+                r.outputHeight()
+            ),
+            "N",
+            false,
+            false,
+            mapMode_ == WorldMapMode::Population,
+            true
+        );
+        const auto nav =
+            WorldMapNavigation::buttonBounds(r.outputWidth(), r.outputHeight());
+        const float legendX =
+            WorldMapNavigation::mapBounds(r.outputWidth(), r.outputHeight()).x;
+        const float legendY = nav.y - 32;
         if (mapMode_ == WorldMapMode::Resources)
         {
-            ui.drawLabel(r, resourceMap_.ready() ? "Natural resource regions" : "Surveying resource regions...",
-                         legendX, legendY, 1);
+            ui.drawLabel(
+                r,
+                resourceMap_.ready() ? "Natural resource regions"
+                                     : "Surveying resource regions...",
+                legendX,
+                legendY,
+                1
+            );
         }
-        else if (mapMode_==WorldMapMode::Government)
+        else if (mapMode_ == WorldMapMode::Government)
         {
-            r.fillRectangle(legendX,legendY,10,10,GovernmentTribal); ui.drawLabel(r,"Tribal",legendX+15,legendY,1);
-            r.fillRectangle(legendX+72,legendY,10,10,GovernmentCivic); ui.drawLabel(r,"Civic",legendX+87,legendY,1);
-            r.fillRectangle(legendX+137,legendY,10,10,UnclaimedLand); ui.drawLabel(r,"Unclaimed",legendX+152,legendY,1);
+            r.fillRectangle(legendX, legendY, 10, 10, GovernmentTribal);
+            ui.drawLabel(r, "Tribal", legendX + 15, legendY, 1);
+            r.fillRectangle(legendX + 72, legendY, 10, 10, GovernmentCivic);
+            ui.drawLabel(r, "Civic", legendX + 87, legendY, 1);
+            r.fillRectangle(legendX + 137, legendY, 10, 10, UnclaimedLand);
+            ui.drawLabel(r, "Unclaimed", legendX + 152, legendY, 1);
         }
-        else if (mapMode_==WorldMapMode::Population)
+        else if (mapMode_ == WorldMapMode::Population)
         {
-            ui.drawLabel(r,"Estimated people / world tile",legendX,legendY-16,1);
-            constexpr std::array<const char*,7> labels{"0","1+","4+","16+","64+","256+","1024+"};
-            const float swatch=std::min(36.F,WorldMapNavigation::mapBounds(r.outputWidth(),r.outputHeight()).width/7);
-            for (int i=0;i<7;++i)
+            ui.drawLabel(
+                r,
+                "Estimated people / world tile",
+                legendX,
+                legendY - 16,
+                1
+            );
+            constexpr std::array<const char*, 7>
+                labels{"0", "1+", "4+", "16+", "64+", "256+", "1024+"};
+            const float swatch = std::min(
+                36.F,
+                WorldMapNavigation::mapBounds(r.outputWidth(), r.outputHeight())
+                        .width /
+                    7
+            );
+            for (int i = 0; i < 7; ++i)
             {
-                const float x=legendX+i*swatch;
-                r.fillRectangle(x,legendY,swatch-3,8,PopulationColors[i]); ui.drawLabel(r,labels[i],x,legendY+10,.75F);
+                const float x = legendX + i * swatch;
+                r.fillRectangle(x, legendY, swatch - 3, 8, PopulationColors[i]);
+                ui.drawLabel(r, labels[i], x, legendY + 10, .75F);
             }
         }
         if (const auto* t = globe_.mapTexture(0))
@@ -625,14 +714,12 @@ namespace Paladin
                 b.x +
                     float(
                         (settlement.position().x + .5) / world.grid().width()
-                    ) *
-                        b.width -
+                    ) * b.width -
                     1,
                 b.y +
                     float(
                         (settlement.position().y + .5) / world.grid().height()
-                    ) *
-                        b.height -
+                    ) * b.height -
                     1,
                 3,
                 3,

@@ -212,6 +212,10 @@ namespace Paladin
                     int count = 0;
                     for (auto index : order)
                     {
+                        if (index == 2 || index == 3)
+                        {
+                            continue;
+                        }
                         if (cell.amounts[index] <= 0 ||
                             (index < 5 &&
                              cell.amounts[index] / cell.tiles < .04))

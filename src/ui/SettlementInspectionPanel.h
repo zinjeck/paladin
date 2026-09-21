@@ -21,6 +21,10 @@ namespace Paladin
     class SettlementInspectionPanel
     {
     public:
+        UiRectangle tradeContentBounds() const noexcept
+        {
+            return tradeContent_;
+        }
         CitizenId takeCitizenNavigation() noexcept
         {
             const auto id = navigateCitizen_;
@@ -83,7 +87,7 @@ namespace Paladin
         float viewportWidth_ = 0, viewportHeight_ = 0;
         BitmapFontRenderer retroFontRenderer_;
         NormalFontRenderer normalFontRenderer_;
-        UiRectangle renderedBounds_;
+        UiRectangle renderedBounds_, tradeContent_;
         bool hasRenderedBounds_ = false;
         WorkplaceId workplaceId_;
         bool showingKeep_ = false;

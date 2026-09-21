@@ -29,7 +29,9 @@ namespace Paladin
         for (const SettlementCommand& command : state.commands())
         {
             if (command.commandTypeId == SettlementCommandTypes::ChopTree ||
-                command.commandTypeId == SettlementCommandTypes::CollectRock)
+                command.commandTypeId == SettlementCommandTypes::CollectRock ||
+                command.commandTypeId == SettlementCommandTypes::Gather ||
+                command.commandTypeId == SettlementCommandTypes::MineMountain)
             {
                 const RenderColor border =
                     command.commandTypeId == SettlementCommandTypes::ChopTree

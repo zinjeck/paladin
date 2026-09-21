@@ -344,6 +344,59 @@ namespace Paladin
                 }
                 if (c.inFishingBoat)
                 {
+                    if (!c.boatReturning && c.path.empty() &&
+                        minute >= c.nextDecisionMinute)
+                    {
+                        const auto hash = GenerationNoise::mix(
+                            c.id.value() ^ ++c.choiceSequence
+                        );
+                        c.nextDecisionMinute = minute + 12 + hash % 19;
+                        const auto* fishery =
+                            map.objectState().completedObject(c.boatFishery);
+                        constexpr SettlementTilePosition
+                            steps[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+                        for (int i = 0; fishery && i < 4; ++i)
+                        {
+                            const auto d = steps[(hash + i) % 4];
+                            const SettlementTilePosition p{
+                                c.tilePosition.x + d.x,
+                                c.tilePosition.y + d.y
+                            };
+                            const auto* tile = map.grid().tile(p);
+                            if (!tile || tile->terrain != TerrainType::Water ||
+                                !std::binary_search(
+                                    fishery->productionWater.begin(),
+                                    fishery->productionWater.end(),
+                                    p,
+                                    [](auto a, auto b)
+                                    {
+                                        return std::pair{a.y, a.x} <
+                                               std::pair{b.y, b.x};
+                                    }
+                                ) ||
+                                std::any_of(
+                                    citizens.citizens().begin(),
+                                    citizens.citizens().end(),
+                                    [&](const auto& other)
+                                    {
+                                        return other.id != c.id &&
+                                               other.inFishingBoat &&
+                                               (other.tilePosition == p ||
+                                                other.destination == p);
+                                    }
+                                ))
+                            {
+                                continue;
+                            }
+                            c.path = {p};
+                            c.pathIndex = 0;
+                            c.stepProgress = 0;
+                            c.stepDuration = 3;
+                            c.destination = p;
+                            c.explicitMovement = true;
+                            break;
+                        }
+                    }
                     continue;
                 }
             }
@@ -1137,8 +1190,14 @@ namespace Paladin
             c.task.kind == CitizenTaskKind::Demolish
         )
         {
+            const auto* workTerrain = map.grid().tile(c.task.workTile);
+            const bool miningMountain =
+                c.task.kind == CitizenTaskKind::Gather && workTerrain &&
+                workTerrain->terrain == TerrainType::Mountain;
             c.task.laborMinutes += elapsed;
-            if (c.task.laborMinutes < (c.task.kind == CitizenTaskKind::Gather
+            if (c.task.laborMinutes < (miningMountain
+                                           ? policy.mountainMiningMinutes
+                                       : c.task.kind == CitizenTaskKind::Gather
                                            ? policy.gatheringMinutes
                                            : policy.demolitionMinutes))
             {
@@ -1146,6 +1205,24 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Gather)
             {
+                if (miningMountain)
+                {
+                    auto* tile = map.grid().tile(c.task.workTile);
+                    tile->terrain = TerrainType::Land;
+                    tile->rockFloor = true;
+                    map.grid().markExcavated(c.task.workTile);
+                    map.objectState().terrainChanged();
+                    map.logistics.drop(
+                        c.task.workTile,
+                        SettlementResourceTypes::Stone,
+                        4,
+                        minute
+                    );
+                    map.commerce.recordProduction(
+                        SettlementResourceTypes::Stone,
+                        4
+                    );
+                }
                 const auto feature = map.naturalFeatures().at(c.task.workTile);
                 if (feature.kind != NaturalFeatureKind::None)
                 {

@@ -86,25 +86,131 @@ namespace Paladin
         const auto& f = object.footprint;
         const double depth = map.mining.depth(object);
         const double x = f.topLeft.x, y = f.topLeft.y;
-        // Equipment occupies the edge; the untouched site has no carpet or
-        // pretend floor. Excavated coverage and exposed strata grow with labor.
-        sprites.submit(
+        // Cleared, compacted earth replaces grass throughout the working yard.
+        // The shared materials keep paths at the same texel scale as roads;
+        // excavation progressively replaces this surface with exposed strata.
+        const auto groundStart = queue.size();
+        sprites.surface(
             queue,
             view,
-            "mine.hoist",
-            x + .65,
-            y + f.height - .15,
+            "market.floor",
+            {x, y, 0, double(f.width), double(f.height), 0, 0},
+            {136, 115, 93, 255},
+            y,
             id,
-            .75
+            0
         );
+        sprites.surface(
+            queue,
+            view,
+            "road.floor",
+            {x + .3, y + 1.55, 0, f.width - .6, .65, 0, 0},
+            {116, 81, 63, 255},
+            y,
+            id,
+            1
+        );
+        sprites.surface(
+            queue,
+            view,
+            "road.floor",
+            {x + .3, y + 1.55, 0, .65, f.height - 1.55, 0, 0},
+            {116, 81, 63, 255},
+            y,
+            id,
+            2
+        );
+        queue.setLayerFrom(groundStart, -3);
+        sprites.submit(queue, view, "mine.hoist", x + .65, y + 1.7, id, .75);
+        // A permanent surface work strip stays above the expanding cut.
+        const auto part = [&](double px,
+                              double py,
+                              double w,
+                              double h,
+                              RenderColor color,
+                              int layer = 0)
+        {
+            queue.submit(
+                {view.bounds({px, py, 0, w, h, 0, 0}), color, py + h, id, layer}
+            );
+        };
+        part(x + f.width - 1.8, y + .35, 1.5, 1.25, {57, 43, 60, 110}, -1);
+        part(x + f.width - 1.75, y + .4, 1.35, 1.05, {161, 116, 72, 255});
+        part(x + f.width - 1.22, y + 1.05, .4, .4, {57, 43, 60, 255}, 1);
+        sprites.placed(
+            queue,
+            view,
+            "roof.thatch",
+            x + f.width - 1.9,
+            y + .1,
+            y + 1.5,
+            id,
+            5,
+            1.6,
+            1.05
+        );
+        sprites
+            .submit(queue, view, "stockpile.crate", x + 1.9, y + 1.6, id, .85);
+        sprites
+            .submit(queue, view, "stockpile.crate", x + 2.5, y + 1.5, id, .7);
+        // Small wheeled ore tub and its handles, authored on the native grid.
+        const double cartX = x + .35, cartY = y + f.height - 1.15;
+        part(cartX, cartY, .625, .5, {57, 43, 60, 255});
+        part(cartX + .0625, cartY + .0625, .5, .3125, {136, 96, 68, 255}, 1);
+        part(cartX - .0625, cartY + .3125, .125, .25, {8, 15, 27, 255}, 2);
+        part(cartX + .5625, cartY + .3125, .125, .25, {8, 15, 27, 255}, 2);
+        part(cartX + .125, cartY + .5, .0625, .375, {136, 96, 68, 255}, 2);
+        part(cartX + .4375, cartY + .5, .0625, .375, {136, 96, 68, 255}, 2);
+        const int left = std::max(
+            f.topLeft.x,
+            int(std::floor(
+                view.cameraX - view.screenWidth * .5 / view.tilePixels
+            ))
+        );
+        const int right = std::min(
+            f.topLeft.x + f.width,
+            int(std::ceil(
+                view.cameraX + view.screenWidth * .5 / view.tilePixels
+            ))
+        );
+        const int top = std::max(
+            f.topLeft.y,
+            int(std::floor(
+                view.cameraY - view.screenHeight * .5 / view.tilePixels
+            ))
+        );
+        const int bottom = std::min(
+            f.topLeft.y + f.height,
+            int(std::ceil(
+                view.cameraY + view.screenHeight * .5 / view.tilePixels
+            ))
+        );
+        for (int yy = top; yy < bottom; ++yy)
+        {
+            for (int xx = left; xx < right; ++xx)
+            {
+                const auto deposit = map.grid().tile({xx, yy})->mineral;
+                if (deposit == MineralDeposit::None ||
+                    map.mining.remainingAt({xx, yy}, deposit) <= 0)
+                {
+                    continue;
+                }
+                const RenderColor tint = deposit == MineralDeposit::Gold
+                                             ? RenderColor{235, 196, 107, 72}
+                                         : deposit == MineralDeposit::Iron
+                                             ? RenderColor{198, 113, 73, 72}
+                                             : RenderColor{154, 167, 175, 72};
+                part(xx, yy, 1, 1, tint, -1);
+            }
+        }
         if (depth <= 0)
         {
             return;
         }
         const double coverage = std::sqrt(depth / job->maximumDepth);
         const double rx = std::max(.3, (f.width * .5 - .2) * coverage);
-        const double ry = std::max(.3, (f.height * .5 - .2) * coverage);
-        const double cx = x + f.width * .5, cy = y + f.height * .5;
+        const double ry = std::max(.3, ((f.height - 2) * .5 - .2) * coverage);
+        const double cx = x + f.width * .5, cy = y + 2 + (f.height - 2) * .5;
         const double wall = depth * .85;
         // A worked cut follows the rectangular site, with stable native-pixel
         // chips along all four faces. Labor expands it without changing the
@@ -277,6 +383,20 @@ namespace Paladin
                 const double seam =
                     north + exposed * (.42 + .12 * std::sin(px * 7));
                 add(seam, .0625, vein, 4);
+            }
+        }
+        const int ladders = std::clamp(f.width / 6, 1, 3);
+        for (int i = 0; i < ladders; ++i)
+        {
+            const double lx =
+                cx - rx + .35 + i * std::max(.6, 2 * rx / (ladders + 1));
+            const double ly = cy - ry;
+            const double length = .5 + depth * .85;
+            part(lx, ly, .0625, length, {161, 116, 72, 255}, 1);
+            part(lx + .3125, ly, .0625, length, {161, 116, 72, 255}, 1);
+            for (double rung = 0; rung < length; rung += .1875)
+            {
+                part(lx, ly + rung, .375, .0625, {203, 155, 96, 255}, 2);
             }
         }
         if (job->tunnels && depth >= .98)

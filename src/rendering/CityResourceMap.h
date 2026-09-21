@@ -46,10 +46,6 @@ namespace Paladin
             }
             switch (map.naturalFeatures().at({x, y}).kind)
             {
-            case NaturalFeatureKind::Tree:
-                return {79, 140, 122, 170};
-            case NaturalFeatureKind::Rock:
-                return {189, 194, 199, 210};
             case NaturalFeatureKind::Wheat:
                 return {235, 196, 107, 220};
             default:
@@ -333,6 +329,61 @@ namespace Paladin
                     art.find("animal." + std::string(std::get<2>(key)));
                 if (!sprite || !sprite->texture)
                 {
+                    const auto* species = animalSpecies(std::get<2>(key));
+                    if (!species)
+                    {
+                        continue;
+                    }
+                    const auto center = projection.bounds(
+                        {herd.x / herd.count + .5,
+                         herd.y / herd.count + .5,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0}
+                    );
+                    const float pitch =
+                        float(std::max(1., renderer.currentPixelPitch()));
+                    const float x =
+                        std::round(center.x / pitch) * pitch - 8 * pitch;
+                    const float y =
+                        std::round(center.y / pitch) * pitch - 6 * pitch;
+                    const RenderColor coat{
+                        std::uint8_t(species->coatRgb >> 16),
+                        std::uint8_t(species->coatRgb >> 8),
+                        std::uint8_t(species->coatRgb),
+                        255
+                    };
+                    const auto part =
+                        [&](int xx, int yy, int w, int h, RenderColor color)
+                    {
+                        renderer.fillRectangle(
+                            x + xx * pitch,
+                            y + yy * pitch,
+                            w * pitch,
+                            h * pitch,
+                            color
+                        );
+                    };
+                    part(0, 0, 13, 9, coat);
+                    part(1, 8, 2, 3, {70, 52, 39, 255});
+                    part(9, 8, 2, 3, {70, 52, 39, 255});
+                    part(10, -1, 5, 5, coat);
+                    part(14, 0, 1, 1, {30, 27, 24, 255});
+                    if (species->id == "cow")
+                    {
+                        part(3, 1, 4, 5, {81, 55, 37, 255});
+                    }
+                    if (species->id == "pig")
+                    {
+                        part(14, 1, 2, 3, {175, 94, 110, 255});
+                    }
+                    if (species->id == "chicken")
+                    {
+                        part(10, -3, 3, 3, {188, 53, 44, 255});
+                        part(15, 0, 3, 2, {226, 166, 45, 255});
+                    }
                     continue;
                 }
                 const auto frame = art.frame(*sprite, false);

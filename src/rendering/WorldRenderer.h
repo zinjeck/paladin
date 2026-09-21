@@ -10,8 +10,8 @@
 #include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
-#include "rendering/WorldResourceMap.h"
 #include "rendering/WorldRealmPresentationRenderer.h"
+#include "rendering/WorldResourceMap.h"
 
 #include "rendering/WorldMapNavigation.h"
 #include "ui/GrayUiRenderer.h"
@@ -33,6 +33,7 @@ namespace Paladin
         RealmId selectedRealm;
         ArmyId selectedArmy;
         ShipmentId selectedCaravan;
+        double solarSecondsOffset = 0;
         double animationSeconds = 0;
         bool profileRendering = false;
         mutable std::array<double, 8> renderTimings{};
@@ -73,7 +74,10 @@ namespace Paladin
         {
             return globe_.preparationProgress();
         }
-        const SceneSpriteLibrary& artwork() const noexcept { return artwork_; }
+        const SceneSpriteLibrary& artwork() const noexcept
+        {
+            return artwork_;
+        }
         void reloadArt() const
         {
             resourceMap_.reset();
@@ -96,11 +100,24 @@ namespace Paladin
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt
         ) const;
 
-        void renderRegionSurvey(Renderer& renderer, const GrayUiRenderer& ui,
-            const World& world, WorldTilePosition center, int width, int height,
-            float x, float y) const
-        { resourceTooltip_.render(renderer, ui, world, center, width, height, x, y); }
-        bool resourceMapReady() const { return resourceMap_.ready(); }
+        void renderRegionSurvey(
+            Renderer& renderer,
+            const GrayUiRenderer& ui,
+            const World& world,
+            WorldTilePosition center,
+            int width,
+            int height,
+            float x,
+            float y
+        ) const
+        {
+            resourceTooltip_
+                .render(renderer, ui, world, center, width, height, x, y);
+        }
+        bool resourceMapReady() const
+        {
+            return resourceMap_.ready();
+        }
         void renderNavigator(
             Renderer&,
             const World&,

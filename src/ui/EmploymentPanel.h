@@ -9,6 +9,7 @@
 #include <vector>
 namespace Paladin
 {
+    class World;
     class SettlementMap;
     class SettlementCitizenState;
     class GrayUiRenderer;
@@ -26,7 +27,9 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
-            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
+            techPointer_ = false;
+            techPanned_ = false;
+            citizenshipRequest_ = false;
         }
         void close() noexcept
         {
@@ -34,18 +37,27 @@ namespace Paladin
             pressed_ = -1;
             dragging_ = false;
             dragCandidate_ = false;
-            techPointer_ = false; techPanned_ = false; citizenshipRequest_ = false;
+            techPointer_ = false;
+            techPanned_ = false;
+            citizenshipRequest_ = false;
             admissionRequest_.reset();
         }
         bool takeCitizenshipResearch() noexcept
-        { const bool result=citizenshipRequest_; citizenshipRequest_=false; return result; }
+        {
+            const bool result = citizenshipRequest_;
+            citizenshipRequest_ = false;
+            return result;
+        }
         bool isOpen() const noexcept
         {
             return open_;
         }
         bool containsPoint(float, float) const noexcept;
         bool pointerPressed(float, float);
-        bool capturingPointer() const noexcept { return dragging_ || dragCandidate_ || techPointer_; }
+        bool capturingPointer() const noexcept
+        {
+            return dragging_ || dragCandidate_ || techPointer_;
+        }
         bool pointerMoved(float, float);
         std::string tooltipAt(float, float) const;
         std::string tooltipKeyAt(float, float) const;
@@ -82,9 +94,15 @@ namespace Paladin
         void setImmigrationOriginAvailable(bool available) noexcept
         {
             immigrationOriginAvailable_ = available;
-            if (!available) admissionCount_ = 0;
+            if (!available)
+            {
+                admissionCount_ = 0;
+            }
         }
-        bool showsPopulation() const noexcept { return open_ && section_ == "Population"; }
+        bool showsPopulation() const noexcept
+        {
+            return open_ && section_ == "Population";
+        }
         void setWorldMode(bool world)
         {
             worldMode_ = world;
@@ -105,20 +123,33 @@ namespace Paladin
             const GrayUiRenderer&,
             const SettlementMap&,
             const SettlementCitizenState&,
-            double minute
+            double minute,
+            const World* marketWorld = nullptr
         );
 
     private:
         friend struct ApplicationSmokeTest;
         friend struct Pr30UiTest;
-        struct TechView { float panX=0,panY=0,zoom=1; };
-        std::array<TechView,4> techViews_{};
-        int techTab_=0;
+        struct TechView
+        {
+            float panX = 0, panY = 0, zoom = 1;
+        };
+        std::array<TechView, 4> techViews_{};
+        int techTab_ = 0;
         UiRectangle techCanvas_;
-        bool techPointer_=false,techPanned_=false,citizenshipRequest_=false;
-        float techStartX_=0,techStartY_=0;
-        void renderTechnology(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
-        void renderLaws(Renderer&,const GrayUiRenderer&,const SettlementCitizenState&);
+        bool techPointer_ = false, techPanned_ = false,
+             citizenshipRequest_ = false;
+        float techStartX_ = 0, techStartY_ = 0;
+        void renderTechnology(
+            Renderer&,
+            const GrayUiRenderer&,
+            const SettlementCitizenState&
+        );
+        void renderLaws(
+            Renderer&,
+            const GrayUiRenderer&,
+            const SettlementCitizenState&
+        );
         std::uint64_t immigrationMap_ = 0, admissionCount_ = 0;
         std::optional<std::uint64_t> admissionRequest_;
         std::array<UiRectangle, 4> attributeBounds_{};
@@ -149,6 +180,7 @@ namespace Paladin
             bool icon = false;
         };
         // Other management sections share the window and dismissal behavior.
+        int marketResource_ = 0;
         std::string section_ = "Employment";
         WorkplaceId focusedWorkplace_;
         bool open_ = false;

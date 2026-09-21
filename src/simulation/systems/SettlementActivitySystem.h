@@ -109,6 +109,7 @@ namespace Paladin
         StockpileJobPolicy stockpile;
         int carryingCapacity = 4;
         double gatheringMinutes = 15;
+        double mountainMiningMinutes = 180;
         double demolitionMinutes = 20;
         double constructionMinutes = 45;
         double roadMinutes = 2;

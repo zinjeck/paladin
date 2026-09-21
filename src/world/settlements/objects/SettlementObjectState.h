@@ -190,6 +190,11 @@ namespace Paladin
         {
             cachedPlacementGrid_ = nullptr;
         }
+        void terrainChanged() noexcept
+        {
+            invalidateTerrainCache();
+            ++navigationVersion_;
+        }
         void rebuildOccupancy();
         std::size_t cancelConstructionWithin(
             const SettlementObjectFootprint& area

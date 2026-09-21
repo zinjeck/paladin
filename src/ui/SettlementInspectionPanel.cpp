@@ -72,6 +72,7 @@ namespace Paladin
     {
         const SettlementObjectState& objectState = settlementMap.objectState();
         spouseId_ = {};
+        tradeContent_ = {};
 
         const CompletedSettlementObject* object =
             controller.selectedObject(objectState);
@@ -149,6 +150,9 @@ namespace Paladin
             object && object->objectTypeId == SettlementObjectTypes::House;
         const bool tradeDepot =
             object && object->objectTypeId == SettlementObjectTypes::TradeDepot;
+        const float panelWidth =
+            tradeDepot ? std::min(850.F, float(renderer.outputWidth()) - 20)
+                       : 340.F;
         showingHouse_ = house;
         const bool pasture = object && object->objectTypeId ==
                                            SettlementObjectTypes::Pastureland;
@@ -168,7 +172,9 @@ namespace Paladin
         showingKeep_ =
             object && object->objectTypeId == SettlementObjectTypes::CityKeep;
         const float totalHeight =
-            objectPanelHeight + constructionPanelHeight + detailsHeight;
+            tradeDepot
+                ? std::min(620.F, float(renderer.outputHeight()) - 40)
+                : objectPanelHeight + constructionPanelHeight + detailsHeight;
 
         Camera2D panelCamera = camera;
         if (citizen)
@@ -212,6 +218,25 @@ namespace Paladin
         hasRenderedBounds_ = true;
 
         grayUiRenderer.drawPanel(renderer, renderedBounds_);
+        const float contentWidth =
+            tradeDepot ? std::min(340.F, renderedBounds_.width * .42F)
+                       : renderedBounds_.width;
+        if (tradeDepot)
+        {
+            tradeContent_ = {
+                renderedBounds_.x + contentWidth,
+                renderedBounds_.y + 8,
+                renderedBounds_.width - contentWidth - 8,
+                renderedBounds_.height - 16
+            };
+            renderer.drawLine(
+                tradeContent_.x - 5,
+                tradeContent_.y,
+                tradeContent_.x - 5,
+                tradeContent_.y + tradeContent_.height,
+                {57, 70, 88, 255}
+            );
+        }
         if (showingKeep_)
         {
             grayUiRenderer.drawLabel(
@@ -224,23 +249,6 @@ namespace Paladin
         }
         if (object && workplace)
         {
-            if (tradeDepot)
-            {
-                grayUiRenderer.drawLabel(
-                    renderer,
-                    "World trade controls available",
-                    renderedBounds_.x + 13,
-                    renderedBounds_.y + renderedBounds_.height - 64,
-                    1.25F
-                );
-                grayUiRenderer.drawLabel(
-                    renderer,
-                    "Imports / exports use separate counters",
-                    renderedBounds_.x + 13,
-                    renderedBounds_.y + renderedBounds_.height - 48,
-                    1.25F
-                );
-            }
             if (pasture)
             {
                 grayUiRenderer.drawLabel(
@@ -290,8 +298,7 @@ namespace Paladin
                                            : definition->displayName;
         const float objectNamePixelSize = std::min(
             preferredNamePixelSize,
-            (renderedBounds_.width - 24) /
-                std::max(1.0F, float(title.size()) * 6 - 1)
+            (contentWidth - 24) / std::max(1.0F, float(title.size()) * 6 - 1)
         );
         const float objectNameWidth =
             retroFontRenderer_.measureWidth(title, objectNamePixelSize);
@@ -300,7 +307,7 @@ namespace Paladin
             const UiRectangle titleBounds{
                 renderedBounds_.x + 5,
                 renderedBounds_.y + 5,
-                renderedBounds_.width - 10,
+                contentWidth - 10,
                 39
             };
             nameButton_.setBounds(titleBounds);
@@ -320,8 +327,7 @@ namespace Paladin
             retroFontRenderer_.drawText(
                 renderer,
                 title,
-                renderedBounds_.x +
-                    (renderedBounds_.width - objectNameWidth) * 0.5F,
+                renderedBounds_.x + (contentWidth - objectNameWidth) * 0.5F,
                 renderedBounds_.y + 14.0F,
                 objectNamePixelSize,
                 {242, 242, 244, 255}
@@ -361,7 +367,7 @@ namespace Paladin
             {
                 const float scale = std::min(
                     1.7F,
-                    (renderedBounds_.width - 26) /
+                    (contentWidth - 26) /
                         std::max(1.0F, float(text.size()) * 6 - 1)
                 );
                 grayUiRenderer.drawLabel(
@@ -403,7 +409,7 @@ namespace Paladin
                 };
                 const float x = renderedBounds_.x + 13;
                 const float top = renderedBounds_.y + y;
-                const float width = renderedBounds_.width - 26;
+                const float width = contentWidth - 26;
                 renderer.fillRectangle(
                     x - 1,
                     top - 1,
@@ -454,7 +460,7 @@ namespace Paladin
                     {left,
                      renderedBounds_.y + 234,
                      std::min(
-                         renderedBounds_.x + renderedBounds_.width - 13 - left,
+                         renderedBounds_.x + contentWidth - 13 - left,
                          retroFontRenderer_.measureWidth(spouse->name, 1.5F) +
                              20
                      ),
@@ -521,10 +527,10 @@ namespace Paladin
             );
             const auto y = renderedBounds_.y + 52;
             decreaseButton_.setBounds(
-                {renderedBounds_.x + renderedBounds_.width - 78, y, 28, 28}
+                {renderedBounds_.x + contentWidth - 78, y, 28, 28}
             );
             increaseButton_.setBounds(
-                {renderedBounds_.x + renderedBounds_.width - 43, y, 28, 28}
+                {renderedBounds_.x + contentWidth - 43, y, 28, 28}
             );
             decreaseButton_.setEnabled(employed > 0);
             increaseButton_.setEnabled(
@@ -608,7 +614,7 @@ namespace Paladin
                 }
                 const float size = std::min(
                     1.4F,
-                    (renderedBounds_.width - 26) /
+                    (contentWidth - 26) /
                         std::max(1.0F, float(resident.name.size()) * 6)
                 );
                 grayUiRenderer.drawLabel(
@@ -661,7 +667,7 @@ namespace Paladin
         const UiRectangle constructionBounds{
             renderedBounds_.x,
             renderedBounds_.y + objectPanelHeight + detailsHeight,
-            renderedBounds_.width,
+            contentWidth,
             constructionPanelHeight
         };
 
@@ -701,6 +707,7 @@ namespace Paladin
 
     void SettlementInspectionPanel::clearLayout() noexcept
     {
+        tradeContent_ = {};
         spouseId_ = {};
         navigateCitizen_ = {};
         spouseButton_.cancelPress();

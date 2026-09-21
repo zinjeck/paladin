@@ -10,6 +10,7 @@ namespace Paladin
         Tree,
         Rock,
         Gatherable,
+        Mountain,
         Animal,
         Object
     };
@@ -25,6 +26,7 @@ namespace Paladin
     {
         inline constexpr std::string_view ChopTree = "chop_tree";
         inline constexpr std::string_view CollectRock = "collect_rock";
+        inline constexpr std::string_view MineMountain = "mine_mountain";
         inline constexpr std::string_view Gather = "gather";
         inline constexpr std::string_view Hunt = "hunt";
         inline constexpr std::string_view Demolish = "demolish";

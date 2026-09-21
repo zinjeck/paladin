@@ -20,7 +20,7 @@ namespace Paladin
 
     struct SimulationTimingSettings
     {
-        std::uint64_t gameMinutesPerStep = 2;
+        std::uint64_t gameMinutesPerStep = 4;
         double realSecondsPerStep = 5.0 / 6.0;
     };
 
@@ -59,6 +59,10 @@ namespace Paladin
         void changeWorkDay(SettlementId settlementId, bool realm, int delta);
         TimingSamples tickTiming, citizenTiming, aggregateTiming;
         std::string systemTimingText() const;
+        double fractionalGameMinutes() const noexcept
+        {
+            return pendingGameMinutes_;
+        }
         double gameMinutesPerTick(double seconds) const noexcept
         {
             return seconds * timingSettings_.gameMinutesPerStep /

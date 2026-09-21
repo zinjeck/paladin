@@ -1,9 +1,4 @@
 #include "core/Application.h"
-#include "ui/TradeDepotPanel.h"
-#include "ui/WorldSettlementPanel.h"
-#include "ui/CaravanPanel.h"
-#include "ui/DiplomacyPanel.h"
-#include "ui/MilitaryPanel.h"
 #include "interaction/GlobeCameraNavigation.h"
 #include "interaction/SettlementPlacementController.h"
 #include "platform/Window.h"
@@ -14,14 +9,19 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
+#include "ui/CaravanPanel.h"
 #include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
+#include "ui/DiplomacyPanel.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
 #include "ui/LedgerPanel.h"
+#include "ui/MilitaryPanel.h"
 #include "ui/SettlementInspectionPanel.h"
 #include "ui/SimulationSpeedControls.h"
+#include "ui/TradeDepotPanel.h"
 #include "ui/WorldHud.h"
+#include "ui/WorldSettlementPanel.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
@@ -191,7 +191,8 @@ namespace Paladin
             return;
         }
         const double panSpeedTilesPerSecond =
-            panSpeedTilesPerSecondAtZoomOne / camera_->zoom();
+            panSpeedTilesPerSecondAtZoomOne / camera_->zoom() *
+            (screen_ == Screen::City ? 1.8 : 1.0);
 
         camera_->move(
             directionX * panSpeedTilesPerSecond * frameDeltaSeconds,
@@ -491,11 +492,30 @@ namespace Paladin
 
     bool Application::activeHudContainsPoint(float x, float y) const noexcept
     {
-        if (screen_ == Screen::City && tradeDepotPanel_ && tradeDepotPanel_->contains(x,y)) return true;
-        if (screen_ == Screen::World && caravanPanel_ && caravanPanel_->contains(x,y)) return true;
-        if (screen_ == Screen::World && worldSettlementPanel_ && worldSettlementPanel_->contains(x,y)) return true;
-        if (screen_ == Screen::World && diplomacyPanel_ && diplomacyPanel_->contains(x,y)) return true;
-        if (militaryPanel_ && militaryPanel_->contains(x,y)) return true;
+        if (screen_ == Screen::City && tradeDepotPanel_ &&
+            tradeDepotPanel_->contains(x, y))
+        {
+            return true;
+        }
+        if (screen_ == Screen::World && caravanPanel_ &&
+            caravanPanel_->contains(x, y))
+        {
+            return true;
+        }
+        if (screen_ == Screen::World && worldSettlementPanel_ &&
+            worldSettlementPanel_->contains(x, y))
+        {
+            return true;
+        }
+        if (screen_ == Screen::World && diplomacyPanel_ &&
+            diplomacyPanel_->contains(x, y))
+        {
+            return true;
+        }
+        if (militaryPanel_ && militaryPanel_->contains(x, y))
+        {
+            return true;
+        }
         if (ledgerPanel_->containsPoint(x, y))
         {
             return true;

@@ -72,7 +72,8 @@ namespace Paladin
             const auto mountain = [&](int xx, int yy)
             {
                 const auto* t = grid.tile({xx, yy});
-                return t && t->terrain == TerrainType::Mountain;
+                return t && t->terrain == TerrainType::Mountain &&
+                       t->relief != ReliefType::Hills;
             };
             return mountain(x, y) && mountain(x - 1, y) && mountain(x + 1, y) &&
                    mountain(x, y - 1) && mountain(x, y + 1);
@@ -118,6 +119,11 @@ namespace Paladin
             bool worldScale = false
         )
         {
+            if (tile.rockFloor)
+            {
+                return "mine.strata";
+            }
+
             std::string id = terrainIds[terrainIndex(tile)];
             if (worldScale)
             {
@@ -609,7 +615,71 @@ namespace Paladin
         const SceneSpriteLibrary* sprites
     ) const
     {
+        if (cachedGrid_ != &grid)
+        {
+            excavationCursor_ = grid.excavated().size();
+        }
+        std::size_t editBudget = 128;
+        while (excavationCursor_ < grid.excavated().size() && editBudget--)
+        {
+            const auto p = grid.excavated()[excavationCursor_++];
+            // Only neighboring four-tile pages can change their edge contours.
+            for (int y = std::max(0, p.y - 2) / 4; y <= (p.y + 2) / 4; ++y)
+            {
+                for (int x = std::max(0, p.x - 2) / 4; x <= (p.x + 2) / 4; ++x)
+                {
+                    const auto key =
+                        (std::uint64_t(x) << 32) | std::uint32_t(y);
+                    if (auto found = terrainChunks_.find(key);
+                        found != terrainChunks_.end())
+                    {
+                        if (found->second.texture)
+                        {
+                            terrainBytes_ -=
+                                std::size_t(found->second.texture->width()) *
+                                found->second.texture->height() * 4;
+                        }
+                        terrainChunks_.erase(found);
+                    }
+                }
+            }
+        }
         renderGrid(renderer, grid, camera, metrics, sprites);
+        if (cachedTerrainTexture_ && !grid.excavated().empty())
+        {
+            // Updating a few edited overview texels avoids rebuilding the
+            // entire city atlas whenever a miner opens a passage.
+            std::size_t budget = 64;
+            while (excavationOverviewCursor_ < grid.excavated().size() &&
+                   budget--)
+            {
+                const auto p = grid.excavated()[excavationOverviewCursor_++];
+                const int left =
+                    p.x * cachedTerrainTexture_->width() / grid.width();
+                const int top =
+                    p.y * cachedTerrainTexture_->height() / grid.height();
+                const int right = std::max(
+                    left + 1,
+                    (p.x + 1) * cachedTerrainTexture_->width() / grid.width()
+                );
+                const int bottom = std::max(
+                    top + 1,
+                    (p.y + 1) * cachedTerrainTexture_->height() / grid.height()
+                );
+                std::vector<RenderColor> floor(
+                    std::size_t(right - left) * (bottom - top),
+                    {113, 109, 112, 255}
+                );
+                renderer.updateTextureRegion(
+                    *cachedTerrainTexture_,
+                    left,
+                    top,
+                    right - left,
+                    bottom - top,
+                    floor
+                );
+            }
+        }
         if (sprites)
         {
             renderCoast(renderer, grid, camera, metrics, *sprites);
@@ -1093,6 +1163,10 @@ namespace Paladin
             {
                 if constexpr (std::is_same_v<Grid, SettlementGrid>)
                 {
+                    if (tile.rockFloor)
+                    {
+                        return sprites->find("mine.strata");
+                    }
                     const double t = tile.temperature.value();
                     const int climate = t > .68 ? 2 : t > 0 && t < .32 ? 1 : 0;
                     const int key =
@@ -1183,6 +1257,7 @@ namespace Paladin
             // A cheap authored fallback is visible immediately. Contour and
             // material sampling runs off the render thread, never at a zoom
             // boundary, and uploads in small strips when ready.
+            excavationOverviewCursor_ = 0;
             cachedTerrainTexture_ = renderer.createTextureFromPixels(
                 grid.width(),
                 grid.height(),
@@ -1352,6 +1427,7 @@ namespace Paladin
             overviewUploadRow_ += rows;
             if (overviewUploadRow_ == overviewReady_.height)
             {
+                excavationOverviewCursor_ = 0;
                 cachedTerrainTexture_ = std::move(overviewUpload_);
                 overviewReady_ = {};
             }
@@ -1762,6 +1838,47 @@ namespace Paladin
                                 item.fill = tileColor(tile);
                             }
                             items.push_back(item);
+                        }
+                    }
+                }
+                if constexpr (std::is_same_v<Grid, SettlementGrid>)
+                {
+                    // Low hill crags use the mountain art at a smaller height,
+                    // baked into the same bounded terrain pages as the valleys.
+                    if (const auto* peak = sprites.find("mountain.peak.small");
+                        peak && peak->texture)
+                    {
+                        const auto frame = sprites.frame(*peak, false);
+                        for (int yy = 0; yy < chunkSide; ++yy)
+                        {
+                            for (int xx = 0; xx < chunkSide; ++xx)
+                            {
+                                const auto* tile = grid.tile(
+                                    {cell.x * chunkSide + xx,
+                                     cell.y * chunkSide + yy}
+                                );
+                                if (!tile ||
+                                    tile->relief != ReliefType::Hills ||
+                                    tile->terrain != TerrainType::Mountain)
+                                {
+                                    continue;
+                                }
+                                TextureDrawItem item;
+                                item.texture = peak->texture.get();
+                                item.source = {
+                                    frame.x,
+                                    frame.y,
+                                    frame.width,
+                                    frame.height
+                                };
+                                item.destination = {
+                                    float(xx * resolution),
+                                    float((yy + .18) * resolution),
+                                    float(resolution),
+                                    float(.82 * resolution)
+                                };
+                                items.push_back(item);
+                            }
                         }
                     }
                 }

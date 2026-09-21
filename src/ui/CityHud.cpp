@@ -40,7 +40,7 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 23> menuOptions{
+        constexpr std::array<MenuOptionDefinition, 24> menuOptions{
             {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
              {6, SettlementObjectTypes::Barracks, "", "", "Barracks", ""},
              {6,
@@ -77,6 +77,12 @@ namespace Paladin
              {7, "", SettlementCommandTypes::Demolish, "Demolish", "", ""},
              {7, "", SettlementCommandTypes::Hunt, "Hunt", "", ""},
              {7, "", SettlementCommandTypes::Gather, "Gather", "", ""},
+             {7,
+              "",
+              SettlementCommandTypes::MineMountain,
+              "Mine Mountain",
+              "",
+              ""},
              {7, "", SettlementCommandTypes::ChopTree, "Chop Trees", "", ""},
              {7,
               "",

@@ -254,6 +254,13 @@ namespace Paladin
         std::vector<SettlementTilePosition> candidates;
         const auto append = [&](SettlementTilePosition p)
         {
+            const auto* targetTerrain = map.grid().tile(f.topLeft);
+            if (f.width == 1 && f.height == 1 && targetTerrain &&
+                targetTerrain->terrain == TerrainType::Mountain &&
+                std::abs(p.x - f.topLeft.x) + std::abs(p.y - f.topLeft.y) != 1)
+            {
+                return;
+            }
             if (navigation
                     .walkable(map, p, routePolicy.avoidBuildingFootprints))
             {

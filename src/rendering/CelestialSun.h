@@ -227,7 +227,7 @@ namespace Paladin
             const float end =
                 (i % 3 != 1) ? smoothC2((along / lobe.length - .20F) / .50F)
                              : 0.F;
-            const float energy = glareLobe(x, y, lobe) * emergence;
+            const float energy = glareLobe(x, y, lobe) * emergence * 1.45F;
             red += energy * (.96F + .04F * hot);
             green += energy * (.97F - .44F * end);
             blue += energy * (.93F + .07F * end);
@@ -243,9 +243,9 @@ namespace Paladin
             blue += chroma;
         }
         const float envelope = 1.F - smoothC2((radius - .65F) / .35F);
-        red *= envelope;
-        green *= envelope;
-        blue *= envelope;
+        red *= envelope * 1.3F;
+        green *= envelope * 1.3F;
+        blue *= envelope * 1.3F;
         const float energy = std::max({red, green, blue});
         if (energy <= 0)
         {
@@ -481,8 +481,8 @@ namespace Paladin
                 const float length = extent * lobe.length *
                                      (.90F + .16F * swell) *
                                      (1.F - .20F * contact * (1.F - facing));
-                const float width =
-                    extent * 3.F * (.002F + lobe.width) * (1.F + .16F * shimmer);
+                const float width = extent * 3.F * (.002F + lobe.width) *
+                                    (1.F + .16F * shimmer);
                 const float strength = opacity * lobe.strength *
                                        (.82F + .15F * swell + .03F * shimmer) *
                                        (1.F - .35F * contact * (1.F - facing));

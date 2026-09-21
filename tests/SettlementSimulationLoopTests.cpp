@@ -197,6 +197,56 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        auto map = land(24);
+        SettlementCitizenState people;
+        found(map, people, 2);
+        for (int y = 11; y <= 16; ++y)
+        {
+            for (int x = 11; x <= 16; ++x)
+            {
+                map.grid().tile({x, y})->terrain = TerrainType::Mountain;
+            }
+        }
+        map.objectState().terrainChanged();
+        PALADIN_CHECK(map.commandState().add(
+            map,
+            SettlementCommandTypes::MineMountain,
+            {{11, 11}, 6, 6},
+            people
+        ));
+        const auto command = map.commandState().commands().front().id;
+        PALADIN_CHECK(
+            map.commandState().contains(map, command, {13, 13}, {}, {})
+        );
+        // Several workers excavate exposed faces, keep selected interiors,
+        // and produce the same four stone as a collected rock.
+        for (int i = 0; i < 350; ++i)
+        {
+            for (std::size_t n = 0; n < people.citizens().size(); ++n)
+            {
+                auto& c = SettlementActivityTestFixture::resident(people, n);
+                c.hunger = 0;
+                c.energy = 100;
+            }
+            advance(map, people, 360 + i, 1);
+        }
+        PALADIN_CHECK(!map.grid().excavated().empty());
+        PALADIN_CHECK(map.logistics.total("stone") >= 4);
+        for (const auto p : map.grid().excavated())
+        {
+            PALADIN_CHECK(map.grid().tile(p)->terrain == TerrainType::Land);
+            PALADIN_CHECK(map.grid().tile(p)->rockFloor);
+            PALADIN_CHECK(
+                !map.commandState().contains(map, command, p, {}, {})
+            );
+        }
+        PALADIN_CHECK(
+            map.commandState()
+                .cancelIntersecting(map, {{11, 11}, 6, 6}, people, 710) > 0
+        );
+    }
+
     // Audit regression: cancellation preserves goods and their real creation
     // time through both the state API and the player command controller.
     for (const bool throughController : {false, true})
@@ -1539,6 +1589,24 @@ void runSettlementSimulationLoopTests()
         map.commerce.treasury->balance = 0;
         PALADIN_CHECK(map.commerce.usesMoney());
         PALADIN_CHECK(map.commerce.mealPrice(map, destination) > 0);
+        auto exportYard = destination;
+        exportYard.kind = InventoryKind::TradeDepot;
+        PALADIN_CHECK(
+            map.commerce.affordableTradeUnits(
+                destination,
+                exportYard,
+                10,
+                &people,
+                "lumber"
+            ) == 10
+        );
+        const auto businessCash = map.commerce.businessCash(store);
+        PALADIN_CHECK(
+            map.commerce
+                .buyGoods(destination, exportYard, 10, &people, "lumber")
+        );
+        PALADIN_CHECK(map.commerce.treasury->balance == 0);
+        PALADIN_CHECK(map.commerce.businessCash(store) == businessCash);
     }
     {
         auto map = land();

@@ -25,6 +25,19 @@ namespace Paladin
     {
     public:
         using TileGrid<SettlementTilePosition>::TileGrid;
+        void markExcavated(SettlementTilePosition tile)
+        {
+            excavated_.push_back(tile);
+        }
+        const std::vector<SettlementTilePosition>& excavated() const noexcept
+        {
+            return excavated_;
+        }
+
+    private:
+        std::vector<SettlementTilePosition> excavated_;
+
+    public:
         bool coastPassNeeded(int x, int y) const noexcept
         {
             return !coastRegions_.empty() &&
@@ -45,7 +58,8 @@ namespace Paladin
         {
             return settlementSurfaceType(p);
         }
-        // Settlement surfaces preserve walkable land and strategic-world terrain.
+        // Settlement surfaces preserve walkable land and strategic-world
+        // terrain.
         void classifyCoast(std::uint64_t seed)
         {
             surfaces_.assign(tileCount(), SettlementSurfaceType::Inland);

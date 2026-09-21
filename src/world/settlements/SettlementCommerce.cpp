@@ -386,13 +386,9 @@ namespace Paladin
         }
         if (destination.kind == InventoryKind::TradeDepot)
         {
-            // Local producers keep a margin, while abundant exports can
-            // still sell profitably at the world's minimum scarcity price.
-            return std::max<Money>(
-                1,
-                resourceTradeBasePrice(resource) *
-                    (source.kind == InventoryKind::Workplace ? 28 : 40) / 100
-            );
+            // Preparing the realm's export cargo is a goods transfer. The
+            // foreign buyer pays on the shipment; staging requires no gold.
+            return 0;
         }
         if (source.kind == InventoryKind::Market)
         {

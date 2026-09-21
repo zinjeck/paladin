@@ -4,15 +4,15 @@
 #include "core/StrongId.h"
 
 #include "world/Army.h"
-#include "world/WorldShipment.h"
-#include "world/Diplomacy.h"
-#include "world/Soldier.h"
 #include "world/Culture.h"
+#include "world/Diplomacy.h"
 #include "world/FoundingIdentity.h"
 #include "world/Realm.h"
 #include "world/Settlement.h"
+#include "world/Soldier.h"
 #include "world/WorldGrid.h"
 #include "world/WorldRoad.h"
+#include "world/WorldShipment.h"
 #include "world/WorldTilePosition.h"
 #include "world/WorldTime.h"
 #include "world/generation/WorldGenerationSettings.h"
@@ -23,21 +23,71 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <span>
 #include <string>
+#include <vector>
 
 namespace Paladin
 {
+    struct MarketProducer
+    {
+        RealmId realm;
+        double dailyOutput = 0;
+    };
+    struct MarketPriceSample
+    {
+        double minute = 0, price = 0;
+    };
+    struct WorldResourceMarket
+    {
+        std::string resource;
+        double price = 0, demand = 0, supply = 0, weight = 0;
+        std::vector<MarketProducer> producers;
+        std::deque<MarketPriceSample> history;
+    };
+    struct WorldMarketHistory
+    {
+        std::vector<WorldResourceMarket> resources, pending;
+        std::size_t cityCursor = 0;
+        double nextMinute = 0, sampleMinute = 0;
+        bool collecting = false;
+    };
     class World
     {
     public:
-        std::span<const WorldShipment> shipments() const noexcept { return shipments_; }
+        WorldMarketHistory marketHistory;
+        std::span<const WorldShipment> shipments() const noexcept
+        {
+            return shipments_;
+        }
         const WorldShipment* shipment(ShipmentId id) const noexcept
-        { for (const auto& route : shipments_) if (route.id==id) return &route; return nullptr; }
-        DiplomacyState& diplomacy() noexcept { return diplomacy_; }
-        const DiplomacyState& diplomacy() const noexcept { return diplomacy_; }
-        const Soldier* soldier(SoldierId id) const noexcept { return soldiers_.find(id); }
-        std::span<const Soldier> soldiers() const noexcept { return soldiers_.entities(); }
+        {
+            for (const auto& route : shipments_)
+            {
+                if (route.id == id)
+                {
+                    return &route;
+                }
+            }
+            return nullptr;
+        }
+        DiplomacyState& diplomacy() noexcept
+        {
+            return diplomacy_;
+        }
+        const DiplomacyState& diplomacy() const noexcept
+        {
+            return diplomacy_;
+        }
+        const Soldier* soldier(SoldierId id) const noexcept
+        {
+            return soldiers_.find(id);
+        }
+        std::span<const Soldier> soldiers() const noexcept
+        {
+            return soldiers_.entities();
+        }
         World();
         explicit World(const WorldGenerationSettings& generationSettings);
 

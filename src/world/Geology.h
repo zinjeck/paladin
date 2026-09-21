@@ -40,7 +40,10 @@ namespace Paladin
                     (std::uint64_t(y / 2) * 19349663ULL)
                 );
                 const auto roll = hash % 10000;
-                const unsigned occurrence = 250 + rugged * 180;
+                const bool upland = tile->terrain == TerrainType::Mountain ||
+                                    tile->relief != ReliefType::Lowland;
+                const unsigned occurrence =
+                    upland ? 1800 + rugged * 100 : 35 + rugged * 8;
                 if (roll < occurrence)
                 {
                     tile->mineral = (hash >> 20) % 100 < 2

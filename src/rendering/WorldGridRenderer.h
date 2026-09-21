@@ -122,6 +122,8 @@ namespace Paladin
         mutable std::unordered_map<std::uint64_t, CoastFields> coastFields_;
 
 
+        mutable std::size_t excavationOverviewCursor_ = 0;
+        mutable std::size_t excavationCursor_ = 0;
         mutable const void* cachedGrid_ = nullptr;
         mutable std::unique_ptr<Texture> cachedTerrainTexture_;
         mutable bool cacheBuildAttempted_ = false;

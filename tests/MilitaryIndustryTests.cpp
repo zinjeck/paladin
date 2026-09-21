@@ -143,7 +143,9 @@ namespace
             *map.logistics.inventory(publicStock), "lumber");
         const auto localWholesale = map.commerce.tradePrice(
             *map.logistics.inventory(publicStock), exportRecord, "lumber");
-        PALADIN_CHECK(localProduction < localWholesale && localWholesale < 18);
+        // Export staging is a free transfer; the foreign buyer supplies gold.
+        PALADIN_CHECK(localProduction > 0 && localWholesale == 0);
+        PALADIN_CHECK(map.commerce.tradePrice(producer, exportRecord, "lumber") == 0);
         // Imported goods are sold from a separate depot-owned counter.
         const auto inbound = map.logistics.importsForObject(depot);
         PALADIN_CHECK(map.logistics.add(inbound, "lumber", 3));

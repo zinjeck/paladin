@@ -167,8 +167,8 @@ namespace Paladin
     {
         const WorldTile* tile = grid_.tile({position.x, position.y});
 
-        if (!tile || tile->terrain != TerrainType::Land || tile->polarContinent ||
-            tile->biome == BiomeType::Tundra || tile->biome == BiomeType::Polar)
+        if (!tile || tile->terrain != TerrainType::Land ||
+            tile->polarContinent || tile->biome == BiomeType::Polar)
         {
             return false;
         }
@@ -662,9 +662,10 @@ namespace Paladin
         }
         else if (wasTribal && !becomesTribal)
         {
-            // Converting to civic sovereignty materializes discrete control from
-            // all existing settlements. The capital receives the established
-            // capital borderland budget; ordinary settlements use theirs.
+            // Converting to civic sovereignty materializes discrete control
+            // from all existing settlements. The capital receives the
+            // established capital borderland budget; ordinary settlements use
+            // theirs.
             for (const Settlement& settlement : settlements_.entities())
             {
                 if (settlement.ownerRealmId() != realmId)

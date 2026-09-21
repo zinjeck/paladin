@@ -90,6 +90,8 @@ namespace Paladin
                 return {};
             }
             auto result = forecast.quote(snapshot, 1, resource);
+            result.dailyOutput =
+                found == report.end() ? 0 : found->second.production;
             result.offered = std::min(
                 result.offered,
                 double(WorldShipmentSystem::available(city, resource))
@@ -426,9 +428,103 @@ namespace Paladin
                 return;
             }
         }
+        static void updateHistory(World& world)
+        {
+            auto& history = world.marketHistory;
+            const double minute = double(world.time().totalGameMinutes());
+            if (!history.collecting)
+            {
+                if (minute < history.nextMinute)
+                {
+                    return;
+                }
+                history.pending.clear();
+                for (const auto& resource :
+                     SettlementResourceCatalog::definitions())
+                {
+                    WorldResourceMarket row;
+                    row.resource = resource.id;
+                    history.pending.push_back(std::move(row));
+                }
+                history.collecting = true;
+                history.cityCursor = 0;
+                history.sampleMinute = minute;
+            }
+            // Bounded census work, never a whole world scan in the draw path.
+            const auto cities = world.settlements();
+            const auto end = std::min(cities.size(), history.cityCursor + 4);
+            for (; history.cityCursor < end; ++history.cityCursor)
+            {
+                const auto& city = cities[history.cityCursor];
+                for (auto& row : history.pending)
+                {
+                    const auto q = quote(world, city, row.resource);
+                    const double weight =
+                        std::max(1., q.dailyNeed + q.dailyOutput);
+                    row.price += q.unitPrice * weight;
+                    row.weight += weight;
+                    row.supply += q.offered;
+                    row.demand += q.wanted;
+                    auto at = std::find_if(
+                        row.producers.begin(),
+                        row.producers.end(),
+                        [&](const auto& producer)
+                        { return producer.realm == city.ownerRealmId(); }
+                    );
+                    if (at == row.producers.end())
+                    {
+                        row.producers.push_back(
+                            {city.ownerRealmId(), q.dailyOutput}
+                        );
+                    }
+                    else
+                    {
+                        at->dailyOutput += q.dailyOutput;
+                    }
+                }
+            }
+            if (history.cityCursor < cities.size())
+            {
+                return;
+            }
+            for (auto& row : history.pending)
+            {
+                row.price /= std::max(1., row.weight);
+                for (auto& old : history.resources)
+                {
+                    if (old.resource == row.resource)
+                    {
+                        row.history = std::move(old.history);
+                    }
+                }
+                row.history.push_back({history.sampleMinute, row.price});
+                while (row.history.size() > 97)
+                {
+                    row.history.pop_front();
+                }
+                std::erase_if(
+                    row.producers,
+                    [](const auto& p) { return p.dailyOutput <= 0; }
+                );
+                std::stable_sort(
+                    row.producers.begin(),
+                    row.producers.end(),
+                    [](const auto& a, const auto& b)
+                    { return a.dailyOutput > b.dailyOutput; }
+                );
+                if (row.producers.size() > 5)
+                {
+                    row.producers.resize(5);
+                }
+            }
+            history.resources = std::move(history.pending);
+            history.collecting = false;
+            history.nextMinute = (std::floor(minute / 240) + 1) * 240;
+        }
         static void tick(World& world)
         {
             const double minute = double(world.time().totalGameMinutes());
+            updateHistory(world);
             tickOrders(world, minute);
             for (const auto& record : world.realms())
             {

@@ -77,8 +77,7 @@ namespace Paladin
                     {
                         const auto& tile = *grid.tile({x, y});
                         if (tile.terrain != TerrainType::Land ||
-                            tile.biome == BiomeType::Polar ||
-                            tile.biome == BiomeType::Tundra)
+                            tile.biome == BiomeType::Polar)
                         {
                             continue;
                         }
