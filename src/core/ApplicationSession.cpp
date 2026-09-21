@@ -77,8 +77,7 @@ namespace Paladin
         foundingAdditionalSettlement_ = false;
         worldHud_->setAdditionalSelection(false);
         simulationControlsCapturedPointer_ = false;
-        settlementInspectionController_->clear();
-        settlementInspectionPanel_->clearLayout();
+        clearSettlementInspection();
         simulationClock_->reset();
         screen_ = Screen::World;
         cityHud_->setWorldMode(simulationControlsUnlocked_);
@@ -107,8 +106,7 @@ namespace Paladin
         settlementPlacementController_.reset();
         settlementObjectPlacementController_.reset();
         settlementCommandController_.reset();
-        settlementInspectionController_->clear();
-        settlementInspectionPanel_->clearLayout();
+        clearSettlementInspection();
         camera_.reset();
         savedWorldCamera_.reset();
         simulation_.reset();
@@ -201,8 +199,7 @@ namespace Paladin
         settlementPlacementController_->cancelSelection();
         settlementObjectPlacementController_->cancelPlacement();
         settlementCommandController_->cancel();
-        settlementInspectionController_->clear();
-        settlementInspectionPanel_->clearLayout();
+        clearSettlementInspection();
         cityHudCapturedPointer_ = false;
         simulationControlsUnlocked_ = true;
         simulationControlsCapturedPointer_ = false;
@@ -248,8 +245,7 @@ namespace Paladin
 
         settlementObjectPlacementController_->cancelPlacement();
         settlementCommandController_->cancel();
-        settlementInspectionController_->clear();
-        settlementInspectionPanel_->clearLayout();
+        clearSettlementInspection();
         cityHudCapturedPointer_ = false;
         simulationControlsCapturedPointer_ = false;
 

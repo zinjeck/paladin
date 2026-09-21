@@ -594,10 +594,10 @@ namespace Paladin
                     }
                 }
                 std::sort(candidates.begin(), candidates.end());
-                if (candidates.size() > 8)
-                {
-                    candidates.resize(8);
-                }
+                // Qualify stock, price and demand before ranking. Eight empty
+                // nearby cities must not hide a ninth legitimate supplier.
+                // These are aggregate quotes; only the winning offer below
+                // performs a route search (still at most one per tick).
                 struct Offer
                 {
                     SettlementId seller;

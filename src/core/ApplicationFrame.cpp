@@ -24,6 +24,25 @@
 
 namespace Paladin
 {
+    void Application::clearSettlementInspection() noexcept
+    {
+        // The embedded depot owns input as well as drawing. Dismiss it in the
+        // same event as its inspector, not at the next layout/render boundary:
+        // another queued click must never dispatch an invisible trade order.
+        if (settlementInspectionController_)
+        {
+            settlementInspectionController_->clear();
+        }
+        if (settlementInspectionPanel_)
+        {
+            settlementInspectionPanel_->clearLayout();
+        }
+        if (tradeDepotPanel_)
+        {
+            tradeDepotPanel_->close();
+        }
+    }
+
     bool Application::simulationControlsVisible() const noexcept
     {
         return screen_ == Screen::Battle || screen_ == Screen::City ||

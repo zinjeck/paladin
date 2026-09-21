@@ -186,7 +186,7 @@ namespace Paladin
         if (cityHudCapturedPointer_ && !inspectionPanelCapturedPointer &&
             !cityHud_->roofControlAt(event.button.x, event.button.y))
         {
-            settlementInspectionController_->clear();
+            clearSettlementInspection();
         }
 
         SettlementMap* settlementMap =
@@ -264,8 +264,7 @@ namespace Paladin
             }
             else
             {
-                settlementInspectionController_->clear();
-                tradeDepotPanel_->close();
+                clearSettlementInspection();
             }
         }
     }
@@ -335,8 +334,7 @@ namespace Paladin
                 : action == CityHudAction::Economy    ? "Economy"
                                                       : "Employment";
             employmentPanel_->toggle(section);
-            settlementInspectionController_->clear();
-            settlementInspectionPanel_->clearLayout();
+            clearSettlementInspection();
             SDL_StopTextInput(window_->nativeHandle());
             settlementObjectPlacementController_->cancelPlacement();
             settlementCommandController_->cancel();
@@ -364,7 +362,7 @@ namespace Paladin
         }
         else if (action == CityHudAction::BeginObjectPlacement)
         {
-            settlementInspectionController_->clear();
+            clearSettlementInspection();
             settlementCommandController_->cancel();
             static_cast<void>(
                 settlementObjectPlacementController_->beginPlacement(
@@ -374,7 +372,7 @@ namespace Paladin
         }
         else if (action == CityHudAction::BeginCommand)
         {
-            settlementInspectionController_->clear();
+            clearSettlementInspection();
             settlementObjectPlacementController_->cancelPlacement();
             static_cast<void>(settlementCommandController_->begin(
                 cityHud_->selectedCommandTypeId()
@@ -501,7 +499,7 @@ namespace Paladin
             {
                 cityHud_->closeCategoryMenus();
                 settlementCommandController_->cancel();
-                settlementInspectionController_->clear();
+                clearSettlementInspection();
             }
             return;
         }

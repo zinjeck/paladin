@@ -2,6 +2,7 @@
 #include "simulation/DiplomacySystem.h"
 #include "simulation/MilitarySystem.h"
 #include "simulation/WorldMarketSystem.h"
+#include "simulation/WorldLandNavigation.h"
 #include "simulation/WorldShipmentSystem.h"
 #include "world/World.h"
 #include "world/WorldGeography.h"
@@ -152,15 +153,17 @@ namespace Paladin
                 const auto* unit = world.army(patrol);
                 if (unit && !unit->moving() && !unit->engagedOpponent())
                 {
+                    // Claim the shared budget before trying a destination. An
+                    // isolated friendly city must not leave this patrol idle
+                    // forever or trigger one failed search per realm/frame.
+                    --patrolBudget;
                     const auto origin = unit->position();
                     WorldTilePosition destination = origin;
                     double nearest = 33;
                     for (const auto& city : world.settlements())
                     {
-                        const double distance = std::hypot(
-                            double(city.position().x - origin.x),
-                            double(city.position().y - origin.y)
-                        );
+                        const double distance = worldLandStepDistance(
+                            origin, city.position(), world.grid().width());
                         if (city.ownerRealmId() == actor && distance > 1 &&
                             distance < nearest)
                         {
@@ -168,37 +171,38 @@ namespace Paladin
                             destination = city.position();
                         }
                     }
-                    if (destination == origin)
+                    const bool ordered = destination != origin &&
+                        MilitarySystem::orderMove(world, actor, patrol, destination) ==
+                            MilitaryResult::Success;
+                    if (!ordered)
                     {
                         const auto choice = GenerationNoise::mix(
-                            actor.value() ^ std::uint64_t(minute / 1440)
-                        );
+                            actor.value() ^ std::uint64_t(minute / 1440));
                         constexpr WorldTilePosition
                             directions[]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+                        const int width = world.grid().width();
                         for (int i = 0; i < 4; ++i)
                         {
                             const auto d = directions[(choice + i) % 4];
-                            const WorldTilePosition candidate{
-                                origin.x + d.x * 3,
-                                origin.y + d.y * 3
-                            };
-                            const auto* tile = world.grid().tile(candidate);
-                            if (tile && tile->terrain == TerrainType::Land)
+                            auto candidate = origin;
+                            // Check every leg, not just a dry endpoint beyond
+                            // water/mountains. Longitude wraps; latitude does not.
+                            for (int step = 0; step < 3; ++step)
                             {
-                                destination = candidate;
-                                break;
+                                const WorldTilePosition next{
+                                    (candidate.x + d.x + width) % width,
+                                    candidate.y + d.y};
+                                if (!worldLandStepAllowed(world.grid(), candidate, next))
+                                    break;
+                                candidate = next;
                             }
+                            if (candidate == origin) continue;
+                            // At most one short, known-reachable fallback after
+                            // the one city route search, never a world-wide scan.
+                            static_cast<void>(MilitarySystem::orderMove(
+                                world, actor, patrol, candidate));
+                            break;
                         }
-                    }
-                    if (destination != origin)
-                    {
-                        --patrolBudget;
-                        static_cast<void>(MilitarySystem::orderMove(
-                            world,
-                            actor,
-                            patrol,
-                            destination
-                        ));
                     }
                 }
             }

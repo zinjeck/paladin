@@ -40,6 +40,9 @@ jobs:
           --target Paladin PaladinTests PaladinAssetTests
           --parallel
 
+      - name: Verify Debug executable icon
+        run: python tools/check_windows_icon.py build/Debug/Paladin.exe assets/icons/paladin.ico
+
       - name: Run automated tests
         run: ctest --test-dir build -C Debug --output-on-failure
 
@@ -71,6 +74,11 @@ jobs:
           --target PaladinArtCheck
           --parallel
 
+      - name: Build Release executable and verify embedded artwork
+        run: |
+          cmake --build art-build --target Paladin --parallel
+          python tools/check_windows_icon.py art-build/Paladin.exe assets/icons/paladin.ico --report art-review/pr32-release-icon.json
+
       - name: Verify application input and army deployment
         env:
           PALADIN_SMOKE_UI_ONLY: "1"
@@ -83,6 +91,7 @@ jobs:
           $required = @("pr25-coast-mask.png", "pr25-flat-political.png", "pr25-flat-terrain.png", "pr25-globe-political.png", "pr25-globe-terrain.png", "pr25-sun-glare.png", "pr25-sun-planet.png", "pr25-marker-motion.csv", "pr26-military-panel.png", "pr26-world-city.png", "pr26-world-marching.png", "pr26-walk-0.png", "pr26-gather-2.png", "pr26-sleep-close.png", "pr26-sleep-normal.png", "pr26-ui-states.png", "pr29-compact-unit-grid.png", "pr27-selection-skinned.png", "pr27-rule-buildings.png", "pr27-close-border-only.png", "pr27-army-globe-selected.bmp", "pr27-army-flat-selected.bmp", "pr27-army-half-tile-march.bmp", "pr29-diplomacy-blank.png", "pr29-diplomacy-actions.png", "pr29-diplomacy-tributary.png", "pr29-military-overflow-top.png", "pr29-military-overflow-bottom.png", "pr29-army-unselected.png", "pr29-army-selected.png", "pr29-army-far.png", "pr29-flat-government.png", "pr29-globe-government.png", "pr29-flat-population.png", "pr29-globe-population.png", "pr29-select-tribal-globe.bmp", "pr29-select-civic-flat.bmp", "pr29-fortress-icon.png", "pr29-fortress-population-invariant.png")
           $required += @("pr30-barracks-hover.bmp", "pr30-foreign-settlement-globe.bmp", "pr30-foreign-settlement-flat.bmp", "pr30-shipment-setup.bmp", "pr30-settlement-caravans.bmp", "pr30-caravan-flat.bmp", "pr30-caravan-globe.bmp", "pr30-settlement-dragged.bmp", "pr30-laws.bmp", "pr30-technology-tree.bmp", "pr30-citizenship-researched.bmp", "pr30-silhouette-citizen-male-6-0-selected.png", "pr30-silhouette-citizen-female-128-3-selected.png")
           $required += @("pr31-startup-ready.png", "pr31-caravan-flat.png", "pr31-caravan-globe.png", "pr31-density-flat.png", "pr31-density-globe.png", "pr31-density-generated-flat.png", "pr31-density-generated-globe.png", "pr31-attack-cursor.png", "pr31-encounter.png", "pr31-battlefield.png", "pr31-battlefield-close.png", "pr31-battle-result.png", "pr31-retreat-world.png")
+          $required += @("next-trade-depot-no-treaty.bmp", "next-trade-depot-import.bmp", "next-trade-depot-export.bmp", "terrain-pass-world-economy.bmp", "pr32-depot-selected.bmp", "pr32-depot-dismissed.bmp", "pr32-depot-ledger.bmp", "pr32-depot-world-exit.bmp", "pr32-release-icon.json")
           foreach ($file in $required) {
             if (-not (Test-Path "art-review/$file")) { throw "Missing mandatory render evidence: $file" }
           }

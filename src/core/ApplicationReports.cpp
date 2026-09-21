@@ -48,8 +48,7 @@ namespace Paladin
         if (action == CityHudAction::Military)
         {
             employmentPanel_->close(); ledgerPanel_->close();
-            settlementInspectionController_->clear();
-            settlementInspectionPanel_->clearLayout();
+            clearSettlementInspection();
             settlementObjectPlacementController_->cancelPlacement();
             settlementCommandController_->cancel();
             SDL_StopTextInput(window_->nativeHandle());
@@ -67,8 +66,7 @@ namespace Paladin
             return false;
         }
         employmentPanel_->close();
-        settlementInspectionController_->clear();
-        settlementInspectionPanel_->clearLayout();
+        clearSettlementInspection();
         settlementObjectPlacementController_->cancelPlacement();
         settlementCommandController_->cancel();
         SDL_StopTextInput(window_->nativeHandle());
