@@ -186,19 +186,6 @@ namespace Paladin
                     )
                 );
 
-                settlementInspectionPanel_->render(
-                    *renderer_,
-                    *grayUiRenderer_,
-                    *settlementInspectionController_,
-                    *settlementMap,
-                    renderedSettlement->simulationState().citizens(),
-                    *camera_,
-                    *tileRenderMetrics_
-                );
-            }
-            else
-            {
-                settlementInspectionPanel_->clearLayout();
             }
         }
 
@@ -219,6 +206,25 @@ namespace Paladin
         }
 
         simulationSpeedControls_->render(*renderer_, *grayUiRenderer_);
+        // The inspector and its embedded depot controls are one foreground
+        // surface. Paint its background after the HUD and minimap so those
+        // layers cannot show through the later-rendered trade controls.
+        if (settlementMap && citySettlement)
+        {
+            settlementInspectionPanel_->render(
+                *renderer_,
+                *grayUiRenderer_,
+                *settlementInspectionController_,
+                *settlementMap,
+                citySettlement->simulationState().citizens(),
+                *camera_,
+                *tileRenderMetrics_
+            );
+        }
+        else
+        {
+            settlementInspectionPanel_->clearLayout();
+        }
         if (const auto* realm =
                 simulation_->world().realm(simulation_->playerRealmId()))
         {
