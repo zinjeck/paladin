@@ -8,6 +8,7 @@
 #include "Pr31AnimalNavigationChecks.h"
 #include "Pr31BattleChecks.h"
 #include "Pr32ContinuationChecks.h"
+#include "Pr32EconomyCadenceChecks.h"
 #include "Pr16Regression.h"
 #include "TribalInfluenceChecks.h"
 
@@ -31,6 +32,7 @@ int main()
     try
     {
         Paladin::Test::Pr32::run();
+        Paladin::Test::Pr32::hourlyEconomyCadence();
         runPr31BattleChecks();
         runPr31AnimalNavigationChecks();
         runPr30ShipmentTests();
