@@ -24,7 +24,17 @@ namespace Paladin::Test::Pr32
 
     struct Fixture
     {
-        World world{settings()};
+        // Compact foundation regions isolate partner ranking from the unrelated
+        // nine-tile settlement-spacing rule; production defaults stay intact.
+        static TerritoryFoundationPolicy foundationPolicy()
+        {
+            auto result = defaultTerritoryFoundationPolicy();
+            result.settlementRegionWidth = 1;
+            result.settlementRegionHeight = 1;
+            result.capitalBorderlandTraversalBudget = 0;
+            return result;
+        }
+        World world{settings(), foundationPolicy()};
         RealmId buyer, seller;
         SettlementId destination, source;
         Fixture()
@@ -125,8 +135,7 @@ namespace Paladin::Test::Pr32
         realm->nextStrategyMinute = 0;
         const WorldTilePosition home = seam ? WorldTilePosition{0, 32} : WorldTilePosition{32, 32};
         PALADIN_CHECK(f.world.setSettlementPosition(f.destination, home));
-        auto& state = f.world.settlement(f.destination)->simulationState();
-        PALADIN_CHECK(state.stockpile().setAmount("bread", 2000));
+        PALADIN_CHECK(f.world.settlement(f.destination)->simulationState().stockpile().setAmount("bread", 2000));
         // A nearby owned settlement across impassable water used to permanently
         // consume the patrol's only order. It must fall back to a dry local walk.
         if (!seam)
@@ -135,11 +144,11 @@ namespace Paladin::Test::Pr32
             profile.initialPopulation = 0;
             profile.initialDetailedCitizenCount = 0;
             profile.initialResources = {};
-            const auto isolated = f.world.foundSettlement({36, 32}, f.buyer, profile);
+            const auto isolated = f.world.foundSettlement({32, 36}, f.buyer, profile);
             PALADIN_CHECK(isolated);
-            for (int y = 31; y <= 33; ++y)
-                for (int x = 35; x <= 37; ++x)
-                    if (x != 36 || y != 32)
+            for (int y = 35; y <= 37; ++y)
+                for (int x = 31; x <= 33; ++x)
+                    if (x != 32 || y != 36)
                         f.world.grid().tile({x, y})->terrain = TerrainType::Water;
         }
         else
@@ -150,6 +159,7 @@ namespace Paladin::Test::Pr32
             f.world.grid().tile({0, 33})->terrain = TerrainType::Water;
         }
         f.world.grid().terrainChanged();
+        auto& state = f.world.settlement(f.destination)->simulationState();
         const auto foodBefore = civilianFood(state.stockpile());
         const auto peopleBefore = f.world.settlement(f.destination)->population();
         AiRealmSystem::tick(f.world, 0, 1);
