@@ -30,8 +30,10 @@ namespace Paladin
     {
     public:
         // No independent soldier count: synchronize actual staffed barracks.
-        static void synchronize(World&, double minute);
+        static void synchronize(World&, double minute, bool force = true);
         static void tick(World&, double minute, double elapsed);
+        static std::uint64_t rosterRebuilds(const World&) noexcept;
+        static std::uint64_t personnelUpdates(const World&) noexcept;
         // Removes canonical people and their payroll/reservations, never
         // abstract manpower.
         static std::size_t applyBattleCasualties(World&, ArmyId, std::size_t);

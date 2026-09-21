@@ -61,6 +61,11 @@ namespace Paladin
         double lastTendedMinute = -100000;
         AnimalOrder order = AnimalOrder::None;
         double nextWanderMinute = 0;
+        ConstructionSiteId escapingSite;
+        std::vector<SettlementTilePosition> escapePath;
+        std::size_t escapePathIndex = 0, escapeCandidateCursor = 0;
+        std::size_t escapePerimeterCursor = 0;
+        std::uint64_t escapeTopology = 0;
         std::uint64_t sequence = 0;
         bool female = false;
         bool juvenile = false;

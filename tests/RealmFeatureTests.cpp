@@ -363,8 +363,8 @@ void runRealmFeatureTests()
     );
     // Identical total elapsed time yields identical reigns and dynasty choices.
     Realm whole = *ai.realm(ai.realms().front().id()), divided = whole;
-    RealmRulerSystem::updateAi(whole, 18.0 * 1440 * 180);
-    for (int day = 0; day < 18 * 180; ++day)
+    RealmRulerSystem::updateAi(whole, 18.0 * 1440 * 1000);
+    for (int day = 0; day < 18 * 1000; ++day)
     {
         RealmRulerSystem::updateAi(divided, 1440);
     }

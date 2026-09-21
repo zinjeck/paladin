@@ -6,6 +6,7 @@
 #include "world/WorldTilePosition.h"
 #include "world/entities/animals/SettlementAnimals.h"
 #include "world/settlements/SettlementCommerce.h"
+#include "world/settlements/SettlementTradeState.h"
 #include "world/settlements/SettlementEmploymentState.h"
 #include "world/settlements/SettlementHomeHeating.h"
 #include "world/settlements/SettlementImmigration.h"
@@ -96,6 +97,7 @@ namespace Paladin
         }
 
         // Geographic inputs for future seasons; orbital phase stays fixed.
+        FisheryBoatNavigation fishingBoats;
         double planetU = .5, planetV = .5;
         double latitudeRadians() const
         {
@@ -105,6 +107,7 @@ namespace Paladin
         SettlementLogistics logistics;
         SettlementHomeHeating heating;
         SettlementCommerce commerce;
+        SettlementTradeState trade;
         SettlementImmigration immigration;
         SettlementAnimals animals;
         SettlementActivitySystem activities;

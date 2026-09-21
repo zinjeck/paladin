@@ -4,6 +4,8 @@
 #include "rendering/GrassPresentation.h"
 #include "rendering/MarketPresentation.h"
 #include "rendering/SelectionOutline.h"
+#include "rendering/TransportPresentation.h"
+#include "rendering/WorkplaceCompoundPresentation.h"
 #include "rendering/WorldPixelGrid.h"
 #include "ui/UiTypes.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -260,6 +262,7 @@ namespace Paladin
             }
             raised_.setOpacityFrom(start, objectDetail);
         }
+        preview_.clear();
         if (const auto* definition = placementController.activeDefinition())
         {
             if (const auto footprint = placementController.visibleFootprint();
@@ -268,13 +271,25 @@ namespace Paladin
                 // An adjustable building begins as ONE hover tile. Do not feed
                 // that undersized tile to a recipe that expands a barracks to
                 // its minimum dimensions, creating a detached carpet beside it.
-                const auto first = raised_.size();
+                const auto first = preview_.size();
                 if (definition->id == SettlementObjectTypes::Market)
                 {
                     marketStalls(
-                        raised_,
+                        preview_,
                         projection,
                         sprites_,
+                        *footprint,
+                        ~std::uint64_t(0)
+                    );
+                }
+                else if (workplaceCompound(definition->id))
+                {
+                    compoundWorkplace(
+                        preview_,
+                        projection,
+                        sprites_,
+                        presentation,
+                        definition->id,
                         *footprint,
                         ~std::uint64_t(0)
                     );
@@ -282,7 +297,7 @@ namespace Paladin
                 else
                 {
                     tribalBuilding(
-                        raised_,
+                        preview_,
                         projection,
                         sprites_,
                         presentation,
@@ -292,9 +307,16 @@ namespace Paladin
                         ~std::uint64_t(0)
                     );
                 }
-                raised_.setOpacityFrom(first, .65);
+                preview_.setOpacityFrom(first, .85);
             }
         }
+        localTradeCaravans(
+            raised_,
+            projection,
+            sprites_,
+            settlementMap.trade,
+            gameMinute
+        );
         citizenRenderer_.render(
             renderer,
             citizens,
@@ -388,6 +410,10 @@ namespace Paladin
             );
         }
         stage(4);
+        if (resourcesVisible)
+        {
+            resourceMap_.render(renderer, settlementMap, projection, sprites_);
+        }
         objectRenderer_.renderOverlay(
             renderer,
             settlementMap,
@@ -395,6 +421,7 @@ namespace Paladin
             metrics,
             placementController
         );
+        preview_.render(renderer);
         commandRenderer_.render(
             renderer,
             settlementMap.commandState(),

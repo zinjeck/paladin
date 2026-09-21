@@ -1,11 +1,12 @@
 #include "rendering/SettlementStructurePresentation.h"
 #include "rendering/BuildingView.h"
 #include "rendering/HomePresentation.h"
-#include "rendering/MiningPresentation.h"
 #include "rendering/MarketPresentation.h"
+#include "rendering/MiningPresentation.h"
 #include "rendering/PasturePresentation.h"
 #include "rendering/SettlementEnvironmentDetails.h"
 #include "rendering/StockpilePresentation.h"
+#include "rendering/WorkplaceCompoundPresentation.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -205,11 +206,16 @@ namespace Paladin
             {
                 continue;
             }
+            const auto id = (object.id.value() << 3) | 2;
+            const auto entrance =
+                workplaceCompound(object.objectTypeId)
+                    ? std::optional{workplaceRoomDoor(object.footprint)}
+                    : object.door;
             double doorOpen = 0;
-            if (object.door && citizens && animate)
+            if (entrance && citizens && animate)
             {
                 auto& door = doors_[object.id.value()];
-                if (doorTraffic.contains(key(object.door->x, object.door->y)))
+                if (doorTraffic.contains(key(entrance->x, entrance->y)))
                 {
                     door.until = now + .7;
                 }
@@ -225,6 +231,20 @@ namespace Paladin
                 doorOpen = door.openness;
             }
             const auto& style = sprites.objectStyle(object.objectTypeId);
+            if (workplaceCompound(object.objectTypeId))
+            {
+                compoundWorkplace(
+                    queue,
+                    projection,
+                    sprites,
+                    policy,
+                    object.objectTypeId,
+                    object.footprint,
+                    id,
+                    doorOpen
+                );
+                continue;
+            }
             const bool placeholder = !sprites.objectHasArt(object.objectTypeId);
             const auto& f = object.footprint;
             const double x = f.topLeft.x, y = f.topLeft.y, w = f.width,
@@ -243,7 +263,6 @@ namespace Paladin
             {
                 continue;
             }
-            const auto id = (object.id.value() << 3) | 2;
             const auto rgb = [](std::uint32_t color)
             {
                 return RenderColor{
@@ -654,8 +673,7 @@ namespace Paladin
                 );
             }
             queue.setLayerFrom(floorStart, -2);
-            if (object.objectTypeId == SettlementObjectTypes::FishingGrounds ||
-                object.objectTypeId == SettlementObjectTypes::Market)
+            if (object.objectTypeId == SettlementObjectTypes::FishingGrounds)
             {
                 workYardFoundation(
                     queue,

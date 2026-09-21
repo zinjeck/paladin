@@ -267,6 +267,8 @@ namespace Paladin
                 renderer_->outputWidth(),
                 renderer_->outputHeight()
             );
+        const auto resourceButtonBounds = WorldMapNavigation::resourceModeButtonBounds(
+            renderer_->outputWidth(), renderer_->outputHeight());
         const auto terrainButtonBounds =
             WorldMapNavigation::terrainModeButtonBounds(
                 renderer_->outputWidth(),
@@ -300,6 +302,14 @@ namespace Paladin
                 if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
                 {
                     worldRenderer_->setMapMode(WorldMapMode::Political);
+                }
+                return;
+            }
+            if (leftButtonEvent && resourceButtonBounds.contains(event.button.x, event.button.y))
+            {
+                if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+                {
+                    worldRenderer_->setMapMode(WorldMapMode::Resources);
                 }
                 return;
             }

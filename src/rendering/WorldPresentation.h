@@ -13,13 +13,20 @@ namespace Paladin
         Political,
         Terrain,
         Government,
-        Population
+        Population,
+        Resources
     };
 
     inline bool thematicMapMode(WorldMapMode mode) noexcept
-    { return mode==WorldMapMode::Government || mode==WorldMapMode::Population; }
+    {
+        return mode == WorldMapMode::Government ||
+               mode == WorldMapMode::Population;
+    }
     inline float worldArmyVisibility(double pixels) noexcept
-    { return std::isfinite(pixels) ? float(detailBlend(pixels,10.0,16.0)) : 0.F; }
+    {
+        return std::isfinite(pixels) ? float(detailBlend(pixels, 10.0, 16.0))
+                                     : 0.F;
+    }
 
     // One authoritative zoom policy for the world screen.  The values are
     // expressed in effective screen pixels per logical world tile, so the same
@@ -68,18 +75,12 @@ namespace Paladin
 
         const double realmBegin =
             std::max(0.0, policy.realmToRegionalBeginPixels);
-        const double realmEnd = std::max(
-            realmBegin + 0.001,
-            policy.realmToRegionalEndPixels
-        );
-        const double localBegin = std::max(
-            realmEnd,
-            policy.regionalToLocalBeginPixels
-        );
-        const double localEnd = std::max(
-            localBegin + 0.001,
-            policy.regionalToLocalEndPixels
-        );
+        const double realmEnd =
+            std::max(realmBegin + 0.001, policy.realmToRegionalEndPixels);
+        const double localBegin =
+            std::max(realmEnd, policy.regionalToLocalBeginPixels);
+        const double localEnd =
+            std::max(localBegin + 0.001, policy.regionalToLocalEndPixels);
 
         const float regionalArrival = static_cast<float>(
             detailBlend(effectiveTilePixels, realmBegin, realmEnd)
@@ -88,27 +89,18 @@ namespace Paladin
             detailBlend(effectiveTilePixels, localBegin, localEnd)
         );
         const float realmLabelWeight = 1.0F - regionalArrival;
-        const float closeFillOpacity = std::clamp(
-            policy.closeRealmFillOpacity,
-            0.0F,
-            1.0F
-        );
+        const float closeFillOpacity =
+            std::clamp(policy.closeRealmFillOpacity, 0.0F, 1.0F);
         const float realmFillWeight = std::clamp(
             closeFillOpacity +
                 (1.0F - closeFillOpacity) * (1.0F - regionalArrival),
             0.0F,
             1.0F
         );
-        const float regionalWeight = std::clamp(
-            regionalArrival * (1.0F - localArrival),
-            0.0F,
-            1.0F
-        );
-        const float closeBorderOpacity = std::clamp(
-            policy.closeRealmBorderOpacity,
-            0.0F,
-            1.0F
-        );
+        const float regionalWeight =
+            std::clamp(regionalArrival * (1.0F - localArrival), 0.0F, 1.0F);
+        const float closeBorderOpacity =
+            std::clamp(policy.closeRealmBorderOpacity, 0.0F, 1.0F);
 
         return {
             realmFillWeight,
@@ -126,7 +118,7 @@ namespace Paladin
         WorldMapMode mode
     ) noexcept
     {
-        if (mode == WorldMapMode::Terrain)
+        if (mode == WorldMapMode::Terrain || mode == WorldMapMode::Resources)
         {
             // Terrain mode is a projection-independent presentation choice.
             // Settlements and realm labels remain useful navigation context,
@@ -134,17 +126,22 @@ namespace Paladin
             presentation.realmFillWeight = 0.0F;
             presentation.realmBorderWeight = 0.0F;
         }
+        if (mode == WorldMapMode::Resources)
+        {
+            presentation.realmLabelWeight = 0;
+        }
         if (thematicMapMode(mode))
         {
-            presentation.realmFillWeight=1.F;
-            presentation.realmBorderWeight=1.F;
+            presentation.realmFillWeight = 1.F;
+            presentation.realmBorderWeight = 1.F;
         }
-        if (mode==WorldMapMode::Population)
+        if (mode == WorldMapMode::Population)
         {
             // Keep real intercity roads and small settlement symbols readable
             // while the density map is zoomed out; do not restore city sprawl.
-            presentation.regionalWeight=std::max(.35F,presentation.regionalWeight);
-            presentation.realmLabelWeight*=.35F;
+            presentation.regionalWeight =
+                std::max(.35F, presentation.regionalWeight);
+            presentation.realmLabelWeight *= .35F;
         }
         return presentation;
     }

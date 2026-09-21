@@ -228,14 +228,14 @@ namespace Paladin
             {
                 grayUiRenderer.drawLabel(
                     renderer,
-                    "Trade agreement required",
+                    "World trade controls available",
                     renderedBounds_.x + 13,
                     renderedBounds_.y + renderedBounds_.height - 64,
                     1.25F
                 );
                 grayUiRenderer.drawLabel(
                     renderer,
-                    "Caravans buy and sell for gold",
+                    "Imports / exports use separate counters",
                     renderedBounds_.x + 13,
                     renderedBounds_.y + renderedBounds_.height - 48,
                     1.25F

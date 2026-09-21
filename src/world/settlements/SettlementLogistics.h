@@ -20,7 +20,8 @@ namespace Paladin
         Market,
         Construction,
         Home,
-        TradeDepot
+        TradeDepot,
+        TradeImports
     };
 
     inline bool countsAsCityStorage(InventoryKind kind)
@@ -29,7 +30,8 @@ namespace Paladin
                kind == InventoryKind::Stockpile ||
                kind == InventoryKind::Workplace ||
                kind == InventoryKind::Market ||
-               kind == InventoryKind::TradeDepot;
+               kind == InventoryKind::TradeDepot ||
+               kind == InventoryKind::TradeImports;
     }
     struct ResourceAmount
     {
@@ -74,6 +76,7 @@ namespace Paladin
         }
         const SettlementInventory* inventory(InventoryId id) const;
         InventoryId forObject(SettlementObjectId id) const;
+        InventoryId importsForObject(SettlementObjectId id) const;
         InventoryId forSite(ConstructionSiteId id) const;
         InventoryId drop(
             SettlementTilePosition tile,
@@ -91,11 +94,19 @@ namespace Paladin
             double minute = 0
         );
         bool consumeCarriedUnit(CitizenId citizen);
-        int convert(InventoryId id, std::string_view input,
-                    std::string_view output, int requested, double minute);
+        int convert(
+            InventoryId id,
+            std::string_view input,
+            std::string_view output,
+            int requested,
+            double minute
+        );
         // Ingredients and military packs are not ordinary wholesale outputs.
-        bool mayExport(const SettlementObjectState&, const SettlementInventory&,
-                       std::string_view resource) const;
+        bool mayExport(
+            const SettlementObjectState&,
+            const SettlementInventory&,
+            std::string_view resource
+        ) const;
 
         bool consumeAvailable(
             InventoryId,
@@ -140,6 +151,9 @@ namespace Paladin
         mutable std::
             unordered_map<SettlementObjectId, InventoryId, StrongIdHash>
                 objectIndex_;
+        mutable std::
+            unordered_map<SettlementObjectId, InventoryId, StrongIdHash>
+                importIndex_;
         mutable std::
             unordered_map<ConstructionSiteId, InventoryId, StrongIdHash>
                 siteIndex_;

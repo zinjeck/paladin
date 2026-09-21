@@ -20,10 +20,8 @@ namespace Paladin
     {
         // Each cell includes a compact counter, a clear merchant tile behind
         // it, and circulation space. Rendering, preview and work share it.
-        const bool rotated =
-            (width / 4) * (height / 3) > (width / 3) * (height / 4);
-        const int cellWidth = std::min(width, rotated ? 4 : 3);
-        const int cellHeight = std::min(height, rotated ? 3 : 4);
+        const int cellWidth = std::min(width, 3);
+        const int cellHeight = std::min(height, 3);
         const int columns = std::max(1, width / std::max(1, cellWidth));
         const int rows = std::max(1, height / std::max(1, cellHeight));
         return {

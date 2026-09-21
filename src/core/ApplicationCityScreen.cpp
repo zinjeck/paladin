@@ -26,6 +26,7 @@ namespace Paladin
         const auto* settlement =
             simulation_->world().settlement(activeCitySettlementId_);
         cityHud_->setFortress(settlement && settlement->isFortress());
+        cityHud_->setResourcesVisible(cityRenderer_->resourcesVisible);
         cityHud_->setRoofsVisible(cityRenderer_->presentation.roofsVisible);
         cityHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
     }
@@ -117,63 +118,28 @@ namespace Paladin
         cityHud_->setHousingCapacity(
             settlementMap ? settlementMap->activities.housingCapacity() : 0
         );
-        std::array<double, 4> goodsAmounts{};
-        const auto addGoods = [&](std::string_view resource, double amount)
-        {
-            if (resource == "stone")
-            {
-                goodsAmounts[0] += amount;
-            }
-            else if (resource == "lumber")
-            {
-                goodsAmounts[1] += amount;
-            }
-            else if (resource == "fish")
-            {
-                goodsAmounts[2] += amount;
-            }
-            else if (resource == "meat")
-            {
-                goodsAmounts[3] += amount;
-            }
-        };
-        if (settlementMap)
-        {
-            for (const auto& inventory : settlementMap->logistics.inventories())
-            {
-                if (!countsAsCityStorage(inventory.kind))
-                {
-                    continue;
-                }
-                for (const auto& goods : inventory.goods)
-                {
-                    addGoods(goods.resource, goods.amount);
-                }
-            }
-        }
-        std::array<ResourceDailyRates, 4> goodsRates{};
+        cityHud_->clearGoods();
         if (settlementMap && citySettlement)
         {
             const auto& report = settlementMap->commerce.dailyResourceReport(
                 *settlementMap, citySettlement->simulationState().citizens(),
-                double(worldTime.totalGameMinutes())
-            );
-            constexpr std::array names{"stone", "lumber", "fish", "meat"};
-            for (std::size_t i = 0; i < names.size(); ++i)
+                double(worldTime.totalGameMinutes()));
+            for (const auto& resource : SettlementResourceCatalog::definitions())
             {
-                if (const auto found = report.find(names[i]); found != report.end())
+                double amount = 0;
+                for (const auto& inventory : settlementMap->logistics.inventories())
                 {
-                    goodsRates[i] = found->second;
+                    if (!countsAsCityStorage(inventory.kind)) { continue; }
+                    for (const auto& goods : inventory.goods)
+                    {
+                        if (goods.resource == resource.id) { amount += goods.amount; }
+                    }
                 }
+                const auto found = report.find(std::string(resource.id));
+                cityHud_->setGoodsResource(resource.id, amount,
+                    found != report.end() ? found->second : ResourceDailyRates{});
             }
         }
-        cityHud_->setGoodsDailyRates(goodsRates);
-        cityHud_->setGoodsAmounts(
-            goodsAmounts[0],
-            goodsAmounts[1],
-            goodsAmounts[2],
-            goodsAmounts[3]
-        );
         if (const auto* realm =
                 simulation_->world().realm(simulation_->playerRealmId()))
         {
@@ -183,6 +149,7 @@ namespace Paladin
 
     void Application::renderCityScreen()
     {
+        cityRenderer_->gameMinute = double(simulation_->world().time().totalGameMinutes());
         auto* settlementMap =
             simulation_->settlementMap(activeCitySettlementId_);
 

@@ -349,6 +349,12 @@ namespace Paladin
             const SettlementMap&,
             double minute
         );
+        bool boatMealAvailable(
+            SettlementMap&,
+            SettlementCitizenState&,
+            SettlementCitizen&,
+            double minute
+        );
         bool chooseFood(
             SettlementMap&,
             SettlementCitizenState&,

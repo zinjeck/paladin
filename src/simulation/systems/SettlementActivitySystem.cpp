@@ -1,7 +1,7 @@
 #include "simulation/systems/SettlementActivitySystem.h"
-#include "world/settlements/SettlementIndustry.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementHomeBeds.h"
+#include "world/settlements/SettlementIndustry.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
@@ -83,8 +83,7 @@ namespace Paladin
         {
             return false;
         }
-        const auto* workplace =
-            map.employment().workplace(citizen.workplaceId);
+        const auto* workplace = map.employment().workplace(citizen.workplaceId);
         return workplace && workplace->operational &&
                workplace->objectTypeId == SettlementObjectTypes::Pastureland &&
                map.animals.containedCount(workplace->objectId) == 0;
@@ -96,6 +95,39 @@ namespace Paladin
         double minute
     )
     {
+        if (c.inFishingBoat && c.health > 0)
+        {
+            if (c.boatReturning)
+            {
+                return;
+            }
+            c.boatReturning = true;
+            const bool finishEdge =
+                c.pathIndex < c.path.size() && c.stepProgress > 0;
+            const auto routeStart =
+                finishEdge ? c.path[c.pathIndex] : c.tilePosition;
+            auto returning =
+                map.fishingBoats.returnRoute(map, routeStart, c.boatLanding);
+            if (finishEdge)
+            {
+                returning.insert(returning.begin(), routeStart);
+            }
+            c.path = std::move(returning);
+            c.pathIndex = 0;
+            if (!finishEdge)
+            {
+                c.stepProgress = 0;
+            }
+            c.stepDuration = 1;
+            c.destination = c.path.empty() ? c.tilePosition : c.path.back();
+            c.explicitMovement = !c.path.empty();
+            c.nextDecisionMinute = minute + policy.retryMinutes;
+            return;
+        }
+        c.inFishingBoat = false;
+        c.boatReturning = false;
+        c.boatFishery = {};
+        c.boatRoute.clear();
         // Cancellation, dismissal, starvation interruption and death all use
         // the same physical exit. Cargo is never erased with its old task.
         if (c.carriedAmount > 0)
@@ -227,7 +259,10 @@ namespace Paladin
                 handleDeath(c);
                 continue;
             }
-            if (c.militaryDeployed) continue;
+            if (c.militaryDeployed)
+            {
+                continue;
+            }
             if (c.foodSeekHunger < policy.foodSeekThreshold)
             {
                 planMeal(c, map);
@@ -266,6 +301,52 @@ namespace Paladin
                 AttributeEffect::FoodShortage
             );
             c.enforceHappinessModifiers();
+            if (c.inFishingBoat && c.health > 0)
+            {
+                const auto* workplace =
+                    map.employment().workplace(c.workplaceId);
+                const bool breakDue =
+                    !c.breakTaken && minute >= c.breakDue &&
+                    policy.localMinute(minute) + policy.workBreakMinutes <=
+                        policy.shiftEndMinute;
+                if (!workplace || !workplace->operational ||
+                    workplace->objectId != c.boatFishery ||
+                    !policy.isWorkTime(minute) ||
+                    (!c.boatReturning && c.hunger >= c.foodSeekHunger &&
+                     boatMealAvailable(map, citizens, c, minute)) ||
+                    shouldSleep(c, minute) || breakDue ||
+                    (c.path.empty() && c.tilePosition != c.destination))
+                {
+                    finish(map, c, minute);
+                }
+                if (c.boatReturning && c.path.empty())
+                {
+                    if (citizens.navigation_.walkable(map, c.tilePosition))
+                    {
+                        c.inFishingBoat = false;
+                        c.boatReturning = false;
+                        c.boatFishery = {};
+                        c.boatRoute.clear();
+                        if (breakDue && policy.isWorkTime(minute))
+                        {
+                            startBreak(map, c, minute);
+                        }
+                        else
+                        {
+                            finish(map, c, minute);
+                        }
+                    }
+                    else if (minute >= c.nextDecisionMinute)
+                    {
+                        c.boatReturning = false;
+                        finish(map, c, minute);
+                    }
+                }
+                if (c.inFishingBoat)
+                {
+                    continue;
+                }
+            }
             const auto* cargoDefinition =
                 SettlementResourceCatalog::definition(c.carriedResource);
             if (c.health > 0 && c.hunger >= c.foodSeekHunger &&
@@ -299,11 +380,13 @@ namespace Paladin
             if (c.task.kind == CitizenTaskKind::AnimalWork)
             {
                 const auto* animal = map.animals.find(c.task.animal);
-                const bool assignedGatherer = w && w->operational &&
-                    w->objectTypeId == SettlementObjectTypes::Pastureland && animal &&
-                    animal->order == AnimalOrder::Gather && animal->reservedPasture == w->objectId;
-                valid = !c.child && (generalLabor || assignedGatherer) && !c.youngDependents &&
-                        animal && animal->health > 0 &&
+                const bool assignedGatherer =
+                    w && w->operational &&
+                    w->objectTypeId == SettlementObjectTypes::Pastureland &&
+                    animal && animal->order == AnimalOrder::Gather &&
+                    animal->reservedPasture == w->objectId;
+                valid = !c.child && (generalLabor || assignedGatherer) &&
+                        !c.youngDependents && animal && animal->health > 0 &&
                         animal->handler == c.id &&
                         animal->order != AnimalOrder::None &&
                         (animal->order != AnimalOrder::Gather ||
@@ -325,8 +408,8 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Work)
             {
-                valid = c.youngDependents == 0 && shift && activeWorkplace && w &&
-                        w->operational && w->objectId == c.task.object;
+                valid = c.youngDependents == 0 && shift && activeWorkplace &&
+                        w && w->operational && w->objectId == c.task.object;
             }
             if (c.task.kind == CitizenTaskKind::Sleep)
             {
@@ -358,8 +441,7 @@ namespace Paladin
             }
             if (c.task.kind == CitizenTaskKind::Home)
             {
-                valid = (generalLabor || !shift) &&
-                        c.homeId == c.task.object &&
+                valid = (generalLabor || !shift) && c.homeId == c.task.object &&
                         map.objectState().completedObject(c.homeId);
             }
             if (c.task.kind == CitizenTaskKind::Build)
@@ -455,7 +537,8 @@ namespace Paladin
             auto& c =
                 citizens
                     .citizens_[decisionCursor_++ % citizens.citizens_.size()];
-            if (c.militaryDeployed || !map.grid().isValidPosition(c.tilePosition))
+            if (c.militaryDeployed || c.inFishingBoat ||
+                !map.grid().isValidPosition(c.tilePosition))
             {
                 continue;
             }
@@ -550,14 +633,19 @@ namespace Paladin
             }
             // An occupied pasture must still be able to gather its second and
             // later animals. Do not wait forever in the generic tending task.
-            if (c.task.kind == CitizenTaskKind::Work && map.animals.hasOrders() &&
-                policy.isWorkTime(minute) && minute >= c.nextWorkCheckMinutes)
+            if (c.task.kind == CitizenTaskKind::Work &&
+                map.animals.hasOrders() && policy.isWorkTime(minute) &&
+                minute >= c.nextWorkCheckMinutes)
             {
                 const auto* job = map.employment().workplace(c.workplaceId);
-                if (job && job->operational && job->objectTypeId == SettlementObjectTypes::Pastureland)
+                if (job && job->operational &&
+                    job->objectTypeId == SettlementObjectTypes::Pastureland)
                 {
                     c.nextWorkCheckMinutes = minute + policy.retryMinutes;
-                    if (chooseAnimalWork(map, citizens, c, minute)) continue;
+                    if (chooseAnimalWork(map, citizens, c, minute))
+                    {
+                        continue;
+                    }
                 }
             }
             if (c.task.kind == CitizenTaskKind::Home && c.path.empty())
@@ -574,8 +662,12 @@ namespace Paladin
             }
         }
         // A full sweep otherwise returns to the same first citizen forever.
-        // Rotate priority as well as coverage so late arrivals share path credit.
-        if (count && count == citizens.citizens_.size()) { ++decisionCursor_; }
+        // Rotate priority as well as coverage so late arrivals share path
+        // credit.
+        if (count && count == citizens.citizens_.size())
+        {
+            ++decisionCursor_;
+        }
         citizens.tickMovement(
             map,
             elapsed,
@@ -594,8 +686,11 @@ namespace Paladin
             if (!c.militaryDeployed)
             {
                 if (c.path.empty() && (c.task.kind == CitizenTaskKind::Gather ||
-                    c.task.kind == CitizenTaskKind::Build || c.task.kind == CitizenTaskKind::Work))
+                                       c.task.kind == CitizenTaskKind::Build ||
+                                       c.task.kind == CitizenTaskKind::Work))
+                {
                     c.workAnimationMinutes += elapsed;
+                }
                 execute(map, citizens, c, minute, elapsed);
             }
         }
@@ -619,7 +714,8 @@ namespace Paladin
             return;
         }
         // Lack of shared path credit is not a failed job search. Retry on the
-        // next turn instead of synchronizing every worker to a five-minute poll.
+        // next turn instead of synchronizing every worker to a five-minute
+        // poll.
         struct RetryWhenBudgetExhausted
         {
             SettlementCitizen& citizen;
@@ -628,8 +724,10 @@ namespace Paladin
             ~RetryWhenBudgetExhausted()
             {
                 if (!remaining && (citizen.task.kind == CitizenTaskKind::None ||
-                                    citizen.task.kind == CitizenTaskKind::Home))
+                                   citizen.task.kind == CitizenTaskKind::Home))
+                {
                     citizen.nextWorkCheckMinutes = minute;
+                }
             }
         } retry{c, pathsRemaining_, minute};
         c.nextWorkCheckMinutes = minute + policy.retryMinutes;
@@ -684,8 +782,12 @@ namespace Paladin
                 {
                     return;
                 }
-                if (workplace.objectTypeId == SettlementObjectTypes::Pastureland &&
-                    chooseAnimalWork(map, citizens, c, minute)) return;
+                if (workplace.objectTypeId ==
+                        SettlementObjectTypes::Pastureland &&
+                    chooseAnimalWork(map, citizens, c, minute))
+                {
+                    return;
+                }
                 chooseWork(map, citizens, c, minute);
                 return;
             }
@@ -723,6 +825,12 @@ namespace Paladin
         double elapsed
     )
     {
+        if (c.inFishingBoat)
+        {
+            c.activity = c.path.empty() ? CitizenActivity::Fishing
+                                        : CitizenActivity::TravelingToWork;
+            return;
+        }
         if (c.task.kind == CitizenTaskKind::AnimalWork)
         {
             executeAnimalWork(map, citizens, c, minute, elapsed);
@@ -858,7 +966,8 @@ namespace Paladin
                         *sourceInventory,
                         *destination,
                         copy.amount,
-                        &citizens
+                        &citizens,
+                        copy.resource
                     ) < copy.amount ||
                     (market && sourceInventory &&
                      sourceInventory->kind == InventoryKind::Keep))
@@ -908,7 +1017,8 @@ namespace Paladin
                         sourceForTrade,
                         destinationForTrade,
                         copy.amount,
-                        &citizens
+                        &citizens,
+                        copy.resource
                     ))
                 {
                     finish(map, c, minute);
@@ -962,20 +1072,44 @@ namespace Paladin
             }
             const auto footprint = site->footprint;
             const bool road = site->objectTypeId == SettlementObjectTypes::Road;
-            const auto object = map.objectState().build(
-                c.task.site,
-                elapsed,
-                road ? policy.roadMinutes : policy.constructionMinutes,
-                c.tilePosition
-            );
+            const double required =
+                road ? policy.roadMinutes : policy.constructionMinutes;
+            double labor = elapsed;
+            if (!road &&
+                site->objectTypeId != SettlementObjectTypes::Pastureland &&
+                site->laborMinutes + labor >= required &&
+                std::any_of(
+                    map.animals.all().begin(),
+                    map.animals.all().end(),
+                    [&](const auto& animal)
+                    {
+                        return animal.health > 0 &&
+                               footprint.contains(animal.tilePosition);
+                    }
+                ))
+            {
+                // Keep the unfinished site escapable until its last animal
+                // has left. Workers can continue all other construction.
+                labor = std::min(
+                    labor,
+                    std::max(0., required - site->laborMinutes - .001)
+                );
+            }
+            const auto object =
+                map.objectState()
+                    .build(c.task.site, labor, required, c.tilePosition);
             if (object)
             {
                 if (const auto* delivered = map.logistics.inventory(
-                        map.logistics.forSite(c.task.site)))
+                        map.logistics.forSite(c.task.site)
+                    ))
                 {
                     for (const auto& goods : delivered->goods)
                     {
-                        map.commerce.recordConsumption(goods.resource, goods.amount);
+                        map.commerce.recordConsumption(
+                            goods.resource,
+                            goods.amount
+                        );
                     }
                 }
                 map.logistics.consumeSite(c.task.site);
@@ -1019,16 +1153,18 @@ namespace Paladin
                         c.task.workTile,
                         feature.kind == NaturalFeatureKind::Tree
                             ? SettlementResourceTypes::Lumber
-                            : feature.kind == NaturalFeatureKind::Wheat
-                                ? SettlementResourceTypes::Wheat : SettlementResourceTypes::Stone,
+                        : feature.kind == NaturalFeatureKind::Wheat
+                            ? SettlementResourceTypes::Wheat
+                            : SettlementResourceTypes::Stone,
                         4,
                         minute
                     );
                     map.commerce.recordProduction(
                         feature.kind == NaturalFeatureKind::Tree
                             ? SettlementResourceTypes::Lumber
-                            : feature.kind == NaturalFeatureKind::Wheat
-                                ? SettlementResourceTypes::Wheat : SettlementResourceTypes::Stone,
+                        : feature.kind == NaturalFeatureKind::Wheat
+                            ? SettlementResourceTypes::Wheat
+                            : SettlementResourceTypes::Stone,
                         4
                     );
                     map.naturalFeatures().harvest(c.task.workTile, minute);
@@ -1425,6 +1561,19 @@ namespace Paladin
             }
             if (object->objectTypeId == SettlementObjectTypes::FishingGrounds)
             {
+                if (!c.boatRoute.empty())
+                {
+                    c.inFishingBoat = true;
+                    c.boatReturning = false;
+                    c.boatFishery = object->id;
+                    c.boatLanding = c.tilePosition;
+                    c.path = std::move(c.boatRoute);
+                    c.pathIndex = 0;
+                    c.stepProgress = 0;
+                    c.stepDuration = 1;
+                    c.destination = c.path.back();
+                    c.explicitMovement = true;
+                }
                 c.activity = CitizenActivity::Fishing;
             }
             if (object->objectTypeId == SettlementObjectTypes::Pastureland)
@@ -1469,7 +1618,10 @@ namespace Paladin
         std::unordered_map<SettlementObjectId, int, StrongIdHash> attendance;
         for (const auto& c : citizens.citizens())
         {
-            if (c.militaryDeployed) continue;
+            if (c.militaryDeployed)
+            {
+                continue;
+            }
             if (caregivingAtWorkTime(map, c, minute))
             {
                 const auto* workplace =
@@ -1495,7 +1647,10 @@ namespace Paladin
                         continue;
                     }
                 }
-                else if (!c.path.empty() || c.tilePosition != c.destination)
+                else if (
+                    c.boatReturning || !c.path.empty() ||
+                    c.tilePosition != c.destination
+                )
                 {
                     continue;
                 }
@@ -1504,7 +1659,10 @@ namespace Paladin
         }
         for (const auto& [objectId, workers] : attendance)
         {
-            if (produceIndustry(map, objectId, workers, minute, elapsed)) continue;
+            if (produceIndustry(map, objectId, workers, minute, elapsed))
+            {
+                continue;
+            }
             const auto* object = map.objectState().completedObject(objectId);
             if (object &&
                 object->objectTypeId == SettlementObjectTypes::Pastureland)
@@ -1551,7 +1709,7 @@ namespace Paladin
                 continue;
             }
             const double rate = fisheryProductionPerMinute(
-                object->productionWater.size(),
+                map.fishingBoats.productiveWater(map, *object),
                 workers,
                 policy.fishery
             );
@@ -1568,10 +1726,17 @@ namespace Paladin
                 )
             );
             if (fish > 0 && map.logistics.add(
-                    inventory, SettlementResourceTypes::Fish, fish, minute))
+                                inventory,
+                                SettlementResourceTypes::Fish,
+                                fish,
+                                minute
+                            ))
             {
                 map.commerce.recordFlow(
-                    {}, inventory, SettlementResourceTypes::Fish, fish
+                    {},
+                    inventory,
+                    SettlementResourceTypes::Fish,
+                    fish
                 );
             }
         }

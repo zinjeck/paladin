@@ -26,6 +26,7 @@ namespace Paladin
     class DiplomacyPanel;
     class WorldSettlementPanel;
     class CaravanPanel;
+    class TradeDepotPanel;
     enum class CityHudAction;
     class EmploymentPanel;
     class DebugConsole;
@@ -196,6 +197,7 @@ namespace Paladin
         std::unique_ptr<DiplomacyPanel> diplomacyPanel_;
         std::unique_ptr<WorldSettlementPanel> worldSettlementPanel_;
         std::unique_ptr<CaravanPanel> caravanPanel_;
+        std::unique_ptr<TradeDepotPanel> tradeDepotPanel_;
         bool caravanPointerCaptured_ = false;
         ArmyId selectedWorldArmy_;
         std::optional<BattleEncounter> battleEncounter_;

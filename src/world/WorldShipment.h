@@ -9,7 +9,14 @@
 
 namespace Paladin
 {
-    enum class ShipmentPhase { Waiting, Outbound, Returning, Completed, Blocked };
+    enum class ShipmentPhase
+    {
+        Waiting,
+        Outbound,
+        Returning,
+        Completed,
+        Blocked
+    };
 
     // One route owns one caravan and its physical cargo. The route never owns a
     // second copy in either city's inventory. Paths include both endpoints.
@@ -22,6 +29,8 @@ namespace Paladin
         std::int64_t unitPrice = 0;
         std::int64_t escrow = 0; // Buyer cash retained until delivery/return.
         SettlementId source, destination;
+        SettlementObjectId sourceDepot, destinationDepot;
+        double minutesPerTile = MinutesPerTile;
         std::string resource;
         int amount = 1;
         int cargo = 0;
@@ -32,28 +41,52 @@ namespace Paladin
         std::size_t tileIndex = 0;
         double stepMinutes = 0;
         double deferredMinutes = 0;
+        double nextRecoveryMinute = 0;
         std::uint64_t deliveries = 0;
         int wrapWidth = 0;
 
         bool moving() const noexcept
-        { return phase == ShipmentPhase::Outbound || phase == ShipmentPhase::Returning; }
-        bool active() const noexcept { return phase != ShipmentPhase::Completed; }
+        {
+            return phase == ShipmentPhase::Outbound ||
+                   phase == ShipmentPhase::Returning;
+        }
+        bool active() const noexcept
+        {
+            return phase != ShipmentPhase::Completed;
+        }
         WorldTilePosition position() const noexcept
-        { return path.empty() ? WorldTilePosition{} : path[tileIndex]; }
+        {
+            return path.empty() ? WorldTilePosition{} : path[tileIndex];
+        }
         std::size_t nextIndex() const noexcept
-        { return phase == ShipmentPhase::Returning ? tileIndex - 1 : tileIndex + 1; }
+        {
+            return phase == ShipmentPhase::Returning ? tileIndex - 1
+                                                     : tileIndex + 1;
+        }
         double visualX() const noexcept
         {
-            if (!moving() || path.size() < 2) return position().x;
+            if (!moving() || path.size() < 2)
+            {
+                return position().x;
+            }
             double dx = path[nextIndex()].x - position().x;
             if (wrapWidth > 0 && std::abs(dx) > wrapWidth * .5)
+            {
                 dx += dx > 0 ? -wrapWidth : wrapWidth;
-            return position().x + dx * std::clamp(stepMinutes / MinutesPerTile, 0.0, 1.0);
+            }
+            return position().x +
+                   dx * std::clamp(stepMinutes / minutesPerTile, 0.0, 1.0);
         }
         double visualY() const noexcept
         {
-            return !moving() || path.size() < 2 ? position().y : position().y +
-                (path[nextIndex()].y - position().y) * std::clamp(stepMinutes / MinutesPerTile, 0.0, 1.0);
+            return !moving() || path.size() < 2
+                       ? position().y
+                       : position().y + (path[nextIndex()].y - position().y) *
+                                            std::clamp(
+                                                stepMinutes / minutesPerTile,
+                                                0.0,
+                                                1.0
+                                            );
         }
     };
-}
+} // namespace Paladin

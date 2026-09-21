@@ -50,6 +50,10 @@ namespace Paladin
             citizen.stepProgress = 0;
             citizen.idleWait = -1;
             citizen.explicitMovement = false;
+            citizen.inFishingBoat = false;
+            citizen.boatReturning = false;
+            citizen.boatRoute.clear();
+            citizen.boatFishery = {};
             citizen.assignedCommandId = {};
             citizen.workplaceId = {};
             citizen.nextWorkCheckMinutes = 0;
@@ -70,7 +74,8 @@ namespace Paladin
             {
                 continue;
             }
-            if (citizen.child || citizen.militaryDeployed)
+            if (citizen.child || citizen.militaryDeployed ||
+                citizen.inFishingBoat)
             {
                 return false;
             }
@@ -121,7 +126,8 @@ namespace Paladin
         std::size_t requests = 0;
         for (auto& citizen : citizens_)
         {
-            if (citizen.militaryDeployed || !map.grid().isValidPosition(citizen.tilePosition))
+            if (citizen.militaryDeployed ||
+                !map.grid().isValidPosition(citizen.tilePosition))
             {
                 continue;
             }
@@ -129,7 +135,9 @@ namespace Paladin
             {
                 citizen.idleWait = std::max(0.0, citizen.idleWait - minutes);
             }
-            double travel = minutes * movementPolicy.tilesPerGameMinute;
+            double travel = minutes * (citizen.inFishingBoat
+                                           ? 2.0
+                                           : movementPolicy.tilesPerGameMinute);
             while (citizen.pathIndex < citizen.path.size())
             {
                 const auto next = citizen.path[citizen.pathIndex];
@@ -137,7 +145,28 @@ namespace Paladin
                     citizen.exitingHomeId ? citizen.exitingHomeId
                                           : citizen.homeId
                 );
-                if (!navigation_.canStep(map, citizen.tilePosition, next))
+                const auto* nextTile = map.grid().tile(next);
+                const bool boatStep =
+                    citizen.inFishingBoat && nextTile &&
+                    std::abs(next.x - citizen.tilePosition.x) +
+                            std::abs(next.y - citizen.tilePosition.y) ==
+                        1 &&
+                    (nextTile->terrain == TerrainType::Water ||
+                     (citizen.boatReturning && next == citizen.destination &&
+                      navigation_.walkable(map, next)));
+                if (citizen.inFishingBoat && !boatStep)
+                {
+                    citizen.path.clear();
+                    citizen.pathIndex = 0;
+                    citizen.stepProgress = 0;
+                    citizen.explicitMovement = false;
+                    citizen.boatReturning = false;
+                    break;
+                }
+                auto stepPolicy = movementPolicy;
+                stepPolicy.avoidBuildingFootprints = citizen.task.kind == CitizenTaskKind::AnimalWork && citizen.task.delivering;
+                if (!citizen.inFishingBoat &&
+                    !navigation_.canStep(map, citizen.tilePosition, next, stepPolicy.avoidBuildingFootprints))
                 {
                     citizen.stepProgress = 0;
                     if (requests >= movementPolicy.pathRequestsPerTick)
@@ -149,7 +178,7 @@ namespace Paladin
                         map,
                         citizen.tilePosition,
                         citizen.destination,
-                        movementPolicy
+                        stepPolicy
                     );
                     citizen.pathIndex = 0;
                     if (citizen.path.empty())
@@ -167,19 +196,25 @@ namespace Paladin
                               1.0
                           )
                         : 0;
-                citizen.stepDuration = navigation_.stepCost(
-                    map,
-                    citizen.tilePosition,
-                    next,
-                    movementPolicy
-                );
+                citizen.stepDuration = citizen.inFishingBoat
+                                           ? 1.0
+                                           : navigation_.stepCost(
+                                                 map,
+                                                 citizen.tilePosition,
+                                                 next,
+                                                 movementPolicy
+                                             );
                 citizen.stepProgress = fraction * citizen.stepDuration;
                 const double used = std::min(
                     travel,
                     citizen.stepDuration - citizen.stepProgress
                 );
-                citizen.walkDistance += used / std::max(1e-9, citizen.stepDuration) *
-                    std::hypot(double(next.x - citizen.tilePosition.x), double(next.y - citizen.tilePosition.y));
+                citizen.walkDistance +=
+                    used / std::max(1e-9, citizen.stepDuration) *
+                    std::hypot(
+                        double(next.x - citizen.tilePosition.x),
+                        double(next.y - citizen.tilePosition.y)
+                    );
                 citizen.stepProgress += used;
                 travel -= used;
                 if (citizen.stepProgress + 1e-10 < citizen.stepDuration)
@@ -219,7 +254,7 @@ namespace Paladin
         for (std::size_t scan = 0; scan < count; ++scan)
         {
             auto& citizen = citizens_[decisionCursor_++ % citizens_.size()];
-            if (citizen.child ||
+            if (citizen.child || citizen.inFishingBoat ||
                 !map.grid().isValidPosition(citizen.tilePosition) ||
                 citizen.activity != CitizenActivity::Idle ||
                 citizen.task.kind != CitizenTaskKind::None ||

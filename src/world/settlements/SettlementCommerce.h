@@ -180,19 +180,22 @@ namespace Paladin
         }
         Money tradePrice(
             const SettlementInventory& source,
-            const SettlementInventory& destination
+            const SettlementInventory& destination,
+            std::string_view resource = {}
         ) const;
         int affordableTradeUnits(
             const SettlementInventory& source,
             const SettlementInventory& destination,
             int requested,
-            const SettlementCitizenState* households = nullptr
+            const SettlementCitizenState* households = nullptr,
+            std::string_view resource = {}
         ) const;
         bool buyGoods(
             const SettlementInventory& source,
             const SettlementInventory& destination,
             int amount,
-            const SettlementCitizenState* households = nullptr
+            const SettlementCitizenState* households = nullptr,
+            std::string_view resource = {}
         );
         Money mealPrice(const SettlementMap&, const SettlementInventory&) const;
         bool canBuyMeal(

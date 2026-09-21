@@ -6,6 +6,7 @@
 #include "rendering/CityDistantObjects.h"
 #include "rendering/CityLighting.h"
 #include "rendering/CityPresentation.h"
+#include "rendering/CityResourceMap.h"
 #include "rendering/GrassPresentation.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SettlementCitizenRenderer.h"
@@ -32,6 +33,8 @@ namespace Paladin
     {
     public:
         CityPresentation presentation;
+        bool resourcesVisible = false;
+        double gameMinute = 0;
         std::string artRootOverride;
         double animationTimeOverride =
             -1; // Fixed clock for reproducible art previews/tests.
@@ -49,6 +52,7 @@ namespace Paladin
             lighting_.reset();
             naturalFeatureRenderer_.invalidateArt();
             objectRenderer_.invalidate();
+            resourceMap_.reset();
         }
         void render(
             Renderer& renderer,
@@ -92,6 +96,8 @@ namespace Paladin
         mutable CityLighting lighting_;
         mutable SceneSpriteLibrary sprites_;
         mutable SceneDrawQueue raised_;
+        mutable SceneDrawQueue preview_;
+        mutable CityResourceMap resourceMap_;
         mutable double minimapDaylight_ = 1.0;
         SettlementStructurePresentation structures_;
         WorldGridRenderer gridRenderer_;

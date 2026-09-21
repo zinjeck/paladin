@@ -1,13 +1,16 @@
 #pragma once
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <string_view>
 namespace Paladin
 {
     enum class ConsoleCommandKind
     {
         Empty,
+        Help,
         Stats,
         SpawnCitizens,
         Money,
@@ -20,76 +23,53 @@ namespace Paladin
         std::string_view error;
         std::int64_t amount = 0;
     };
-    inline ConsoleCommand parseConsoleCommand(std::string_view text)
+    struct ConsoleCommandDefinition
     {
-        auto trim = [](std::string_view s)
+        std::string_view name;
+        std::string_view usage;
+        std::string_view description;
+        ConsoleCommandKind kind;
+        ConsoleCommand (*parseArguments)(std::string_view);
+    };
+
+    inline ConsoleCommand parseMoneyArguments(std::string_view argument)
+    {
+        if (argument.empty())
         {
-            auto a = s.find_first_not_of(" \t\r\n");
-            if (a == s.npos)
-            {
-                return std::string_view{};
-            }
-            return s.substr(a, s.find_last_not_of(" \t\r\n") - a + 1);
-        };
-        text = trim(text);
-        if (text.empty())
-        {
-            return {};
+            return {
+                ConsoleCommandKind::Invalid,
+                0,
+                "Specify an amount. Usage: money <whole amount>"
+            };
         }
-        auto split = text.find_first_of(" \t");
-        auto name = text.substr(0, split);
-        auto argument =
-            split == text.npos ? std::string_view{} : trim(text.substr(split));
-        if (name == "stats")
+        std::int64_t amount = 0;
+        const auto [end, error] = std::from_chars(
+            argument.data(),
+            argument.data() + argument.size(),
+            amount
+        );
+        if (error != std::errc{} || end != argument.data() + argument.size() ||
+            amount > std::numeric_limits<std::int64_t>::max() / 100 ||
+            amount < std::numeric_limits<std::int64_t>::min() / 100)
         {
-            return argument.empty() ? ConsoleCommand{ConsoleCommandKind::Stats}
-                                    : ConsoleCommand{
-                                          ConsoleCommandKind::Invalid,
-                                          0,
-                                          "Usage: stats"
-                                      };
+            return {
+                ConsoleCommandKind::Invalid,
+                0,
+                "Invalid amount. Use money <whole amount> within the "
+                "supported cash range."
+            };
         }
-        if (name == "money")
-        {
-            if (argument.empty())
-            {
-                return {
-                    ConsoleCommandKind::Invalid,
-                    0,
-                    "Specify an amount. Usage: money <whole amount>"
-                };
-            }
-            std::int64_t amount = 0;
-            const auto [end, error] = std::from_chars(
-                argument.data(),
-                argument.data() + argument.size(),
-                amount
-            );
-            if (error != std::errc{} ||
-                end != argument.data() + argument.size() ||
-                amount > std::numeric_limits<std::int64_t>::max() / 100 ||
-                amount < std::numeric_limits<std::int64_t>::min() / 100)
-            {
-                return {
-                    ConsoleCommandKind::Invalid,
-                    0,
-                    "Invalid amount. Use money <whole amount> within the "
-                    "supported cash range."
-                };
-            }
-            ConsoleCommand command{ConsoleCommandKind::Money};
-            command.amount =
-                amount * 100; // Console units are gold, storage is hundredths.
-            return command;
-        }
-        if (name != "spawncitizens")
-        {
-            return {ConsoleCommandKind::Invalid, 0, "Unknown command."};
-        }
+        ConsoleCommand command{ConsoleCommandKind::Money};
+        command.amount = amount * 100;
+        return command;
+    }
+
+    inline ConsoleCommand parseSpawnArguments(std::string_view argument)
+    {
         std::uint64_t count = 1;
         if (!argument.empty())
         {
-            auto [end, error] = std::from_chars(
+            const auto [end, error] = std::from_chars(
                 argument.data(),
                 argument.data() + argument.size(),
                 count
@@ -107,5 +87,92 @@ namespace Paladin
             }
         }
         return {ConsoleCommandKind::SpawnCitizens, count};
+    }
+
+    // The parser and help use this one registry. Adding a command here also
+    // adds its usage to help; no separately maintained command list exists.
+    inline constexpr std::array ConsoleCommands{
+        ConsoleCommandDefinition{
+            "help",
+            "help",
+            "List every console command.",
+            ConsoleCommandKind::Help,
+            nullptr
+        },
+        ConsoleCommandDefinition{
+            "money",
+            "money <whole amount>",
+            "Set the realm treasury in gold.",
+            ConsoleCommandKind::Money,
+            parseMoneyArguments
+        },
+        ConsoleCommandDefinition{
+            "spawncitizens",
+            "spawncitizens [number]",
+            "Spawn citizens in the active settlement; "
+            "defaults to 1, maximum 100000.",
+            ConsoleCommandKind::SpawnCitizens,
+            parseSpawnArguments
+        },
+        ConsoleCommandDefinition{
+            "stats",
+            "stats",
+            "Open live debug statistics.",
+            ConsoleCommandKind::Stats,
+            nullptr
+        }
+    };
+
+    inline std::string consoleCommandHelp()
+    {
+        std::string text;
+        for (const auto& command : ConsoleCommands)
+        {
+            text += std::string(command.usage) + " - " +
+                    std::string(command.description) + "\n";
+        }
+        return text;
+    }
+
+    inline ConsoleCommand parseConsoleCommand(std::string_view text)
+    {
+        const auto trim = [](std::string_view value)
+        {
+            const auto first = value.find_first_not_of(" \t\r\n");
+            return first == value.npos
+                       ? std::string_view{}
+                       : value.substr(
+                             first,
+                             value.find_last_not_of(" \t\r\n") - first + 1
+                         );
+        };
+        text = trim(text);
+        if (text.empty())
+        {
+            return {};
+        }
+        const auto split = text.find_first_of(" \t");
+        const auto name = text.substr(0, split);
+        const auto argument =
+            split == text.npos ? std::string_view{} : trim(text.substr(split));
+        for (const auto& definition : ConsoleCommands)
+        {
+            if (definition.name != name)
+            {
+                continue;
+            }
+            if (definition.parseArguments)
+            {
+                return definition.parseArguments(argument);
+            }
+            return argument.empty()
+                       ? ConsoleCommand{definition.kind}
+                       : ConsoleCommand{
+                             ConsoleCommandKind::Invalid,
+                             0,
+                             "This command takes no arguments. Type help."
+                         };
+        }
+        return {ConsoleCommandKind::Invalid, 0, "Unknown command. Type help."};
     }
 } // namespace Paladin

@@ -154,6 +154,10 @@ namespace Paladin
         std::vector<WorldTilePosition> route_;
         std::size_t routeIndex_ = 0;
         double stepMinutes_ = 0;
+        // Needs accrue continuously; stationary strategic guards consume them
+        // on staggered appointments instead of sweeping every soldier/frame.
+        double pendingNeedsMinutes_ = 0;
+        double nextNeedsMinute_ = -1;
         double minutesPerTile_ = MarchMinutesPerTile;
         int wrapWidth_ = 0;
         int rations_ = 0;

@@ -29,6 +29,9 @@ namespace Paladin
         void backspace() noexcept;
         void clear() noexcept;
         void setText(std::string_view text);
+        // Suggestions render as placeholders and are accepted unchanged until
+        // the first typed character replaces them.
+        void setSuggestedText(std::string_view text);
 
         [[nodiscard]]
         const std::string& text() const noexcept;
@@ -38,8 +41,10 @@ namespace Paladin
     private:
         std::string placeholder_;
         std::string text_;
+        std::string suggestion_;
         std::size_t maximumLength_ = 0;
         UiRectangle bounds_;
         bool focused_ = false;
+        bool suggested_ = false;
     };
 } // namespace Paladin

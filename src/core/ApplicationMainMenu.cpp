@@ -1,4 +1,5 @@
 #include "core/Application.h"
+#include "platform/Window.h"
 #include "rendering/Renderer.h"
 #include "ui/MainMenu.h"
 #include <SDL3/SDL.h>
@@ -7,11 +8,18 @@ namespace Paladin
 {
     void Application::layoutMainMenu()
     {
+        mainMenu_->setWindowMode(window_->mode());
         mainMenu_->layout(renderer_->outputWidth(), renderer_->outputHeight());
     }
 
     bool Application::handleMainMenuEvent(const SDL_Event& event)
     {
+        if (event.type == SDL_EVENT_KEY_DOWN &&
+            event.key.scancode == SDL_SCANCODE_ESCAPE)
+        {
+            static_cast<void>(mainMenu_->closeTopLayer());
+            return true;
+        }
         if (event.type == SDL_EVENT_MOUSE_MOTION)
         {
             mainMenu_->pointerMoved(event.motion.x, event.motion.y);
@@ -32,6 +40,14 @@ namespace Paladin
             if (action == MainMenuAction::Play)
             {
                 startWorldSession();
+            }
+            else if (action == MainMenuAction::ChangeWindowMode)
+            {
+                if (!window_->setMode(mainMenu_->requestedWindowMode()))
+                {
+                    mainMenu_->setDisplayError(SDL_GetError());
+                }
+                layoutMainMenu();
             }
             else if (action == MainMenuAction::Exit)
             {

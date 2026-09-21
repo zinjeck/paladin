@@ -11,14 +11,20 @@ namespace Paladin
     struct WorldShipment;
     enum class ShipmentResult
     {
-        Success, InvalidSettlement, NotOwned, SameSettlement, InvalidResource,
+        Success,
+        InvalidSettlement,
+        NotOwned,
+        SameSettlement,
+        InvalidResource,
         InvalidAmount,
         InsufficientGoods,
         NoLandRoute,
         RouteLimit,
         InvalidRoute,
         MissingTradeDepot,
-        TradeAgreementRequired
+        TradeAgreementRequired,
+        DepotFull,
+        InsufficientMoney
     };
     std::string_view shipmentResultText(ShipmentResult) noexcept;
 
@@ -30,7 +36,11 @@ namespace Paladin
         // Display total separately from shippable goods. Private household,
         // construction, market and factory inputs are not requisitioned.
         static double total(const Settlement&, std::string_view resource);
-        static int available(const Settlement&, std::string_view resource);
+        static int available(
+            const Settlement&,
+            std::string_view resource,
+            SettlementObjectId depot = {}
+        );
         static bool hasTradeDepot(const Settlement&);
         static ShipmentResult create(
             World&,
@@ -43,13 +53,26 @@ namespace Paladin
             ShipmentId* created = nullptr,
             bool aiManaged = false,
             RealmId buyer = {},
-            std::int64_t unitPrice = 0
+            std::int64_t unitPrice = 0,
+            SettlementObjectId sourceDepot = {},
+            SettlementObjectId destinationDepot = {}
         );
-        // In-flight goods finish their delivery/return; stopping cannot delete cargo.
+        // In-flight goods finish their delivery/return; stopping cannot delete
+        // cargo.
         static ShipmentResult stop(World&, RealmId, ShipmentId);
         static void tick(World&, double minute, double elapsed);
-        static bool receive(World&, SettlementId, std::string_view, int amount, double minute);
+        static bool receive(
+            World&,
+            SettlementId,
+            std::string_view,
+            int amount,
+            double minute,
+            SettlementObjectId depot = {},
+            bool imported = true,
+            bool strictCapacity = false
+        );
+
     private:
         static bool load(World&, WorldShipment&);
     };
-}
+} // namespace Paladin

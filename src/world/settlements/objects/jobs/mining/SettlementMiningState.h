@@ -23,6 +23,30 @@ namespace Paladin
     class SettlementMiningState
     {
     public:
+        static constexpr int columnYield(MineralDeposit deposit) noexcept
+        {
+            return deposit == MineralDeposit::Gold   ? 8
+                   : deposit == MineralDeposit::Iron ? 250
+                   : deposit == MineralDeposit::Coal ? 400
+                                                     : 10000;
+        }
+        int remainingAt(SettlementTilePosition p, MineralDeposit deposit) const
+        {
+            const auto key =
+                std::uint64_t(std::uint32_t(p.y)) << 32 | std::uint32_t(p.x);
+            const auto found = extracted_.find(key);
+            const int removed = found == extracted_.end()
+                                    ? 0
+                                    : found->second[std::size_t(deposit)];
+            return std::max(0, columnYield(deposit) - removed);
+        }
+        std::uint64_t depletionChunkVersion(int x, int y) const
+        {
+            const auto key =
+                std::uint64_t(std::uint32_t(y)) << 32 | std::uint32_t(x);
+            const auto found = depletedChunks_.find(key);
+            return found == depletedChunks_.end() ? 0 : found->second;
+        }
         void synchronize(const SettlementObjectState& objects)
         {
             if (revision_ == objects.navigationVersion())
@@ -117,10 +141,7 @@ namespace Paladin
                 site.productionCredit + labor / job->minutesPerUnit
             );
             int wanted = std::min(room, int(site.productionCredit));
-            const int yield = job->deposit == MineralDeposit::Gold   ? 8
-                              : job->deposit == MineralDeposit::Iron ? 250
-                              : job->deposit == MineralDeposit::Coal ? 400
-                                                                     : 10000;
+            const int yield = columnYield(job->deposit);
             int produced = 0;
             int inspected = 0;
             while (wanted > 0 && site.cursor < site.columns.size() &&
@@ -136,6 +157,13 @@ namespace Paladin
                 wanted -= take;
                 if (removed >= yield)
                 {
+                    if (take > 0)
+                    {
+                        const auto chunk =
+                            std::uint64_t(std::uint32_t(p.y / 32)) << 32 |
+                            std::uint32_t(p.x / 32);
+                        ++depletedChunks_[chunk];
+                    }
                     ++site.cursor;
                 }
             }
@@ -152,5 +180,6 @@ namespace Paladin
         std::unordered_map<SettlementObjectId, MiningSiteProgress, StrongIdHash>
             sites_;
         std::unordered_map<std::uint64_t, std::array<int, 4>> extracted_;
+        std::unordered_map<std::uint64_t, std::uint64_t> depletedChunks_;
     };
 } // namespace Paladin

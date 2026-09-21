@@ -29,6 +29,11 @@ namespace Paladin
         {
             return;
         }
+        if (command.kind == ConsoleCommandKind::Help)
+        {
+            debugConsole_->print(consoleCommandHelp());
+            return;
+        }
         if (command.kind == ConsoleCommandKind::Stats)
         {
             debugConsole_->showStats();
@@ -47,7 +52,7 @@ namespace Paladin
             if (!realm)
             {
                 debugConsole_->print(
-                    "No player realm. Found your polity first."
+                    "No player realm. Found your realm first."
                 );
                 return;
             }

@@ -32,6 +32,7 @@
 #include "ui/MilitaryPanel.h"
 #include "ui/WorldSettlementPanel.h"
 #include "simulation/WorldShipmentSystem.h"
+#include "simulation/WorldMarketSystem.h"
 #include "simulation/DiplomacySystem.h"
 #include "simulation/CitizenshipSystem.h"
 #include "ui/DiplomacyPanel.h"
@@ -42,6 +43,9 @@
 #include "ui/EmploymentPanel.h"
 #include "ui/FoundingPanel.h"
 #include "ui/LedgerPanel.h"
+#include "ui/MainMenu.h"
+#include "ui/TradeDepotPanel.h"
+#include "world/settlements/SettlementResourceDefinition.h"
 #include "ui/SettlementInspectionPanel.h"
 #include "ui/SimulationSpeedControls.h"
 #include "world/World.h"
@@ -420,15 +424,27 @@ namespace Paladin
             for(const bool globe:{false,true})
             {
                 app.worldRenderer_->globeEnabled=globe;
-                for(const auto mode:{WorldMapMode::Government,WorldMapMode::Population,WorldMapMode::Terrain,WorldMapMode::Political})
+                for(const auto mode:{WorldMapMode::Government,WorldMapMode::Population,WorldMapMode::Terrain,WorldMapMode::Resources,WorldMapMode::Political})
                 {
                     const auto b=mode==WorldMapMode::Government?WorldMapNavigation::governmentModeButtonBounds(int(width),int(height)):
                         mode==WorldMapMode::Population?WorldMapNavigation::populationModeButtonBounds(int(width),int(height)):
                         mode==WorldMapMode::Terrain?WorldMapNavigation::terrainModeButtonBounds(int(width),int(height)):
+                        mode==WorldMapMode::Resources?WorldMapNavigation::resourceModeButtonBounds(int(width),int(height)):
                         WorldMapNavigation::politicalModeButtonBounds(int(width),int(height));
                     PALADIN_CHECK(click(app,b.x+13,b.y+13));
                     PALADIN_CHECK(app.worldRenderer_->mapMode()==mode && app.screen_==Application::Screen::World);
                     PALADIN_CHECK(!app.globePointerDown_ && !app.globeDragging_);
+                    if (mode == WorldMapMode::Resources)
+                    {
+                        const auto previousCamera = *app.camera_;
+                        app.camera_->setWorldZoom(globe ?
+                            8. * world.grid().width() / (height * .4 * 6.283185307179586) :
+                            8. / app.tileRenderMetrics_->tilePixels);
+                        frame(app);
+                        capture(app, globe ? "next-world-resources-globe.bmp" :
+                                             "next-world-resources-flat.bmp");
+                        *app.camera_ = previousCamera;
+                    }
                 }
             }
             const auto* realm=world.realm(actor);
@@ -498,9 +514,9 @@ namespace Paladin
                 bool placed = false;
                 for (int y = 1; y + 5 < map->grid().height() && !placed; ++y)
                 {
-                    for (int x = 1; x + 5 < map->grid().width() && !placed; ++x)
+                    for (int x = 1; x + 8 < map->grid().width() && !placed; ++x)
                     {
-                        const SettlementObjectFootprint f{{x,y},5,5};
+                        const SettlementObjectFootprint f{{x,y},8,5};
                         if (!map->objectState().canPlace(map->grid(),depot,f)) continue;
                         placed = map->objectState().placeCompletedObject(map->grid(),depot,f);
                         if (placed) map->naturalFeatures().clear(f);
@@ -512,6 +528,62 @@ namespace Paladin
             const auto width=app.renderer_->outputWidth(),height=app.renderer_->outputHeight();
             app.selectedWorldArmy_={}; app.militaryPanel_->close(); app.diplomacyPanel_->close(); app.employmentPanel_->close();
             sim.setSpeed(SimulationSpeed::Paused); app.simulationClock_->setPaused(true);
+            {
+                auto* map = sim.settlementMap(source);
+                PALADIN_CHECK(map);
+                SettlementObjectId depot;
+                for (const auto& object : map->objectState().completedObjects())
+                {
+                    if (object.objectTypeId == SettlementObjectTypes::TradeDepot)
+                    {
+                        depot = object.id;
+                        break;
+                    }
+                }
+                PALADIN_CHECK(depot);
+                TradeDepotPanel trade;
+                trade.open(source, depot);
+                const auto savedRelations = world.diplomacy().relations;
+                world.diplomacy().relations.clear();
+                const auto paintTrade = [&](const char* name)
+                {
+                    trade.layout(width, height, world, actor);
+                    PALADIN_CHECK(trade.isOpen());
+                    app.renderer_->beginFrame();
+                    app.renderWorldScreen();
+                    trade.render(*app.renderer_, *app.grayUiRenderer_, world, actor);
+                    capture(app, name);
+                    app.renderer_->endFrame();
+                };
+                paintTrade("next-trade-depot-no-treaty.bmp");
+                const auto owner = world.settlement(enemy)->ownerRealmId();
+                const auto previousPosition = world.settlement(enemy)->position();
+                const auto homePosition = world.settlement(source)->position();
+                PALADIN_CHECK(world.setSettlementPosition(enemy,
+                    {(homePosition.x + 2) % world.grid().width(), homePosition.y}));
+                PALADIN_CHECK(WorldShipmentSystem::hasTradeDepot(*world.settlement(enemy)));
+                world.diplomacy().relations.push_back({actor, owner, false, true});
+                auto& foreignStock = world.settlement(enemy)->simulationState().stockpile();
+                const auto previousCoal = foreignStock.amount("coal");
+                PALADIN_CHECK(foreignStock.setAmount("coal", 50));
+                const auto quote = WorldMarketSystem::depotOffer(
+                    world, source, depot, "coal", TradeDirection::Import, 10);
+                PALADIN_CHECK(quote.treatyPartners > 0 && quote.partner == enemy &&
+                              quote.available >= 10 && quote.unitPrice > 0);
+                paintTrade("next-trade-depot-import.bmp");
+                SDL_Event press{};
+                press.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                press.button.button = SDL_BUTTON_LEFT;
+                press.button.x = float(width) - 300;
+                press.button.y = 296;
+                PALADIN_CHECK(trade.handle(press, world, actor));
+                press.type = SDL_EVENT_MOUSE_BUTTON_UP;
+                PALADIN_CHECK(trade.handle(press, world, actor));
+                paintTrade("next-trade-depot-export.bmp");
+                PALADIN_CHECK(foreignStock.setAmount("coal", previousCoal));
+                PALADIN_CHECK(world.setSettlementPosition(enemy, previousPosition));
+                world.diplomacy().relations = savedRelations;
+            }
             const auto focus=[&](SettlementId id,bool globe)
             {
                 panel.close(); const auto p=world.settlement(id)->position();
@@ -530,7 +602,8 @@ namespace Paladin
                 capture(app,globe?"pr30-foreign-settlement-globe.bmp":"pr30-foreign-settlement-flat.bmp");
             }
             focus(source,false);
-            PALADIN_CHECK(WorldShipmentSystem::receive(world,source,"lumber",100,world.time().totalGameMinutes()));
+            PALADIN_CHECK(WorldShipmentSystem::receive(world,source,"lumber",100,world.time().totalGameMinutes(),{},false));
+            PALADIN_CHECK(WorldShipmentSystem::available(*world.settlement(source), "lumber") >= 100);
             frame(app);
             using Kind=WorldSettlementPanel::Kind;
             const auto control=[&](Kind kind,int value=0)
@@ -620,8 +693,20 @@ namespace Paladin
         {
             auto& renderer = *app.renderer_;
             FoundingPanel panel;
+            panel.setRulerNameSeed(777);
+            panel.open();
+            const auto suggested = panel.identity();
+            PALADIN_CHECK(!suggested.realmName.empty() && !suggested.cultureName.empty() &&
+                          !suggested.capitalName.empty() && !suggested.realmOriginId.empty());
+            panel.layout(renderer.outputWidth(), renderer.outputHeight());
+            renderer.beginFrame(); panel.render(renderer,*app.grayUiRenderer_);
+            capture(app,"next-founding-suggestions.bmp");
+            PALADIN_CHECK(panel.submit() == FoundingPanelAction::None);
+            PALADIN_CHECK(panel.submit() == FoundingPanelAction::Confirm);
+            PALADIN_CHECK(panel.identity().capitalName == suggested.capitalName);
             panel.open();
             panel.appendText("Aster Realm");
+            PALADIN_CHECK(panel.identity().realmName == "Aster Realm");
             panel.focusNextField();
             panel.appendText("Aster Folk");
             panel.layout(renderer.outputWidth(), renderer.outputHeight());
@@ -661,10 +746,20 @@ namespace Paladin
                 panel.settlementKind() == SettlementKind::Fortress
             );
             CityHud hud;
+            PALADIN_CHECK(hud.goodsCount() == SettlementResourceCatalog::definitions().size());
+            for (const auto& resource : SettlementResourceCatalog::definitions())
+            { hud.setGoodsResource(resource.id,42); }
+            hud.setRealmFlag(panel.identity().flag);
             hud.setFortress(true);
             hud.setSettlementStatus(true, 8);
             hud.setCityInformation("North Watch", 1, 12, 0);
             hud.layout(renderer.outputWidth(), renderer.outputHeight());
+            for (const auto& resource : SettlementResourceCatalog::definitions())
+            {
+                const auto cell = hud.goodsBounds(resource.id);
+                PALADIN_CHECK(cell.width > 0 && cell.height > 0);
+                PALADIN_CHECK(hud.tooltipAt(cell.x + 4, cell.y + 4).find(resource.displayName) != std::string::npos);
+            }
             renderer.beginFrame();
             hud.render(renderer, *app.grayUiRenderer_);
             capture(app, "fortress-toolbar.bmp");
@@ -674,6 +769,45 @@ namespace Paladin
 
         static void presentationChecks(Application& app)
         {
+            // Rare deposits survive exact reduction even when they miss every
+            // distant sampling point. Edge chunks obey the same work budget.
+            SettlementGrid mineralGrid(97, 65);
+            for (int y = 0; y < mineralGrid.height(); ++y)
+            {
+                for (int x = 0; x < mineralGrid.width(); ++x)
+                {
+                    mineralGrid.tile({x, y})->terrain = TerrainType::Land;
+                }
+            }
+            mineralGrid.tile({23, 27})->mineral = MineralDeposit::Gold;
+            mineralGrid.tile({81, 47})->mineral = MineralDeposit::Iron;
+            mineralGrid.tile({96, 64})->mineral = MineralDeposit::Coal;
+            SettlementMap mineralMap(std::move(mineralGrid), {0, 0}, 1, 1, 97, 991);
+            CityMineralOverview overview;
+            for (int frame = 0; frame < 8; ++frame)
+            {
+                overview.begin(mineralMap);
+                overview.advance(mineralMap);
+                PALADIN_CHECK(overview.examinedTiles() <= 4096);
+            }
+            PALADIN_CHECK(overview.maskAt(0, 0, 128) == 7);
+            PALADIN_CHECK(overview.maskAt(16, 16, 16) == 4);
+            PALADIN_CHECK(overview.maskAt(64, 32, 32) == 2);
+            PALADIN_CHECK(overview.maskAt(96, 64, 32) == 1);
+            const auto unchanged = overview.revisionAt(64, 32, 32);
+            const auto changed = overview.revisionAt(0, 0, 32);
+            CompletedSettlementObject mine;
+            mine.id = SettlementObjectId{1};
+            mine.objectTypeId = SettlementObjectTypes::GoldMine;
+            mine.footprint = {{22, 26}, 3, 3};
+            PALADIN_CHECK(mineralMap.mining.work(mineralMap.grid(), mine, 1, 28800, 8) == 8);
+            overview.begin(mineralMap);
+            static_cast<void>(overview.touch(mineralMap, 0, 0));
+            PALADIN_CHECK(overview.examinedTiles() == 1024);
+            PALADIN_CHECK(overview.maskAt(0, 0, 128) == 3);
+            PALADIN_CHECK(overview.maskAt(16, 16, 16) == 0);
+            PALADIN_CHECK(overview.revisionAt(0, 0, 32) != changed);
+            PALADIN_CHECK(overview.revisionAt(64, 32, 32) == unchanged);
             // Feature summaries must follow resource changes, including
             // irregular map edges, rather than retain stale distant trees.
             SettlementNaturalFeatures summary(7, 5);
@@ -1109,8 +1243,8 @@ namespace Paladin
                                    SettlementFootprintSelectionMode::Fixed;
                 const SettlementObjectFootprint footprint{
                     {4 + (slot % 3) * 12, 4 + (slot / 3) * 12},
-                    fixed ? definition.previewWidth : 6,
-                    fixed ? definition.previewHeight : 6
+                    fixed ? definition.previewWidth : std::max(6, definition.minimumWidth),
+                    fixed ? definition.previewHeight : std::max(6, definition.minimumHeight)
                 };
                 if (const auto* mine = miningJob(definition.id))
                 {
@@ -3025,6 +3159,20 @@ namespace Paladin
             const float width = float(app.renderer_->outputWidth());
             const float height = float(app.renderer_->outputHeight());
             frame(app);
+            PALADIN_CHECK(click(app,width / 2,height / 2 + 60)); // Settings.
+            const float settingsX = (width - 650) * .5F;
+            const float settingsY = std::max(28.F,(height - 400) * .5F);
+            PALADIN_CHECK(click(app,settingsX + 300,settingsY + 155));
+            frame(app);
+            capture(app,"next-display-settings.bmp");
+            PALADIN_CHECK(app.mainMenu_->closeTopLayer()); // Dropdown.
+            PALADIN_CHECK(app.mainMenu_->closeTopLayer()); // Settings.
+            PALADIN_CHECK(!app.mainMenu_->closeTopLayer());
+            PALADIN_CHECK(click(app,width / 2,height / 2 + 60));
+            PALADIN_CHECK(click(app,settingsX + 300,settingsY + 155));
+            PALADIN_CHECK(click(app,settingsX + 300,settingsY + 199)); // Windowed.
+            PALADIN_CHECK(app.window_->mode() == WindowMode::Windowed);
+            key(app,SDL_SCANCODE_ESCAPE);
             PALADIN_CHECK(click(app, width / 2, height / 2)); // Tutorial.
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(click(app, width / 2, height / 2 - 60)); // Play.
@@ -3053,6 +3201,11 @@ namespace Paladin
                 }
             }
             grid.terrainChanged(); // Publish fixture edits to both terrain projections.
+            WorldResourceMap resourceCache;
+            resourceCache.prepare(app.simulation_->world());
+            PALADIN_CHECK(resourceCache.lastPreparedTiles() <= 4096);
+            resourceCache.prepare(app.simulation_->world());
+            PALADIN_CHECK(resourceCache.lastPreparedTiles() <= 4096);
             app.camera_->setPosition(32, 32);
             frame(app);
             const auto terrainDeadline = SDL_GetTicks() + 120000;
@@ -3205,6 +3358,13 @@ namespace Paladin
             PALADIN_CHECK(click(app, 180, 118));
             PALADIN_CHECK(app.cityRenderer_->presentation.roofsVisible);
             app.settlementInspectionController_->clear();
+            const auto resourceMini = app.cityHud_->minimapBounds();
+            PALADIN_CHECK(click(app,resourceMini.x + 16,resourceMini.y - 18));
+            PALADIN_CHECK(app.cityRenderer_->resourcesVisible);
+            for (int warm = 0; warm < 24; ++warm) { frame(app); }
+            capture(app,"next-city-resources.bmp");
+            PALADIN_CHECK(click(app,resourceMini.x + 16,resourceMini.y - 18));
+            PALADIN_CHECK(!app.cityRenderer_->resourcesVisible);
             capture(app, "presentation-hud.bmp");
             PALADIN_CHECK(click(app, 260, 118)); // Art F8 beside roof control.
             PALADIN_CHECK(!SceneSpriteLibrary::environmentArtEnabled());
@@ -3663,7 +3823,7 @@ namespace Paladin
             PALADIN_CHECK(app.screen_ == Application::Screen::MainMenu);
             PALADIN_CHECK(!app.simulation_);
             frame(app);
-            PALADIN_CHECK(!click(app, width / 2, height / 2 + 60)); // Exit.
+            PALADIN_CHECK(!click(app, width / 2, height / 2 + 120)); // Exit.
 
             SDL_Event quit{};
             quit.type = SDL_EVENT_QUIT;

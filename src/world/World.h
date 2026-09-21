@@ -285,6 +285,9 @@ namespace Paladin
 
     private:
         friend class MilitarySystem;
+        std::uint64_t militaryRosterStamp_ = 0;
+        std::uint64_t militaryRosterRebuilds_ = 0;
+        std::uint64_t militaryPersonnelUpdates_ = 0;
         friend class BattleSystem;
         friend class WorldShipmentSystem;
         std::vector<WorldShipment> shipments_;

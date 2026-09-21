@@ -13,7 +13,7 @@ namespace Paladin
         std::uint64_t id
     )
     {
-        if (!sprites.find("stockpile.shelter.roof"))
+        if (!sprites.find("roof.thatch.full"))
         {
             return false;
         }
@@ -66,7 +66,7 @@ namespace Paladin
         sprites.placed(
             q,
             p,
-            "stockpile.shelter.wall",
+            "wall.adobe.front",
             x + .15,
             y + shedH,
             y + shedH,
@@ -78,7 +78,7 @@ namespace Paladin
         sprites.placed(
             q,
             p,
-            "stockpile.shelter.roof",
+            "roof.thatch.full",
             x + .08,
             y - .38,
             y + shedH,

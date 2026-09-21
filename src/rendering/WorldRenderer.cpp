@@ -172,7 +172,9 @@ namespace Paladin
             );
         }
 
-        territoryPresentationRenderer_.configure(mapMode_,selectedRealm);
+        territoryPresentationRenderer_.configure(
+            mapMode_ == WorldMapMode::Resources ? WorldMapMode::Terrain : mapMode_,
+            selectedRealm);
         if (thematicMapMode(mapMode_) && !territoryPresentationRenderer_.preparationReady() &&
             !territoryPresentationRenderer_.prepare(renderer,world))
         {
@@ -354,6 +356,11 @@ namespace Paladin
                 placementMarker,
                 objectResidual, &artwork_, selectedArmy, selectedCaravan
             );
+            if (mapMode_ == WorldMapMode::Resources)
+            {
+                resourceMap_.render(renderer, world, camera,
+                    presentationTilePixels, true, artwork_);
+            }
             stage(7);
             return;
         }
@@ -428,6 +435,11 @@ namespace Paladin
             placementMarker,
             {flatResidualX, flatResidualY, 0}, &artwork_, selectedArmy, selectedCaravan
         );
+        if (mapMode_ == WorldMapMode::Resources)
+        {
+            resourceMap_.render(renderer, world, camera,
+                presentationTilePixels, false, artwork_);
+        }
     }
 
     void WorldRenderer::toggleProjection(
@@ -522,12 +534,19 @@ namespace Paladin
             true
         );
 
+        ui.drawButton(r, WorldMapNavigation::resourceModeButtonBounds(r.outputWidth(), r.outputHeight()),
+            "R", false, false, mapMode_ == WorldMapMode::Resources, true);
         ui.drawButton(r,WorldMapNavigation::governmentModeButtonBounds(r.outputWidth(),r.outputHeight()),"G",false,false,mapMode_==WorldMapMode::Government,true);
         ui.drawButton(r,WorldMapNavigation::populationModeButtonBounds(r.outputWidth(),r.outputHeight()),"N",false,false,mapMode_==WorldMapMode::Population,true);
         const auto nav=WorldMapNavigation::buttonBounds(r.outputWidth(),r.outputHeight());
         const float legendX=WorldMapNavigation::mapBounds(r.outputWidth(),r.outputHeight()).x;
         const float legendY=nav.y-32;
-        if (mapMode_==WorldMapMode::Government)
+        if (mapMode_ == WorldMapMode::Resources)
+        {
+            ui.drawLabel(r, resourceMap_.ready() ? "Natural resource regions" : "Surveying resource regions...",
+                         legendX, legendY, 1);
+        }
+        else if (mapMode_==WorldMapMode::Government)
         {
             r.fillRectangle(legendX,legendY,10,10,GovernmentTribal); ui.drawLabel(r,"Tribal",legendX+15,legendY,1);
             r.fillRectangle(legendX+72,legendY,10,10,GovernmentCivic); ui.drawLabel(r,"Civic",legendX+87,legendY,1);

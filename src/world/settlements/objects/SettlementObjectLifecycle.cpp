@@ -1,6 +1,7 @@
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include "world/settlements/objects/SettlementObjectState.h"
+#include "world/settlements/objects/WorkplaceCompound.h"
 #include "world/settlements/objects/jobs/wheat_farm/WheatFarmJob.h"
 #include <algorithm>
 #include <cmath>
@@ -32,25 +33,32 @@ namespace Paladin
                 occupy(*definition, object.footprint);
                 // Outdoor workplaces remain walkable while keeping their
                 // building footprint exclusive.
-                if (definition->wallThickness > 0)
+                if (definition->wallThickness > 0 ||
+                    workplaceCompound(object.objectTypeId))
                 {
-                    const auto& f = object.footprint;
+                    const bool compound =
+                        workplaceCompound(object.objectTypeId);
+                    const auto f = compound ? workplaceRoom(object.footprint)
+                                            : object.footprint;
+                    const auto door =
+                        compound
+                            ? std::optional{workplaceRoomDoor(object.footprint)}
+                            : object.door;
                     for (int y = f.topLeft.y; y < f.topLeft.y + f.height; ++y)
                     {
                         for (int x = f.topLeft.x; x < f.topLeft.x + f.width;
                              ++x)
                         {
-                            const int band = definition->wallThickness;
+                            const int band =
+                                compound ? 1 : definition->wallThickness;
                             const bool wall =
                                 x < f.topLeft.x + band ||
                                 y < f.topLeft.y + band ||
                                 x >= f.topLeft.x + f.width - band ||
                                 y >= f.topLeft.y + f.height - band;
                             movementBlockedTiles_[tileIndex({x, y})] =
-                                wall &&
-                                (!object.door ||
-                                 !validDoorTile(f, *object.door) ||
-                                 *object.door != SettlementTilePosition{x, y});
+                                wall && (!door || !validDoorTile(f, *door) ||
+                                         *door != SettlementTilePosition{x, y});
                         }
                     }
                 }
@@ -246,32 +254,56 @@ namespace Paladin
         ++presentationVersion_;
         return true;
     }
-    int SettlementObjectState::prepareGrainHarvest(SettlementObjectId id, double minute)
+    int SettlementObjectState::prepareGrainHarvest(
+        SettlementObjectId id,
+        double minute
+    )
     {
         for (auto& object : completedObjects_)
         {
-            if (object.id != id || object.objectTypeId != SettlementObjectTypes::WheatFarm) continue;
+            if (object.id != id ||
+                object.objectTypeId != SettlementObjectTypes::WheatFarm)
+            {
+                continue;
+            }
             if (object.cropReadyMinute < 0)
             {
                 object.cropReadyMinute =
                     minute + WheatFarmPolicy::GrowthMinutes;
-                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height * WheatFarmPolicy::GrainPerTile);
+                object.grainRemaining = std::max(
+                    4,
+                    object.footprint.width * object.footprint.height *
+                        WheatFarmPolicy::GrainPerTile
+                );
             }
             return minute >= object.cropReadyMinute ? object.grainRemaining : 0;
         }
         return 0;
     }
-    void SettlementObjectState::takeGrainHarvest(SettlementObjectId id, int amount, double minute)
+    void SettlementObjectState::takeGrainHarvest(
+        SettlementObjectId id,
+        int amount,
+        double minute
+    )
     {
         for (auto& object : completedObjects_)
         {
-            if (object.id != id || object.objectTypeId != SettlementObjectTypes::WheatFarm || amount <= 0) continue;
+            if (object.id != id ||
+                object.objectTypeId != SettlementObjectTypes::WheatFarm ||
+                amount <= 0)
+            {
+                continue;
+            }
             object.grainRemaining = std::max(0, object.grainRemaining - amount);
             if (object.grainRemaining == 0)
             {
                 object.cropReadyMinute =
                     minute + WheatFarmPolicy::GrowthMinutes;
-                object.grainRemaining = std::max(4, object.footprint.width * object.footprint.height * WheatFarmPolicy::GrainPerTile);
+                object.grainRemaining = std::max(
+                    4,
+                    object.footprint.width * object.footprint.height *
+                        WheatFarmPolicy::GrainPerTile
+                );
             }
             return;
         }

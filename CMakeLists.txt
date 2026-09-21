@@ -82,6 +82,7 @@ add_custom_target(PaladinCompileAssets
  DEPENDS PaladinAssetCompiler VERBATIM)
 
 add_executable(Paladin
+    src/debug/CrashReporter.cpp
     src/main.cpp
     src/core/ApplicationCameraBenchmark.cpp
     src/core/Application.cpp
@@ -208,6 +209,7 @@ add_executable(Paladin
     src/ui/UiTextField.cpp
     src/ui/MainMenu.cpp
     src/ui/NormalFontRenderer.cpp
+    src/ui/TradeDepotPanel.cpp
     src/ui/SettlementInspectionPanel.cpp
     src/ui/SimulationSpeedControls.cpp
     src/ui/WorldHud.cpp

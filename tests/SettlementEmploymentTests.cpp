@@ -145,7 +145,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(map.objectState().createConstructionSites(
         map.grid(),
         fishing,
-        {{10, 10}, 3, 3}
+        {{10, 10}, 8, 5}
     ));
     auto stockpile =
         *SettlementObjectCatalog::definition(SettlementObjectTypes::Stockpile);
@@ -178,7 +178,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(delivery.front().resourceId == "lumber");
     PALADIN_CHECK(delivery.front().requiredAmount == 4);
     PALADIN_CHECK(
-        !map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 3, 3})
+        !map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 8, 5})
     );
     PALADIN_CHECK(
         map.commandState()
@@ -187,7 +187,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(map.objectState().constructionSites().empty());
     PALADIN_CHECK(!jobs.workplace(pendingFishId));
     PALADIN_CHECK(
-        map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 3, 3})
+        map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 8, 5})
     );
     PALADIN_CHECK(!map.objectState().blocksMovement({11, 11}));
     PALADIN_CHECK(!map.objectState().blocksMovement({20, 20}));
@@ -195,7 +195,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
         fishing,
-        {{10, 10}, 3, 3}
+        {{10, 10}, 8, 5}
     ));
     jobs.synchronize(map.objectState(), citizens);
     const auto fishId =
@@ -262,7 +262,7 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(map.objectState().placeCompletedObject(
         map.grid(),
         fishing,
-        {{25, 5}, 6, 6}
+        {{22, 5}, 16, 10}
     ));
     jobs.synchronize(map.objectState(), citizens);
     const auto largeId =
@@ -270,6 +270,22 @@ void runSettlementEmploymentTests()
     PALADIN_CHECK(jobs.workplace(largeId)->capacity == 0);
     PALADIN_CHECK(jobs.workplace(largeId)->maximumCapacity == 16);
     PALADIN_CHECK(jobs.workplace(fishId)->maximumCapacity == 4);
+    auto depot =
+        *SettlementObjectCatalog::definition(SettlementObjectTypes::TradeDepot);
+    depot.bypassesConstruction = true;
+    for (const auto [area, capacity] :
+         {std::pair{SettlementObjectFootprint{{25, 20}, 8, 5}, 2U},
+          std::pair{SettlementObjectFootprint{{24, 27}, 16, 10}, 7U}})
+    {
+        PALADIN_CHECK(
+            map.objectState().placeCompletedObject(map.grid(), depot, area)
+        );
+        jobs.synchronize(map.objectState(), citizens);
+        const auto id =
+            jobs.forObject(map.objectState().completedObjects().back().id);
+        PALADIN_CHECK(jobs.workplace(id)->maximumCapacity == capacity);
+        PALADIN_CHECK(jobs.workplace(id)->capacity == 0);
+    }
     const auto* road =
         SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
     PALADIN_CHECK(map.objectState().createConstructionSites(
@@ -278,8 +294,8 @@ void runSettlementEmploymentTests()
         {{5, 30}, 5, 2}
     ));
     PALADIN_CHECK(
-        map.commandState().cancelIntersecting(map, {{7, 30}, 1, 1}, citizens, 0) ==
-        1
+        map.commandState()
+            .cancelIntersecting(map, {{7, 30}, 1, 1}, citizens, 0) == 1
     );
     PALADIN_CHECK(!map.objectState().constructionSiteAt({7, 30}));
     PALADIN_CHECK(map.objectState().constructionSiteAt({6, 30}));

@@ -1,9 +1,10 @@
 #include "simulation/Simulation.h"
+#include "debug/CrashContext.h"
+#include "simulation/AiRealmSystem.h"
 #include "simulation/CitizenshipSystem.h"
 #include "simulation/MilitarySystem.h"
-#include "simulation/WorldShipmentSystem.h"
-#include "simulation/AiRealmSystem.h"
 #include "simulation/RealmRulerSystem.h"
+#include "simulation/WorldShipmentSystem.h"
 #include "world/PlanetAstronomy.h"
 #include "world/generation/AiRealmGenerator.h"
 
@@ -78,7 +79,23 @@ namespace Paladin
             return;
         }
 
-        MilitarySystem::synchronize(*world_, world_->time().totalGameMinutes() + pendingGameMinutes_);
+        CrashContext::seed = world_->generationSeed();
+        CrashContext::minute = world_->time().totalGameMinutes();
+        CrashContext::tick = tickCount_;
+        CrashContext::settlements = world_->settlements().size();
+        CrashContext::soldiers = world_->soldiers().size();
+        CrashContext::armies = world_->armies().size();
+        CrashContext::shipments = world_->shipments().size();
+        CrashContext::activeSettlement = presentedSettlementId_.value();
+        CrashContext::elapsedMinutes = gameDeltaMinutes;
+        CrashContext::tickMilliseconds = tickTiming.last;
+        CrashContext::setPhase("Military roster reconciliation");
+        MilitarySystem::synchronize(
+            *world_,
+            world_->time().totalGameMinutes() + pendingGameMinutes_,
+            false
+        );
+        CrashContext::setPhase("Local citizen simulation");
         {
             ScopedTiming citizenTimer{citizenTiming};
             for (auto& settlement : world_->settlements())
@@ -86,16 +103,23 @@ namespace Paladin
                 auto& state = settlement.simulationState();
                 if (auto* map = settlementMap(settlement.id()))
                 {
-                    const double now = world_->time().totalGameMinutes() + pendingGameMinutes_;
+                    const double now =
+                        world_->time().totalGameMinutes() + pendingGameMinutes_;
                     if (settlement.id() != detailedSimulationSettlementId_)
                     {
-                        // Reuse the physical activity authority, but avoid per-frame
-                        // AI sweeps and visual snapshots for cities nobody is viewing.
-                        // Aggregate commerce must NOT run as well: it would fabricate
-                        // production while jobs consume/deliver the same real goods.
+                        // Reuse the physical activity authority, but avoid
+                        // per-frame AI sweeps and visual snapshots for cities
+                        // nobody is viewing. Aggregate commerce must NOT run as
+                        // well: it would fabricate production while jobs
+                        // consume/deliver the same real goods.
                         state.pendingLocalActivityMinutes_ += gameDeltaMinutes;
                         if (state.pendingLocalActivityMinutes_ + 1e-9 >= 1.0)
-                            flushLocalActivity(settlement.id(), now + gameDeltaMinutes);
+                        {
+                            flushLocalActivity(
+                                settlement.id(),
+                                now + gameDeltaMinutes
+                            );
+                        }
                     }
                     else
                     {
@@ -103,7 +127,12 @@ namespace Paladin
                         map->commerce.resumeActive();
                         state.citizens().captureVisualPositions();
                         map->animals.captureVisualPositions();
-                        map->activities.tick(*map, state.citizens(), now, gameDeltaMinutes);
+                        map->activities.tick(
+                            *map,
+                            state.citizens(),
+                            now,
+                            gameDeltaMinutes
+                        );
                         ++state.localActivityUpdates_;
                     }
                     if (map->logistics.founded())
@@ -114,10 +143,26 @@ namespace Paladin
             }
         }
 
-        MilitarySystem::tick(*world_, world_->time().totalGameMinutes() + pendingGameMinutes_, gameDeltaMinutes);
-        WorldShipmentSystem::tick(*world_, world_->time().totalGameMinutes() + pendingGameMinutes_, gameDeltaMinutes);
+        CrashContext::setPhase("Army movement and needs");
+        MilitarySystem::tick(
+            *world_,
+            world_->time().totalGameMinutes() + pendingGameMinutes_,
+            gameDeltaMinutes
+        );
+        CrashContext::setPhase("World cargo movement");
+        WorldShipmentSystem::tick(
+            *world_,
+            world_->time().totalGameMinutes() + pendingGameMinutes_,
+            gameDeltaMinutes
+        );
+        CrashContext::setPhase("Ruler succession");
         RealmRulerSystem::tick(*world_, playerRealmId_, gameDeltaMinutes);
-        AiRealmSystem::tick(*world_, world_->time().totalGameMinutes()+pendingGameMinutes_, gameDeltaMinutes);
+        CrashContext::setPhase("AI realm decisions");
+        AiRealmSystem::tick(
+            *world_,
+            world_->time().totalGameMinutes() + pendingGameMinutes_,
+            gameDeltaMinutes
+        );
         pendingGameMinutes_ += gameDeltaMinutes;
 
         const double wholeMinutes = std::floor(pendingGameMinutes_);
@@ -139,7 +184,9 @@ namespace Paladin
 
         world_->advanceTime(gameMinutes);
         ScopedTiming aggregateTimer{aggregateTiming};
+        CrashContext::setPhase("Aggregate economy and population");
         worldSimulationPipeline_->tick(*world_, gameMinutes);
+        CrashContext::setPhase("Simulation reports");
         reports.update(*world_, playerRealmId_);
     }
 
@@ -148,15 +195,24 @@ namespace Paladin
     {
         auto* settlement = world_->settlement(id);
         auto* map = settlementMap(id);
-        if (!settlement || !map) return;
+        if (!settlement || !map)
+        {
+            return;
+        }
         auto& state = settlement->simulationState();
         const double elapsed = state.pendingLocalActivityMinutes_;
-        if (elapsed <= 1e-9) return;
+        if (elapsed <= 1e-9)
+        {
+            return;
+        }
         map->commerce.resumeActive();
         map->activities.tick(*map, state.citizens(), now - elapsed, elapsed);
         state.pendingLocalActivityMinutes_ = 0;
         ++state.localActivityUpdates_;
-        if (map->logistics.founded()) state.synchronizeCitizenPopulation();
+        if (map->logistics.founded())
+        {
+            state.synchronizeCitizenPopulation();
+        }
     }
 
 
@@ -177,10 +233,14 @@ namespace Paladin
             return false;
         }
         auto& state = settlement->simulationState();
-        const auto origins=CitizenshipSystem::nearbyOrigins(*world_,settlementId);
-        if (origins.empty()) return false;
+        const auto origins =
+            CitizenshipSystem::nearbyOrigins(*world_, settlementId);
+        if (origins.empty())
+        {
+            return false;
+        }
         CitizenshipSystem::synchronize(*world_);
-        const auto first=state.citizens().citizens().size();
+        const auto first = state.citizens().citizens().size();
         if (!map->immigration.admit(
                 *map,
                 state.citizens(),
@@ -190,7 +250,12 @@ namespace Paladin
         {
             return false;
         }
-        CitizenshipSystem::assignImmigrants(*world_,settlementId,first,origins);
+        CitizenshipSystem::assignImmigrants(
+            *world_,
+            settlementId,
+            first,
+            origins
+        );
         state.synchronizeCitizenPopulation();
         return true;
     }
@@ -269,12 +334,16 @@ namespace Paladin
 
         const SettlementId previousSettlementId =
             detailedSimulationSettlementId_;
-        const double now = world_->time().totalGameMinutes() + pendingGameMinutes_;
+        const double now =
+            world_->time().totalGameMinutes() + pendingGameMinutes_;
         flushLocalActivity(settlementId, now);
         if (auto* map = settlementMap(settlementId))
         {
             // Never interpolate against the snapshot from the last visit.
-            world_->settlement(settlementId)->simulationState().citizens().captureVisualPositions();
+            world_->settlement(settlementId)
+                ->simulationState()
+                .citizens()
+                .captureVisualPositions();
             map->animals.captureVisualPositions();
         }
 

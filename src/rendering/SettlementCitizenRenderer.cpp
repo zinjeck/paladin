@@ -1,13 +1,14 @@
 #include "rendering/SettlementCitizenRenderer.h"
 #include "rendering/SceneDetail.h"
 #include "rendering/ScenePresentation.h"
+#include "rendering/TransportPresentation.h"
 #include "world/entities/animals/SettlementAnimals.h"
 
 #include "rendering/Camera2D.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
-#include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/SettlementEmploymentState.h"
+#include "world/settlements/citizens/SettlementCitizenState.h"
 
 #include "ui/BitmapFontRenderer.h"
 #include <algorithm>
@@ -82,19 +83,39 @@ namespace Paladin
                 continue;
             }
 
-            // Presentation follows employment without changing citizen simulation.
+            // Presentation follows employment without changing citizen
+            // simulation.
             const char* role = "citizen";
             if (!citizen.child && employment)
             {
-                if (const auto* work = employment->workplace(citizen.workplaceId))
+                if (const auto* work =
+                        employment->workplace(citizen.workplaceId))
                 {
                     const auto& type = work->objectTypeId;
-                    if (work->constructionId) role = "builder";
-                    else if (type == "wheat_farm") role = "farmer";
-                    else if (type == "fishing_grounds") role = "fisher";
-                    else if (type == "logging_grounds") role = "logger";
-                    else if (type == "pastureland") role = "herder";
-                    else if (type == "bakery") role = "baker";
+                    if (work->constructionId)
+                    {
+                        role = "builder";
+                    }
+                    else if (type == "wheat_farm")
+                    {
+                        role = "farmer";
+                    }
+                    else if (type == "fishing_grounds")
+                    {
+                        role = "fisher";
+                    }
+                    else if (type == "logging_grounds")
+                    {
+                        role = "logger";
+                    }
+                    else if (type == "pastureland")
+                    {
+                        role = "herder";
+                    }
+                    else if (type == "bakery")
+                    {
+                        role = "baker";
+                    }
                     else if (
                         type == "coal_mine" || type == "iron_mine" ||
                         type == "gold_mine" || type == "quarry"
@@ -102,39 +123,109 @@ namespace Paladin
                     {
                         role = "miner";
                     }
-                    else if (type == "market") role = "merchant";
+                    else if (type == "market")
+                    {
+                        role = "merchant";
+                    }
                     else if (type == "stockpile" || type == "trade_depot")
                     {
                         role = "porter";
                     }
-                    else if (type == "barracks") role = "militia";
-                    else if (type == "army_supply_depot") role = "porter";
+                    else if (type == "barracks")
+                    {
+                        role = "militia";
+                    }
+                    else if (type == "army_supply_depot")
+                    {
+                        role = "porter";
+                    }
                 }
             }
-            if (!citizen.child && citizen.activity == CitizenActivity::Constructing)
+            if (!citizen.child &&
+                citizen.activity == CitizenActivity::Constructing)
+            {
                 role = "builder";
-            if (!citizen.child && citizen.task.kind == CitizenTaskKind::Gather) role = "logger";
-            if (citizen.soldierId) role = "militia";
+            }
+            if (!citizen.child && citizen.task.kind == CitizenTaskKind::Gather)
+            {
+                role = "logger";
+            }
+            if (citizen.soldierId)
+            {
+                role = "militia";
+            }
             bool north = false;
             if (citizen.pathIndex < citizen.path.size())
+            {
                 north = citizen.path[citizen.pathIndex].y < citizen.visualY();
-            std::string spriteId = std::string("citizen.") + role +
+            }
+            std::string spriteId =
+                std::string("citizen.") + role +
                 (citizen.sex == CitizenSex::Female ? ".female." : ".male.") +
                 (north ? "back" : "front");
             const bool walking = citizen.pathIndex < citizen.path.size();
-            const bool gathering = citizen.task.kind == CitizenTaskKind::Gather && !walking;
+            const bool gathering =
+                citizen.task.kind == CitizenTaskKind::Gather && !walking;
             const bool working =
                 !walking &&
                 (gathering || citizen.task.kind == CitizenTaskKind::Build ||
                  citizen.activity == CitizenActivity::Mining);
-            const int pose = walking ? int(std::fmod(citizen.walkDistance, 1.0) * 4.0)
-                : working ? int(std::fmod(citizen.workAnimationMinutes, 8.0) * .5) : 0;
-            if ((walking || working) && sprites && sprites->find(spriteId + ".walk")) spriteId += ".walk";
-            const std::uint64_t actorKey = citizen.soldierId
-                ? (std::uint64_t(3) << 61) | citizen.soldierId.value()
-                : (std::uint64_t(1) << 62) | citizen.id.value();
+            const int pose =
+                walking ? int(std::fmod(citizen.walkDistance, 1.0) * 4.0)
+                : working
+                    ? int(std::fmod(citizen.workAnimationMinutes, 8.0) * .5)
+                    : 0;
+            if ((walking || working) && sprites &&
+                sprites->find(spriteId + ".walk"))
+            {
+                spriteId += ".walk";
+            }
+            const std::uint64_t actorKey =
+                citizen.soldierId
+                    ? (std::uint64_t(3) << 61) | citizen.soldierId.value()
+                    : (std::uint64_t(1) << 62) | citizen.id.value();
+            if (citizen.inFishingBoat && sprites)
+            {
+                const auto next = citizen.pathIndex < citizen.path.size()
+                                      ? citizen.path[citizen.pathIndex]
+                                      : citizen.tilePosition;
+                const double dx = next.x - citizen.visualX();
+                const double dy = next.y - citizen.visualY();
+                if (const auto* boat = sprites->find(
+                        std::string("transport.canoe.") +
+                        transportDirection(dx, dy)
+                    ))
+                {
+                    const double x =
+                        citizen.renderX(citizen.visualX(), interpolationAlpha) +
+                        .5;
+                    const double y =
+                        citizen.renderY(citizen.visualY(), interpolationAlpha) +
+                        .5;
+                    queue.submit(
+                        {projection.bounds(
+                             {x,
+                              y,
+                              0,
+                              boat->width * .8,
+                              boat->height * .8,
+                              boat->pivotX,
+                              boat->pivotY}
+                         ),
+                         {},
+                         y,
+                         actorKey,
+                         0,
+                         -5,
+                         boat->texture.get(),
+                         sprites->frame(*boat)}
+                    );
+                }
+            }
             const bool custom =
-                (tilePixels >= StaticDetailPixels || citizen.id == selectedCitizen) && sprites &&
+                (tilePixels >= StaticDetailPixels ||
+                 citizen.id == selectedCitizen) &&
+                sprites &&
                 sprites->submit(
                     queue,
                     projection,
@@ -143,8 +234,10 @@ namespace Paladin
                         sleepOffset + .5,
                     citizen.renderY(citizen.visualY(), interpolationAlpha) + .5,
                     actorKey,
-                    citizen.child ? .5 : 1,
-                    pose
+                    citizen.child           ? .5
+                    : citizen.inFishingBoat ? .75
+                                            : 1,
+                    citizen.inFishingBoat ? 0 : pose
                 );
             if (working && tilePixels >= AnimationDetailPixels)
             {
@@ -152,15 +245,43 @@ namespace Paladin
                 // Quantized poses follow actual work time; pause freezes them.
                 const float p = float(tilePixels / 16.0);
                 const float x = float(centerX), y = float(centerY);
-                const int tipX[4]={6,9,9,7}, tipY[4]={-9,-6,-1,-4};
-                const auto pixel=[&](float px,float py,int w,int h,RenderColor color,int part)
-                { queue.submit({{x+px*p,y+py*p,w*p,h*p},color,
-                    citizen.renderY(citizen.visualY(),interpolationAlpha)+.5,actorKey,0,part}); };
-                const int tx=tipX[pose],ty=tipY[pose];
-                const int steps=std::max(std::abs(tx-3),std::abs(ty+3));
-                for(int i=0;i<=steps;++i)
-                    pixel(std::round(3+(tx-3)*float(i)/std::max(1,steps)),
-                          std::round(-3+(ty+3)*float(i)/std::max(1,steps)),1,1,{136,96,68,255},2);
+                const int tipX[4] = {6, 9, 9, 7}, tipY[4] = {-9, -6, -1, -4};
+                const auto pixel = [&](float px,
+                                       float py,
+                                       int w,
+                                       int h,
+                                       RenderColor color,
+                                       int part)
+                {
+                    queue.submit(
+                        {{x + px * p, y + py * p, w * p, h * p},
+                         color,
+                         citizen.renderY(
+                             citizen.visualY(),
+                             interpolationAlpha
+                         ) + .5,
+                         actorKey,
+                         0,
+                         part}
+                    );
+                };
+                const int tx = tipX[pose], ty = tipY[pose];
+                const int steps = std::max(std::abs(tx - 3), std::abs(ty + 3));
+                for (int i = 0; i <= steps; ++i)
+                {
+                    pixel(
+                        std::round(
+                            3 + (tx - 3) * float(i) / std::max(1, steps)
+                        ),
+                        std::round(
+                            -3 + (ty + 3) * float(i) / std::max(1, steps)
+                        ),
+                        1,
+                        1,
+                        {136, 96, 68, 255},
+                        2
+                    );
+                }
                 if (citizen.activity == CitizenActivity::Mining)
                 {
                     pixel(
@@ -199,12 +320,19 @@ namespace Paladin
                         3
                     );
                 }
-                pixel(float(tx-1),float(ty-1),2,1,{215,224,227,255},4);
-                if (pose==2)
+                pixel(
+                    float(tx - 1),
+                    float(ty - 1),
+                    2,
+                    1,
+                    {215, 224, 227, 255},
+                    4
+                );
+                if (pose == 2)
                 {
-                    pixel(10,0,1,1,{213,164,84,255},5);
-                    pixel(12,-2,1,1,{167,141,114,255},5);
-                    pixel(10,-4,1,1,{235,196,107,255},5);
+                    pixel(10, 0, 1, 1, {213, 164, 84, 255}, 5);
+                    pixel(12, -2, 1, 1, {167, 141, 114, 255}, 5);
+                    pixel(10, -4, 1, 1, {235, 196, 107, 255}, 5);
                 }
             }
             if (tilePixels >= AnimationDetailPixels &&
@@ -228,7 +356,7 @@ namespace Paladin
                          float(tilePixels) * .65F}
                 );
             }
-            if (tilePixels >= StaticDetailPixels && policy &&
+            if (!custom && tilePixels >= StaticDetailPixels && policy &&
                 policy->shadowsVisible)
             {
                 queue.submit(
@@ -426,19 +554,47 @@ namespace Paladin
         // resampling or native-screen bypass. The silhouette stays readable at
         // the closest zoom and rises in whole-art-pixel steps with world time.
         const float p = float(tilePixels / 16.0);
-        constexpr unsigned glyph[5]={7,1,2,4,7};
-        for (const auto& [x,y] : sleeping_)
+        constexpr unsigned glyph[5] = {7, 1, 2, 4, 7};
+        for (const auto& [x, y] : sleeping_)
         {
-            for (int z=0;z<3;++z)
+            for (int z = 0; z < 3; ++z)
             {
-                const int lift=(int(std::fmod(animationSeconds_, 4.0)*.75)+z)%3;
-                const float ox=x+float(z*5-3)*p, oy=y-float(7+z*3+lift)*p;
-                for(int row=0;row<5;++row) for(int col=0;col<3;++col)
-                    if (glyph[row] & (1u<<(2-col)))
-                        renderer.fillRectangle(ox+(col+1)*p,oy+(row+1)*p,p,p,{8,15,27,255});
-                for(int row=0;row<5;++row) for(int col=0;col<3;++col)
-                    if (glyph[row] & (1u<<(2-col)))
-                        renderer.fillRectangle(ox+col*p,oy+row*p,p,p,{175,201,214,255});
+                const int lift =
+                    (int(std::fmod(animationSeconds_, 4.0) * .75) + z) % 3;
+                const float ox = x + float(z * 5 - 3) * p,
+                            oy = y - float(7 + z * 3 + lift) * p;
+                for (int row = 0; row < 5; ++row)
+                {
+                    for (int col = 0; col < 3; ++col)
+                    {
+                        if (glyph[row] & (1u << (2 - col)))
+                        {
+                            renderer.fillRectangle(
+                                ox + (col + 1) * p,
+                                oy + (row + 1) * p,
+                                p,
+                                p,
+                                {8, 15, 27, 255}
+                            );
+                        }
+                    }
+                }
+                for (int row = 0; row < 5; ++row)
+                {
+                    for (int col = 0; col < 3; ++col)
+                    {
+                        if (glyph[row] & (1u << (2 - col)))
+                        {
+                            renderer.fillRectangle(
+                                ox + col * p,
+                                oy + row * p,
+                                p,
+                                p,
+                                {175, 201, 214, 255}
+                            );
+                        }
+                    }
+                }
             }
         }
     }

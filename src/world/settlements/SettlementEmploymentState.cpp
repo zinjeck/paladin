@@ -176,7 +176,12 @@ namespace Paladin
             found->objectId = objectId;
             found->constructionId = siteId;
             found->footprint = footprint;
-            const auto room = buildingInterior(footprint, type);
+            // Compound rooms store goods, but staff work throughout the
+            // outdoor dock/yard. Staffing follows that full workplace area.
+            const auto room = (type == SettlementObjectTypes::FishingGrounds ||
+                               type == SettlementObjectTypes::TradeDepot)
+                                  ? footprint
+                                  : buildingInterior(footprint, type);
             const auto area = std::uint64_t(room.width) * room.height;
             const auto capacity =
                 (area * d->workersPerReferenceArea + d->referenceArea - 1) /

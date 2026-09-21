@@ -1,5 +1,6 @@
 #include "simulation/WorldShipmentSystem.h"
 #include "simulation/DiplomacySystem.h"
+#include "simulation/LocalTradeVisitSystem.h"
 #include "simulation/WorldLandNavigation.h"
 #include "simulation/systems/SettlementNavigation.h"
 #include "world/World.h"
@@ -134,7 +135,8 @@ namespace Paladin
     }
     int WorldShipmentSystem::available(
         const Settlement& city,
-        std::string_view resource
+        std::string_view resource,
+        SettlementObjectId depot
     )
     {
         if (!SettlementResourceCatalog::definition(resource))
@@ -146,7 +148,8 @@ namespace Paladin
             std::int64_t count = 0;
             for (const auto& inventory : local->logistics.inventories())
             {
-                if (publicStorage(inventory.kind))
+                if (publicStorage(inventory.kind) &&
+                    (!depot || inventory.objectId == depot))
                 {
                     count += local->logistics.available(inventory.id, resource);
                 }
@@ -167,7 +170,8 @@ namespace Paladin
             !hasTradeDepot(*target) ||
             source->ownerRealmId() != shipment.owner ||
             !authorizedDestination(world, shipment) ||
-            available(*source, shipment.resource) < shipment.amount)
+            available(*source, shipment.resource, shipment.sourceDepot) <
+                shipment.amount)
         {
             return false;
         }
@@ -199,7 +203,9 @@ namespace Paladin
             int remaining = shipment.amount;
             for (const auto& inventory : local->logistics.inventories())
             {
-                if (!publicStorage(inventory.kind))
+                if (!publicStorage(inventory.kind) ||
+                    (shipment.sourceDepot &&
+                     inventory.objectId != shipment.sourceDepot))
                 {
                     continue;
                 }
@@ -233,6 +239,18 @@ namespace Paladin
             world.realm(shipment.buyer)->treasury->balance -= payment;
             shipment.escrow = payment;
         }
+        if (auto* local = source->simulationState().localMap_.get())
+        {
+            LocalTradeVisitSystem::arrive(
+                *local,
+                shipment.id,
+                shipment.sourceDepot,
+                shipment.resource,
+                shipment.amount,
+                false,
+                double(world.time().totalGameMinutes())
+            );
+        }
         shipment.cargo = shipment.amount;
         shipment.phase = ShipmentPhase::Outbound;
         shipment.stepMinutes = 0;
@@ -243,7 +261,10 @@ namespace Paladin
         SettlementId id,
         std::string_view resource,
         int amount,
-        double minute
+        double minute,
+        SettlementObjectId depot,
+        bool imported,
+        bool strictCapacity
     )
     {
         auto* city = world.settlement(id);
@@ -264,6 +285,24 @@ namespace Paladin
         {
             return false;
         }
+        const auto storageKind =
+            imported ? InventoryKind::TradeImports : InventoryKind::TradeDepot;
+        if (strictCapacity)
+        {
+            std::int64_t room = 0;
+            for (const auto& inventory : local->logistics.inventories())
+            {
+                if (inventory.kind == storageKind &&
+                    (!depot || inventory.objectId == depot))
+                {
+                    room += local->logistics.receivable(inventory.id, resource);
+                }
+            }
+            if (room < amount)
+            {
+                return false;
+            }
+        }
         const auto dropAt = unloadingTile(*local);
         if (dropAt.x < 0)
         {
@@ -274,7 +313,8 @@ namespace Paladin
         int remaining = amount;
         for (const auto& inventory : local->logistics.inventories())
         {
-            if (inventory.kind != InventoryKind::TradeDepot)
+            if (inventory.kind != storageKind ||
+                (depot && inventory.objectId != depot))
             {
                 continue;
             }
@@ -305,7 +345,9 @@ namespace Paladin
         ShipmentId* created,
         bool aiManaged,
         RealmId buyer,
-        std::int64_t unitPrice
+        std::int64_t unitPrice,
+        SettlementObjectId sourceDepot,
+        SettlementObjectId destinationDepot
     )
     {
         if (created)
@@ -360,7 +402,17 @@ namespace Paladin
         {
             return ShipmentResult::RouteLimit;
         }
-        if (available(*source, resource) < amount)
+        if (buyer)
+        {
+            const auto* payer = world.realm(buyer);
+            if (!payer || !payer->treasury || unitPrice <= 0 ||
+                unitPrice > std::numeric_limits<Money>::max() / amount ||
+                payer->treasury->balance < unitPrice * amount)
+            {
+                return ShipmentResult::InsufficientMoney;
+            }
+        }
+        if (available(*source, resource, sourceDepot) < amount)
         {
             return ShipmentResult::InsufficientGoods;
         }
@@ -379,12 +431,21 @@ namespace Paladin
         shipment.source = from;
         shipment.destination = to;
         shipment.buyer = buyer;
+        shipment.sourceDepot = sourceDepot;
+        shipment.destinationDepot = destinationDepot;
         shipment.unitPrice = unitPrice;
         shipment.resource = resource;
         shipment.amount = amount;
         shipment.repeating = repeating;
         shipment.aiManaged = aiManaged;
         shipment.path = std::move(*path);
+        // Strategic caravans represent a trade connection; local horses carry
+        // its presentation. Near neighbours arrive in roughly 20-60 minutes.
+        if (buyer)
+        {
+            shipment.minutesPerTile =
+                std::max(1.5, 20. / double(shipment.path.size() - 1));
+        }
         shipment.wrapWidth = world.grid().width();
         if (!load(world, shipment))
         {
@@ -414,7 +475,8 @@ namespace Paladin
         {
             if (shipment.id == id)
             {
-                if (!actor || shipment.owner != actor)
+                if (!actor ||
+                    (shipment.owner != actor && shipment.buyer != actor))
                 {
                     return ShipmentResult::NotOwned;
                 }
@@ -441,14 +503,17 @@ namespace Paladin
                             shipment.stepMinutes = 0;
                         }
                         else if (
-                            back && (shipment.cargo == 0 ||
-                                     receive(
-                                         world,
-                                         home->id(),
-                                         shipment.resource,
-                                         shipment.cargo,
-                                         double(world.time().totalGameMinutes())
-                                     ))
+                            back &&
+                            (shipment.cargo == 0 ||
+                             receive(
+                                 world,
+                                 home->id(),
+                                 shipment.resource,
+                                 shipment.cargo,
+                                 double(world.time().totalGameMinutes()),
+                                 shipment.sourceDepot,
+                                 false
+                             ))
                         )
                         {
                             shipment.cargo = 0;
@@ -468,8 +533,53 @@ namespace Paladin
         {
             return;
         }
+        bool recoveryAttempted = false;
         for (auto& shipment : world.shipments_)
         {
+            if (shipment.phase == ShipmentPhase::Blocked &&
+                !recoveryAttempted && minute >= shipment.nextRecoveryMinute)
+            {
+                recoveryAttempted = true;
+                shipment.nextRecoveryMinute = minute + 60;
+                // A blocked caravan retains its actual cargo and retries a
+                // safe return at most once per hour. Reopened roads/depot
+                // reconstruction cannot leave paid goods stuck forever.
+                const auto* home = world.settlement(shipment.source);
+                if (home && home->ownerRealmId() == shipment.owner)
+                {
+                    auto route = worldLandRoute(
+                        world.grid(),
+                        home->position(),
+                        shipment.position()
+                    );
+                    if (route && route->size() > 1)
+                    {
+                        shipment.path = std::move(*route);
+                        shipment.tileIndex = shipment.path.size() - 1;
+                        shipment.phase = ShipmentPhase::Returning;
+                        shipment.stepMinutes = 0;
+                    }
+                    else if (
+                        route &&
+                        (shipment.cargo == 0 || receive(
+                                                    world,
+                                                    home->id(),
+                                                    shipment.resource,
+                                                    shipment.cargo,
+                                                    minute,
+                                                    shipment.sourceDepot,
+                                                    false
+                                                ))
+                    )
+                    {
+                        shipment.cargo = 0;
+                        refund(world, shipment);
+                        shipment.phase = shipment.escrow
+                                             ? ShipmentPhase::Blocked
+                                             : ShipmentPhase::Completed;
+                    }
+                }
+            }
             if (!shipment.active() || shipment.phase == ShipmentPhase::Blocked)
             {
                 continue;
@@ -516,11 +626,11 @@ namespace Paladin
                 }
                 const double used = std::min(
                     remaining,
-                    WorldShipment::MinutesPerTile - shipment.stepMinutes
+                    shipment.minutesPerTile - shipment.stepMinutes
                 );
                 shipment.stepMinutes += used;
                 remaining -= used;
-                if (shipment.stepMinutes + 1e-9 < WorldShipment::MinutesPerTile)
+                if (shipment.stepMinutes + 1e-9 < shipment.minutesPerTile)
                 {
                     break;
                 }
@@ -538,7 +648,10 @@ namespace Paladin
                             target->id(),
                             shipment.resource,
                             shipment.cargo,
-                            minute + elapsed - remaining
+                            minute + elapsed - remaining,
+                            shipment.destinationDepot,
+                            bool(shipment.buyer),
+                            bool(shipment.buyer)
                         ))
                     {
                         if (shipment.escrow)
@@ -546,6 +659,21 @@ namespace Paladin
                             world.realm(shipment.owner)->treasury->balance +=
                                 shipment.escrow;
                             shipment.escrow = 0;
+                        }
+                        if (auto* local =
+                                world.settlement(shipment.destination)
+                                    ->simulationState()
+                                    .localMap_.get())
+                        {
+                            LocalTradeVisitSystem::arrive(
+                                *local,
+                                shipment.id,
+                                shipment.destinationDepot,
+                                shipment.resource,
+                                shipment.cargo,
+                                true,
+                                minute + elapsed - remaining
+                            );
                         }
                         shipment.cargo = 0;
                         ++shipment.deliveries;
@@ -574,7 +702,9 @@ namespace Paladin
                                 source->id(),
                                 shipment.resource,
                                 shipment.cargo,
-                                minute + elapsed - remaining
+                                minute + elapsed - remaining,
+                                shipment.sourceDepot,
+                                false
                             ))
                         {
                             shipment.phase = ShipmentPhase::Blocked;
@@ -622,6 +752,10 @@ namespace Paladin
         case ShipmentResult::TradeAgreementRequired:
             return "An active trade agreement within diplomatic range is "
                    "required.";
+        case ShipmentResult::DepotFull:
+            return "The depot's import counter has no room for this order.";
+        case ShipmentResult::InsufficientMoney:
+            return "The buyer has insufficient treasury gold.";
         case ShipmentResult::InvalidRoute:
             return "This shipment no longer exists.";
         }

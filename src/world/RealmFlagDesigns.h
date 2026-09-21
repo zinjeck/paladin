@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/FoundingIdentity.h"
+#include "world/generation/GenerationNoise.h"
 #include <array>
 #include <cstdlib>
 
@@ -83,6 +84,86 @@ namespace Paladin
                     color = dark;
                 }
                 flag.cells[std::size_t(y * 7 + x)] = {true, color};
+            }
+        }
+        return flag;
+    }
+
+    // Seeded heraldry keeps generated worlds reproducible while varying all
+    // colors, the field division and the position/orientation of the charge.
+    inline MapColor randomizedHeraldicColor(std::uint64_t seed) noexcept
+    {
+        constexpr std::array<MapColor, 16> colors{
+            {{166, 53, 69},
+             {63, 95, 154},
+             {35, 87, 71},
+             {111, 74, 126},
+             {183, 106, 54},
+             {79, 140, 122},
+             {99, 62, 75},
+             {51, 122, 88},
+             {48, 69, 93},
+             {135, 77, 80},
+             {116, 81, 63},
+             {235, 196, 107},
+             {244, 243, 232},
+             {8, 15, 27},
+             {185, 134, 76},
+             {100, 156, 181}}
+        };
+        return colors[GenerationNoise::mix(seed) % colors.size()];
+    }
+
+    inline RealmFlag randomizedRealmFlag(std::uint64_t seed)
+    {
+        auto next = [&seed]() { return seed = GenerationNoise::mix(seed); };
+        const auto pattern = next() % 12;
+        const auto source = realmFlagDesign(pattern);
+        const auto field = randomizedHeraldicColor(next());
+        auto accent = randomizedHeraldicColor(next());
+        const auto contrast = [](MapColor a, MapColor b)
+        {
+            return std::abs(int(a.red) - int(b.red)) +
+                   std::abs(int(a.green) - int(b.green)) +
+                   std::abs(int(a.blue) - int(b.blue));
+        };
+        for (int attempt = 0; attempt < 16 && contrast(field, accent) < 200;
+             ++attempt)
+        {
+            accent = randomizedHeraldicColor(next());
+        }
+        if (contrast(field, accent) < 200)
+        {
+            accent = int(field.red) + int(field.green) + int(field.blue) > 380
+                         ? MapColor{8, 15, 27}
+                         : MapColor{244, 243, 232};
+        }
+        const auto secondary = randomizedHeraldicColor(next());
+        const auto division = next() % 6;
+        const bool mirrorX = (next() & 1) != 0;
+        const bool mirrorY = (next() & 1) != 0;
+        RealmFlag flag;
+        flag.primaryColor = accent;
+        for (std::size_t y = 0; y < flag.height; ++y)
+        {
+            for (std::size_t x = 0; x < flag.width; ++x)
+            {
+                const auto sx = mirrorX ? flag.width - 1 - x : x;
+                const auto sy = mirrorY ? flag.height - 1 - y : y;
+                const bool charge = source.cells[sy * flag.width + sx].color ==
+                                    source.primaryColor;
+                const bool divided = division == 1   ? x < 3
+                                     : division == 2 ? y < 4
+                                     : division == 3 ? ((x < 3) != (y < 4))
+                                     : division == 4 ? int(x) - int(y) > -1
+                                     : division == 5 ? y % 3 == 0
+                                                     : false;
+                flag.cells[y * flag.width + x] = {
+                    true,
+                    charge    ? accent
+                    : divided ? secondary
+                              : field
+                };
             }
         }
         return flag;

@@ -27,6 +27,17 @@ namespace Paladin
 {
     struct SettlementActivityTestFixture
     {
+        static bool boatMealAvailable(
+            SettlementMap& map,
+            SettlementCitizenState& citizens,
+            SettlementCitizen& citizen,
+            double minute
+        )
+        {
+            map.activities.pathsRemaining_ = 8;
+            return map.activities
+                .boatMealAvailable(map, citizens, citizen, minute);
+        }
         static bool routeWithoutPathSearch(
             SettlementMap& map,
             SettlementCitizenState& citizens,
@@ -1091,16 +1102,65 @@ void runSettlementSimulationLoopTests()
             producer = completed(
                 map,
                 SettlementObjectTypes::FishingGrounds,
-                {{18, 12}, 3, 3}
+                {{14, 12}, 8, 5}
             );
         }
         map.employment().synchronize(map.objectState(), citizens);
-        PALADIN_CHECK(map.employment().adjust(
-            map.employment().forObject(producer),
-            2,
-            citizens
-        ));
-        advance(map, citizens, 360, 4 * 1440);
+        for (int worker = 0; worker < 2; ++worker)
+        {
+            PALADIN_CHECK(map.employment().adjust(
+                map.employment().forObject(producer),
+                1,
+                citizens
+            ));
+        }
+        bool sawTwoBoats = false;
+        for (int minute = 360; minute < 1080; minute += 5)
+        {
+            advance(map, citizens, minute, 5);
+            if (!livestock)
+            {
+                std::set<std::pair<int, int>> targets;
+                for (const auto& c : citizens.citizens())
+                {
+                    if (!c.inFishingBoat)
+                    {
+                        continue;
+                    }
+                    if (!c.boatReturning)
+                    {
+                        targets.insert({c.task.target.x, c.task.target.y});
+                    }
+                    auto previous = c.tilePosition;
+                    for (std::size_t i = c.pathIndex; i < c.path.size(); ++i)
+                    {
+                        const auto next = c.path[i];
+                        PALADIN_CHECK(
+                            std::abs(next.x - previous.x) +
+                                std::abs(next.y - previous.y) ==
+                            1
+                        );
+                        PALADIN_CHECK(
+                            map.grid().tile(next)->terrain ==
+                                TerrainType::Water ||
+                            (c.boatReturning && i + 1 == c.path.size())
+                        );
+                        previous = next;
+                    }
+                }
+                sawTwoBoats |= targets.size() == 2;
+            }
+        }
+        if (!livestock)
+        {
+            PALADIN_CHECK(sawTwoBoats);
+            const auto* fishery = map.objectState().completedObject(producer);
+            PALADIN_CHECK(
+                map.fishingBoats.productiveWater(map, *fishery) <
+                fishery->productionWater.size()
+            );
+        }
+        advance(map, citizens, 1080, 4 * 1440 - 720);
         const auto& totals =
             map.commerce.resourceTotals().at(livestock ? "meat" : "fish");
         std::cout << (livestock ? "Pasture" : "Fishery")
@@ -1149,9 +1209,69 @@ void runSettlementSimulationLoopTests()
         );
     }
     {
+        // Unreachable or unaffordable food must not repeatedly recall boats.
+        auto map = land();
+        SettlementCitizenState citizens;
+        found(map, citizens, 1);
+        emptyFood(map);
+        for (int y = 0; y < 40; ++y)
+        {
+            map.grid().tile({20, y})->terrain = TerrainType::Water;
+        }
+        const auto inaccessible = map.logistics.drop({26, 12}, "fish", 4, 0);
+        auto& person = SettlementActivityTestFixture::resident(citizens);
+        person.hunger = 70;
+        person.inFishingBoat = true;
+        person.boatLanding = {19, 12};
+        person.tilePosition = {20, 12};
+        person.task.kind = CitizenTaskKind::Work;
+        PALADIN_CHECK(!SettlementActivityTestFixture::boatMealAvailable(
+            map,
+            citizens,
+            person,
+            600
+        ));
+        PALADIN_CHECK(!person.routeFailures.empty());
+        const auto failureCount = person.routeFailures.size();
+        PALADIN_CHECK(!SettlementActivityTestFixture::boatMealAvailable(
+            map,
+            citizens,
+            person,
+            601
+        ));
+        PALADIN_CHECK(person.routeFailures.size() == failureCount);
+        PALADIN_CHECK(!person.boatReturning && person.inFishingBoat);
+        PALADIN_CHECK(map.logistics.consumeAvailable(inaccessible, "fish", 4));
+        const auto stockpile =
+            completed(map, SettlementObjectTypes::Stockpile, {{12, 20}, 3, 3});
+        const auto stock = map.logistics.forObject(stockpile);
+        PALADIN_CHECK(map.logistics.add(stock, "fish", 4));
+        PALADIN_CHECK(
+            map.commerce.mealPrice(map, *map.logistics.inventory(stock)) > 0
+        );
+        PALADIN_CHECK(!SettlementActivityTestFixture::boatMealAvailable(
+            map,
+            citizens,
+            person,
+            640
+        ));
+        map.logistics.drop({18, 12}, "fish", 1, 641);
+        PALADIN_CHECK(
+            SettlementActivityTestFixture::boatMealAvailable(
+                map,
+                citizens,
+                person,
+                650
+            )
+        );
+        PALADIN_CHECK(
+            person.task.kind == CitizenTaskKind::Work && !person.boatReturning
+        );
+    }
+    {
         const FisheryJobPolicy policy;
-        PALADIN_CHECK(fisheryReach({{0, 0}, 2, 2}) == 4);
-        PALADIN_CHECK(fisheryReach({{0, 0}, 16, 16}) <= 12);
+        PALADIN_CHECK(fisheryReach({{0, 0}, 2, 2}) == 8);
+        PALADIN_CHECK(fisheryReach({{0, 0}, 16, 16}) <= 24);
         PALADIN_CHECK(fisheryProductionPerMinute(120, 1, policy) * 720 == 9);
         PALADIN_CHECK(fisheryProductionPerMinute(6, 1, policy) * 720 == 4.5);
         PALADIN_CHECK(fisheryProductionPerMinute(0, 1, policy) == 0);
@@ -1495,12 +1615,13 @@ void runSettlementSimulationLoopTests()
             SettlementObjectTypes::Stockpile,
             {{160, 150}, 4, 6}
         );
-        const int smallCapacity = map.logistics.inventory(map.logistics.forObject(small))->capacity;
-        const int largeCapacity = map.logistics.inventory(map.logistics.forObject(large))->capacity;
+        const int smallCapacity =
+            map.logistics.inventory(map.logistics.forObject(small))->capacity;
+        const int largeCapacity =
+            map.logistics.inventory(map.logistics.forObject(large))->capacity;
         // Capacity scales with area, rounded down to whole resource units.
         PALADIN_CHECK(largeCapacity > smallCapacity);
         PALADIN_CHECK(std::abs(9 * largeCapacity - 24 * smallCapacity) < 24);
-
     }
     {
         auto map = land();
@@ -1671,15 +1792,15 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(marketStallCount(4, 6) == 2);
         PALADIN_CHECK(marketStallCount(6, 4) == 2);
         for (const auto dimensions :
-            {std::pair{3, 3}, {4, 6}, {6, 4}, {7, 11}, {11, 7}})
+             {std::pair{3, 3}, {4, 6}, {6, 4}, {7, 11}, {11, 7}})
         {
             std::set<std::pair<int, int>> workers;
             for (int i = 0;
                  i < marketStallCount(dimensions.first, dimensions.second);
                  ++i)
             {
-                const auto tile = marketStallTile({}, dimensions.first,
-                    dimensions.second, i);
+                const auto tile =
+                    marketStallTile({}, dimensions.first, dimensions.second, i);
                 PALADIN_CHECK(tile.x >= 0 && tile.x < dimensions.first);
                 PALADIN_CHECK(tile.y >= 0 && tile.y + 2 <= dimensions.second);
                 PALADIN_CHECK(workers.emplace(tile.x, tile.y).second);
@@ -2673,7 +2794,7 @@ void runSettlementSimulationLoopTests()
         const auto fishery = completed(
             map,
             SettlementObjectTypes::FishingGrounds,
-            {{24, 14}, 3, 3}
+            {{22, 14}, 8, 5}
         );
         // This scenario tests hunger recovery, not the default balance rate.
         map.activities.policy.fishery.minutesPerFish = 80;
@@ -2682,13 +2803,13 @@ void runSettlementSimulationLoopTests()
             map.objectState().completedObject(fishery)->productionWater;
         PALADIN_CHECK(!originalWater.empty());
         const auto preview =
-            fisheryZonePreview(map.grid(), map.objectState(), {{24, 19}, 3, 3});
+            fisheryZonePreview(map.grid(), map.objectState(), {{22, 20}, 8, 5});
         PALADIN_CHECK(!preview.excludedWater.empty());
         PALADIN_CHECK(!preview.availableWater.empty());
         const auto second = completed(
             map,
             SettlementObjectTypes::FishingGrounds,
-            {{24, 19}, 3, 3}
+            {{22, 20}, 8, 5}
         );
         for (auto tile :
              map.objectState().completedObject(second)->productionWater)
@@ -2710,7 +2831,8 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(worker.hunger < 50);
         PALADIN_CHECK(worker.task.kind == CitizenTaskKind::Work);
         PALADIN_CHECK(map.logistics.total("fish") > 0);
-        advance(map, citizens, 1080, 2);
+        advance(map, citizens, 1080, 30);
+        PALADIN_CHECK(!worker.inFishingBoat);
         PALADIN_CHECK(worker.task.kind != CitizenTaskKind::Work);
     }
     std::cout << "Checking cancellation preserves delivered and carried "

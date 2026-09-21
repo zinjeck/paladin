@@ -1,4 +1,5 @@
 #pragma once
+#include "core/StrongId.h"
 #include "debug/TimingSamples.h"
 #include "world/SettlementTilePosition.h"
 #include <cstddef>
@@ -14,6 +15,8 @@ namespace Paladin
         double diagonalCost = 1.4142135623730951;
         std::size_t maximumExpandedNodes = 2048;
         std::size_t pathRequestsPerTick = 2;
+        bool avoidBuildingFootprints = false;
+        ConstructionSiteId escapeConstructionSite;
     };
     class SettlementNavigation
     {
@@ -23,11 +26,18 @@ namespace Paladin
         mutable std::size_t expandedNodes = 0, candidates = 0;
         mutable double lastCost = 0;
         void synchronize(const SettlementMap&);
-        bool walkable(const SettlementMap&, SettlementTilePosition) const;
+        bool walkable(
+            const SettlementMap&,
+            SettlementTilePosition,
+            bool avoidBuildingFootprints = false,
+            ConstructionSiteId escapeConstructionSite = {}
+        ) const;
         bool canStep(
             const SettlementMap&,
             SettlementTilePosition,
-            SettlementTilePosition
+            SettlementTilePosition,
+            bool avoidBuildingFootprints = false,
+            ConstructionSiteId escapeConstructionSite = {}
         ) const;
         double stepCost(
             const SettlementMap&,

@@ -169,9 +169,7 @@ void runWorldTests()
     PALADIN_CHECK(realm->startingOriginId() == "tribal");
     PALADIN_CHECK(realm->mapColor() == editedIdentity.mapColor);
     PALADIN_CHECK(realm->flag() == editedIdentity.flag);
-    PALADIN_CHECK(
-        !world.territory().controllerAt(capitalPosition).isValid()
-    );
+    PALADIN_CHECK(!world.territory().controllerAt(capitalPosition).isValid());
     PALADIN_CHECK(
         world.tribalInfluence().influenceAt(capitalPosition, realmId) > 0.0F
     );
@@ -250,11 +248,9 @@ void runWorldTests()
 
     PALADIN_CHECK(aiCapitalId.isValid());
 
-    PALADIN_CHECK(
-        !world.territory().controllerAt(
-            {aiCapitalPosition.x, aiCapitalPosition.y}
-        ).isValid()
-    );
+    PALADIN_CHECK(!world.territory()
+                       .controllerAt({aiCapitalPosition.x, aiCapitalPosition.y})
+                       .isValid());
     PALADIN_CHECK(
         world.tribalInfluence().influenceAt(aiCapitalPosition, aiRealmId) > 0.0F
     );
@@ -686,9 +682,9 @@ void runWorldTests()
     );
     PALADIN_CHECK(localMap.objectState().completedObjects().size() == 1);
 
-    PALADIN_CHECK(objectPlacement.beginPlacement(
-        Paladin::SettlementObjectTypes::FishingGrounds
-    ));
+    PALADIN_CHECK(
+        objectPlacement.beginPlacement(Paladin::SettlementObjectTypes::Barracks)
+    );
 
     objectPlacement.pointerMoved(Paladin::SettlementTilePosition{2, 2});
     PALADIN_CHECK(!objectPlacement.visibleFootprintIsValid(localMap));
@@ -704,8 +700,8 @@ void runWorldTests()
         objectPlacement.pointerPressed({{2, 2}}, localMap) ==
         Paladin::SettlementPlacementCommitResult::None
     );
-    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{4, 4});
-    PALADIN_CHECK(objectPlacement.pointerReleased({{4, 4}}, localMap));
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{6, 6});
+    PALADIN_CHECK(objectPlacement.pointerReleased({{6, 6}}, localMap));
     PALADIN_CHECK(objectPlacement.hasLockedFootprint());
 
     PALADIN_CHECK(objectPlacement.choosingDoor());
@@ -715,14 +711,14 @@ void runWorldTests()
     );
     PALADIN_CHECK(objectPlacement.choosingDoor());
     PALADIN_CHECK(
-        objectPlacement.pointerPressed({{3, 4}}, localMap) ==
+        objectPlacement.pointerPressed({{3, 6}}, localMap) ==
         Paladin::SettlementPlacementCommitResult::None
     );
     PALADIN_CHECK(!objectPlacement.choosingDoor());
     PALADIN_CHECK(objectPlacement.stepBack());
     PALADIN_CHECK(objectPlacement.choosingDoor());
     PALADIN_CHECK(
-        objectPlacement.pointerPressed({{3, 4}}, localMap) ==
+        objectPlacement.pointerPressed({{3, 6}}, localMap) ==
         Paladin::SettlementPlacementCommitResult::None
     );
     PALADIN_CHECK(
@@ -762,7 +758,7 @@ void runWorldTests()
     PALADIN_CHECK(
         objectPlacement.beginPlacement(Paladin::SettlementObjectTypes::House)
     );
-    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{8, 8});
+    objectPlacement.pointerMoved(Paladin::SettlementTilePosition{14, 8});
     PALADIN_CHECK(objectPlacement.visibleFootprintIsValid(localMap));
     const auto originalDoor = objectPlacement.visibleDoor();
     objectPlacement.rotateDoor(-1);
@@ -770,13 +766,13 @@ void runWorldTests()
     objectPlacement.rotateDoor(1);
     PALADIN_CHECK(objectPlacement.visibleDoor() == originalDoor);
     PALADIN_CHECK(
-        objectPlacement.pointerPressed({{8, 8}}, localMap) ==
+        objectPlacement.pointerPressed({{14, 8}}, localMap) ==
         Paladin::SettlementPlacementCommitResult::ConstructionSites
     );
     PALADIN_CHECK(localMap.objectState().constructionSites().size() == 2);
 
     const Paladin::SettlementConstructionSite* houseSite =
-        localMap.objectState().constructionSiteAt({8, 8});
+        localMap.objectState().constructionSiteAt({14, 8});
     PALADIN_CHECK(houseSite != nullptr);
     PALADIN_CHECK(houseSite->progressPermille == 0);
     PALADIN_CHECK(houseSite->resourceDeliveries.size() == 2);
@@ -789,7 +785,7 @@ void runWorldTests()
     Paladin::SettlementCitizenState citizens;
     Paladin::SettlementInspectionController inspection;
     PALADIN_CHECK(
-        inspection.selectAt({8, 8}, localMap.objectState(), citizens, true)
+        inspection.selectAt({14, 8}, localMap.objectState(), citizens, true)
     );
     PALADIN_CHECK(
         inspection.selectedConstructionSite(localMap.objectState()) == houseSite

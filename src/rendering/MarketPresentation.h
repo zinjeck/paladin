@@ -57,6 +57,45 @@ namespace Paladin
                     footprint.height,
                     ordinal
                 );
+                // Worn lanes join adjacent counters; no enclosing metal frame.
+                const double laneX = x + column * layout.moduleWidth;
+                const double laneY = y + (row + 1) * layout.moduleHeight - .5;
+                const auto lane = view.bounds(
+                    {laneX, laneY, 0, double(layout.moduleWidth), .375, 0, 0}
+                );
+                queue.submit(
+                    {lane, {189, 165, 137, 150}, laneY, id, -1, ordinal}
+                );
+                if ((ordinal % 3) == 0)
+                {
+                    sprites.placed(
+                        queue,
+                        view,
+                        "stockpile.crate",
+                        laneX + layout.moduleWidth - .35,
+                        merchant.y + 1.5,
+                        merchant.y + 1.5,
+                        id,
+                        ordinal * 2 + 1,
+                        .42,
+                        .32
+                    );
+                }
+                else if ((ordinal % 3) == 1)
+                {
+                    sprites.placed(
+                        queue,
+                        view,
+                        "home.detail.jars",
+                        laneX + layout.moduleWidth - .4,
+                        merchant.y + 1.5,
+                        merchant.y + 1.5,
+                        id,
+                        ordinal * 2 + 1,
+                        .4,
+                        .4
+                    );
+                }
                 sprites.placed(
                     queue,
                     view,

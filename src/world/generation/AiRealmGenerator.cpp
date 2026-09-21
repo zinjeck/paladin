@@ -194,7 +194,7 @@ namespace Paladin
                 homeland && homeland->biome == BiomeType::Desert       ? .42
                 : homeland && homeland->relief == ReliefType::Mountain ? .5
                                                                        : 1.0;
-            identity.flag = realmFlagDesign(number - 1);
+            identity.flag = randomizedRealmFlag(next(rng));
             const auto profileFor = [&](bool isCapital, SettlementKind kind)
             {
                 auto profile = defaultSettlementFoundationProfile();

@@ -47,6 +47,7 @@ namespace Paladin
 
             if (acceptedCharacter)
             {
+                suggested_ = false;
                 text_.push_back(static_cast<char>(character));
             }
         }
@@ -54,6 +55,7 @@ namespace Paladin
 
     void UiTextField::backspace() noexcept
     {
+        suggested_ = false;
         if (!text_.empty())
         {
             text_.pop_back();
@@ -62,18 +64,28 @@ namespace Paladin
 
     void UiTextField::clear() noexcept
     {
+        suggested_ = false;
         text_.clear();
     }
 
     void UiTextField::setText(std::string_view text)
     {
+        suggested_ = false;
         text_.clear();
         appendText(text);
     }
 
+    void UiTextField::setSuggestedText(std::string_view text)
+    {
+        setText(text);
+        suggestion_ = std::move(text_);
+        text_.clear();
+        suggested_ = true;
+    }
+
     const std::string& UiTextField::text() const noexcept
     {
-        return text_;
+        return suggested_ ? suggestion_ : text_;
     }
 
     void UiTextField::render(
@@ -81,7 +93,12 @@ namespace Paladin
         const GrayUiRenderer& uiRenderer
     ) const
     {
-        uiRenderer
-            .drawTextField(renderer, bounds_, text_, placeholder_, focused_);
+        uiRenderer.drawTextField(
+            renderer,
+            bounds_,
+            text_,
+            suggested_ ? suggestion_ : placeholder_,
+            focused_
+        );
     }
 } // namespace Paladin

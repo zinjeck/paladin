@@ -11,6 +11,7 @@
 #include "ui/CityHud.h"
 #include "ui/EmploymentPanel.h"
 #include "ui/SettlementInspectionPanel.h"
+#include "ui/TradeDepotPanel.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
 #include <SDL3/SDL.h>
@@ -139,6 +140,10 @@ namespace Paladin
                     workplace->constructionId
                 );
                 settlementInspectionPanel_->clearLayout();
+                const auto* selected = settlementInspectionController_->selectedObject(map.objectState());
+                if (selected && selected->objectTypeId == SettlementObjectTypes::TradeDepot)
+                { tradeDepotPanel_->open(activeCitySettlementId_, selected->id); }
+                else { tradeDepotPanel_->close(); }
             }
             return true;
         }
@@ -234,6 +239,7 @@ namespace Paladin
                     if (citizen)
                     {
                         settlementInspectionController_->selectCitizen(citizen);
+                        tradeDepotPanel_->close();
                         settlementInspectionPanel_->clearLayout();
                         return;
                     }
@@ -246,11 +252,20 @@ namespace Paladin
                         &settlementMap->logistics,
                         false
                     ));
+                    const auto* selected = settlementInspectionController_->selectedObject(
+                        settlementMap->objectState());
+                    if (selected && selected->objectTypeId == SettlementObjectTypes::TradeDepot)
+                    {
+                        tradeDepotPanel_->open(activeCitySettlementId_, selected->id);
+                    }
+                    else { tradeDepotPanel_->close(); }
+
                 }
             }
             else
             {
                 settlementInspectionController_->clear();
+                tradeDepotPanel_->close();
             }
         }
     }
@@ -287,6 +302,7 @@ namespace Paladin
                         ))
                 {
                     settlementInspectionController_->selectCitizen(id);
+                    tradeDepotPanel_->close();
                     settlementInspectionPanel_->clearLayout();
                     camera_->setPosition(
                         citizen->visualX() + .5,
@@ -324,6 +340,11 @@ namespace Paladin
             SDL_StopTextInput(window_->nativeHandle());
             settlementObjectPlacementController_->cancelPlacement();
             settlementCommandController_->cancel();
+        }
+        else if (action == CityHudAction::ToggleResources)
+        {
+            cityRenderer_->resourcesVisible = !cityRenderer_->resourcesVisible;
+            cityHud_->setResourcesVisible(cityRenderer_->resourcesVisible);
         }
         else if (action == CityHudAction::ToggleRoofs)
         {

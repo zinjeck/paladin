@@ -123,6 +123,12 @@ namespace Paladin
         double idleWait = -1;
         std::uint64_t choiceSequence = 0;
         bool explicitMovement = false;
+        // The citizen remains the boat occupant, not a duplicate visual actor.
+        bool inFishingBoat = false;
+        bool boatReturning = false;
+        SettlementObjectId boatFishery;
+        SettlementTilePosition boatLanding{-1, -1};
+        std::vector<SettlementTilePosition> boatRoute;
         std::size_t constructionSearchCursor = 0;
         std::size_t commandSearchCursor = 0;
         std::vector<CitizenRouteFailure> routeFailures;

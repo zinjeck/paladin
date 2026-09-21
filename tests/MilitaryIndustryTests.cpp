@@ -94,6 +94,69 @@ namespace
         std::cout << "Household fuel: pooled adult purchasing, insufficient "
                      "funds, conserved cash and daily lumber use passed\n";
     }
+    void testPaidMarketFallback()
+    {
+        auto map = land();
+        complete(map, "city_keep", {{2,2},5,7});
+        const auto bakery = complete(map, "bakery", {{12,2},5,5});
+        const auto market = complete(map, "market", {{22,2},5,5});
+        const auto stockpile = complete(map, "stockpile", {{12,12},5,5});
+        const auto depot = complete(map, "trade_depot", {{22,12},8,5});
+        SettlementCitizenState people;
+        PALADIN_CHECK(people.initialize(4, 995));
+        map.commerce.treasury->balance = 100000;
+        map.employment().synchronize(map.objectState(), people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(bakery), 1, people));
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(market), 1, people));
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(stockpile), 1, people));
+        map.commerce.update(map, people, 360, 0);
+        const auto mill = map.logistics.forObject(bakery);
+        const auto shop = map.logistics.forObject(market);
+        const auto publicStock = map.logistics.forObject(stockpile);
+        PALADIN_CHECK(map.logistics.add(publicStock, "wheat", 2));
+        PALADIN_CHECK(map.logistics.add(shop, "wheat", 8));
+        const auto before = cash(map);
+        const auto shopCash = map.commerce.businessCash(market);
+        PALADIN_CHECK(produceIndustry(map, bakery, 1, 360, 30));
+        // One worker targets eight inputs: public stock first, then six paid
+        // units from the market. Exactly one wheat becomes one bread.
+        PALADIN_CHECK(map.logistics.inventory(publicStock)->amount("wheat") == 0);
+        PALADIN_CHECK(map.logistics.inventory(shop)->amount("wheat") == 2);
+        PALADIN_CHECK(map.logistics.inventory(mill)->amount("wheat") == 7);
+        PALADIN_CHECK(map.logistics.inventory(mill)->amount("bread") == 1);
+        PALADIN_CHECK(map.commerce.businessCash(market) == shopCash + 600);
+        PALADIN_CHECK(cash(map) == before);
+        // Government construction must also pay market retail prices.
+        SettlementInventory site;
+        site.kind = InventoryKind::Construction;
+        const auto shopRecord = *map.logistics.inventory(shop);
+        const auto treasury = map.commerce.treasury->balance;
+        PALADIN_CHECK(map.commerce.tradePrice(shopRecord, site, "wheat") == 100);
+        PALADIN_CHECK(map.commerce.buyGoods(shopRecord, site, 1, nullptr, "wheat"));
+        PALADIN_CHECK(map.commerce.treasury->balance == treasury - 100);
+        PALADIN_CHECK(cash(map) == before);
+        const auto exportRecord = *map.logistics.inventory(map.logistics.forObject(depot));
+        PALADIN_CHECK(!map.commerce.buyGoods(shopRecord, exportRecord, 1, nullptr, "wheat"));
+        SettlementInventory producer;
+        producer.kind = InventoryKind::Workplace;
+        const auto localProduction = map.commerce.tradePrice(producer,
+            *map.logistics.inventory(publicStock), "lumber");
+        const auto localWholesale = map.commerce.tradePrice(
+            *map.logistics.inventory(publicStock), exportRecord, "lumber");
+        PALADIN_CHECK(localProduction < localWholesale && localWholesale < 18);
+        // Imported goods are sold from a separate depot-owned counter.
+        const auto inbound = map.logistics.importsForObject(depot);
+        PALADIN_CHECK(map.logistics.add(inbound, "lumber", 3));
+        const auto importRecord = *map.logistics.inventory(inbound);
+        const auto stockRecord = *map.logistics.inventory(publicStock);
+        const auto price = map.commerce.tradePrice(importRecord, stockRecord, "lumber");
+        const auto depotCash = map.commerce.treasury->balance;
+        PALADIN_CHECK(map.commerce.buyGoods(importRecord, stockRecord, 3, nullptr, "lumber"));
+        PALADIN_CHECK(map.logistics.moveAvailable(inbound, publicStock, "lumber", 3) == 3);
+        PALADIN_CHECK(map.commerce.treasury->balance == depotCash + price * 3);
+        PALADIN_CHECK(cash(map) == before);
+        std::cout << "Market fallback: processors and government pay, public stock preferred, imported stock sold locally\n";
+    }
     void testMining()
     {
         auto map = land();
@@ -548,6 +611,7 @@ namespace
 void runMilitaryIndustryTests()
 {
     testHouseholdFuel();
+    testPaidMarketFallback();
     testMining();
     testIndustry();
     testEmergencyFoodAndGathering();

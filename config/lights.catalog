@@ -6,3 +6,5 @@ house .65 2.75 2 .45 FFB65C
 city_keep .45 6.65 3 .5 FFB65C
 city_keep 2.55 6.65 3 .5 FFB65C
 bakery 2.6 2.7 3.5 .8 FFA04C
+fishing_grounds 4.65 4.75 3.5 .7 FFA04C
+trade_depot 4.65 4.75 3.5 .7 FFA04C

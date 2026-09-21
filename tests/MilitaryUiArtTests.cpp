@@ -24,6 +24,7 @@
 #include "world/RealmFlagDesigns.h"
 #include "world/World.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/objects/WorkplaceCompound.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
@@ -693,8 +694,8 @@ namespace
         const std::array<SettlementObjectFootprint, 4> footprints{
             {{{10, 10}, 6, 6},
              {{22, 10}, 6, 6},
-             {{34, 10}, 6, 6},
-             {{22, 23}, 6, 6}}
+             {{32, 10}, 8, 5},
+             {{22, 23}, 8, 5}}
         };
         for (std::size_t i = 0; i < types.size(); ++i)
         {
@@ -725,7 +726,7 @@ namespace
         SettlementCitizenState people;
         TileRenderMetrics metrics;
         Camera2D camera(25, 18);
-        PALADIN_CHECK(people.initialize(2, 3350));
+        PALADIN_CHECK(people.initialize(3, 3350));
         map.employment().synchronize(map.objectState(), people);
         const auto market = map.objectState().completedObjects().front().id;
         const auto job = map.employment().forObject(market);
@@ -734,6 +735,10 @@ namespace
         for (const auto& record : people.citizens())
         {
             auto& person = const_cast<SettlementCitizen&>(record);
+            if (!person.workplaceId)
+            {
+                continue;
+            }
             person.tilePosition = person.destination = marketStallTile(
                 footprints[0].topLeft, footprints[0].width,
                 footprints[0].height, stall++
@@ -746,6 +751,34 @@ namespace
             person.task.object = market;
             person.task.workTile = person.tilePosition;
         }
+        const auto fishery = map.objectState().completedObjects()[2].id;
+        const auto fishJob = map.employment().forObject(fishery);
+        PALADIN_CHECK(map.employment().adjust(fishJob, 1, people));
+        for (const auto& record : people.citizens())
+        {
+            if (record.workplaceId != fishJob)
+            {
+                continue;
+            }
+            auto& fisher = const_cast<SettlementCitizen&>(record);
+            fisher.tilePosition = fisher.destination = {43, 12};
+            fisher.hasVisualSnapshot = false;
+            fisher.inFishingBoat = true;
+            fisher.insideHome = false;
+            fisher.activity = CitizenActivity::Fishing;
+            fisher.task.kind = CitizenTaskKind::Work;
+            fisher.task.object = fishery;
+            fisher.task.workTile = fisher.tilePosition;
+            fisher.task.target = {43, 13};
+        }
+        LocalTradeVisit visit;
+        visit.shipment = ShipmentId{1};
+        visit.resource = "lumber";
+        visit.quantity = 10;
+        visit.startMinute = 350;
+        visit.path = {{32, 27}, {31, 27}, {30, 27}, {29, 27}, {28, 27}};
+        map.trade.visits.push_back(visit);
+        city.gameMinute = 360;
         const auto draw = [&](const std::string& name, double hour)
         {
             renderer.beginFrame();
@@ -774,6 +807,9 @@ namespace
         draw("next-workyards-normal-day.png", 12);
         draw("next-workyards-normal-night.png", 0);
         camera.setZoom(16);
+        camera.setPosition(43.5, 12.5);
+        draw("next-fishing-boat-close-day.png", 12);
+        draw("next-fishing-boat-close-night.png", 0);
         for (std::size_t i = 0; i < types.size(); ++i)
         {
             const auto& f = footprints[i];
@@ -793,8 +829,14 @@ namespace
                 true
             );
             draw("next-" + std::string(types[i]) + "-close-night.png", 0);
+            if (workplaceCompound(types[i]))
+            {
+                city.presentation.roofsVisible = false;
+                draw("next-" + std::string(types[i]) + "-interior.png", 12);
+                city.presentation.roofsVisible = true;
+            }
         }
-        // The actual placement controller draws the same two counters as the
+        // The actual placement controller draws the same four counters as the
         // completed market, including while dragging and after release.
         PALADIN_CHECK(map.objectState().placeCompletedObject(
             map.grid(),

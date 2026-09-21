@@ -18,22 +18,33 @@ namespace Paladin
         static UiRectangle buttonBounds(int width, int height)
         {
             const auto map = mapBounds(width, height);
-            return {map.x, std::max(0.F, map.y - 32.F), 122.F, 26.F};
+            return {map.x, std::max(0.F, map.y - 32.F), 154.F, 26.F};
         }
         static UiRectangle politicalModeButtonBounds(int width, int height)
         {
             const auto b = buttonBounds(width, height);
             return {b.x, b.y, 26.0F, b.height};
         }
+        static UiRectangle resourceModeButtonBounds(int width, int height)
+        {
+            const auto b = buttonBounds(width, height);
+            return {b.x + 32.F, b.y, 26.F, b.height};
+        }
         static UiRectangle terrainModeButtonBounds(int width, int height)
         {
             const auto b = buttonBounds(width, height);
-            return {b.x + 32.0F, b.y, 26.0F, b.height};
+            return {b.x + 64.0F, b.y, 26.0F, b.height};
         }
-        static UiRectangle governmentModeButtonBounds(int width,int height)
-        { const auto b=buttonBounds(width,height); return {b.x+64.F,b.y,26.F,b.height}; }
-        static UiRectangle populationModeButtonBounds(int width,int height)
-        { const auto b=buttonBounds(width,height); return {b.x+96.F,b.y,26.F,b.height}; }
+        static UiRectangle governmentModeButtonBounds(int width, int height)
+        {
+            const auto b = buttonBounds(width, height);
+            return {b.x + 96.F, b.y, 26.F, b.height};
+        }
+        static UiRectangle populationModeButtonBounds(int width, int height)
+        {
+            const auto b = buttonBounds(width, height);
+            return {b.x + 128.F, b.y, 26.F, b.height};
+        }
         static WorldSurface::UV minimapPoint(UiRectangle b, double x, double y)
         {
             return {
@@ -129,17 +140,12 @@ namespace Paladin
                 if (presentation.localWorldWeight >= 0.5F)
                 {
                     // The close renderer rasterizes around a snapped 1/16-tile
-                    // source camera, then translates that finished raster by the
-                    // authoritative camera remainder. Picking must use the same
-                    // final translated chart or clicks drift by several screen
-                    // pixels at maximum zoom.
-                    Camera2D renderCamera = pixelStableWorldCamera(
-                        c,
-                        g,
-                        w,
-                        h,
-                        true
-                    );
+                    // source camera, then translates that finished raster by
+                    // the authoritative camera remainder. Picking must use the
+                    // same final translated chart or clicks drift by several
+                    // screen pixels at maximum zoom.
+                    Camera2D renderCamera =
+                        pixelStableWorldCamera(c, g, w, h, true);
                     auto tangent = LocalTangentWorldView::from(
                         renderCamera,
                         g,

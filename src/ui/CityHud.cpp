@@ -4,6 +4,7 @@
 #include "ui/SimulationSpeedControls.h"
 #include "world/Season.h"
 #include "world/settlements/SettlementCommerce.h"
+#include "world/settlements/SettlementResourceDefinition.h"
 #include <SDL3/SDL.h>
 #include <cmath>
 #include <iomanip>
@@ -120,6 +121,24 @@ namespace Paladin
               UiButton("Command")
           }
     {
+        for (const auto& resource : SettlementResourceCatalog::definitions())
+        {
+            goods_.push_back({resource.id, resource.displayName});
+        }
+        const auto priority = [](std::string_view id)
+        {
+            constexpr std::array first{"stone", "lumber", "fish", "meat"};
+            const auto found = std::find(first.begin(), first.end(), id);
+            return std::distance(first.begin(), found);
+        };
+        std::stable_sort(
+            goods_.begin(),
+            goods_.end(),
+            [&](const auto& a, const auto& b)
+            { return priority(a.id) < priority(b.id); }
+        );
+        goodsCells_.resize(goods_.size());
+        goodsIcons_.resize(goods_.size());
         setSettlementStatus(false, 8);
         goodsButton_.setSelected(goodsOpen_);
         optionButtons_.reserve(menuOptions.size());
@@ -194,7 +213,7 @@ namespace Paladin
 
         cityNamePanel_ = {0.0F, 0.0F, informationWidth, informationTopHeight};
 
-        flagPanel_ = {informationWidth, 44, 48, 64};
+        flagPanel_ = {8, 5, 37, 42};
         seasonBounds_ = {
             cityNamePanel_.x + cityNamePanel_.width - 44,
             cityNamePanel_.y + (cityNamePanel_.height - 36) * .5F,
@@ -225,7 +244,10 @@ namespace Paladin
             );
         }
 
-        const float goodsWidth = 144.0F;
+        const int maximumRows = std::max(3, (viewportHeight - 300) / 58);
+        const int columns =
+            std::max(2, int((goods_.size() + maximumRows - 1) / maximumRows));
+        const float goodsWidth = float(columns) * 72;
         eventsButton_.setBounds(
             {informationWidth + topButtonWidth * topButtons_.size(), 0, 36, 44}
         );
@@ -238,9 +260,9 @@ namespace Paladin
         for (std::size_t i = 0; i < goodsCells_.size(); ++i)
         {
             goodsCells_[i] = {
-                goodsX + static_cast<float>(i % 2) * 72.0F,
+                goodsX + static_cast<float>(i % columns) * 72.0F,
                 SimulationSpeedControls::ButtonSide + 32.0F +
-                    static_cast<float>(i / 2) * 58.0F,
+                    static_cast<float>(i / columns) * 58.0F,
                 72.0F,
                 58.0F
             };
@@ -262,6 +284,9 @@ namespace Paladin
             minimapSide
         };
 
+        resourceButton_.setBounds(
+            {minimapPanel_.x, std::max(0.F, minimapPanel_.y - 32), 32, 28}
+        );
         reservedPanel_ = {
             informationWidth * 0.5F,
             informationTopHeight,
@@ -316,6 +341,75 @@ namespace Paladin
         artButton_.setSelected(SceneSpriteLibrary::environmentArtEnabled());
     }
 
+    void CityHud::clearGoods() noexcept
+    {
+        for (auto& goods : goods_)
+        {
+            goods.amount = 0;
+            goods.rates = {};
+        }
+    }
+
+    void CityHud::setGoodsResource(
+        std::string_view resource,
+        double amount,
+        ResourceDailyRates rates
+    ) noexcept
+    {
+        for (auto& goods : goods_)
+        {
+            if (goods.id == resource)
+            {
+                goods.amount = std::isfinite(amount) ? std::max(0., amount) : 0;
+                goods.rates = rates;
+                return;
+            }
+        }
+    }
+
+    void CityHud::setGoodsAmounts(
+        double stone,
+        double lumber,
+        double fish,
+        double meat
+    ) noexcept
+    {
+        constexpr std::array ids{"stone", "lumber", "fish", "meat"};
+        const std::array values{stone, lumber, fish, meat};
+        for (auto& goods : goods_)
+        {
+            for (std::size_t i = 0; i < ids.size(); ++i)
+            {
+                if (goods.id == ids[i])
+                {
+                    goods.amount = values[i];
+                }
+            }
+        }
+    }
+
+    void CityHud::setGoodsDailyRates(
+        std::array<ResourceDailyRates, 4> rates
+    ) noexcept
+    {
+        for (std::size_t i = 0; i < rates.size(); ++i)
+        {
+            goods_[i].rates = rates[i];
+        }
+    }
+
+    UiRectangle CityHud::goodsBounds(std::string_view resource) const noexcept
+    {
+        for (std::size_t i = 0; i < goods_.size(); ++i)
+        {
+            if (goods_[i].id == resource)
+            {
+                return goodsCells_[i];
+            }
+        }
+        return {};
+    }
+
     void CityHud::setSettlementStatus(
         bool hasKeep,
         std::size_t population
@@ -331,8 +425,13 @@ namespace Paladin
         {
             bottomButtons_[i].setEnabled(i == 0 || hasKeep_);
         }
-        for (std::size_t i=0;i<optionButtons_.size();++i)
-            optionButtons_[i].setEnabled(hasKeep_ || menuOptions[i].objectTypeId == SettlementObjectTypes::CityKeep);
+        for (std::size_t i = 0; i < optionButtons_.size(); ++i)
+        {
+            optionButtons_[i].setEnabled(
+                hasKeep_ ||
+                menuOptions[i].objectTypeId == SettlementObjectTypes::CityKeep
+            );
+        }
     }
 
     void CityHud::setCityInformation(
@@ -350,7 +449,14 @@ namespace Paladin
 
     void CityHud::pointerMoved(float x, float y) noexcept
     {
-        if (worldMode_) activeSettlementButton_.pointerMoved(x, y);
+        if (worldMode_)
+        {
+            activeSettlementButton_.pointerMoved(x, y);
+        }
+        if (!worldMode_)
+        {
+            resourceButton_.pointerMoved(x, y);
+        }
         artButton_.pointerMoved(x, y);
         if (!worldMode_)
         {
@@ -384,6 +490,10 @@ namespace Paladin
 
     bool CityHud::pointerPressed(float x, float y) noexcept
     {
+        if (!worldMode_ && resourceButton_.pointerPressed(x, y))
+        {
+            return true;
+        }
         const bool art = artButton_.pointerPressed(x, y);
         const bool roofs = !worldMode_ && roofsButton_.pointerPressed(x, y);
         const bool events = eventsButton_.pointerPressed(x, y);
@@ -448,6 +558,10 @@ namespace Paladin
 
     bool CityHud::containsInteractivePoint(float x, float y) const noexcept
     {
+        if (!worldMode_ && resourceButton_.containsPoint(x, y))
+        {
+            return true;
+        }
         if (flagPanel_.contains(x, y) || eventsButton_.containsPoint(x, y) ||
             ledgerButton_.containsPoint(x, y))
         {
@@ -510,8 +624,14 @@ namespace Paladin
 
     CityHudAction CityHud::pointerReleased(float x, float y) noexcept
     {
+        if (!worldMode_ && resourceButton_.pointerReleased(x, y))
+        {
+            return CityHudAction::ToggleResources;
+        }
         if (worldMode_ && activeSettlementButton_.pointerReleased(x, y))
+        {
             return CityHudAction::FocusActiveSettlement;
+        }
         if (artButton_.pointerReleased(x, y))
         {
             return CityHudAction::ToggleEnvironmentArt;
@@ -552,7 +672,8 @@ namespace Paladin
             if (topButtons_[i].pointerReleased(x, y))
             {
                 closeCategoryMenus();
-                topAction = worldMode_ && i == 1 ? CityHudAction::Diplomacy : topActions[i];
+                topAction = worldMode_ && i == 1 ? CityHudAction::Diplomacy
+                                                 : topActions[i];
             }
         }
 
@@ -638,105 +759,20 @@ namespace Paladin
         return selectedCommandTypeId_;
     }
 
-    void CityHud::render(
+    void CityHud::renderIdentity(
         Renderer& renderer,
         const GrayUiRenderer& uiRenderer
     ) const
     {
-        if (!goodsIconsLoaded_)
-        {
-            goodsIconsLoaded_ = true;
-            SceneSpriteLibrary icons;
-            icons.load(
-                renderer,
-                std::string(SDL_GetBasePath()) + "assets/sprites"
-            );
-            const char* names[] = {
-                "ui.goods.stone",
-                "ui.goods.lumber",
-                "ui.goods.fish",
-                "ui.goods.meat",
-                "ui.goods.gold"
-            };
-            for (int i = 0; i < 5; ++i)
-            {
-                if (auto* sprite = icons.find(names[i]))
-                {
-                    goodsIcons_[i] = sprite->texture;
-                }
-            }
-            for (const auto& option : menuOptions)
-            {
-                if (option.objectTypeId.empty())
-                {
-                    continue;
-                }
-                if (auto* sprite = icons.find(
-                        "ui.build." + std::string(option.objectTypeId)
-                    ))
-                {
-                    optionIcons_[std::string(option.objectTypeId)] =
-                        sprite->texture;
-                }
-            }
-        }
-
         uiRenderer.drawPanel(renderer, cityNamePanel_);
-        uiRenderer.drawPanel(renderer, flagPanel_);
-        drawRealmFlag(renderer, flag_, flagPanel_.x + 10, flagPanel_.y + 14, 4);
-        uiRenderer.drawPanel(renderer, dayTimePanel_);
-        uiRenderer.drawPanel(renderer, treasuryPanel_);
-        uiRenderer.drawPanel(renderer, extensionPanel_);
-        if (const auto& icon = goodsIcons_[4])
-        {
-            renderer.drawTexture(
-                *icon,
-                0,
-                0,
-                float(icon->width()),
-                float(icon->height()),
-                treasuryPanel_.x + 6,
-                treasuryPanel_.y + 6,
-                float(icon->width()),
-                float(icon->height())
-            );
-        }
-        uiRenderer.drawLabel(
-            renderer,
-            goldText(treasuryGold_),
-            treasuryPanel_.x + 35,
-            treasuryPanel_.y + 12,
-            1.5F
-        );
-        populationButton_.render(renderer, uiRenderer);
-        const auto populationLabel =
-            std::string("Population:") +
-            (hasKeep_
-                 ? " " + std::to_string(population_) +
-                       (worldMode_ ? ""
-                                   : "/" + std::to_string(housingCapacity_))
-                 : "");
-        const float populationScale = std::min(
-            1.5F,
-            (reservedPanel_.width - 12) /
-                (float(populationLabel.size()) * 6 - 1)
-        );
-        uiRenderer.drawLabel(
-            renderer,
-            populationLabel,
-            centeredLabelX(reservedPanel_, populationLabel, populationScale),
-            reservedPanel_.y +
-                (reservedPanel_.height - 7 * populationScale) * .5F,
-            populationScale
-        );
-
+        drawRealmFlag(renderer, flag_, flagPanel_.x + 7, flagPanel_.y + 7, 3);
         const std::string visibleCityName =
             cityName_.empty() ? std::string("Unnamed City") : cityName_;
 
         const UiRectangle nameBounds{
-            cityNamePanel_.x,
+            cityNamePanel_.x + 48,
             cityNamePanel_.y,
-            cityNamePanel_.width - 48,
+            cityNamePanel_.width - 96,
             cityNamePanel_.height
         };
         const float cityNamePixelSize = std::min(
@@ -864,6 +900,95 @@ namespace Paladin
                 );
             }
         }
+    }
+
+    void CityHud::render(
+        Renderer& renderer,
+        const GrayUiRenderer& uiRenderer
+    ) const
+    {
+        if (!goodsIconsLoaded_)
+        {
+            goodsIconsLoaded_ = true;
+            SceneSpriteLibrary icons;
+            icons.load(
+                renderer,
+                std::string(SDL_GetBasePath()) + "assets/sprites"
+            );
+            for (std::size_t i = 0; i < goods_.size(); ++i)
+            {
+                if (auto* sprite =
+                        icons.find("ui.goods." + std::string(goods_[i].id)))
+                {
+                    goodsIcons_[i] = sprite->texture;
+                }
+            }
+            if (auto* sprite = icons.find("ui.goods.gold"))
+            {
+                treasuryIcon_ = sprite->texture;
+            }
+            for (const auto& option : menuOptions)
+            {
+                if (option.objectTypeId.empty())
+                {
+                    continue;
+                }
+                if (auto* sprite = icons.find(
+                        "ui.build." + std::string(option.objectTypeId)
+                    ))
+                {
+                    optionIcons_[std::string(option.objectTypeId)] =
+                        sprite->texture;
+                }
+            }
+        }
+
+        renderIdentity(renderer, uiRenderer);
+        uiRenderer.drawPanel(renderer, dayTimePanel_);
+        uiRenderer.drawPanel(renderer, treasuryPanel_);
+        uiRenderer.drawPanel(renderer, extensionPanel_);
+        if (const auto& icon = treasuryIcon_)
+        {
+            renderer.drawTexture(
+                *icon,
+                0,
+                0,
+                float(icon->width()),
+                float(icon->height()),
+                treasuryPanel_.x + 6,
+                treasuryPanel_.y + 6,
+                float(icon->width()),
+                float(icon->height())
+            );
+        }
+        uiRenderer.drawLabel(
+            renderer,
+            goldText(treasuryGold_),
+            treasuryPanel_.x + 35,
+            treasuryPanel_.y + 12,
+            1.5F
+        );
+        populationButton_.render(renderer, uiRenderer);
+        const auto populationLabel =
+            std::string("Population:") +
+            (hasKeep_
+                 ? " " + std::to_string(population_) +
+                       (worldMode_ ? ""
+                                   : "/" + std::to_string(housingCapacity_))
+                 : "");
+        const float populationScale = std::min(
+            1.5F,
+            (reservedPanel_.width - 12) /
+                (float(populationLabel.size()) * 6 - 1)
+        );
+        uiRenderer.drawLabel(
+            renderer,
+            populationLabel,
+            centeredLabelX(reservedPanel_, populationLabel, populationScale),
+            reservedPanel_.y +
+                (reservedPanel_.height - 7 * populationScale) * .5F,
+            populationScale
+        );
 
         const std::string dayAndTime =
             "Day " + std::to_string(day_) + " " + (hour_ < 10 ? "0" : "") +
@@ -918,6 +1043,7 @@ namespace Paladin
         {
             button.render(renderer, uiRenderer);
         }
+        resourceButton_.render(renderer, uiRenderer);
         uiRenderer.drawPanel(renderer, minimapPanel_);
         goodsButton_.render(renderer, uiRenderer);
 
@@ -927,7 +1053,7 @@ namespace Paladin
             {
                 uiRenderer.drawPanel(renderer, cell);
             }
-            for (std::size_t i = 0; i < 4; ++i)
+            for (std::size_t i = 0; i < goods_.size(); ++i)
             {
                 const auto& cell = goodsCells_[i];
                 const float x = cell.x + cell.width * .5F;
@@ -948,25 +1074,18 @@ namespace Paladin
                 }
                 else
                 {
-                    renderer.fillRectangle(
-                        x - 8,
+                    const auto name = goods_[i].name.substr(0, 6);
+                    uiRenderer.drawLabel(
+                        renderer,
+                        name,
+                        centeredLabelX(cell, name, 1),
                         y + 4,
-                        16,
-                        14,
-                        {0xA9, 0x94, 0x78, 255}
+                        1
                     );
                 }
                 std::ostringstream amount;
                 amount << std::fixed << std::setprecision(0)
-                       << std::floor(
-                              std::max(
-                                  0.0,
-                                  i == 0   ? stoneAmount_
-                                  : i == 1 ? lumberAmount_
-                                  : i == 2 ? fishAmount_
-                                           : meatAmount_
-                              )
-                          );
+                       << std::floor(std::max(0.0, goods_[i].amount));
                 const auto label = amount.str();
                 const float size = std::min(
                     2.0F,
@@ -1175,6 +1294,10 @@ namespace Paladin
 {
     std::string CityHud::tooltipAt(float x, float y) const
     {
+        if (!worldMode_ && resourceButton_.containsPoint(x, y))
+        {
+            return "Resources - highlight natural deposits and wild herds";
+        }
         if (artButton_.containsPoint(x, y))
         {
             return "Environment art: switch sprites on/off (F8). People and "
@@ -1216,47 +1339,46 @@ namespace Paladin
         {
             if (topButtons_[i].containsPoint(x, y))
             {
-                return worldMode_ && i == 1 ? "Diplomacy - realms and agreements" : titles[i];
+                return worldMode_ && i == 1
+                           ? "Diplomacy - realms and agreements"
+                           : titles[i];
             }
         }
         if (goodsOpen_)
         {
-            constexpr std::array goods{
-                "Stone",
-                "Lumber",
-                "Fish - food",
-                "Meat - food",
-                "Empty",
-                "Empty"
-            };
             for (std::size_t i = 0; i < goodsCells_.size(); ++i)
             {
                 if (goodsCells_[i].contains(x, y))
                 {
-                    if (i >= goodsDailyRates_.size()) { return goods[i]; }
-                    const auto& rates = goodsDailyRates_[i];
+                    const auto& rates = goods_[i].rates;
                     const auto number = [](double value)
                     {
                         std::ostringstream text;
                         text << std::fixed << std::setprecision(1) << value;
                         return text.str();
                     };
-                    std::string text = std::string(goods[i]) +
+                    std::string text =
+                        std::string(goods_[i].name) +
                         "\nProduction/day: " + number(rates.production);
                     if (rates.depletion > 1e-7)
                     {
                         text += "\nDepletion/day: " + number(rates.depletion);
-                        if (rates.foodEstimate) { text += " (estimated need)"; }
+                        if (rates.foodEstimate)
+                        {
+                            text += " (estimated need)";
+                        }
                     }
                     text += "\nProduction: last 24 game hours.";
                     if (rates.foodEstimate && rates.depletion > 1e-7)
                     {
-                        text += "\nDaily food need, shared by recent diet."
-                                "\nBefore meals are observed: available food mix.";
+                        text +=
+                            "\nDaily food need, shared by recent diet."
+                            "\nBefore meals are observed: available food mix.";
                     }
                     else if (rates.depletion > 1e-7)
                     {
-                        text += "\nDepletion: actual use in the last 24 game hours.";
+                        text += "\nDepletion: actual use in the last 24 game "
+                                "hours.";
                     }
                     return text;
                 }

@@ -2,6 +2,7 @@
 #include "rendering/SceneSpriteLibrary.h"
 #include "world/settlements/SettlementMap.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/WorkplaceCompound.h"
 
 namespace Paladin
 {
@@ -52,6 +53,8 @@ namespace Paladin
                     bottom_ = std::max(bottom_, f.topLeft.y + f.height);
                     const auto& style =
                         sprites.objectStyle(object.objectTypeId);
+                    const bool compound = style.mode == "compound";
+                    const auto room = compound ? workplaceRoom(f) : f;
                     for (int y = std::max(0, f.topLeft.y);
                          y < std::min(height, f.topLeft.y + f.height);
                          ++y)
@@ -79,12 +82,25 @@ namespace Paladin
                                             ? RenderColor{0x74, 0x51, 0x3F, 255}
                                             : RenderColor{0, 0, 0, 0};
                             }
-                            else if (style.mode == "enclosed")
+                            else if (
+                                style.mode == "enclosed" ||
+                                (compound && room.contains({x, y}))
+                            )
                             {
                                 color =
-                                    roofed && x < f.topLeft.x + f.width * .5
+                                    roofed &&
+                                            x < room.topLeft.x + room.width * .5
                                         ? RenderColor{0xBD, 0x86, 0x4C, 255}
                                         : RenderColor{0x88, 0x60, 0x44, 255};
+                            }
+                            else if (compound)
+                            {
+                                color =
+                                    object.objectTypeId ==
+                                            SettlementObjectTypes::
+                                                FishingGrounds
+                                        ? RenderColor{0xD1, 0xA3, 0x52, 255}
+                                        : RenderColor{0xA9, 0x94, 0x78, 255};
                             }
                             else if (
                                 style.mode == "ground" ||

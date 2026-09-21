@@ -1,6 +1,7 @@
 #include "core/Application.h"
 #include "rendering/BattleScene.h"
 #include "ui/CaravanPanel.h"
+#include "ui/TradeDepotPanel.h"
 #include "ui/DebugConsole.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/LedgerPanel.h"
@@ -85,6 +86,7 @@ namespace Paladin
         diplomacyPanel_ = std::make_unique<DiplomacyPanel>();
         worldSettlementPanel_ = std::make_unique<WorldSettlementPanel>();
         caravanPanel_ = std::make_unique<CaravanPanel>();
+        tradeDepotPanel_ = std::make_unique<TradeDepotPanel>();
 
         simulationSpeedControls_ = std::make_unique<SimulationSpeedControls>();
 
@@ -177,6 +179,7 @@ namespace Paladin
         simulation_.reset();
 
         caravanPanel_.reset();
+        tradeDepotPanel_.reset();
         worldSettlementPanel_.reset();
         diplomacyPanel_.reset();
         worldHud_.reset();

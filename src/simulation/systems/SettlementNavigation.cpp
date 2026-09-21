@@ -39,24 +39,62 @@ namespace Paladin
 
     bool SettlementNavigation::walkable(
         const SettlementMap& map,
-        SettlementTilePosition p
+        SettlementTilePosition p,
+        bool avoidBuildingFootprints,
+        ConstructionSiteId escapeConstructionSite
     ) const
     {
         const auto* tile = map.grid().tile(p);
-        return tile && tile->terrain == TerrainType::Land &&
-               !map.objectState().blocksMovement(p);
+        if (!tile || tile->terrain != TerrainType::Land ||
+            map.objectState().blocksMovement(p))
+        {
+            return false;
+        }
+        if (!avoidBuildingFootprints)
+        {
+            return true;
+        }
+        const auto allowed = [](std::string_view type)
+        {
+            return type == SettlementObjectTypes::Road ||
+                   type == SettlementObjectTypes::Pastureland;
+        };
+        const auto* object = map.objectState().completedObjectAt(p);
+        const auto* site = map.objectState().constructionSiteAt(p);
+        return (!object || allowed(object->objectTypeId)) &&
+               (!site || site->id == escapeConstructionSite ||
+                allowed(site->objectTypeId));
     }
 
     bool SettlementNavigation::canStep(
         const SettlementMap& map,
         SettlementTilePosition a,
-        SettlementTilePosition b
+        SettlementTilePosition b,
+        bool avoidBuildingFootprints,
+        ConstructionSiteId escapeConstructionSite
     ) const
     {
         const int dx = std::abs(a.x - b.x), dy = std::abs(a.y - b.y);
-        return dx <= 1 && dy <= 1 && dx + dy > 0 && walkable(map, b) &&
+        return dx <= 1 && dy <= 1 && dx + dy > 0 &&
+               walkable(
+                   map,
+                   b,
+                   avoidBuildingFootprints,
+                   escapeConstructionSite
+               ) &&
                (dx == 0 || dy == 0 ||
-                (walkable(map, {a.x, b.y}) && walkable(map, {b.x, a.y})));
+                (walkable(
+                     map,
+                     {a.x, b.y},
+                     avoidBuildingFootprints,
+                     escapeConstructionSite
+                 ) &&
+                 walkable(
+                     map,
+                     {b.x, a.y},
+                     avoidBuildingFootprints,
+                     escapeConstructionSite
+                 )));
     }
 
     double SettlementNavigation::stepCost(
@@ -86,7 +124,13 @@ namespace Paladin
         candidates = 0;
         lastCost = 0;
 
-        if (!map.grid().isValidPosition(start) || !walkable(map, goal) ||
+        if (!map.grid().isValidPosition(start) ||
+            !walkable(
+                map,
+                goal,
+                policy.avoidBuildingFootprints,
+                policy.escapeConstructionSite
+            ) ||
             !std::isfinite(policy.roadSpeedMultiplier) ||
             policy.roadSpeedMultiplier <= 0 ||
             !std::isfinite(policy.diagonalCost) || policy.diagonalCost < 1 ||
@@ -109,7 +153,13 @@ namespace Paladin
                     p.x + (goal.x > p.x) - (goal.x < p.x),
                     p.y + (goal.y > p.y) - (goal.y < p.y)
                 };
-                if (!canStep(map, p, next))
+                if (!canStep(
+                        map,
+                        p,
+                        next,
+                        policy.avoidBuildingFootprints,
+                        policy.escapeConstructionSite
+                    ))
                 {
                     break;
                 }
@@ -134,7 +184,8 @@ namespace Paladin
             // Fastest possible terrain keeps A* admissible even with roads.
             return (std::max(dx, dy) +
                     (policy.diagonalCost - 1) * std::min(dx, dy)) /
-                   (hasRoads_ ? std::max(1.0, policy.roadSpeedMultiplier) : 1.0);
+                   (hasRoads_ ? std::max(1.0, policy.roadSpeedMultiplier)
+                              : 1.0);
         };
         struct Record
         {
@@ -153,7 +204,10 @@ namespace Paladin
                 }
                 // Equal estimates prefer progress toward the goal, avoiding
                 // broad expansion of equally promising long-distance routes.
-                if (cost != rhs.cost) { return cost < rhs.cost; }
+                if (cost != rhs.cost)
+                {
+                    return cost < rhs.cost;
+                }
                 return tile > rhs.tile;
             }
         };
@@ -195,7 +249,13 @@ namespace Paladin
                 for (int dx = -1; dx <= 1; ++dx)
                 {
                     const SettlementTilePosition next{from.x + dx, from.y + dy};
-                    if (!canStep(map, from, next))
+                    if (!canStep(
+                            map,
+                            from,
+                            next,
+                            policy.avoidBuildingFootprints,
+                            policy.escapeConstructionSite
+                        ))
                     {
                         continue;
                     }

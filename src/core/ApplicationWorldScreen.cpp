@@ -227,6 +227,18 @@ namespace Paladin
                 }
             }
         }
+        if (settlementPlacementController_->isSelecting() && hoveredPosition &&
+            !foundingPanel_->isOpen())
+        {
+            const auto& policy = simulation_->world().territoryFoundationPolicy();
+            const auto kind = foundingPanel_->settlementKind();
+            float x = 0, y = 0;
+            SDL_GetMouseState(&x, &y);
+            worldRenderer_->renderRegionSurvey(*renderer_, *grayUiRenderer_,
+                simulation_->world(), *hoveredPosition,
+                settlementRegionDimension(policy.settlementRegionWidth, kind),
+                settlementRegionDimension(policy.settlementRegionHeight, kind), x, y);
+        }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
     }
 

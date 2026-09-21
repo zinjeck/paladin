@@ -4,6 +4,7 @@
 #include "rendering/SceneDetail.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/objects/WorkplaceCompound.h"
 #include <array>
 #include <cmath>
 #include <limits>
@@ -92,13 +93,16 @@ namespace Paladin
                 for (const auto& o : map.objectState().completedObjects())
                 {
                     const auto& style = sprites.objectStyle(o.objectTypeId);
-                    if (style.mode == "enclosed")
+                    if (style.mode == "enclosed" || style.mode == "compound")
                     {
+                        const auto room = style.mode == "compound"
+                                              ? workplaceRoom(o.footprint)
+                                              : o.footprint;
                         buildings_.push_back(
-                            {double(o.footprint.topLeft.x),
-                             double(o.footprint.topLeft.y),
-                             double(o.footprint.width),
-                             double(o.footprint.height),
+                            {double(room.topLeft.x),
+                             double(room.topLeft.y),
+                             double(room.width),
+                             double(room.height),
                              style.height,
                              o.objectTypeId}
                         );

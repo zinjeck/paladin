@@ -96,9 +96,340 @@ namespace Paladin
             );
             return result;
         }
+        struct DepotOffer
+        {
+            SettlementId partner;
+            Money unitPrice = 0;
+            int available = 0;
+            double distance = 0;
+            std::size_t treatyPartners = 0;
+        };
+        static DepotOffer depotOffer(
+            const World& world,
+            SettlementId cityId,
+            SettlementObjectId depot,
+            std::string_view resource,
+            TradeDirection direction,
+            int minimumStock = 1
+        )
+        {
+            DepotOffer result;
+            const auto* home = world.settlement(cityId);
+            if (!home || !SettlementResourceCatalog::definition(resource))
+            {
+                return result;
+            }
+            std::vector<std::pair<double, SettlementId>> candidates;
+            for (const auto& candidate : world.settlements())
+            {
+                if (candidate.ownerRealmId() == home->ownerRealmId() ||
+                    !WorldShipmentSystem::hasTradeDepot(candidate))
+                {
+                    continue;
+                }
+                const auto* relation = world.diplomacy().between(
+                    home->ownerRealmId(),
+                    candidate.ownerRealmId()
+                );
+                if (!relation || !relation->trading || relation->atWar)
+                {
+                    continue;
+                }
+                const double distance = geographicDistance(
+                    home->position(),
+                    candidate.position(),
+                    world.grid().width(),
+                    world.grid().height()
+                );
+                if (distance > DiplomacySystem::RangeRadians)
+                {
+                    continue;
+                }
+                ++result.treatyPartners;
+                const auto* local = home->simulationState().localMap();
+                if (local &&
+                    local->trade.routeTerrainRevision ==
+                        world.grid().revision() &&
+                    std::find(
+                        local->trade.unreachablePartners.begin(),
+                        local->trade.unreachablePartners.end(),
+                        candidate.id()
+                    ) != local->trade.unreachablePartners.end())
+                {
+                    continue;
+                }
+                // Discard empty suppliers before the more expensive market
+                // quote. Distance ranking must never hide an eligible ninth
+                // (or later) city behind nearer cities without supply/demand.
+                if (direction == TradeDirection::Import &&
+                    WorldShipmentSystem::available(candidate, resource) <
+                        std::max(1, minimumStock))
+                {
+                    continue;
+                }
+                candidates.emplace_back(distance, candidate.id());
+            }
+            std::sort(candidates.begin(), candidates.end());
+            for (const auto& [distance, id] : candidates)
+            {
+                const auto* partner = world.settlement(id);
+                const auto price = quote(world, *partner, resource);
+                int stock = 0;
+                Money unitPrice = price.unitPrice;
+                if (direction == TradeDirection::Import)
+                {
+                    stock = std::min(
+                        int(std::min(1000000., price.offered)),
+                        WorldShipmentSystem::available(*partner, resource)
+                    );
+                }
+                else
+                {
+                    const auto* buyer = world.realm(partner->ownerRealmId());
+                    stock = int(std::min(
+                        {1000000.,
+                         price.wanted,
+                         double(
+                             buyer ? buyer->treasury->balance /
+                                         std::max<Money>(1, unitPrice)
+                                   : 0
+                         )}
+                    ));
+                }
+                if (stock < std::max(1, minimumStock))
+                {
+                    continue;
+                }
+                result.partner = id;
+                result.unitPrice = unitPrice;
+                result.available = stock;
+                result.distance = distance;
+                return result;
+            }
+            return result;
+        }
+        static ShipmentResult dispatch(
+            World& world,
+            RealmId actor,
+            SettlementId cityId,
+            SettlementObjectId depot,
+            std::string_view resource,
+            TradeDirection direction,
+            int quantity,
+            ShipmentId* created = nullptr
+        )
+        {
+            if (created)
+            {
+                *created = {};
+            }
+            const auto* home = world.settlement(cityId);
+            if (!home || home->ownerRealmId() != actor)
+            {
+                return ShipmentResult::NotOwned;
+            }
+            if (quantity <= 0 ||
+                quantity > WorldShipmentSystem::MaximumShipment)
+            {
+                return ShipmentResult::InvalidAmount;
+            }
+            const auto* map = home->simulationState().localMap();
+            const auto* object =
+                map ? map->objectState().completedObject(depot) : nullptr;
+            if (!object ||
+                object->objectTypeId != SettlementObjectTypes::TradeDepot)
+            {
+                return ShipmentResult::MissingTradeDepot;
+            }
+            auto* trade =
+                world.settlement(cityId)->simulationState().localMap_.get();
+            if (trade->trade.routeTerrainRevision != world.grid().revision())
+            {
+                trade->trade.routeTerrainRevision = world.grid().revision();
+                trade->trade.unreachablePartners.clear();
+            }
+            ShipmentResult last = ShipmentResult::InsufficientGoods;
+            // Disconnected nearest ports must not permanently mask the next
+            // eligible land neighbour. Cache failures by terrain revision and
+            // cap actual route searches per request.
+            for (int attempt = 0; attempt < 2; ++attempt)
+            {
+                const auto offer = depotOffer(
+                    world,
+                    cityId,
+                    depot,
+                    resource,
+                    direction,
+                    quantity
+                );
+                if (!offer.treatyPartners)
+                {
+                    return ShipmentResult::TradeAgreementRequired;
+                }
+                if (!offer.partner)
+                {
+                    return last;
+                }
+                const auto* partner = world.settlement(offer.partner);
+                if (direction == TradeDirection::Import)
+                {
+                    const auto inventory =
+                        map->logistics.importsForObject(depot);
+                    if (map->logistics.receivable(inventory, resource) <
+                        quantity)
+                    {
+                        return ShipmentResult::DepotFull;
+                    }
+                    last = WorldShipmentSystem::create(
+                        world,
+                        partner->ownerRealmId(),
+                        partner->id(),
+                        cityId,
+                        resource,
+                        quantity,
+                        false,
+                        created,
+                        false,
+                        actor,
+                        offer.unitPrice,
+                        {},
+                        depot
+                    );
+                }
+                else
+                {
+                    last = WorldShipmentSystem::create(
+                        world,
+                        actor,
+                        cityId,
+                        partner->id(),
+                        resource,
+                        quantity,
+                        false,
+                        created,
+                        false,
+                        partner->ownerRealmId(),
+                        offer.unitPrice,
+                        depot,
+                        {}
+                    );
+                }
+                if (last != ShipmentResult::NoLandRoute)
+                {
+                    return last;
+                }
+                if (trade->trade.unreachablePartners.size() >= 64)
+                {
+                    trade->trade.unreachablePartners.erase(
+                        trade->trade.unreachablePartners.begin()
+                    );
+                }
+                trade->trade.unreachablePartners.push_back(offer.partner);
+            }
+            return last;
+        }
+        static bool setOrder(
+            World& world,
+            RealmId actor,
+            SettlementId city,
+            SettlementObjectId depot,
+            std::string_view resource,
+            TradeDirection direction,
+            int quantity,
+            bool enabled
+        )
+        {
+            auto* settlement = world.settlement(city);
+            if (!settlement || settlement->ownerRealmId() != actor ||
+                !SettlementResourceCatalog::definition(resource))
+            {
+                return false;
+            }
+            auto* map = settlement->simulationState().localMap_.get();
+            const auto* object =
+                map ? map->objectState().completedObject(depot) : nullptr;
+            if (!object ||
+                object->objectTypeId != SettlementObjectTypes::TradeDepot)
+            {
+                return false;
+            }
+            auto& order = map->trade.order(depot, resource);
+            if (!enabled && order.shipment)
+            {
+                static_cast<void>(
+                    WorldShipmentSystem::stop(world, actor, order.shipment)
+                );
+            }
+            order.direction = direction;
+            order.quantity =
+                std::clamp(quantity, 1, WorldShipmentSystem::MaximumShipment);
+            order.enabled = enabled;
+            order.nextAttemptMinute = double(world.time().totalGameMinutes());
+            order.status = enabled ? "Waiting for the next caravan."
+                                   : "Standing order stopped.";
+            return true;
+        }
+        static void tickOrders(World& world, double minute)
+        {
+            for (const auto& record : world.settlements())
+            {
+                auto* map = world.settlement(record.id())
+                                ->simulationState()
+                                .localMap_.get();
+                if (!map)
+                {
+                    continue;
+                }
+                map->trade.expire(minute);
+                std::erase_if(
+                    map->trade.orders,
+                    [&](const auto& order)
+                    { return !map->objectState().completedObject(order.depot); }
+                );
+                if (minute < map->trade.nextOrderMinute ||
+                    map->trade.orders.empty())
+                {
+                    continue;
+                }
+                map->trade.nextOrderMinute = minute + 5;
+                auto& order =
+                    map->trade.orders
+                        [map->trade.orderCursor++ % map->trade.orders.size()];
+                if (!order.enabled || minute < order.nextAttemptMinute)
+                {
+                    continue;
+                }
+                if (const auto* shipment = world.shipment(order.shipment);
+                    shipment && shipment->active())
+                {
+                    order.status = shipment->cargo ? "Cargo in transit."
+                                                   : "Caravan returning.";
+                    continue;
+                }
+                order.nextAttemptMinute = minute + 30;
+                const auto result = dispatch(
+                    world,
+                    record.ownerRealmId(),
+                    record.id(),
+                    order.depot,
+                    order.resource,
+                    order.direction,
+                    order.quantity,
+                    &order.shipment
+                );
+                order.status = shipmentResultText(result);
+                if (result == ShipmentResult::NoLandRoute)
+                {
+                    order.nextAttemptMinute = minute + 5;
+                }
+                // At most one human-configured route search per world tick.
+                return;
+            }
+        }
         static void tick(World& world)
         {
             const double minute = double(world.time().totalGameMinutes());
+            tickOrders(world, minute);
             for (const auto& record : world.realms())
             {
                 if (minute < record.nextMarketMinute)
@@ -113,6 +444,7 @@ namespace Paladin
                 {
                     if (city.ownerRealmId() == buyer->id() &&
                         city.population() > 0 &&
+                        !city.simulationState().hasLocalMap() &&
                         WorldShipmentSystem::hasTradeDepot(city))
                     {
                         cities.push_back(city.id());
@@ -201,6 +533,12 @@ namespace Paladin
                     for (const auto& [distance, sellerId] : candidates)
                     {
                         const auto* seller = world.settlement(sellerId);
+                        if (seller->simulationState().hasLocalMap())
+                        {
+                            // Player depots export only the goods explicitly
+                            // configured in their own standing orders.
+                            continue;
+                        }
                         const auto supply = quote(world, *seller, resource.id);
                         if (supply.offered < 1 ||
                             supply.unitPrice > demand.unitPrice)

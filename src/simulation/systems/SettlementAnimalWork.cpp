@@ -53,12 +53,18 @@ namespace Paladin
             return false;
         }
         const auto* workplace = map.employment().workplace(c.workplaceId);
-        const SettlementObjectId assignedPasture = workplace && workplace->operational &&
-            workplace->objectTypeId == SettlementObjectTypes::Pastureland ? workplace->objectId : SettlementObjectId{};
+        const SettlementObjectId assignedPasture =
+            workplace && workplace->operational &&
+                    workplace->objectTypeId ==
+                        SettlementObjectTypes::Pastureland
+                ? workplace->objectId
+                : SettlementObjectId{};
         std::vector<EntityId> candidates;
         for (const auto& a : map.animals.all())
         {
-            if (a.health > 0 && !a.handler && a.order != AnimalOrder::None &&
+            if (a.health > 0 && !a.handler &&
+                (!a.escapingSite || a.order == AnimalOrder::Hunt) &&
+                a.order != AnimalOrder::None &&
                 (!assignedPasture || a.order == AnimalOrder::Gather))
             {
                 candidates.push_back(a.id);
@@ -159,6 +165,8 @@ namespace Paladin
                 delivery.tilePosition = animal->tilePosition;
                 delivery.insideHome = false;
                 delivery.path.clear();
+                delivery.task.kind = CitizenTaskKind::AnimalWork;
+                delivery.task.delivering = true;
                 if (route(
                         map,
                         citizens,
@@ -293,6 +301,7 @@ namespace Paladin
             return;
         }
         auto planned = c;
+        planned.task.delivering = true;
         if (!route(map, citizens, planned, pasture->footprint, true))
         {
             if (!routeBudgetLimited_)
@@ -345,13 +354,12 @@ namespace Paladin
                     {
                         const auto& a = *map.animals.find(id);
                         return a.lastTendedMinute +
-                               .1 *
-                                   (std::abs(
-                                        a.tilePosition.x - c.tilePosition.x
-                                    ) +
-                                    std::abs(
-                                        a.tilePosition.y - c.tilePosition.y
-                                    ));
+                               .1 * (std::abs(
+                                         a.tilePosition.x - c.tilePosition.x
+                                     ) +
+                                     std::abs(
+                                         a.tilePosition.y - c.tilePosition.y
+                                     ));
                     };
                     return score(left) < score(right);
                 }
@@ -397,13 +405,7 @@ namespace Paladin
                         continue;
                     }
                     auto planned = c;
-                    if (!route(
-                            map,
-                            citizens,
-                            planned,
-                            {target, 1, 1},
-                            true
-                        ) ||
+                    if (!route(map, citizens, planned, {target, 1, 1}, true) ||
                         planned.destination != target)
                     {
                         if (routeBudgetLimited_)

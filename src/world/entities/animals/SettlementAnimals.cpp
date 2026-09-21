@@ -46,6 +46,38 @@ namespace Paladin
         {
             return std::abs(a.x - b.x) + std::abs(a.y - b.y);
         }
+        bool animalTile(const SettlementMap& map, SettlementTilePosition p)
+        {
+            SettlementNavigation navigation;
+            return navigation.walkable(map, p, true);
+        }
+        double settlementPressure(
+            const SettlementMap& map,
+            SettlementTilePosition p
+        )
+        {
+            double pressure = 0;
+            for (int dy = -8; dy <= 8; dy += 2)
+            {
+                for (int dx = -8; dx <= 8; dx += 2)
+                {
+                    const SettlementTilePosition q{p.x + dx, p.y + dy};
+                    if (!map.grid().isValidPosition(q))
+                    {
+                        continue;
+                    }
+                    const auto* object = map.objectState().completedObjectAt(q);
+                    const auto* site = map.objectState().constructionSiteAt(q);
+                    if ((object &&
+                         object->objectTypeId != SettlementObjectTypes::Road) ||
+                        site)
+                    {
+                        pressure += 1. / (1 + std::abs(dx) + std::abs(dy));
+                    }
+                }
+            }
+            return pressure;
+        }
     } // namespace
     std::span<const AnimalSpecies> animalSpecies()
     {
@@ -81,7 +113,7 @@ namespace Paladin
     )
     {
         SettlementNavigation navigation;
-        if (!animalSpecies(type) || !navigation.walkable(map, p) ||
+        if (!animalSpecies(type) || !animalTile(map, p) ||
             std::any_of(
                 animals_.begin(),
                 animals_.end(),
@@ -296,7 +328,8 @@ namespace Paladin
         auto* a = find(id);
         SettlementNavigation navigation;
         if (!a || a->handler != handler ||
-            !navigation.canStep(map, a->tilePosition, next))
+            !navigation.canStep(map, a->tilePosition, next, true) ||
+            !animalTile(map, next))
         {
             return;
         }
@@ -348,7 +381,10 @@ namespace Paladin
             animalSpecies(a->species)->huntMeat,
             minute
         );
-        map.commerce.recordProduction("meat", animalSpecies(a->species)->huntMeat);
+        map.commerce.recordProduction(
+            "meat",
+            animalSpecies(a->species)->huntMeat
+        );
         a->health = 0;
         --pendingOrders_;
         a->order = AnimalOrder::None;
@@ -404,6 +440,7 @@ namespace Paladin
                 ++center.count;
             }
         }
+        std::size_t escapeSearches = 0;
         for (auto& a : animals_)
         {
             if (a.health <= 0)
@@ -426,6 +463,254 @@ namespace Paladin
             if (!move)
             {
                 continue;
+            }
+            const auto* coveringSite =
+                map.objectState().constructionSiteAt(a.tilePosition);
+            if (coveringSite &&
+                coveringSite->objectTypeId != SettlementObjectTypes::Road &&
+                coveringSite->objectTypeId !=
+                    SettlementObjectTypes::Pastureland)
+            {
+                // A new blueprint may cover an animal. Only its occupants can
+                // traverse that unfinished site to leave; no animal can enter
+                // from outside, and completed buildings remain solid.
+                const auto* hunter = citizens.citizen(a.handler);
+                if (a.order != AnimalOrder::Hunt || !hunter ||
+                    hunter->health <= 0 || hunter->task.animal != a.id)
+                {
+                    a.handler = {};
+                }
+                a.tender = {};
+                a.beingLed = false;
+                a.reservedPasture = {};
+                const auto f = coveringSite->footprint;
+                if (a.escapingSite != coveringSite->id ||
+                    a.escapeTopology != map.objectState().navigationVersion())
+                {
+                    a.escapingSite = coveringSite->id;
+                    a.escapeTopology = map.objectState().navigationVersion();
+                    a.escapePath.clear();
+                    a.escapePathIndex = 0;
+                    a.escapeCandidateCursor = 0;
+                    a.escapePerimeterCursor = 0;
+                    a.nextWanderMinute = 0;
+                }
+                if (a.visualProgress < 1)
+                {
+                    continue;
+                }
+                if (a.escapePathIndex >= a.escapePath.size() &&
+                    escapeSearches < 2 && minute >= a.nextWanderMinute)
+                {
+                    a.nextWanderMinute = minute + 5;
+                    std::vector<SettlementTilePosition> exits;
+                    for (int offset = -4; offset <= 4; ++offset)
+                    {
+                        for (const auto exit :
+                             {SettlementTilePosition{
+                                  std::clamp(
+                                      a.tilePosition.x + offset,
+                                      f.topLeft.x,
+                                      f.topLeft.x + f.width - 1
+                                  ),
+                                  f.topLeft.y - 1
+                              },
+                              {std::clamp(
+                                   a.tilePosition.x + offset,
+                                   f.topLeft.x,
+                                   f.topLeft.x + f.width - 1
+                               ),
+                               f.topLeft.y + f.height},
+                              {f.topLeft.x - 1,
+                               std::clamp(
+                                   a.tilePosition.y + offset,
+                                   f.topLeft.y,
+                                   f.topLeft.y + f.height - 1
+                               )},
+                              {f.topLeft.x + f.width,
+                               std::clamp(
+                                   a.tilePosition.y + offset,
+                                   f.topLeft.y,
+                                   f.topLeft.y + f.height - 1
+                               )}})
+                        {
+                            if (animalTile(map, exit))
+                            {
+                                exits.push_back(exit);
+                            }
+                        }
+                    }
+                    // Search the entire perimeter incrementally, not only
+                    // the nearest four projections. A distant dry gap may be
+                    // the sole exit from a coastal blueprint.
+                    const std::size_t perimeter =
+                        2 * std::size_t(f.width + f.height);
+                    if (a.escapePerimeterCursor >= perimeter)
+                    {
+                        a.escapePerimeterCursor = 0;
+                    }
+                    for (int scanned = 0;
+                         scanned < 64 && a.escapePerimeterCursor < perimeter;
+                         ++scanned)
+                    {
+                        const auto edge = a.escapePerimeterCursor++;
+                        SettlementTilePosition exit;
+                        if (edge < std::size_t(f.width))
+                        {
+                            exit = {f.topLeft.x + int(edge), f.topLeft.y - 1};
+                        }
+                        else if (edge < 2 * std::size_t(f.width))
+                        {
+                            exit = {
+                                f.topLeft.x + int(edge - f.width),
+                                f.topLeft.y + f.height
+                            };
+                        }
+                        else if (edge < 2 * std::size_t(f.width) + f.height)
+                        {
+                            exit = {
+                                f.topLeft.x - 1,
+                                f.topLeft.y + int(edge - 2 * f.width)
+                            };
+                        }
+                        else
+                        {
+                            exit = {
+                                f.topLeft.x + f.width,
+                                f.topLeft.y + int(edge - 2 * f.width - f.height)
+                            };
+                        }
+                        if (animalTile(map, exit))
+                        {
+                            exits.push_back(exit);
+                        }
+                    }
+                    std::sort(
+                        exits.begin(),
+                        exits.end(),
+                        [&](auto left, auto right)
+                        {
+                            const int aDistance =
+                                          distance(a.tilePosition, left),
+                                      bDistance =
+                                          distance(a.tilePosition, right);
+                            return aDistance != bDistance
+                                       ? aDistance < bDistance
+                                   : left.y != right.y ? left.y < right.y
+                                                       : left.x < right.x;
+                        }
+                    );
+                    exits.erase(
+                        std::unique(exits.begin(), exits.end()),
+                        exits.end()
+                    );
+                    CitizenMovementPolicy policy;
+                    policy.maximumExpandedNodes = 1024;
+                    policy.avoidBuildingFootprints = true;
+                    policy.escapeConstructionSite = coveringSite->id;
+                    for (std::size_t attempt = 0; attempt < exits.size();
+                         ++attempt)
+                    {
+                        if (escapeSearches >= 2)
+                        {
+                            break;
+                        }
+                        const auto exit =
+                            exits[a.escapeCandidateCursor++ % exits.size()];
+                        ++escapeSearches;
+                        // Inside one exclusive rectangle, the axis-aligned
+                        // route to its edge is O(distance), even for a huge
+                        // selection. Never expand a diamond of search nodes.
+                        a.escapePath.clear();
+                        auto from = a.tilePosition;
+                        const SettlementTilePosition edge{
+                            std::clamp(
+                                exit.x,
+                                f.topLeft.x,
+                                f.topLeft.x + f.width - 1
+                            ),
+                            std::clamp(
+                                exit.y,
+                                f.topLeft.y,
+                                f.topLeft.y + f.height - 1
+                            )
+                        };
+                        const auto walk = [&](SettlementTilePosition target)
+                        {
+                            while (from != target)
+                            {
+                                auto next = from;
+                                if (next.x != target.x)
+                                {
+                                    next.x += target.x > next.x ? 1 : -1;
+                                }
+                                else
+                                {
+                                    next.y += target.y > next.y ? 1 : -1;
+                                }
+                                if (!navigation.canStep(
+                                        map,
+                                        from,
+                                        next,
+                                        true,
+                                        a.escapingSite
+                                    ))
+                                {
+                                    return false;
+                                }
+                                a.escapePath.push_back(next);
+                                from = next;
+                            }
+                            return true;
+                        };
+                        if (!walk(edge) || !walk(exit))
+                        {
+                            a.escapePath = navigation.findPath(
+                                map,
+                                a.tilePosition,
+                                exit,
+                                policy
+                            );
+                        }
+                        a.escapePathIndex = 0;
+                        if (!a.escapePath.empty())
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (a.escapePathIndex < a.escapePath.size())
+                {
+                    const auto next = a.escapePath[a.escapePathIndex];
+                    if (!navigation.canStep(
+                            map,
+                            a.tilePosition,
+                            next,
+                            true,
+                            a.escapingSite
+                        ))
+                    {
+                        a.escapePath.clear();
+                        a.escapePathIndex = 0;
+                    }
+                    else if (!occupied.contains(tileKey(next)))
+                    {
+                        ++occupied[tileKey(next)];
+                        a.previousTile = a.tilePosition;
+                        a.tilePosition = next;
+                        a.visualProgress = 0;
+                        ++a.escapePathIndex;
+                        a.herdCenter = next;
+                        a.nextWanderMinute = minute + 1;
+                    }
+                }
+                continue;
+            }
+            if (a.escapingSite)
+            {
+                a.escapingSite = {};
+                a.escapePath.clear();
+                a.escapePathIndex = 0;
             }
             if (a.tender)
             {
@@ -472,7 +757,46 @@ namespace Paladin
             {
                 continue;
             }
-            const auto& center = centers[herdKey(a)];
+            const auto center = centers[herdKey(a)];
+            const double pressure =
+                pasture ? 0 : settlementPressure(map, a.tilePosition);
+            if (pressure > .1)
+            {
+                // Move the shared wild-herd anchor away from new settlement
+                // growth. Every member keeps the same destination and identity.
+                const auto original = a.herdCenter;
+                auto refuge = original;
+                double bestPressure = settlementPressure(map, original);
+                for (const auto d : directions)
+                {
+                    const SettlementTilePosition q{
+                        original.x + d.x * policy.roamingRadius,
+                        original.y + d.y * policy.roamingRadius
+                    };
+                    if (!animalTile(map, q))
+                    {
+                        continue;
+                    }
+                    const double value = settlementPressure(map, q);
+                    if (value < bestPressure)
+                    {
+                        bestPressure = value;
+                        refuge = q;
+                    }
+                }
+                if (refuge != original)
+                {
+                    for (auto& member : animals_)
+                    {
+                        if (!member.pasture && member.species == a.species &&
+                            member.herdCenter == original)
+                        {
+                            member.herdCenter = refuge;
+                        }
+                    }
+                    centers[herdKey(a)] = center;
+                }
+            }
             SettlementTilePosition next = a.tilePosition;
             double best = -1e30;
             for (std::size_t index = 0; index < directions.size(); ++index)
@@ -485,17 +809,29 @@ namespace Paladin
                 if (occupied.contains(tileKey(candidate)) ||
                     (pasture ? !pasture->footprint.contains(candidate)
                              : distance(candidate, a.herdCenter) >
-                                   policy.roamingRadius) ||
-                    !navigation.canStep(map, a.tilePosition, candidate))
+                                   std::max(
+                                       policy.roamingRadius,
+                                       distance(a.tilePosition, a.herdCenter)
+                                   )) ||
+                    !navigation.canStep(map, a.tilePosition, candidate) ||
+                    !animalTile(map, candidate))
                 {
                     continue;
                 }
                 const double separation = std::hypot(
-                    candidate.x - center.x / center.count,
-                    candidate.y - center.y / center.count
+                    candidate.x - center.x / std::max(1, center.count),
+                    candidate.y - center.y / std::max(1, center.count)
                 );
                 double score = -std::max(0.0, separation - policy.herdRadius) *
                                policy.cohesionWeight;
+                if (!pasture)
+                {
+                    score -= .4 * distance(candidate, a.herdCenter);
+                    if (pressure > .1)
+                    {
+                        score -= settlementPressure(map, candidate) * 4;
+                    }
+                }
                 // Prefer a little breathing room, while retaining random
                 // wandering.
                 for (const auto neighbor : directions)

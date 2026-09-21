@@ -242,9 +242,81 @@ namespace Paladin
         unit->garrison_ = cityId;
         return MilitaryResult::Success;
     }
-    void MilitarySystem::synchronize(World& world, double minute)
+    namespace
+    {
+        // Store only a fingerprint, never pointers into relocatable registries.
+        // Explicit commands force reconciliation; the hot tick path checks the
+        // small set of structural facts which can change soldier membership.
+        std::uint64_t militaryRosterStamp(const World& world)
+        {
+            std::uint64_t stamp = 1469598103934665603ULL;
+            const auto add = [&](std::uint64_t value)
+            { stamp = (stamp ^ value) * 1099511628211ULL; };
+            add(world.soldiers().size());
+            for (const auto& unit : world.armies())
+            {
+                add(unit.id().value());
+                add(unit.ownerRealmId().value());
+                add(unit.soldierCount());
+                add(unit.moving());
+                // A marching unit has no station. Its individual tile steps
+                // cannot change roster membership; reconcile at departure and
+                // arrival, not for every interpolated journey.
+                if (!unit.moving())
+                {
+                    add(std::uint32_t(unit.position().x));
+                    add(std::uint32_t(unit.position().y));
+                }
+            }
+            for (const auto& city : world.settlements())
+            {
+                add(city.id().value());
+                add(city.ownerRealmId().value());
+                add(std::uint32_t(city.position().x));
+                add(std::uint32_t(city.position().y));
+                const auto& people = city.simulationState().citizens();
+                const auto* local = city.simulationState().localMap();
+                if (!local)
+                {
+                    // Strategic personnel are only created/removed through
+                    // military commands, which advance this structural version.
+                    add(people.version());
+                    continue;
+                }
+                add(local->instanceId());
+                for (const auto& c : people.citizens())
+                {
+                    add(c.id.value());
+                    add(c.workplaceId.value());
+                    add(c.soldierId.value());
+                    add(c.militaryUnitId.value());
+                    add(c.militaryDeployed);
+                    add(c.health > 0);
+                    add(people.militaryEligible(c));
+                }
+            }
+            return stamp ? stamp : 1;
+        }
+    } // namespace
+
+    void MilitarySystem::synchronize(World& world, double minute, bool force)
     {
         CitizenshipSystem::synchronize(world);
+        for (auto& city : world.settlements())
+        {
+            if (auto* local = map(world, city.id()))
+            {
+                local->employment().synchronize(
+                    local->objectState(),
+                    city.simulationState().citizens_
+                );
+            }
+        }
+        if (!force && world.militaryRosterStamp_ == militaryRosterStamp(world))
+        {
+            return;
+        }
+        ++world.militaryRosterRebuilds_;
         std::unordered_set<SoldierId, StrongIdHash> retained;
         std::unordered_map<SoldierId, ArmyId, StrongIdHash> roster;
         retained.reserve(world.soldiers().size());
@@ -390,6 +462,31 @@ namespace Paladin
                 unit.garrison_ = {};
             }
         }
+        for (auto& city : world.settlements())
+        {
+            if (city.simulationState().localMap())
+            {
+                continue;
+            }
+            auto& people = city.simulationState().citizens_;
+            const auto removedPeople = std::erase_if(
+                people.citizens_,
+                [](const auto& c) { return c.health <= 0 && !c.soldierId; }
+            );
+            if (removedPeople)
+            {
+                ++people.version_;
+            }
+        }
+        world.militaryRosterStamp_ = militaryRosterStamp(world);
+    }
+    std::uint64_t MilitarySystem::rosterRebuilds(const World& world) noexcept
+    {
+        return world.militaryRosterRebuilds_;
+    }
+    std::uint64_t MilitarySystem::personnelUpdates(const World& world) noexcept
+    {
+        return world.militaryPersonnelUpdates_;
     }
     ArmyId MilitarySystem::maintainStrategicGarrison(
         World& world,
@@ -512,6 +609,13 @@ namespace Paladin
                     !people.appendCitizens(1, false))
                 {
                     break;
+                }
+                if (!people.militaryEligible(people.citizens_.back()))
+                {
+                    // Sampling an aggregate demographic must not materialize
+                    // a permanent unused person on every failed draw. Nobody
+                    // references this unaccepted sample yet.
+                    people.citizens_.pop_back();
                 }
             }
             if (!candidate || !state.population_.transferResidents(-1))
@@ -1285,15 +1389,70 @@ namespace Paladin
         {
             return;
         }
-        synchronize(world, minute);
+        synchronize(world, minute, false);
         BattleSystem::updatePursuit(world);
         BattleSystem::detectContacts(world);
-        // Indexed once per tick, never a citizen-array scan per marching
-        // soldier.
+        // Quiet strategic garrisons have no visible movement. Schedule their
+        // actual people every 15 minutes, staggered by stable unit ID, while
+        // retaining every fractional minute. Marching/player units remain
+        // smooth and immediate. No background citizens are duplicated.
+        std::vector<double> unitElapsed(world.armies().size(), elapsed);
+        std::unordered_set<SettlementId, StrongIdHash> neededCities;
+        std::size_t unitIndex = 0;
+        for (auto& unit : world.armies())
+        {
+            auto& duration = unitElapsed[unitIndex++];
+            const auto* realm = world.realm(unit.ownerRealmId());
+            const bool quiet = unit.garrisoned() && !unit.moving() &&
+                               !unit.engagedOpponent_ && realm &&
+                               realm->aiControlled;
+            if (quiet)
+            {
+                constexpr double cadence = 15.0;
+                const double phase = double(unit.id().value() % 300) * .05;
+                if (unit.nextNeedsMinute_ < 0)
+                {
+                    unit.nextNeedsMinute_ =
+                        (std::floor((minute + phase) / cadence) + 1) * cadence -
+                        phase;
+                }
+                unit.pendingNeedsMinutes_ += elapsed;
+                if (minute + elapsed + 1e-9 < unit.nextNeedsMinute_)
+                {
+                    duration = 0;
+                    continue;
+                }
+                duration = unit.pendingNeedsMinutes_;
+                unit.pendingNeedsMinutes_ = 0;
+                unit.nextNeedsMinute_ =
+                    (std::floor((minute + elapsed + phase) / cadence) + 1) *
+                        cadence -
+                    phase;
+            }
+            else
+            {
+                duration += unit.pendingNeedsMinutes_;
+                unit.pendingNeedsMinutes_ = 0;
+                unit.nextNeedsMinute_ = -1;
+            }
+            for (const auto id : unit.soldiers())
+            {
+                if (const auto* soldier = world.soldier(id))
+                {
+                    neededCities.insert(soldier->homeSettlementId());
+                }
+            }
+        }
+        // Build transient pointers only for units with work due, then discard
+        // them before any canonical citizen array can relocate.
         PersonnelIndex people;
         for (auto& city : world.settlements())
         {
             auto* local = map(world, city.id());
+            if (!local && !neededCities.contains(city.id()))
+            {
+                continue;
+            }
             std::unordered_map<SettlementObjectId, int, StrongIdHash>
                 barracksStaff;
             for (auto& c : city.simulationState().citizens_.citizens_)
@@ -1319,13 +1478,15 @@ namespace Paladin
                 }
             }
         }
+        unitIndex = 0;
         for (auto& unit : world.armies())
         {
-            if (unit.soldiers_.empty())
+            const double duration = unitElapsed[unitIndex++];
+            if (unit.soldiers_.empty() || duration <= 0)
             {
                 continue;
             }
-            double remaining = elapsed;
+            double remaining = duration;
             while (remaining > 1e-9)
             {
                 const double dt = std::min(remaining, 15.0);
@@ -1395,6 +1556,7 @@ namespace Paladin
                             continue;
                         }
                         auto& c = *it->second;
+                        ++world.militaryPersonnelUpdates_;
                         const auto* soldier = world.soldier(id);
                         auto* source =
                             soldier ? map(world, soldier->homeSettlementId())
@@ -1438,12 +1600,16 @@ namespace Paladin
                                     policy.healthRecoveryPerDay * dt / 1440
                             );
                         }
+                        if (c.health <= 0)
+                        {
+                            world.militaryRosterStamp_ = 0;
+                        }
                     }
                 }
                 remaining -= dt;
             }
         }
-        synchronize(world, minute + elapsed);
+        synchronize(world, minute + elapsed, false);
         BattleSystem::detectContacts(world);
     }
 } // namespace Paladin

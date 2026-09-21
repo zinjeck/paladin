@@ -1,5 +1,6 @@
 #include "core/Application.h"
 #include "core/SimulationClock.h"
+#include "debug/CrashContext.h"
 #include "rendering/BattleScene.h"
 #include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
@@ -13,6 +14,7 @@
 #include "ui/EmploymentPanel.h"
 #include "ui/LedgerPanel.h"
 #include "ui/SimulationSpeedControls.h"
+#include "ui/TradeDepotPanel.h"
 #include "ui/WorldSettlementPanel.h"
 #include <SDL3/SDL.h>
 #include <cmath>
@@ -52,6 +54,20 @@ namespace Paladin
             simulationSpeedControls_->setPlaybackState(
                 simulationClock_->isPaused(),
                 simulationClock_->speedMultiplier()
+            );
+        }
+        if (tradeDepotPanel_ && simulation_)
+        {
+            if (screen_ != Screen::City ||
+                tradeDepotPanel_->city() != activeCitySettlementId_)
+            {
+                tradeDepotPanel_->close();
+            }
+            tradeDepotPanel_->layout(
+                renderer_->outputWidth(),
+                renderer_->outputHeight(),
+                simulation_->world(),
+                simulation_->playerRealmId()
             );
         }
         debugConsole_->layout(
@@ -202,21 +218,38 @@ namespace Paladin
         switch (screen_)
         {
         case Screen::MainMenu:
+            CrashContext::setScreen("MainMenu");
+            CrashContext::setPhase("Render MainMenu");
             renderMainMenu();
             break;
         case Screen::World:
+            CrashContext::setScreen("World");
+            CrashContext::setPhase("Render World");
             renderWorldScreen();
             break;
         case Screen::City:
+            CrashContext::setScreen("City");
+            CrashContext::setPhase("Render City");
             renderCityScreen();
             break;
         case Screen::Battle:
+            CrashContext::setScreen("Battle");
+            CrashContext::setPhase("Render Battle");
             renderBattleScreen();
             break;
         }
         if (screen_ != Screen::MainMenu && screen_ != Screen::Battle &&
             simulation_)
         {
+            if (screen_ == Screen::City && tradeDepotPanel_)
+            {
+                tradeDepotPanel_->render(
+                    *renderer_,
+                    *grayUiRenderer_,
+                    simulation_->world(),
+                    simulation_->playerRealmId()
+                );
+            }
             ledgerPanel_->render(*renderer_, *grayUiRenderer_);
             renderMilitary();
             renderDebug();
@@ -263,29 +296,61 @@ namespace Paladin
             return handleMainMenuEvent(event);
         }
         if (screen_ == Screen::World && controlsVisible &&
-            worldSettlementPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
+            worldSettlementPanel_->handle(
+                event,
+                simulation_->world(),
+                simulation_->playerRealmId()
+            ))
         {
             if (worldSettlementPanel_->takeMilitaryRequest())
             {
                 handleReportAction(CityHudAction::Military);
             }
-            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                event.button.button == SDL_BUTTON_LEFT)
+            {
+                globePointerDown_ = globeDragging_ = false;
+            }
             return true;
         }
-        if (screen_ == Screen::World && controlsVisible && diplomacyPanel_->handle(event,simulation_->world(),simulation_->playerRealmId()))
+        if (screen_ == Screen::World && controlsVisible &&
+            diplomacyPanel_->handle(
+                event,
+                simulation_->world(),
+                simulation_->playerRealmId()
+            ))
         {
-            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                event.button.button == SDL_BUTTON_LEFT)
+            {
+                globePointerDown_ = globeDragging_ = false;
+            }
+            return true;
+        }
+        if (screen_ == Screen::City && tradeDepotPanel_->handle(
+                                           event,
+                                           simulation_->world(),
+                                           simulation_->playerRealmId()
+                                       ))
+        {
             return true;
         }
         if (handleCaravanEvent(event))
         {
-            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT)
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                event.button.button == SDL_BUTTON_LEFT)
+            {
                 globePointerDown_ = globeDragging_ = false;
+            }
             return true;
         }
         if (handleMilitaryEvent(event))
         {
-            if (event.type==SDL_EVENT_MOUSE_BUTTON_UP && event.button.button==SDL_BUTTON_LEFT) globePointerDown_=globeDragging_=false;
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_UP &&
+                event.button.button == SDL_BUTTON_LEFT)
+            {
+                globePointerDown_ = globeDragging_ = false;
+            }
             return true;
         }
         if (handleReportEvent(event))
@@ -293,16 +358,33 @@ namespace Paladin
             return true;
         }
         // Movable management panels own their pointer capture above the HUD,
-        // minimap and speed buttons. A drag must not click through those layers.
+        // minimap and speed buttons. A drag must not click through those
+        // layers.
         if (screen_ == Screen::World && employmentPanel_->isOpen())
         {
-            const bool pointer = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP;
-            const bool inside = pointer ? employmentPanel_->containsPoint(event.button.x,event.button.y) :
-                event.type == SDL_EVENT_MOUSE_WHEEL ? employmentPanel_->containsPoint(event.wheel.mouse_x,event.wheel.mouse_y) : false;
-            if ((inside || employmentPanel_->capturingPointer() || employmentCapturedPointer_) && handleWorldManagement(event))
+            const bool pointer = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
+                                 event.type == SDL_EVENT_MOUSE_BUTTON_UP;
+            const bool inside = pointer ? employmentPanel_->containsPoint(
+                                              event.button.x,
+                                              event.button.y
+                                          )
+                                : event.type == SDL_EVENT_MOUSE_WHEEL
+                                    ? employmentPanel_->containsPoint(
+                                          event.wheel.mouse_x,
+                                          event.wheel.mouse_y
+                                      )
+                                    : false;
+            if ((inside || employmentPanel_->capturingPointer() ||
+                 employmentCapturedPointer_) &&
+                handleWorldManagement(event))
+            {
                 return true;
+            }
         }
-        if (controlsVisible && handleSimulationControlEvent(event)) return true;
+        if (controlsVisible && handleSimulationControlEvent(event))
+        {
+            return true;
+        }
         switch (screen_)
         {
         case Screen::MainMenu:

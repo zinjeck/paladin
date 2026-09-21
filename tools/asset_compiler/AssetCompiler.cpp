@@ -188,7 +188,15 @@ namespace Paladin
             {"stone", "environment-v4/props/resource-stone.png"},
             {"lumber", "environment-v4/props/resource-lumber.png"},
             {"fish", "tribal-v14/fish.png"},
-            {"meat", "tribal-v14/meat.png"}
+            {"meat", "tribal-v14/meat.png"},
+            {"wheat", "mining-v1/wheat.png"},
+            {"bread", "mining-v1/bread.png"},
+            {"coal", "mining-v1/coal.png"},
+            {"iron", "mining-v1/iron.png"},
+            {"gold", "mining-v1/gold.png"},
+            {"food", "environment-v4/props/resource-food.png"},
+            {"rations", "environment-v4/props/resource-food.png"},
+            {"materials", "environment-v4/props/resource-materials.png"}
         };
         std::set<unsigned> palette;
         std::ifstream pf(settings / "art-palette.hex");

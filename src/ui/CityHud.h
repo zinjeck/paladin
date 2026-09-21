@@ -35,6 +35,7 @@ namespace Paladin
         Events,
         Ledger,
         ToggleRoofs,
+        ToggleResources,
         ToggleEnvironmentArt,
         Back
     };
@@ -52,6 +53,10 @@ namespace Paladin
             return artButton_.containsPoint(x, y) ||
                    (!worldMode_ && roofsButton_.containsPoint(x, y));
         }
+        void setResourcesVisible(bool value)
+        {
+            resourceButton_.setSelected(value);
+        }
         void setRoofsVisible(bool value)
         {
             roofsButton_.setSelected(value);
@@ -67,18 +72,26 @@ namespace Paladin
         }
         void setWorldMode(bool enabled)
         {
-            if (worldMode_ != enabled) topButtons_[1].setText(enabled ? "Diplomacy" : "Employment");
+            if (worldMode_ != enabled)
+            {
+                topButtons_[1].setText(enabled ? "Diplomacy" : "Employment");
+            }
             worldMode_ = enabled;
             if (enabled)
             {
                 closeCategoryMenus();
             }
         }
-        const UiRectangle& activeSettlementBounds() const noexcept { return activeSettlementPanel_; }
+        const UiRectangle& activeSettlementBounds() const noexcept
+        {
+            return activeSettlementPanel_;
+        }
         void setActiveSettlementName(std::string name)
         {
             activeSettlementName_ = std::move(name);
-            activeSettlementButton_.setText("Active Settlement: " + activeSettlementName_);
+            activeSettlementButton_.setText(
+                "Active Settlement: " + activeSettlementName_
+            );
         }
 
         void setFortress(bool value) noexcept
@@ -105,23 +118,34 @@ namespace Paladin
         {
             housingCapacity_ = capacity;
         }
+        void clearGoods() noexcept;
+        void setGoodsResource(
+            std::string_view resource,
+            double amount,
+            ResourceDailyRates rates = {}
+        ) noexcept;
+        // Compatibility helpers for older callers; new scenes use the catalog.
         void setGoodsAmounts(
             double stone,
             double lumber,
             double fish,
             double meat = 0
-        ) noexcept
+        ) noexcept;
+        void setGoodsDailyRates(
+            std::array<ResourceDailyRates, 4> rates
+        ) noexcept;
+        void renderIdentity(
+            Renderer& renderer,
+            const GrayUiRenderer& uiRenderer
+        ) const;
+        [[nodiscard]] std::size_t goodsCount() const noexcept
         {
-            stoneAmount_ = stone;
-            lumberAmount_ = lumber;
-            fishAmount_ = fish;
-            meatAmount_ = meat;
+            return goods_.size();
         }
+        [[nodiscard]] UiRectangle goodsBounds(
+            std::string_view resource
+        ) const noexcept;
 
-        void setGoodsDailyRates(std::array<ResourceDailyRates, 4> rates) noexcept
-        {
-            goodsDailyRates_ = rates;
-        }
         void pointerMoved(float x, float y) noexcept;
         std::string tooltipAt(float x, float y) const;
 
@@ -151,7 +175,11 @@ namespace Paladin
         void reloadArt()
         {
             goodsIconsLoaded_ = false;
-            goodsIcons_ = {};
+            for (auto& icon : goodsIcons_)
+            {
+                icon.reset();
+            }
+            treasuryIcon_.reset();
             optionIcons_.clear();
         }
 
@@ -179,6 +207,7 @@ namespace Paladin
         [[nodiscard]]
         bool optionIsVisible(std::size_t optionIndex) const noexcept;
 
+        UiButton resourceButton_{"R"};
         UiButton roofsButton_{"Roofs O"};
         UiButton artButton_{"Art F8"};
         UiButton backButton_;
@@ -189,19 +218,23 @@ namespace Paladin
         UiRectangle minimapPanel_;
         UiButton goodsButton_{"Goods"};
         mutable bool goodsIconsLoaded_ = false;
-        mutable std::array<std::shared_ptr<Texture>, 5> goodsIcons_;
+        mutable std::vector<std::shared_ptr<Texture>> goodsIcons_;
+        mutable std::shared_ptr<Texture> treasuryIcon_;
         mutable std::unordered_map<std::string, std::shared_ptr<Texture>>
             optionIcons_;
-        std::array<UiRectangle, 6> goodsCells_{};
+        std::vector<UiRectangle> goodsCells_;
         bool goodsOpen_ = true;
         bool hasKeep_ = false;
         std::size_t population_ = 8;
         std::size_t housingCapacity_ = 0;
-        double stoneAmount_ = 0;
-        double lumberAmount_ = 0;
-        double fishAmount_ = 0;
-        double meatAmount_ = 0;
-        std::array<ResourceDailyRates, 4> goodsDailyRates_{};
+        struct GoodsEntry
+        {
+            std::string_view id;
+            std::string_view name;
+            double amount = 0;
+            ResourceDailyRates rates;
+        };
+        std::vector<GoodsEntry> goods_;
         std::array<UiButton, CategoryCount> bottomButtons_;
         UiRectangle toolbarBounds_;
         std::vector<UiButton> optionButtons_;

@@ -10,6 +10,7 @@
 #include "rendering/WorldObjectRenderer.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
+#include "rendering/WorldResourceMap.h"
 #include "rendering/WorldRealmPresentationRenderer.h"
 
 #include "rendering/WorldMapNavigation.h"
@@ -75,6 +76,7 @@ namespace Paladin
         const SceneSpriteLibrary& artwork() const noexcept { return artwork_; }
         void reloadArt() const
         {
+            resourceMap_.reset();
             artwork_.reset();
             globe_.reset();
             sunRenderer_.reset();
@@ -94,6 +96,11 @@ namespace Paladin
             std::optional<WorldPlacementMarker> placementMarker = std::nullopt
         ) const;
 
+        void renderRegionSurvey(Renderer& renderer, const GrayUiRenderer& ui,
+            const World& world, WorldTilePosition center, int width, int height,
+            float x, float y) const
+        { resourceTooltip_.render(renderer, ui, world, center, width, height, x, y); }
+        bool resourceMapReady() const { return resourceMap_.ready(); }
         void renderNavigator(
             Renderer&,
             const World&,
@@ -121,6 +128,8 @@ namespace Paladin
         std::optional<PlanetRotation> lastGlobeRotation_;
         WorldGridRenderer gridRenderer_;
         mutable SceneSpriteLibrary artwork_;
+        mutable WorldResourceMap resourceMap_;
+        mutable RegionResourceTooltip resourceTooltip_;
         mutable GlobeRenderer globe_;
         mutable CelestialSunRenderer sunRenderer_;
         OverlayRenderer overlayRenderer_;

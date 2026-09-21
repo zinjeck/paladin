@@ -407,3 +407,13 @@ ui.build.quarry mining-v1/mine.hoist.png 1 1 0 0 0 0
 
 trade_depot.station mining-v1/trade_depot.png 4 3.5 .5 1 0 0
 ui.build.trade_depot mining-v1/trade_depot.icon.png 1 1 .5 .5 0 0
+
+# Native transport sprites, independent of real citizen/cargo ownership.
+transport.cart.south transport-v1/cart.south.png 1.5 3 .5 .5 0 0
+transport.cart.west transport-v1/cart.west.png 3 2.25 .5 .5 0 0
+transport.cart.north transport-v1/cart.north.png 1.5 3 .5 .5 0 0
+transport.cart.east transport-v1/cart.east.png 3 2.25 .5 .5 0 0
+transport.canoe.north transport-v1/canoe.north.png 1.25 2 0.72 .5 0 0
+transport.canoe.east transport-v1/canoe.east.png 2.25 0.75 0.62 .5 0 0
+transport.canoe.south transport-v1/canoe.south.png 1.25 2 0.72 .5 0 0
+transport.canoe.west transport-v1/canoe.west.png 2.25 0.75 0.62 .5 0 0

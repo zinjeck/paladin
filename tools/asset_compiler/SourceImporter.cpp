@@ -153,7 +153,8 @@ namespace Paladin
                   style.frameRgb >> std::dec >> style.bodyWidth >>
                   style.bodyDepth) ||
                 (style.mode != "ground" && style.mode != "enclosed" &&
-                 style.mode != "modules" && style.mode != "single") ||
+                 style.mode != "modules" && style.mode != "single" &&
+                 style.mode != "compound") ||
                 !std::isfinite(style.moduleWidth) ||
                 !std::isfinite(style.moduleDepth) ||
                 !std::isfinite(style.height) ||

@@ -3,6 +3,7 @@
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
+#include "world/settlements/objects/WorkplaceCompound.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
 
@@ -11,44 +12,77 @@ namespace Paladin
     bool SettlementLogistics::canEat(std::string_view resource) const
     {
         const auto* type = SettlementResourceCatalog::definition(resource);
-        if (!type || !type->edible) return false;
-        if (!type->emergencyOnly) return true;
+        if (!type || !type->edible)
+        {
+            return false;
+        }
+        if (!type->emergencyOnly)
+        {
+            return true;
+        }
         for (const auto& inventory : inventories_)
+        {
             if (inventory.kind != InventoryKind::Construction)
+            {
                 for (const auto& goods : inventory.goods)
                 {
-                    const auto* food = SettlementResourceCatalog::definition(goods.resource);
-                    if (goods.amount > 0 && food && food->edible && !food->emergencyOnly)
+                    const auto* food =
+                        SettlementResourceCatalog::definition(goods.resource);
+                    if (goods.amount > 0 && food && food->edible &&
+                        !food->emergencyOnly)
+                    {
                         return false;
+                    }
                 }
+            }
+        }
         for (const auto& claim : reservations_)
         {
-            const auto* food = SettlementResourceCatalog::definition(claim.resource);
-            if (claim.pickedUp && claim.amount > 0 && food && food->edible && !food->emergencyOnly)
+            const auto* food =
+                SettlementResourceCatalog::definition(claim.resource);
+            if (claim.pickedUp && claim.amount > 0 && food && food->edible &&
+                !food->emergencyOnly)
+            {
                 return false;
+            }
         }
         return true;
     }
-    bool SettlementLogistics::mayExport(const SettlementObjectState& objects,
-        const SettlementInventory& inventory, std::string_view resource) const
+    bool SettlementLogistics::mayExport(
+        const SettlementObjectState& objects,
+        const SettlementInventory& inventory,
+        std::string_view resource
+    ) const
     {
         const auto* object = objects.completedObject(inventory.objectId);
-        if (!object) return true;
+        if (!object)
+        {
+            return true;
+        }
         // Retain real recipe inputs, not every incidental good in a building.
         // A bakery may still sell a stocked fish; only its wheat is committed.
         if (object->objectTypeId == SettlementObjectTypes::Barracks)
+        {
             return resource != SettlementResourceTypes::Rations;
+        }
         if (object->objectTypeId == SettlementObjectTypes::ArmySupplyDepot)
         {
             const auto* food = SettlementResourceCatalog::definition(resource);
             return !food || !food->edible || food->emergencyOnly;
         }
         if (object->objectTypeId == SettlementObjectTypes::Bakery)
+        {
             return resource != SettlementResourceTypes::Wheat;
+        }
         return true;
     }
-    int SettlementLogistics::convert(InventoryId id, std::string_view input,
-        std::string_view output, int requested, double minute)
+    int SettlementLogistics::convert(
+        InventoryId id,
+        std::string_view input,
+        std::string_view output,
+        int requested,
+        double minute
+    )
     {
         const auto* result = SettlementResourceCatalog::definition(output);
         auto* entry = edit(id);
@@ -60,15 +94,32 @@ namespace Paladin
         int amount = std::min(requested, available(id, input));
         if (!entry->resourceLimits.empty())
         {
-            const auto limit = std::find_if(entry->resourceLimits.begin(),
-                entry->resourceLimits.end(), [&](const auto& l) { return l.resource == output; });
-            if (limit == entry->resourceLimits.end()) return 0;
+            const auto limit = std::find_if(
+                entry->resourceLimits.begin(),
+                entry->resourceLimits.end(),
+                [&](const auto& l) { return l.resource == output; }
+            );
+            if (limit == entry->resourceLimits.end())
+            {
+                return 0;
+            }
             int reserved = 0;
             for (const auto& claim : reservations_)
-                if (claim.destination == id && claim.resource == output) reserved += claim.amount;
-            amount = std::min(amount, limit->amount - entry->amount(output) - reserved);
+            {
+                if (claim.destination == id && claim.resource == output)
+                {
+                    reserved += claim.amount;
+                }
+            }
+            amount = std::min(
+                amount,
+                limit->amount - entry->amount(output) - reserved
+            );
         }
-        if (amount <= 0) return 0;
+        if (amount <= 0)
+        {
+            return 0;
+        }
         // Input and output have the same bulk. Conversion creates exactly the
         // slots it needs, including when freeSpace() is zero.
         change(*entry, input, -amount);
@@ -103,13 +154,18 @@ namespace Paladin
             indexedSize_ = 0;
             inventoryIndex_.clear();
             objectIndex_.clear();
+            importIndex_.clear();
             siteIndex_.clear();
         }
         while (indexedSize_ < inventories_.size())
         {
             const auto& entry = inventories_[indexedSize_];
             inventoryIndex_[entry.id] = indexedSize_++;
-            if (entry.objectId)
+            if (entry.objectId && entry.kind == InventoryKind::TradeImports)
+            {
+                importIndex_[entry.objectId] = entry.id;
+            }
+            if (entry.objectId && entry.kind != InventoryKind::TradeImports)
             {
                 objectIndex_[entry.objectId] = entry.id;
             }
@@ -134,6 +190,14 @@ namespace Paladin
         const auto it = inventoryIndex_.find(id);
         return it == inventoryIndex_.end() ? nullptr
                                            : &inventories_[it->second];
+    }
+    InventoryId SettlementLogistics::importsForObject(
+        SettlementObjectId id
+    ) const
+    {
+        synchronizeIndexes();
+        const auto found = importIndex_.find(id);
+        return found == importIndex_.end() ? InventoryId{} : found->second;
     }
     InventoryId SettlementLogistics::forObject(SettlementObjectId id) const
     {
@@ -582,7 +646,9 @@ namespace Paladin
                      : InventoryKind::Workplace,
                  object.id,
                  {},
-                 object.footprint,
+                 workplaceCompound(object.objectTypeId)
+                     ? workplaceStorageRoom(object.footprint)
+                     : object.footprint,
                  keep ? int((std::int64_t(100) * room.width * room.height +
                              keepArea - 1) /
                             keepArea)
@@ -601,6 +667,16 @@ namespace Paladin
                                    ->referenceArea
                        ))}
             );
+            if (object.objectTypeId == SettlementObjectTypes::TradeDepot)
+            {
+                // Imports never become export stock merely by entering the
+                // same building. Each counter has its own physical capacity.
+                auto inbound = inventories_.back();
+                inbound.id = ids_.generate();
+                inbound.kind = InventoryKind::TradeImports;
+                inbound.goods.clear();
+                inventories_.push_back(std::move(inbound));
+            }
             if (keep && !foundingGoodsGranted_)
             {
                 foundingGoodsGranted_ = true;

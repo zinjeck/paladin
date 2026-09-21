@@ -28,10 +28,7 @@ namespace Paladin
                        std::clamp(p.y, f.topLeft.y, f.topLeft.y + f.height - 1)
                    );
         }
-        std::uint64_t jobRouteKey(
-            std::uint64_t id,
-            SettlementTilePosition tile
-        )
+        std::uint64_t jobRouteKey(std::uint64_t id, SettlementTilePosition tile)
         {
             std::uint64_t value = id * 0x9E3779B97F4A7C15ULL;
             value ^= std::uint64_t(std::uint32_t(tile.x)) +
@@ -164,6 +161,9 @@ namespace Paladin
         bool inside
     )
     {
+        auto routePolicy = citizens.movementPolicy;
+        routePolicy.avoidBuildingFootprints =
+            c.task.kind == CitizenTaskKind::AnimalWork && c.task.delivering;
         const auto original = c.tilePosition;
         const bool midStep = c.pathIndex < c.path.size() && c.stepProgress > 0;
         const double progress = midStep ? c.stepProgress : 0;
@@ -254,7 +254,8 @@ namespace Paladin
         std::vector<SettlementTilePosition> candidates;
         const auto append = [&](SettlementTilePosition p)
         {
-            if (navigation.walkable(map, p))
+            if (navigation
+                    .walkable(map, p, routePolicy.avoidBuildingFootprints))
             {
                 candidates.push_back(p);
             }
@@ -300,7 +301,11 @@ namespace Paladin
         // Construction explicitly requests an interior tile, never perimeter
         // labor.
         if (inside && f.contains(c.tilePosition) &&
-            navigation.walkable(map, c.tilePosition))
+            navigation.walkable(
+                map,
+                c.tilePosition,
+                routePolicy.avoidBuildingFootprints
+            ))
         {
             candidates.insert(candidates.begin(), c.tilePosition);
         }
@@ -333,12 +338,8 @@ namespace Paladin
                 return false;
             }
             --pathsRemaining_;
-            auto path = navigation.findPath(
-                map,
-                c.tilePosition,
-                goal,
-                citizens.movementPolicy
-            );
+            auto path =
+                navigation.findPath(map, c.tilePosition, goal, routePolicy);
             if (path.empty())
             {
                 continue;
@@ -356,6 +357,89 @@ namespace Paladin
             c.explicitMovement = true;
             successful = true;
             return true;
+        }
+        return false;
+    }
+    bool SettlementActivitySystem::boatMealAvailable(
+        SettlementMap& map,
+        SettlementCitizenState& citizens,
+        SettlementCitizen& c,
+        double minute
+    )
+    {
+        if (minute < c.nextDecisionMinute)
+        {
+            return false;
+        }
+        c.nextDecisionMinute = minute + policy.retryMinutes;
+        std::vector<InventoryId> candidates;
+        for (const auto& inventory : map.logistics.inventories())
+        {
+            if (inventory.kind == InventoryKind::Construction ||
+                failedRoute(c, inventory.id, c.boatLanding, map, minute))
+            {
+                continue;
+            }
+            const auto price = map.commerce.mealPrice(map, inventory);
+            if (price < 0 ||
+                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                (inventory.kind == InventoryKind::Market &&
+                 !map.commerce.marketOpen(map, citizens, inventory.objectId)))
+            {
+                continue;
+            }
+            for (const auto& goods : inventory.goods)
+            {
+                if (map.logistics.canEat(goods.resource) &&
+                    map.logistics.available(inventory.id, goods.resource) > 0)
+                {
+                    candidates.push_back(inventory.id);
+                    break;
+                }
+            }
+        }
+        std::stable_sort(
+            candidates.begin(),
+            candidates.end(),
+            [&](auto a, auto b)
+            {
+                return distance(
+                           c.boatLanding,
+                           map.logistics.inventory(a)->footprint
+                       ) <
+                       distance(
+                           c.boatLanding,
+                           map.logistics.inventory(b)->footprint
+                       );
+            }
+        );
+        for (const auto source : candidates)
+        {
+            // Land routing is checked from the physical landing, without
+            // interrupting the boat or reserving food before arrival.
+            auto planned = c;
+            planned.tilePosition = c.boatLanding;
+            planned.path.clear();
+            planned.pathIndex = 0;
+            planned.stepProgress = 0;
+            planned.inFishingBoat = false;
+            planned.insideHome = false;
+            if (route(
+                    map,
+                    citizens,
+                    planned,
+                    map.logistics.inventory(source)->footprint,
+                    true
+                ))
+            {
+                return true;
+            }
+            if (routeBudgetLimited_)
+            {
+                c.nextDecisionMinute = minute + 1;
+                return false;
+            }
+            rememberFailure(c, source, c.boatLanding, map, minute);
         }
         return false;
     }
@@ -592,7 +676,8 @@ namespace Paladin
             *sourceInventory,
             *targetInventory,
             amount,
-            &citizens
+            &citizens,
+            resource
         );
         if (amount <= 0)
         {
@@ -710,7 +795,8 @@ namespace Paladin
                              source,
                              home,
                              policy.carryingCapacity,
-                             &citizens
+                             &citizens,
+                             SettlementResourceTypes::Lumber
                          ),
                          map.logistics.available(
                              source.id,
@@ -729,7 +815,7 @@ namespace Paladin
                              std::string(SettlementResourceTypes::Lumber),
                              amount,
                              -10000 +
-                                 (source.kind == InventoryKind::Market ? -500
+                                 (source.kind == InventoryKind::Market ? 100000
                                                                        : 0) +
                                  distance(c.tilePosition, source.footprint) +
                                  distance(
@@ -751,11 +837,12 @@ namespace Paladin
                 source.kind == InventoryKind::Stockpile ||
                 source.kind == InventoryKind::Workplace ||
                 source.kind == InventoryKind::Groundpile ||
-                (market && source.kind == InventoryKind::TradeDepot);
+                (market && source.kind == InventoryKind::TradeImports);
             if (((market || depot)
                      ? !wholesaleSource
                      : (source.kind != InventoryKind::Groundpile &&
-                        source.kind != InventoryKind::Workplace)) ||
+                        source.kind != InventoryKind::Workplace &&
+                        source.kind != InventoryKind::TradeImports)) ||
                 source.used() <= 0)
             {
                 continue;
@@ -818,14 +905,17 @@ namespace Paladin
                 }
                 for (const auto& goods : source.goods)
                 {
-                    if (!map.logistics.mayExport(map.objectState(), source, goods.resource)) continue;
+                    if (!map.logistics.mayExport(
+                            map.objectState(),
+                            source,
+                            goods.resource
+                        ))
+                    {
+                        continue;
+                    }
                     const auto* resource =
                         SettlementResourceCatalog::definition(goods.resource);
-                    if (market &&
-                        (!resource ||
-                         (!resource->edible &&
-                          goods.resource != SettlementResourceTypes::Lumber) ||
-                         resource->emergencyOnly))
+                    if (market && !resource)
                     {
                         continue;
                     }
@@ -833,14 +923,28 @@ namespace Paladin
                         source,
                         destination,
                         policy.carryingCapacity,
-                        &citizens
+                        &citizens,
+                        goods.resource
                     );
+                    int exportTarget = std::max(8, destination.capacity / 12);
+                    for (const auto& order : map.trade.orders)
+                    {
+                        if (depot && order.depot == destination.objectId &&
+                            order.resource == goods.resource && order.enabled &&
+                            order.direction == TradeDirection::Export)
+                        {
+                            exportTarget =
+                                std::max(exportTarget, order.quantity);
+                        }
+                    }
                     const int target =
-                        depot ? std::max(8, destination.capacity / 12)
+                        depot ? exportTarget
                         : market
                             ? (goods.resource == SettlementResourceTypes::Lumber
                                    ? std::max(2, destination.capacity / 4)
-                                   : std::max(4, destination.capacity * 3 / 4))
+                               : resource && resource->edible
+                                   ? std::max(4, destination.capacity * 3 / 4)
+                                   : std::max(2, destination.capacity / 12))
                             : destination.capacity;
                     int held = destination.amount(goods.resource);
                     if (market && resource && resource->edible)
@@ -987,7 +1091,8 @@ namespace Paladin
         {
             const auto id = choice.id;
             const auto& site = *map.objectState().constructionSite(id);
-            const auto routeKey = jobRouteKey(id.value(), site.footprint.topLeft);
+            const auto routeKey =
+                jobRouteKey(id.value(), site.footprint.topLeft);
             if (routeFailed(
                     c,
                     RouteFailureDomain::Construction,
@@ -1090,7 +1195,10 @@ namespace Paladin
                         continue;
                     }
                     sources.push_back(
-                        {source.id, distance(c.tilePosition, source.footprint)}
+                        {source.id,
+                         distance(c.tilePosition, source.footprint) +
+                             (source.kind == InventoryKind::Market ? 100000
+                                                                   : 0)}
                     );
                 }
                 std::stable_sort(
@@ -1468,52 +1576,48 @@ namespace Paladin
             {
                 return false;
             }
-            auto spots = fisheryShoreline(map.grid(), *object);
-            std::stable_sort(
-                spots.begin(),
-                spots.end(),
-                [&](const auto& a, const auto& b)
-                {
-                    return distance(c.tilePosition, {a.land, 1, 1}) <
-                           distance(c.tilePosition, {b.land, 1, 1});
-                }
-            );
-            for (const auto& spot : spots)
+            std::vector<SettlementTilePosition> occupied;
+            for (const auto& other : citizens.citizens())
             {
-                if (std::any_of(
-                        citizens.citizens().begin(),
-                        citizens.citizens().end(),
-                        [&](const auto& other)
-                        {
-                            return other.id != c.id &&
-                                   other.task.kind == CitizenTaskKind::Work &&
-                                   other.task.workTile == spot.land;
-                        }
-                    ))
+                if (other.id != c.id &&
+                    other.task.kind == CitizenTaskKind::Work &&
+                    other.task.object == object->id)
                 {
-                    continue;
+                    occupied.push_back(other.task.target);
                 }
-                auto planned = c;
-                if (!route(map, citizens, planned, {spot.land, 1, 1}, true) ||
-                    planned.destination != spot.land)
-                {
-                    if (!pathsRemaining_)
-                    {
-                        break;
-                    }
-                    continue;
-                }
-                copyRoute(c, planned);
-                c.task = {};
-                c.task.kind = CitizenTaskKind::Work;
-                c.task.object = workplace.objectId;
-                c.task.workTile = spot.land;
-                c.task.target = spot.water;
-                c.task.startedMinute = minute;
-                c.activity = CitizenActivity::TravelingToWork;
-                return true;
             }
-            return false;
+            auto voyage = map.fishingBoats.plan(
+                map,
+                *object,
+                c.id.value() ^ ++c.choiceSequence,
+                occupied
+            );
+            if (voyage.route.empty())
+            {
+                return false;
+            }
+            auto planned = c;
+            if (!route(
+                    map,
+                    citizens,
+                    planned,
+                    {voyage.launch.land, 1, 1},
+                    true
+                ) ||
+                planned.destination != voyage.launch.land)
+            {
+                return false;
+            }
+            copyRoute(c, planned);
+            c.task = {};
+            c.task.kind = CitizenTaskKind::Work;
+            c.task.object = workplace.objectId;
+            c.task.workTile = voyage.launch.land;
+            c.task.target = voyage.route.back();
+            c.task.startedMinute = minute;
+            c.boatRoute = std::move(voyage.route);
+            c.activity = CitizenActivity::TravelingToWork;
+            return true;
         }
         if (!route(map, citizens, c, workplace.footprint, true))
         {

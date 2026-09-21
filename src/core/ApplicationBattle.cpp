@@ -8,6 +8,7 @@
 #include "rendering/WorldRenderer.h"
 #include "simulation/Simulation.h"
 #include "ui/CaravanPanel.h"
+#include "ui/CityHud.h"
 #include "ui/DebugConsole.h"
 #include "ui/DiplomacyPanel.h"
 #include "ui/EmploymentPanel.h"
@@ -378,6 +379,16 @@ namespace Paladin
             ),
             simulationClock_->presentationSeconds()
         );
+        const auto* realm = world.realm(simulation_->playerRealmId());
+        cityHud_->setRealmFlag(realm ? realm->flag() : RealmFlag{});
+        cityHud_->setCityInformation(
+            realm ? std::string(realm->name()) : "Battle",
+            world.time().day(),
+            world.time().hour(),
+            world.time().minute()
+        );
+        cityHud_->layout(renderer_->outputWidth(), renderer_->outputHeight());
+        cityHud_->renderIdentity(*renderer_, *grayUiRenderer_);
         battleScene_->retreat.render(*renderer_, *grayUiRenderer_);
         simulationSpeedControls_->render(*renderer_, *grayUiRenderer_);
     }

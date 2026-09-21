@@ -1,6 +1,7 @@
 #include "simulation/systems/SettlementEconomySystem.h"
 #include "simulation/WorldMarketSystem.h"
 
+#include "world/ResourceSurvey.h"
 #include "world/Settlement.h"
 #include "world/World.h"
 #include "world/generation/GenerationNoise.h"
@@ -27,81 +28,29 @@ namespace Paladin
             {
                 return false;
             }
-            std::array<double, 4> ore{};
-            double land = 0, fertile = 0, forest = 0, rugged = 0;
-            const auto centre = city.position();
-            for (int dy = -12; dy <= 12; ++dy)
-            {
-                for (int dx = -12; dx <= 12; ++dx)
-                {
-                    if (dx * dx + dy * dy > 144)
-                    {
-                        continue;
-                    }
-                    WorldTilePosition p{
-                        (centre.x + dx + world.grid().width()) %
-                            world.grid().width(),
-                        centre.y + dy
-                    };
-                    const auto* tile = world.grid().tile(p);
-                    if (!tile || tile->terrain == TerrainType::Water ||
-                        tile->biome == BiomeType::Polar)
-                    {
-                        continue;
-                    }
-                    const auto owner = world.territory().controllerAt(p);
-                    if (realm->usesCivicControl()
-                            ? owner != realm->id()
-                            : owner && owner != realm->id())
-                    {
-                        continue;
-                    }
-                    // Divide shared districts between their closest towns; the
-                    // same ore cannot support every city at full output.
-                    bool nearest = true;
-                    for (const auto& other : world.settlements())
-                    {
-                        if (other.id() == city.id() ||
-                            other.ownerRealmId() != city.ownerRealmId())
-                        {
-                            continue;
-                        }
-                        int x = std::abs(p.x - other.position().x);
-                        x = std::min(x, world.grid().width() - x);
-                        const int y = p.y - other.position().y;
-                        if (x * x + y * y < dx * dx + dy * dy ||
-                            (x * x + y * y == dx * dx + dy * dy &&
-                             other.id() < city.id()))
-                        {
-                            nearest = false;
-                            break;
-                        }
-                    }
-                    if (!nearest)
-                    {
-                        continue;
-                    }
-                    ++land;
-                    const bool mountain =
-                        tile->terrain == TerrainType::Mountain ||
-                        tile->relief == ReliefType::Mountain;
-                    rugged += mountain                            ? 1
-                              : tile->relief == ReliefType::Hills ? .5
-                                                                  : 0;
-                    fertile += mountain                           ? .05
-                               : tile->biome == BiomeType::Desert ? .2
-                               : tile->biome == BiomeType::Tundra ? .15
-                               : tile->biome == BiomeType::Plain  ? 1
-                                                                  : .7;
-                    forest += tile->biome == BiomeType::Forest ||
-                                      tile->biome == BiomeType::Jungle ||
-                                      tile->biome == BiomeType::Taiga
-                                  ? 1
-                                  : .08;
-                    ore[std::size_t(tile->mineral)] += 1;
-                }
-            }
-            const double denominator = std::max(1., land);
+            const auto& policy = world.territoryFoundationPolicy();
+            const auto survey = surveyResources(
+                world.grid(),
+                city.position(),
+                settlementRegionDimension(
+                    policy.settlementRegionWidth,
+                    city.kind()
+                ),
+                settlementRegionDimension(
+                    policy.settlementRegionHeight,
+                    city.kind()
+                )
+            );
+            const double denominator = std::max(1., survey.land);
+            const double fertile = survey.amount("wheat");
+            const double forest = survey.amount("lumber");
+            const double rugged = survey.amount("stone");
+            const std::array<double, 4> ore{
+                0,
+                survey.amount("coal"),
+                survey.amount("iron"),
+                survey.amount("gold")
+            };
             const double development =
                 double(
                     GenerationNoise::mix(
@@ -116,9 +65,13 @@ namespace Paladin
             std::vector<ResourceFlowRate> flows{
                 {"food", food, 2, 1},
                 {"materials", .028 + development * .035, .035, 0},
-                {"lumber", .01 + forest / denominator * .065, .025, 0},
-                {"stone", .005 + rugged / denominator * .065, .018, 0},
-                {"wheat", .004 + fertile / denominator * .012, .012, 0},
+                {"lumber", forest / denominator * .10, .025, 0},
+                {"stone", rugged / denominator * .25, .018, 0},
+                {"wheat", fertile / denominator * .025, .012, 0},
+                {"fish",
+                 survey.amount("fish") / std::max(1., survey.tiles) * .04,
+                 .01,
+                 0},
                 {"coal", std::min(.04, ore[1] * 2 / population), .012, 0},
                 {"iron", std::min(.025, ore[2] * 1.25 / population), .007, 0},
                 {"gold",

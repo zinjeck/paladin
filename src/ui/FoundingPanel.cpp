@@ -6,6 +6,7 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <string>
 
@@ -29,17 +30,46 @@ namespace Paladin
         refreshButtonState();
     }
 
+    std::uint64_t FoundingPanel::nextRandom() noexcept
+    {
+        if (randomState_ == 0)
+        {
+            randomState_ = std::uint64_t(
+                std::chrono::steady_clock::now().time_since_epoch().count()
+            );
+        }
+        return randomState_ = GenerationNoise::mix(randomState_);
+    }
+
+    void FoundingPanel::suggestNames(bool realm)
+    {
+        constexpr std::array roots{
+            "Aster",   "Valmere", "Dunmar",  "Eldara", "Kestrel", "Ostara",
+            "Thalen",  "Nerath",  "Caldrin", "Verden", "Ashen",   "Istria",
+            "Merrow",  "Tarsen",  "Orvale",  "Selkar", "Ardent",  "Bracken",
+            "Caerwyn", "Darovar", "Estrel",  "Galren", "Harrow",  "Ildren",
+            "Junara",  "Keldar",  "Lorien",  "Morven", "Norath",  "Ravelle"
+        };
+        constexpr std::array endings{"haven", "ford", "wick", "mere", "hold"};
+        const std::string root = roots[nextRandom() % roots.size()];
+        capitalNameField_.setSuggestedText(
+            root + endings[nextRandom() % endings.size()]
+        );
+        if (realm)
+        {
+            realmNameField_.setSuggestedText(root);
+            cultureNameField_.setSuggestedText(root + " Folk");
+        }
+    }
+
     void FoundingPanel::open()
     {
         open_ = true;
         mode_ = FoundingPanelMode::Founding;
-        realmNameField_.clear();
-        cultureNameField_.clear();
-        capitalNameField_.clear();
-        selectedMapColor_ = {210, 54, 54};
-        flagPreset_ = 0;
-        flag_ = realmFlagDesign(flagPreset_);
-        selectedOriginIndex_.reset();
+        suggestNames(true);
+        selectedMapColor_ = randomizedHeraldicColor(nextRandom());
+        flag_ = randomizedRealmFlag(nextRandom());
+        selectedOriginIndex_ = nextRandom() % originCount;
         colorPickerTarget_ = ColorPickerTarget::None;
         showRealmStep();
     }
@@ -58,7 +88,7 @@ namespace Paladin
     {
         open_ = true;
         mode_ = FoundingPanelMode::NewSettlement;
-        capitalNameField_.clear();
+        suggestNames(false);
         colorPickerTarget_ = ColorPickerTarget::None;
         showCapitalStep();
     }
@@ -160,7 +190,7 @@ namespace Paladin
         constexpr float flagCellSize = 20.0F;
         const float flagX = panelBounds_.x + 32.0F;
         const float flagY = panelBounds_.y + 304.0F;
-        flagPresetButton_.setBounds({flagX + 68, flagY - 39, 124, 30});
+        flagPresetButton_.setBounds({flagX + 68, flagY - 39, 112, 30});
 
         for (std::size_t y = 0; y < RealmFlag::defaultHeight; ++y)
         {
@@ -182,12 +212,14 @@ namespace Paladin
         const float originX = panelBounds_.x + 224.0F;
         const float originWidth = (panelBounds_.width - 280.0F) * .53F;
         for (std::size_t index = 0; index < originCount; ++index)
+        {
             originBounds_[index] = {
                 originX,
                 panelBounds_.y + 304 + float(index) * 86,
                 originWidth,
                 72
             };
+        }
         rulerBounds_ = {
             originX + originWidth + 22,
             panelBounds_.y + 304,
@@ -412,8 +444,11 @@ namespace Paladin
         if (step_ == FoundingPanelStep::Realm &&
             flagPresetButton_.pointerReleased(x, y))
         {
-            flagPreset_ = (flagPreset_ + 1) % RealmFlagDesignCount;
-            flag_ = realmFlagDesign(flagPreset_);
+            const auto previous = flag_;
+            do
+            {
+                flag_ = randomizedRealmFlag(nextRandom());
+            } while (flag_ == previous);
         }
         pressedOriginIndex_.reset();
         const bool leftClicked = leftButton_.pointerReleased(x, y);
@@ -678,7 +713,7 @@ namespace Paladin
 
             uiRenderer.drawLabel(
                 renderer,
-                "STARTING FORM",
+                "GOVERNMENT TYPE",
                 panelBounds_.x + 224.0F,
                 panelBounds_.y + 272.0F,
                 2.5F,
@@ -720,7 +755,7 @@ namespace Paladin
             {
                 uiRenderer.drawLabel(
                     renderer,
-                    "ENTER BOTH NAMES AND CHOOSE A FORM",
+                    "ENTER BOTH NAMES AND CHOOSE A GOVERNMENT",
                     panelBounds_.x + 224.0F,
                     panelBounds_.y + 565.0F,
                     2.0F,

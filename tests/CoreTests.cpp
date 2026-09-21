@@ -296,6 +296,9 @@ namespace
         const auto terrain =
             Paladin::WorldMapNavigation::terrainModeButtonBounds(1280, 720);
 
+        const auto resources = Paladin::WorldMapNavigation::resourceModeButtonBounds(1280,720);
+        PALADIN_CHECK(political.x + political.width < resources.x &&
+                      resources.x + resources.width < terrain.x);
         PALADIN_CHECK(political.y + political.height < 720 - 44);
         PALADIN_CHECK(terrain.y + terrain.height < 720 - 44);
         const auto government=Paladin::WorldMapNavigation::governmentModeButtonBounds(1280,720);
@@ -379,6 +382,15 @@ void runCoreTests()
 {
     using Paladin::ConsoleCommandKind;
     using Paladin::parseConsoleCommand;
+    PALADIN_CHECK(parseConsoleCommand("help").kind == ConsoleCommandKind::Help);
+    const auto help = Paladin::consoleCommandHelp();
+    for (const auto& command : Paladin::ConsoleCommands)
+    {
+        PALADIN_CHECK(help.find(command.usage) != std::string::npos);
+        PALADIN_CHECK(help.find(command.description) != std::string::npos);
+    }
+    PALADIN_CHECK(parseConsoleCommand("help extra").kind == ConsoleCommandKind::Invalid);
+
     PALADIN_CHECK(
         parseConsoleCommand("money").kind == ConsoleCommandKind::Invalid
     );

@@ -52,6 +52,7 @@ namespace Paladin
         void setRulerNameSeed(std::uint64_t seed) noexcept
         {
             rulerNameIndex_ = seed % 100;
+            randomState_ = seed;
         }
         void openForCapitalRename(std::string_view currentName);
         void openForRealmEdit(const FoundingIdentity& identity);
@@ -107,7 +108,9 @@ namespace Paladin
         UiButton rightButton_;
         UiButton pickerDoneButton_;
         UiButton flagPresetButton_{"Next design"};
-        std::size_t flagPreset_ = 0;
+        std::uint64_t randomState_ = 0;
+        std::uint64_t nextRandom() noexcept;
+        void suggestNames(bool realm);
         UiButton rulerReloadButton_{"Reload name"};
         UiRectangle rulerBounds_;
         std::array<UiRectangle, 2> settlementKindBounds_{};

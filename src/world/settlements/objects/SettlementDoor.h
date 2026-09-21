@@ -10,7 +10,11 @@ namespace Paladin
     )
     {
         const auto* d = SettlementObjectCatalog::definition(type);
-        const int band = d ? d->wallThickness : 0;
+        const int band = type == SettlementObjectTypes::TradeDepot ||
+                                 type == SettlementObjectTypes::FishingGrounds
+                             ? 1
+                         : d ? d->wallThickness
+                             : 0;
         return {
             {f.topLeft.x + band, f.topLeft.y + band},
             std::max(0, f.width - 2 * band),
