@@ -1,0 +1,24 @@
+name: PR32 final review source
+on:
+  push:
+    branches: [fix/pr32-further-updates]
+    paths: [.github/workflows/pr32-final-review-source.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive exact review sources
+        shell: bash
+        run: |
+          mkdir -p /tmp/pr32-review
+          git rev-parse HEAD > /tmp/pr32-review/commit.txt
+          git ls-tree -r HEAD > /tmp/pr32-review/tree.txt
+          git archive --format=tar.gz HEAD src tests tools docs .github CMakeLists.txt AGENTS.md config .gitignore > /tmp/pr32-review/pr32-latest.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr32-current-source
+          path: /tmp/pr32-review/*
+          retention-days: 2
