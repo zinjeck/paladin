@@ -1,0 +1,75 @@
+[depot-regression] funded lumber batch fetched across city beyond ordinary hauling radius
+[depot-matrix] coal: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] iron: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] gold: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] fish: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] meat: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] stone: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] lumber: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] wheat: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] bread: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] rations: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[city-corrections] delivered and carried construction refunds conserved, including pause
+[city-corrections] no hunger distress below 50; distress above threshold
+[relief-shape] hills=0 seed=17 rock=0.713921 components=1 largest=105272
+[relief-caves] seed=17 hills=0 cells=431
+[relief-shape] hills=0 seed=42 rock=0.603197 components=6 largest=64116
+[relief-caves] seed=42 hills=0 cells=555
+[relief-shape] hills=0 seed=119 rock=0.784051 components=2 largest=115612
+[relief-caves] seed=119 hills=0 cells=559
+[relief-shape] hills=1 seed=17 rock=0.34255 components=30 largest=11056
+[relief-caves] seed=17 hills=1 cells=0
+[relief-shape] hills=1 seed=42 rock=0.4277 components=16 largest=25228
+[relief-caves] seed=42 hills=1 cells=0
+[relief-shape] hills=1 seed=119 rock=0.318726 components=30 largest=7789
+[relief-caves] seed=119 hills=1 cells=0
+[city-corrections] six 384x384 range maps: coherent ranges, sparse accessible caves
+[city-corrections] funded exact-batch orders, one-shot removal, cancellation and separate imports
+[city-corrections] named death events are immediate and emitted exactly once
+[city-corrections] actual depot employee: no blind collection, exact 2-unit one-shot and standing batches
+[pr31/battle] ownership, blocked targets, hostility, moving pursuit, contact stop, retreat, canonical casualties/ancestry and no double resolution passed
+[pr31] diagonal army speed/interpolation, blocked corners/seam, building-safe animal leads and construction escape passed
+[pr31/animals] 100x100 blueprint escape and completion passed
+[pr31/background] short A/B visits, off-screen gathering/material delivery/building, reactivation flush and pause passed
+[shipments] physical cargo, interpolation, pause, one-off return and sustained trips conserve goods
+[shipments] ownership, quantities, blocked routes, captured targets and longitude seam passed
+[trade] escrow, payment, treaty loss, affordability and protected reserves passed
+[trade] live treaties, separate import stock, standing orders, caravan paths and escrow conserve goods/cash
+[trade] ninth eligible supplier and buyer remain reachable
+[shipments] partitioned time and supply-wait restart passed
+[pr30/strategy] bounded real AI soldiers, trait/gender eligibility, civilian and supply conservation, canonical demobilization passed
+[pr30/strategy] pause/cadence, range-gated AI alliances and real intercity supply with protected food passed
+[stability] day-68 garrison: unchanged roster reused; staggered real needs, 1000 conserved recruitment cycles passed
+[pr30/population] geographic census mass, coast and longitude seam, ownership independence and terrain-preserving ink passed
+[pr30/society] laws, gender eligibility, nearby origins, dual culture, citizenship and inheritance passed
+[diplomacy] symmetric pacts, conserved gifts, invalid-action preflight, acyclic subjects, realm statistics and choropleth classes passed
+Household fuel: pooled adult purchasing, insufficient funds, conserved cash and daily lumber use passed
+Market fallback: processors and government pay, public stock preferred, imported stock sold locally
+Mining: required ore, actual output, full storage, time partition and persistent separate deposits passed
+[military/industry] paid purchases, conversion, mature harvest and frozen-input conservation passed
+[military/industry] last-resort food, carried-food exclusion and harvest animation clocks passed
+[military/industry] actual employment, authority, pause, travel, redeployment and casualty rosters passed
+[military] free barracks seats, captured/demolished origin independence, mixed-city recruitment, field cash conservation and seam travel passed
+Realm pass: 12 AI realms, 54 settlements, 2 empires; succession and lightweight simulation passed
+[audit] cancellation timestamps and conservation passed
+[audit] both death paths and cargo cleanup passed
+[audit] finite and ordinary interpolation passed
+[audit] direct interior path timing passed
+[audit] entry, exit, fallback and mid-step rerouting passed
+Fishery four-day production: 51
+Pasture four-day production: 112
+Healthy, housed day-88 population: mean 74.125 range 44-128
+Checking physical storage and exclusive reservations...
+Checking gathering, individual road labor, and construction...
+Checking hunger, physical pickup, starvation and recovery...
+Checking unreachable-food fallback and exclusive fishery zones...
+Checking cancellation preserves delivered and carried materials...
+Checking assigned-stockpile ownership and unemployed fallback...
+Checking distant construction materials and fed recovery...
+geography seed=73517 substantial_landmasses=6
+ocean coverage globe=0.690589 grid=0.642003
+geography seed=84391 substantial_landmasses=5
+ocean coverage globe=0.723473 grid=0.681061
+geography seed=992 substantial_landmasses=6
+ocean coverage globe=0.751639 grid=0.691246
+All Paladin tests passed.

@@ -99,6 +99,12 @@ namespace Paladin
             state.citizens_[1].spouseId = state.citizens_[0].id;
             state.citizens_[1].tilePosition =
                 state.citizens_[1].destination = {15, 10};
+            // This fixture relocates the spouse. Clear the old route and its
+            // interpolated snapshot too, so the focus test observes that tile.
+            state.citizens_[1].path.clear();
+            state.citizens_[1].pathIndex = 0;
+            state.citizens_[1].stepProgress = 0;
+            state.citizens_[1].hasVisualSnapshot = false;
         }
         static void setCharacterReview(
             SettlementCitizenState& state,

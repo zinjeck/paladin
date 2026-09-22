@@ -96,6 +96,39 @@ namespace Paladin
                 roofIndices_.push_back(base + i);
             }
         };
+        if (!side)
+        {
+            // Keep the foreshortened rear slope continuous. Thin, separately
+            // rasterized quads can lose whole source-texel columns on software
+            // backends. Three broad joined planes preserve the hipped outline.
+            const auto rear = [&](float l, float r, float leftTop, float rightTop, int shade)
+            {
+                const int base = int(roofVertices_.size());
+                roofVertices_.push_back(vertex(l,leftTop,l,0,shade));
+                roofVertices_.push_back(vertex(r,rightTop,r,0,shade));
+                roofVertices_.push_back(vertex(r,.29F,r,.5F,shade));
+                roofVertices_.push_back(vertex(l,.29F,l,.5F,shade));
+                for (int i : {0,1,2,0,2,3}) { roofIndices_.push_back(base+i); }
+            };
+            rear(0,.24F,.21F,0,190);
+            rear(.24F,.76F,0,0,213);
+            rear(.76F,1,0,.21F,190);
+            const float eave = std::max(.29F, 1 - 3 * pixel);
+            const float eaveV = .5F + .5F * (eave - .29F) / .71F;
+            quad(0,1,.29F,eave,.5F,eaveV,255);
+            const auto hipFace = [&](bool right)
+            {
+                const float edge = right ? 1.F : 0.F;
+                const float shoulder = right ? .76F : .24F;
+                const int base = int(roofVertices_.size());
+                roofVertices_.push_back(vertex(edge,.29F,edge,.5F,205));
+                roofVertices_.push_back(vertex(shoulder,.29F,shoulder,.5F,205));
+                roofVertices_.push_back(vertex(edge,eave,edge,eaveV,205));
+                for (int i : {0,1,2}) { roofIndices_.push_back(base+i); }
+            };
+            hipFace(false); hipFace(true);
+            quad(0,1,.29F-pixel,.29F,.46F,.49F,255);
+        }
         for (int col = 0; col < columns; ++col)
         {
             const float l = float(col) / columns, r = float(col + 1) / columns;
@@ -125,7 +158,17 @@ namespace Paladin
                     : 0;
             const float top = inset + (side ? fringe + wind : 0);
             const float bottom = 1 - fringe - wind - (side ? inset : 0);
-            quad(
+            if (!side)
+            {
+                const float eave = std::max(ridge,1-3*pixel);
+                if (bottom > eave)
+                {
+                    quad(l,r,eave,bottom,.5F+.5F*(eave-ridge)/(1-ridge),1,
+                         hip > .85F ? 205 : 255);
+                }
+                continue;
+            }
+            if (side) { quad(
                 l,
                 r,
                 top,
@@ -133,7 +176,7 @@ namespace Paladin
                 0,
                 .5F,
                 side ? (hip > .05F ? 218 : 250) : (hip > .05F ? 190 : 213)
-            );
+            ); }
             const float seam = ridge + (bottom - ridge) * hip;
             if (hip > 0)
             {

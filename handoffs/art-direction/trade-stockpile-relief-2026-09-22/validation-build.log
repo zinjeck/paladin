@@ -1,0 +1,12 @@
+[0/2] Re-checking globbed directories...
+[1/7] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=402 cache_hits=414 rebuilt=0 atlas_pages=10 output_bytes=23932627 errors=0 warnings=0
+[2/7] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\ScenePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[3/7] Linking CXX static library PaladinSmokeCore.lib
+[4/7] Building CXX object CMakeFiles\Paladin.dir\src\rendering\ScenePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[5/7] Linking CXX executable Paladin.exe
+[6/7] Linking CXX executable PaladinCityCorrectionsVisualTests.exe

@@ -108,6 +108,36 @@ namespace
         PALADIN_CHECK(moved);
         std::cout << "[city-corrections/art] four mine types, close/normal day/night, frozen pause and working hoist\n";
     }
+    void roofContinuity(Renderer& renderer,SDL_Window* window)
+    {
+        SceneSpriteLibrary sprites;
+        sprites.load(renderer,std::string(PALADIN_TEST_SOURCE_ROOT)+"/assets/sprites");
+        sprites.setTime(0);
+        const auto* roof = sprites.find("roof.thatch.full");
+        PALADIN_CHECK(roof);
+        for (const double pitch : {16.,48.,96.}) for (std::uint64_t variant=1;variant<=4;++variant)
+        {
+            const SceneProjection view{2.4375,0,pitch,960,640};
+            SceneDrawQueue queue;
+            PALADIN_CHECK(sprites.placed(queue,view,"roof.thatch.full",0,roof->elevation,
+                0,variant,0,4.875,2.0));
+            const auto item=std::find_if(queue.items().begin(),queue.items().end(),
+                [](const auto& i){return i.thatchPixelPitch>0;});
+            PALADIN_CHECK(item!=queue.items().end());
+            renderer.beginFrame();
+            renderer.fillRectangle(0,0,960,640,{99,191,195,255});
+            queue.render(renderer);
+            const auto pixels=capture(window,"roof-solid-"+std::to_string(int(pitch))+"-"+std::to_string(variant)+".png");
+            renderer.endFrame();
+            int holes=0;
+            const auto& b=item->bounds;
+            for(int y=int(b.y+b.height*.10);y<int(b.y+b.height*.80);++y)
+            for(int x=int(b.x+b.width*.30);x<int(b.x+b.width*.70);++x)
+            { holes += pixels[std::size_t(y)*960+x]==pixels[0]; }
+            PALADIN_CHECK(holes==0);
+        }
+        std::cout << "[roof/art] all four thatch variants at three sizes have continuous opaque planes\n";
+    }
     void stockpileViews(Renderer& renderer,SDL_Window* window)
     {
         auto map = flatMap();
@@ -176,6 +206,33 @@ namespace
             renderer.beginFrame();
             city.render(renderer,*map,camera,metrics,placement,commands,people,selection,1,12);
             if(warm==19) capture(window,"corrected-city-ranges-overview.png");
+            renderer.endFrame();
+        }
+        // Review more than one fortunate seed, and keep a close view of a
+        // naturally connected cave entrance rather than only a colored mask.
+        for (const std::uint64_t seed : {17ULL,119ULL})
+        {
+            auto other=SettlementMapGenerator{}.generate(source,{2,2},3,3,seed,settings);
+            PALADIN_CHECK(other);
+            for(int warm=0;warm<20;++warm)
+            {
+                renderer.beginFrame();
+                city.render(renderer,*other,camera,metrics,placement,commands,people,selection,1,12);
+                if(warm==19) capture(window,"ranges-seed-"+std::to_string(seed)+"-day.png");
+                renderer.endFrame();
+            }
+        }
+        SettlementTilePosition entrance{-1,-1};
+        for(int yy=12;yy<map->grid().height()-12 && entrance.x<0;++yy)
+        for(int xx=12;xx<map->grid().width()-12 && entrance.x<0;++xx)
+        { if(map->grid().tile({xx,yy})->rockFloor) { entrance={xx,yy}; } }
+        PALADIN_CHECK(entrance.x>=0);
+        camera.setPosition(entrance.x+.5,entrance.y+.5); camera.setZoom(3);
+        for(const double hour : {12.,0.}) for(int warm=0;warm<16;++warm)
+        {
+            renderer.beginFrame();
+            city.render(renderer,*map,camera,metrics,placement,commands,people,selection,1,hour);
+            if(warm==15) capture(window,hour ? "range-cave-close-day.png" : "range-cave-close-night.png");
             renderer.endFrame();
         }
         std::cout << "[city-corrections/art] mixed mountain/hill overview from actual city generator\n";
@@ -252,6 +309,7 @@ int main()
         Window window("Paladin city corrections",960,640); PALADIN_CHECK(window.isValid());
         SDL_HideWindow(window.nativeHandle());
         Renderer renderer(window.nativeHandle()); PALADIN_CHECK(renderer.isValid());
+        roofContinuity(renderer,window.nativeHandle());
         mineViews(renderer,window.nativeHandle());
         stockpileViews(renderer,window.nativeHandle());
         rangeViews(renderer,window.nativeHandle());

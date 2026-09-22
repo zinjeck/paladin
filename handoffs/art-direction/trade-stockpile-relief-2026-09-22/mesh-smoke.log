@@ -1,0 +1,8 @@
+world pan/zoom mean_ms=16.1894 worst_ms=43.4636
+Realm founding, name reload and fortress chooser checks passed
+globe renderer=software
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=28.758 worst=67.4452
+city coast zoom mean_ms=16.4442 worst_ms=40.5624
+globe warm zoom/rotation mean_ms=28.758 worst_ms=67.4452 atlas_builds=1
+C:\Paladin\tests\RenderingRevisionChecks.h:389 Test failed: !(r == 18 && g == 20 && b == 24)

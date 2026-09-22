@@ -1,0 +1,16 @@
+[0/2] Re-checking globbed directories...
+[1/7] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=402 cache_hits=414 rebuilt=0 atlas_pages=10 output_bytes=23932627 errors=0 warnings=0
+[2/7] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\ScenePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[3/7] Linking CXX static library PaladinSmokeCore.lib
+[4/7] Building CXX object CMakeFiles\Paladin.dir\src\rendering\ScenePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[5/7] Linking CXX executable Paladin.exe
+FAILED: [code=4294967295] Paladin.exe 
+C:\WINDOWS\system32\cmd.exe /C "cd . && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E vs_link_exe --msvc-ver=1951 --intdir=CMakeFiles\Paladin.dir --rc=C:\PROGRA~2\WI3CF2~1\10\bin\100280~1.0\x64\rc.exe --mt=C:\PROGRA~2\WI3CF2~1\10\bin\100280~1.0\x64\mt.exe --manifests  -- C:\PROGRA~1\MIB055~1\18\COMMUN~1\VC\Tools\MSVC\1451~1.362\bin\Hostx64\x64\link.exe /nologo @CMakeFiles\Paladin.rsp  /out:Paladin.exe /implib:Paladin.lib /pdb:Paladin.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console && C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/out/build/x64-Debug/_deps/sdl3-build/SDL3.dll C:/Paladin/out/build/x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/out/build/x64-Debug/_deps/sdl3_ttf-build/SDL3_ttf.dll C:/Paladin/out/build/x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E make_directory C:/Paladin/out/build/x64-Debug/assets/fonts && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different C:/Paladin/assets/fonts/Arimo-Regular.ttf C:/Paladin/out/build/x64-Debug/assets/fonts/Arimo-Regular.ttf""
+LINK Pass 1: command "C:\PROGRA~1\MIB055~1\18\COMMUN~1\VC\Tools\MSVC\1451~1.362\bin\Hostx64\x64\link.exe /nologo @CMakeFiles\Paladin.rsp /out:Paladin.exe /implib:Paladin.lib /pdb:Paladin.pdb /version:0.0 /machine:x64 /debug /INCREMENTAL /subsystem:console /MANIFEST /MANIFESTFILE:CMakeFiles\Paladin.dir/intermediate.manifest CMakeFiles\Paladin.dir/manifest.res" failed (exit code 1168) with the following output:
+LINK : fatal error LNK1168: cannot open Paladin.exe for writing
+ninja: build stopped: subcommand failed.
