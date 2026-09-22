@@ -31,6 +31,8 @@
 !CMakeLists.txt
 !*.cmake
 !*.cmake.in
+!/tools/dev/*.ps1
+!/tools/dev/*.bat
 !/.gitignore
 !/AGENTS.md
 
