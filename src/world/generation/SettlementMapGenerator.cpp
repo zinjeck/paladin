@@ -174,8 +174,8 @@ namespace Paladin
                                  0.5;
 
                 sourceX += GenerationNoise::simplexFractal(
-                               static_cast<double>(x) * 0.026,
-                               static_cast<double>(y) * 0.026,
+                               static_cast<double>(x) * 0.006,
+                               static_cast<double>(y) * 0.006,
                                seed + 1'771ULL,
                                3,
                                0.52,
@@ -184,8 +184,8 @@ namespace Paladin
                            settings.coordinateWarpStrength;
 
                 sourceY += GenerationNoise::simplexFractal(
-                               static_cast<double>(x + 9'173) * 0.026,
-                               static_cast<double>(y - 4'289) * 0.026,
+                               static_cast<double>(x + 9'173) * 0.006,
+                               static_cast<double>(y - 4'289) * 0.006,
                                seed + 1'771ULL,
                                3,
                                0.52,
@@ -330,25 +330,11 @@ namespace Paladin
                     settings.biomeBoundaryNoiseStrength
                 );
 
-                const double mountainThreshold =
-                    0.50 + GenerationNoise::simplexFractal(
-                               static_cast<double>(x) * 0.006,
-                               static_cast<double>(y) * 0.006,
-                               seed + 7'409ULL,
-                               1,
-                               0.50,
-                               2.0
-                           ) * settings.biomeBoundaryNoiseStrength;
-
                 const bool hills = hillWeight > .45;
-                const bool mountain = mountainWeight > mountainThreshold;
-                const bool pass = relief.valley(x, y);
-                const bool rock = (mountain || hills) && !pass;
+                output->relief = relief.classify(x, y, mountainWeight, hillWeight);
+                const bool rock = output->relief != ReliefType::Lowland;
                 output->terrain =
                     rock ? TerrainType::Mountain : TerrainType::Land;
-                output->relief = !rock ? ReliefType::Lowland
-                                : mountain ? ReliefType::Mountain
-                                           : ReliefType::Hills;
                 const int nearest = (tx >= .5 ? 1 : 0) + (ty >= .5 ? 2 : 0);
                 const double vein = GenerationNoise::fractal(
                     x * .32,
@@ -364,6 +350,7 @@ namespace Paladin
             }
         }
 
+        relief.consolidate(cityGrid);
         relief.caves(cityGrid);
         cityGrid.classifyCoast(seed);
         auto result = std::make_unique<SettlementMap>(

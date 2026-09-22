@@ -142,6 +142,7 @@ add_executable(Paladin
     src/simulation/systems/SettlementPopulationSystem.cpp
     src/simulation/WorldLandNavigation.cpp
     src/simulation/WorldShipmentSystem.cpp
+    src/simulation/WorldMarketOrders.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/BattleSystem.cpp
@@ -275,6 +276,7 @@ add_executable(PaladinTests
 
     src/simulation/WorldLandNavigation.cpp
     src/simulation/WorldShipmentSystem.cpp
+    src/simulation/WorldMarketOrders.cpp
     src/simulation/AiRealmSystem.cpp
     src/simulation/MilitarySystem.cpp
     src/simulation/BattleSystem.cpp

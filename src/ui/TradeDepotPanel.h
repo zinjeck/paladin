@@ -109,6 +109,7 @@ namespace Paladin
             std::int64_t unitPrice = 0;
             int available = 0;
             std::size_t treatyPartners = 0;
+            std::string unavailableReason;
         } offer_;
         std::uint64_t quoteSignature_ = ~std::uint64_t(0);
     };

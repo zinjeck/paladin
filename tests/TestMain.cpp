@@ -5,6 +5,7 @@
 #include "CityResourceFlowChecks.h"
 #include "CityCorrectionsChecks.h"
 #include "TradeDepotRegressionChecks.h"
+#include "DepotResourceMatrixChecks.h"
 #include "CloseWorldStabilityChecks.h"
 #include "PastureDormancyRegression.h"
 #include "Pr31AnimalNavigationChecks.h"
@@ -34,6 +35,7 @@ int main()
     try
     {
         Paladin::Test::DepotRegression::run();
+        Paladin::Test::DepotRegression::allResources();
         Paladin::Test::CityCorrections::run();
         Paladin::Test::Pr32::run();
         Paladin::Test::Pr32::hourlyEconomyCadence();

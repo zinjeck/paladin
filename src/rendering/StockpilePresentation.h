@@ -2,6 +2,7 @@
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/WorkYardFoundation.h"
 #include "rendering/OutdoorGround.h"
+#include "rendering/StockpileShelter.h"
 #include "world/settlements/SettlementMap.h"
 namespace Paladin
 {
@@ -36,82 +37,28 @@ namespace Paladin
         );
         q.setLayerFrom(floorStart, -2);
         workYardFoundation(q, p, map, object, id, true);
-        const double shedW = std::min(2.5, std::max(1., w - .3)),
-                     shedH = std::min(1.2, h * .4);
-        if (sprites.shadowsEnabled())
+        const auto shelter = StockpileShelterLayout::fit(f);
+        stockpileShelter(q, p, sprites, shelter, id);
+        // Low raised rails outline the yard, with real footings and an open
+        // loading side. They do not turn the drawable stockpile into a room.
+        for (const double xx : {x + .0625, x + w - .1875})
         {
-            // The shelter shades its platform, not the inventory drawn above.
-            q.submit(
-                {p.bounds({x + .16, y + .20, 0, shedW, shedH, 0, 0}),
-                 {57, 43, 60, 46},
-                 y,
-                 id,
-                 -1,
-                 0}
-            );
-            for (const double xx : {x + .10, x + w - .10})
+            q.submit({p.bounds({xx,y+.1875,0,.1875,h-.375,0,0}),
+                      {57,43,60,65},y+h,id,-1,1});
+            q.submit({p.bounds({xx,y-.125,0,.125,h-.375,0,0}),
+                      {122,80,56,255},y+h,id,0,1});
+            q.submit({p.bounds({xx,y-.125,0,.0625,h-.375,0,0}),
+                      {193,139,90,255},y+h,id,0,2});
+            for (const double yy : {y+.1875,y+h-.1875})
             {
-                for (const double yy : {y + .15, y + h - .1})
-                {
-                    q.submit(
-                        {p.bounds({xx, yy, 0, .28, .125, 0, 0}),
-                         {57, 43, 60, 64},
-                         y,
-                         id,
-                         -1,
-                         0}
-                    );
-                }
-            }
-        }
-        // A modest open storage shelter, with the goods visible in its yard.
-        sprites.placed(
-            q,
-            p,
-            "wall.adobe.front",
-            x + .15,
-            y + shedH,
-            y + shedH,
-            id,
-            2,
-            shedW,
-            .6
-        );
-        sprites.placed(
-            q,
-            p,
-            "roof.thatch.full",
-            x + .08,
-            y - .38,
-            y + shedH,
-            id,
-            3,
-            shedW + .14,
-            shedH + .2
-        );
-        // Low timber boundaries and corner posts identify the storage yard
-        // without hiding the inventory behind another full roof.
-        for (int edge = 0; edge < 2; ++edge)
-        {
-            const double xx = edge ? x + w - .10 : x;
-            q.submit(
-                {p.bounds({xx, y, 0, .10, h, 0, 0}),
-                 {0x63, 0x3E, 0x4B, 255},
-                 y + h,
-                 id,
-                 0,
-                 4}
-            );
-            for (const double yy : {y + .15, y + h})
-            {
-                q.submit(
-                    {p.bounds({xx, yy, 0, .14, .65, 0, 1}),
-                     {0x74, 0x51, 0x3F, 255},
-                     yy,
-                     id,
-                     0,
-                     5}
-                );
+                q.submit({p.bounds({xx-.0625,yy-.0625,0,.25,.1875,0,0}),
+                          {73,53,47,255},yy,id,0,3});
+                q.submit({p.bounds({xx,yy,0,.1875,.5,0,1}),
+                          {122,80,56,255},yy,id,0,4});
+                q.submit({p.bounds({xx,yy-.5,0,.1875,.0625,0,0}),
+                          {215,200,162,255},yy,id,0,5});
+                q.submit({p.bounds({xx,yy-.5,0,.0625,.5,0,0}),
+                          {193,139,90,255},yy,id,0,6});
             }
         }
         const auto* inventory =
@@ -120,8 +67,9 @@ namespace Paladin
         {
             return true;
         }
-        const int columns = std::max(1, int(w / .8)),
-                  rows = std::max(1, int((h - shedH) / .7));
+        const double storageTop = std::min(y + h - .625, shelter.front() + .25);
+        const int columns = std::max(1, int((w - .5) / .8)),
+                  rows = std::max(1, int((y + h - storageTop) / .625));
         const int capacity = std::min(48, columns * rows);
         int slot = 0;
         for (const auto& goods : inventory->goods)
@@ -140,7 +88,7 @@ namespace Paladin
             for (int i = 0; i < stacks; ++i, ++slot)
             {
                 const double xx = x + .4 + (slot % columns) * w / columns,
-                             yy = y + shedH + .45 + (slot / columns) * .7;
+                             yy = storageTop + .4375 + (slot / columns) * .625;
                 const double baseY = std::min(y + h - .08, yy);
                 sprites.placed(
                     q,

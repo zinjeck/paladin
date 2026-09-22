@@ -4,6 +4,7 @@
 #include "rendering/Camera2D.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/MineSurface.h"
+#include "rendering/StockpileShelter.h"
 #include "interaction/SettlementCommandController.h"
 #include "interaction/SettlementInspectionController.h"
 #include "interaction/SettlementObjectPlacementController.h"
@@ -107,6 +108,50 @@ namespace
         PALADIN_CHECK(moved);
         std::cout << "[city-corrections/art] four mine types, close/normal day/night, frozen pause and working hoist\n";
     }
+    void stockpileViews(Renderer& renderer,SDL_Window* window)
+    {
+        auto map = flatMap();
+        const SettlementObjectFootprint footprints[]{
+            {{3,5},3,3},{{14,5},8,4},{{3,21},4,9},{{20,21},12,8}};
+        for (const auto& footprint : footprints)
+        {
+            const auto id = complete(map,SettlementObjectTypes::Stockpile,footprint);
+            for (const auto& resource : SettlementResourceCatalog::definitions())
+            { PALADIN_CHECK(map.logistics.add(map.logistics.forObject(id),std::string(resource.id),21,0)); }
+            const auto s = StockpileShelterLayout::fit(footprint);
+            PALADIN_CHECK(s.width > 0 && s.depth > 0 && s.postHeight >= .5);
+            PALADIN_CHECK(s.front() < footprint.topLeft.y + footprint.height);
+            PALADIN_CHECK(std::abs(s.eave() + s.postHeight - s.front()) < 1e-8);
+            PALADIN_CHECK(s.left - .1875 >= footprint.topLeft.x);
+            PALADIN_CHECK(s.left+s.width+.1875 <= footprint.topLeft.x+footprint.width);
+        }
+        CityRenderer city; city.animationTimeOverride=42; city.presentation.cloudsEnabled=false;
+        city.artRootOverride=std::string(PALADIN_TEST_SOURCE_ROOT)+"/assets/sprites";
+        SettlementCitizenState people; SettlementInspectionController selection;
+        SettlementObjectPlacementController placement; SettlementCommandController commands;
+        TileRenderMetrics metrics; Camera2D camera(20,19);
+        const auto draw = [&](std::string name,double hour)
+        {
+            for (int warm=0;warm<12;++warm)
+            {
+                renderer.beginFrame();
+                city.render(renderer,map,camera,metrics,placement,commands,people,selection,1,hour);
+                if (warm==11) { capture(window,name); }
+                renderer.endFrame();
+            }
+        };
+        camera.setZoom(4); draw("stockpile-normal-day.png",12);
+        draw("stockpile-normal-night.png",0);
+        for (int i=0;i<4;++i)
+        {
+            const auto& f=footprints[i];
+            camera.setPosition(f.topLeft.x+f.width*.5,f.topLeft.y+f.height*.5);
+            camera.setZoom(12);
+            draw("stockpile-"+std::to_string(i)+"-close-day.png",12);
+            draw("stockpile-"+std::to_string(i)+"-close-night.png",0);
+        }
+        std::cout << "[stockpile/art] four drawable footprints: roof/post contact, grounded platform, contents, normal and close day/night\n";
+    }
     void rangeViews(Renderer& renderer,SDL_Window* window)
     {
         WorldGrid source(5,5);
@@ -174,7 +219,7 @@ namespace
         PALADIN_CHECK(map.trade.orders.size()==1);
         PALADIN_CHECK(map.trade.orders[0].resource=="iron" && map.trade.orders[0].quantity==2);
         PALADIN_CHECK(!map.trade.orders[0].standing);
-        click(x+span*.50F,y+431*scale);
+        click(x+span*.75F,y+431*scale);
         PALADIN_CHECK(map.trade.orders.size()==2 && map.trade.orders[1].standing);
         WorldMarketSystem::tickOrders(world,0);
         layout(); panel.render(renderer,ui,world,f.seller);
@@ -208,6 +253,7 @@ int main()
         SDL_HideWindow(window.nativeHandle());
         Renderer renderer(window.nativeHandle()); PALADIN_CHECK(renderer.isValid());
         mineViews(renderer,window.nativeHandle());
+        stockpileViews(renderer,window.nativeHandle());
         rangeViews(renderer,window.nativeHandle());
         orderUi(renderer,window.nativeHandle());
     }

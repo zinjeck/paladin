@@ -174,7 +174,8 @@ namespace Paladin
                 quote.partner,
                 quote.unitPrice,
                 quote.available,
-                quote.treatyPartners
+                quote.treatyPartners,
+                std::string(shipmentResultText(quote.blocker))
             };
             quoteSignature_ = signature;
         }
@@ -221,13 +222,9 @@ namespace Paladin
         add(x + span - 72, y + 185, 30, Kind::More, "+");
         add(x + span - 38, y + 185, 38, Kind::MoreTen, "+10");
         const float bottom = y + 417;
-        add(x, bottom, span * .33F - 4, Kind::Dispatch, "One shipment");
-        add(x + span * .33F,
-            bottom,
-            span * .34F - 4,
-            Kind::Start,
-            "Standing order");
-        add(x + span * .67F, bottom, span * .33F, Kind::Stop, "Stop");
+        add(x, bottom, span * .5F - 4, Kind::Dispatch, "Send once");
+        add(x + span * .5F + 4, bottom, span * .5F - 4,
+            Kind::Start, "Repeat batch");
         std::vector<const SettlementTradeOrder*> orders;
         for (const auto& order : map->trade.orders)
         {
@@ -551,17 +548,17 @@ namespace Paladin
             }
             ui.drawLabel(renderer, label, x, yy, size);
         };
-        text("Resources", y + 5, 1.5F);
+        text("1. Choose a resource", y + 5, 1.5F);
         const auto& offer = offer_;
         const bool activeAgreement = hasActiveTradeAgreement(world, actor);
-        text("Quantity per shipment", y + 167, 1);
+        text("2. Units in each caravan", y + 167, 1);
         const auto* partner = world.settlement(offer.partner);
         text(
             partner ? "Nearest partner: " + std::string(partner->name())
             : !activeAgreement ? "Make a trade agreement in Diplomacy."
             : offer.treatyPartners == 0
                 ? "Trade pact active; no nearby eligible depot."
-                : "No eligible partner stock or demand.",
+                : offer.unavailableReason,
             y + 233
         );
         text(
@@ -582,9 +579,10 @@ namespace Paladin
         const auto* imports =
             map->logistics.inventory(map->logistics.importsForObject(depot_));
         text(
-            "Export stock: " +
+            "City available: " + std::to_string(DepotCollection::available(*map,resource())) +
+                " | Ready: " +
                 std::to_string(exports ? exports->amount(resource()) : 0) +
-                "   Import stock: " +
+                " | Imported: " +
                 std::to_string(imports ? imports->amount(resource()) : 0),
             y + 311
         );
@@ -604,12 +602,12 @@ namespace Paladin
         const float bottom = y + 417;
         text(status, bottom + 38, 1);
         text(
-            "Exports need resources, not gold. The foreign buyer pays you.",
+            "Exports: secure buyer > worker collects > caravan delivers.",
             bottom + 58,
             1
         );
         text(
-            "Nearby deliveries: about 20-60 minutes; distance affects travel.",
+            "Repeat sends this batch again. Cancel using its order card.",
             bottom + 73,
             1
         );

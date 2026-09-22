@@ -124,7 +124,7 @@ namespace Paladin::Test::CityCorrections
             PALADIN_CHECK(map);
             const int w=map->grid().width(), h=map->grid().height();
             std::vector<bool> seen(std::size_t(w)*h);
-            int total=0, components=0, tiny=0;
+            int total=0, components=0, tiny=0, largest=0;
             for(int y=0;y<h;++y) for(int x=0;x<w;++x)
             {
                 if(seen[y*w+x] || map->grid().tile({x,y})->terrain!=TerrainType::Mountain) continue;
@@ -137,8 +137,18 @@ namespace Paladin::Test::CityCorrections
                     { seen[p.y*w+p.x]=true; queue.push_back(p); }
                 }
                 total+=int(queue.size()); ++components; tiny += queue.size()<32;
+                largest = std::max(largest,int(queue.size()));
             }
-            PALADIN_CHECK(total > w*h*.70 && components <= 8 && tiny <= 1);
+            std::cout << "[relief-shape] hills=" << hill << " seed=" << seed
+                      << " rock=" << double(total)/(w*h) << " components=" << components
+                      << " largest=" << largest << '\n';
+            // Mountain country is a few broad barriers; hill country has
+            // smaller separated forms. Neither requires an almost-solid map
+            // cut by compulsory cross-map channels.
+            PALADIN_CHECK(total > w*h*(hill ? .08 : .30));
+            PALADIN_CHECK(total < w*h*(hill ? .65 : .90));
+            PALADIN_CHECK(components <= (hill ? 45 : 24) && tiny <= 1);
+            if (!hill) { PALADIN_CHECK(largest > total*.20); }
             // Every naturally open cave is attached to ordinary traversable land.
             std::fill(seen.begin(),seen.end(),false);
             std::vector<SettlementTilePosition> reachable;
@@ -158,6 +168,7 @@ namespace Paladin::Test::CityCorrections
             }
             for(int y=0;y<h;++y) for(int x=0;x<w;++x)
             { PALADIN_CHECK(!map->grid().tile({x,y})->rockFloor || seen[y*w+x]); }
+            std::cout << "[relief-caves] seed=" << seed << " hills=" << hill << " cells=" << caves << '\n';
             if(!hill) { PALADIN_CHECK(caves > 0 && caves < w*h*.015); }
         }
         std::cout << "[city-corrections] six 384x384 range maps: coherent ranges, sparse accessible caves\n";

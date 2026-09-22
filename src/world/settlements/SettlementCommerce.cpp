@@ -3,6 +3,7 @@
 #include "world/settlements/SettlementFoodDemand.h"
 #include "world/settlements/SettlementIndustry.h"
 #include "world/settlements/SettlementMap.h"
+#include "world/settlements/DepotCollection.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
@@ -287,9 +288,7 @@ namespace Paladin
                 const auto source = *from, destination = *to;
                 if (!map.logistics.importsMaySupply(source, destination.kind)) { continue; }
                 const int authorized = destination.kind == InventoryKind::TradeDepot
-                    ? std::max(0, map.trade.exportTarget(destination.objectId, flow.resource) -
-                                     destination.amount(flow.resource) -
-                                     map.logistics.incoming(destination.id, flow.resource))
+                    ? DepotCollection::needed(map, destination, flow.resource)
                     : requested;
                 const int amount = std::min(
                     {requested, authorized,
