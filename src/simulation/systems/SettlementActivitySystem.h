@@ -366,6 +366,10 @@ namespace Paladin
             SettlementCitizen&,
             double minute
         );
+        bool chooseDepotHaul(
+            SettlementMap&, SettlementCitizenState&, SettlementCitizen&,
+            double minute, InventoryId destination
+        );
         bool chooseHaul(
             SettlementMap&,
             SettlementCitizenState&,

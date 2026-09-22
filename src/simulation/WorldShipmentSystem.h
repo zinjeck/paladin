@@ -24,7 +24,8 @@ namespace Paladin
         MissingTradeDepot,
         TradeAgreementRequired,
         DepotFull,
-        InsufficientMoney
+        InsufficientMoney,
+        NoBuyerDemand
     };
     std::string_view shipmentResultText(ShipmentResult) noexcept;
 
@@ -42,6 +43,7 @@ namespace Paladin
             SettlementObjectId depot = {}
         );
         static bool hasTradeDepot(const Settlement&);
+        static int importSpace(const World&, const Settlement&, SettlementObjectId depot = {});
         static ShipmentResult create(
             World&,
             RealmId,

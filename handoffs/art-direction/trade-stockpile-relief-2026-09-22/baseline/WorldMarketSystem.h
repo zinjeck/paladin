@@ -105,7 +105,6 @@ namespace Paladin
             int available = 0;
             double distance = 0;
             std::size_t treatyPartners = 0;
-            ShipmentResult blocker = ShipmentResult::TradeAgreementRequired;
         };
         static DepotOffer depotOffer(
             const World& world,
@@ -149,8 +148,6 @@ namespace Paladin
                     continue;
                 }
                 ++result.treatyPartners;
-                result.blocker = direction == TradeDirection::Export
-                    ? ShipmentResult::NoBuyerDemand : ShipmentResult::InsufficientGoods;
                 const auto* local = home->simulationState().localMap();
                 if (local &&
                     local->trade.routeTerrainRevision ==
@@ -161,7 +158,6 @@ namespace Paladin
                         candidate.id()
                     ) != local->trade.unreachablePartners.end())
                 {
-                    result.blocker = ShipmentResult::NoLandRoute;
                     continue;
                 }
                 // Discard empty suppliers before the more expensive market
@@ -201,14 +197,9 @@ namespace Paladin
                             (shipment.awaitingCollection || shipment.cargo > 0))
                         { reservedDemand += shipment.amount; }
                     }
-                    const double wanted = std::max(0.0, price.wanted - reservedDemand);
-                    if (wanted < minimumStock) { continue; }
-                    if (WorldShipmentSystem::importSpace(world, *partner) < minimumStock)
-                    { result.blocker = ShipmentResult::DepotFull; continue; }
-                    result.blocker = ShipmentResult::InsufficientMoney;
                     stock = int(std::min(
                         {1000000.,
-                         wanted,
+                         std::max(0.0, price.wanted - reservedDemand),
                          double(
                              buyer ? buyer->treasury->balance /
                                          std::max<Money>(1, unitPrice)
@@ -224,7 +215,6 @@ namespace Paladin
                 result.unitPrice = unitPrice;
                 result.available = stock;
                 result.distance = distance;
-                result.blocker = ShipmentResult::Success;
                 return result;
             }
             return result;
@@ -290,7 +280,7 @@ namespace Paladin
                 }
                 if (!offer.partner)
                 {
-                    return offer.blocker;
+                    return last;
                 }
                 const auto* partner = world.settlement(offer.partner);
                 if (direction == TradeDirection::Import)

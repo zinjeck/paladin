@@ -171,7 +171,7 @@ namespace Paladin::Test::CityCorrections
         RealmId seller,buyer;
         SettlementObjectId depot,storage;
         SettlementMap* map=nullptr;
-        TradeFixture()
+        explicit TradeFixture(int localScale = 16)
         {
             auto& world=sim.world();
             for(int y=0;y<64;++y) for(int x=0;x<128;++x)
@@ -189,7 +189,7 @@ namespace Paladin::Test::CityCorrections
             foreign=world.foundCapitalSettlement({44,32},buyer,{"Buyer","Buyer Folk","Buyer City",{},"civic"},profile);
             PALADIN_CHECK(foreign);
             PALADIN_CHECK(world.settlement(foreign)->simulationState().economy().configure({{"iron",0,1,0}}));
-            SettlementMapGenerationSettings settings; settings.localTilesPerWorldTile=16;
+            SettlementMapGenerationSettings settings; settings.localTilesPerWorldTile=localScale;
             PALADIN_CHECK(sim.prepareSettlementMap(home,settings)); map=sim.settlementMap(home);
             for(int y=0;y<map->grid().height();++y) for(int x=0;x<map->grid().width();++x)
             {

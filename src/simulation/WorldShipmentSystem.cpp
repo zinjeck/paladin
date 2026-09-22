@@ -361,6 +361,28 @@ namespace Paladin
         }
         return bool(local->logistics.drop(dropAt, resource, remaining, minute));
     }
+    int WorldShipmentSystem::importSpace(const World& world, const Settlement& target,
+                                         SettlementObjectId depot)
+    {
+        const auto* local = target.simulationState().localMap();
+        if (!local) { return MaximumShipment; }
+        std::int64_t room = 0;
+        for (const auto& inventory : local->logistics.inventories())
+        {
+            if (inventory.kind == InventoryKind::TradeImports &&
+                (!depot || inventory.objectId == depot))
+            { room += local->logistics.freeSpace(inventory.id); }
+        }
+        for (const auto& pending : world.shipments())
+        {
+            if (pending.buyer && pending.destination == target.id() && pending.active() &&
+                pending.deliveries == 0 && (pending.cargo || pending.awaitingCollection) &&
+                (!depot || !pending.destinationDepot || pending.destinationDepot == depot))
+            { room -= pending.amount; }
+        }
+        return int(std::clamp<std::int64_t>(room, 0, MaximumShipment));
+    }
+
     ShipmentResult WorldShipmentSystem::create(
         World& world,
         RealmId actor,
@@ -455,28 +477,8 @@ namespace Paladin
         {
             return ShipmentResult::InsufficientGoods;
         }
-        if (buyer)
-        {
-            if (const auto* local = target->simulationState().localMap())
-            {
-                std::int64_t room = 0;
-                for (const auto& inventory : local->logistics.inventories())
-                {
-                    if (inventory.kind == InventoryKind::TradeImports &&
-                        (!destinationDepot || inventory.objectId == destinationDepot))
-                    { room += local->logistics.freeSpace(inventory.id); }
-                }
-                for (const auto& pending : world.shipments_)
-                {
-                    if (pending.buyer && pending.destination == to && pending.active() &&
-                        pending.deliveries == 0 && (pending.cargo || pending.awaitingCollection) &&
-                        (!destinationDepot || !pending.destinationDepot ||
-                         pending.destinationDepot == destinationDepot))
-                    { room -= pending.amount; }
-                }
-                if (room < amount) { return ShipmentResult::DepotFull; }
-            }
-        }
+        if (buyer && importSpace(world, *target, destinationDepot) < amount)
+        { return ShipmentResult::DepotFull; }
         auto path = worldLandRoute(
             world.grid(),
             source->position(),
@@ -862,6 +864,8 @@ namespace Paladin
             return "The depot's import counter has no room for this order.";
         case ShipmentResult::InsufficientMoney:
             return "The buyer has insufficient treasury gold.";
+        case ShipmentResult::NoBuyerDemand:
+            return "No trade partner needs this batch yet.";
         case ShipmentResult::InvalidRoute:
             return "This shipment no longer exists.";
         }

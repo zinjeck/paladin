@@ -12,6 +12,12 @@ namespace Paladin
         Import,
         Export
     };
+    enum class DepotCollectionIssue
+    {
+        None,
+        NoStock,
+        NoPath
+    };
     struct SettlementTradeOrder
     {
         SettlementObjectId depot;
@@ -26,6 +32,7 @@ namespace Paladin
         bool standing = true;
         bool collectionAuthorized = false;
         bool fulfilled = false;
+        DepotCollectionIssue collectionIssue = DepotCollectionIssue::None;
     };
     struct LocalTradeVisit
     {

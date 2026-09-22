@@ -1,11 +1,9 @@
 #include "simulation/systems/SettlementActivitySystem.h"
 #include "world/settlements/SettlementMap.h"
-#include "world/settlements/DepotCollection.h"
 #include "world/settlements/SettlementResourceDefinition.h"
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include "world/settlements/objects/SettlementObjectDefinition.h"
-#include "world/settlements/objects/WorkplaceCompound.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
 #include <cmath>
@@ -271,23 +269,6 @@ namespace Paladin
         };
         const auto* targetObject =
             map.objectState().completedObjectAt(f.topLeft);
-        std::optional<SettlementTilePosition> doorwayTarget;
-        if (inside && targetObject)
-        {
-            const auto door = workplaceCompound(targetObject->objectTypeId)
-                ? std::optional{workplaceRoomDoor(targetObject->footprint)}
-                : targetObject->door;
-            if (door)
-            {
-                const SettlementTilePosition entry{
-                    std::clamp(door->x, f.topLeft.x, f.topLeft.x + f.width - 1),
-                    std::clamp(door->y, f.topLeft.y, f.topLeft.y + f.height - 1)};
-                // A storage room is entered through its real door, not the
-                // nearest corner behind a wall. This also bounds long hauls.
-                if (navigation.walkable(map, entry, routePolicy.avoidBuildingFootprints))
-                { doorwayTarget = entry; append(entry); }
-            }
-        }
         const bool doorAccess = !inside && targetObject &&
                                 targetObject->footprint == f &&
                                 targetObject->door;
@@ -340,8 +321,6 @@ namespace Paladin
             candidates.end(),
             [&](auto a, auto b)
             {
-                if (doorwayTarget && ((a == *doorwayTarget) != (b == *doorwayTarget)))
-                { return a == *doorwayTarget; }
                 return distance(c.tilePosition, {a, 1, 1}) <
                        distance(c.tilePosition, {b, 1, 1});
             }
@@ -704,7 +683,10 @@ namespace Paladin
         { return false; }
         if (targetInventory->kind == InventoryKind::TradeDepot)
         {
-            amount = std::min(amount, DepotCollection::needed(map, *targetInventory, resource));
+            amount = std::min(amount, std::max(0,
+                map.trade.exportTarget(targetInventory->objectId, resource) -
+                targetInventory->amount(resource) -
+                map.logistics.incoming(destination, resource)));
         }
         amount = map.commerce.affordableTradeUnits(
             *sourceInventory,
@@ -772,52 +754,6 @@ namespace Paladin
         c.activity = CitizenActivity::Hauling;
         return true;
     }
-    bool SettlementActivitySystem::chooseDepotHaul(
-        SettlementMap& map, SettlementCitizenState& citizens,
-        SettlementCitizen& citizen, double minute, InventoryId destination)
-    {
-        const auto* target = map.logistics.inventory(destination);
-        if (!target || target->kind != InventoryKind::TradeDepot) { return false; }
-        struct Source { InventoryId id; int rank, distance; };
-        // Bounded by the order list and inventories, never a whole-map tile scan.
-        for (auto& order : map.trade.orders)
-        {
-            if (!order.enabled || !order.collectionAuthorized ||
-                order.depot != target->objectId || order.direction != TradeDirection::Export)
-            { continue; }
-            const int needed = DepotCollection::needed(map, *target, order.resource);
-            if (!needed) { continue; }
-            std::vector<Source> sources;
-            for (const auto& inventory : map.logistics.inventories())
-            {
-                if (!DepotCollection::source(map, inventory, order.resource) ||
-                    map.logistics.available(inventory.id, order.resource) <= 0)
-                { continue; }
-                sources.push_back({inventory.id,
-                    inventory.kind == InventoryKind::Stockpile ? 0 : 1,
-                    distance(citizen.tilePosition, inventory.footprint)});
-            }
-            std::stable_sort(sources.begin(), sources.end(), [](const auto& a, const auto& b)
-            { return a.rank != b.rank ? a.rank < b.rank : a.distance < b.distance; });
-            for (const auto& source : sources)
-            {
-                const int units = std::min({needed, policy.carryingCapacity,
-                    map.logistics.available(source.id, order.resource),
-                    map.logistics.receivable(destination, order.resource)});
-                if (beginHaul(map, citizens, citizen, source.id, destination,
-                              order.resource, units, minute))
-                {
-                    order.collectionIssue = DepotCollectionIssue::None;
-                    return true;
-                }
-                if (routeBudgetLimited_ || pathsRemaining_ == 0) { return false; }
-            }
-            order.collectionIssue = sources.empty() ? DepotCollectionIssue::NoStock
-                                                    : DepotCollectionIssue::NoPath;
-        }
-        return false;
-    }
-
     bool SettlementActivitySystem::chooseHaul(
         SettlementMap& map,
         SettlementCitizenState& citizens,
@@ -834,12 +770,12 @@ namespace Paladin
         };
         std::vector<Opportunity> opportunities;
         const auto* assigned = map.logistics.inventory(assignedDestination);
-        if (assigned && assigned->kind == InventoryKind::TradeDepot)
-        { return chooseDepotHaul(map, citizens, c, minute, assignedDestination); }
         const bool market = assigned && assigned->kind == InventoryKind::Market;
+        const bool depot =
+            assigned && assigned->kind == InventoryKind::TradeDepot;
         const bool homeDelivery =
             assigned && assigned->kind == InventoryKind::Home;
-        if (!market)
+        if (!market && !depot)
         {
             std::unordered_set<SettlementObjectId, StrongIdHash> occupiedHomes;
             for (const auto& resident : citizens.citizens())
@@ -918,7 +854,7 @@ namespace Paladin
                 source.kind == InventoryKind::Workplace ||
                 source.kind == InventoryKind::Groundpile ||
                 (market && source.kind == InventoryKind::TradeImports);
-            if ((market
+            if (((market || depot)
                      ? !wholesaleSource
                      : (source.kind != InventoryKind::Groundpile &&
                         source.kind != InventoryKind::Workplace &&
@@ -974,7 +910,7 @@ namespace Paladin
             {
                 if (destination.id == source.id ||
                     !(publicStorage(destination) ||
-                      (market &&
+                      ((market || depot) &&
                        destination.id == assignedDestination)) ||
                     (assignedDestination &&
                      destination.id != assignedDestination) ||
@@ -1006,8 +942,11 @@ namespace Paladin
                         &citizens,
                         goods.resource
                     );
+                    const int exportTarget = depot
+                        ? map.trade.exportTarget(destination.objectId, goods.resource) : 0;
                     const int target =
-                        market
+                        depot ? exportTarget
+                        : market
                             ? (goods.resource == SettlementResourceTypes::Lumber
                                    ? std::max(2, destination.capacity / 4)
                                : resource && resource->edible
@@ -1030,7 +969,9 @@ namespace Paladin
                             }
                         }
                     }
-                    const int incoming = std::max(0, destination.capacity - destination.used() -
+                    const int incoming = depot
+                        ? map.logistics.incoming(destination.id, goods.resource)
+                        : std::max(0, destination.capacity - destination.used() -
                                          map.logistics.freeSpace(destination.id));
                     const int needed = std::max(0, target - held - incoming);
                     const int amount = std::min(
