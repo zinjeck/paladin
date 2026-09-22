@@ -1,4 +1,5 @@
 #pragma once
+#include "rendering/NaturalSurfaceShape.h"
 #include "rendering/TerrainMaterialField.h"
 #include "world/SettlementGrid.h"
 #include <algorithm>
@@ -46,33 +47,36 @@ namespace Paladin
         {
             if (!active_) { return ground; }
             if (buried_) { return {8,15,27,255}; }
-            // A subpixel displacement breaks ruler-straight edges but cannot
-            // carve a playable corridor or change any navigation tile.
-            const double sx = std::clamp(x-x_+.5 +
-                (landscapeField(x*.8,y*.8,931)-.5)*.12, 0.0, 1.999);
-            const double sy = std::clamp(y-y_+.5 +
-                (landscapeField(x*.8,y*.8,981)-.5)*.12, 0.0, 1.999);
+            // Bounded, faceted chipping moves the boundary by less than a
+            // quarter tile. Tile centres retain their navigation/mining meaning;
+            // the canonical scene grid, not the storage grid, resolves the edge.
+            const double chip = rockSurfaceNoise(x*2.3,y*2.3);
+            const double sampleX = x + chip*.20 + rockSurfaceNoise(x*7,y*7)*.035;
+            const double sampleY = y + rockSurfaceNoise(x*2.3+39,y*2.3-17)*.20 +
+                                       rockSurfaceNoise(x*7-83,y*7+51)*.035;
+            const double sx = sampleX-x_+.5, sy = sampleY-y_+.5;
             const int ix = int(sx), iy = int(sy), cell = iy*3+ix;
             const double ux = sx-ix, vy = sy-iy;
-            const double u = ux*ux*(3-2*ux), v = vy*vy*(3-2*vy);
+            const double u = ux, v = vy;
             const auto sample = [&](const auto& values)
             {
-                return (values[cell]*(1-u)+values[cell+1]*u)*(1-v) +
-                       (values[cell+3]*(1-u)+values[cell+4]*u)*v;
+                return surfaceField(sampleX, sampleY, [&](int atX, int atY)
+                { return values[(atY-y_+1)*3 + atX-x_+1]; }, false);
             };
             const double rock = sample(rock_);
             if (rock < .5) { return ground; }
             const double high = sample(high_);
-            if (high > .86) { return {8,15,27,255}; }
+            const double shelf = rockSurfaceNoise(x*.73,y*.73);
+            if (high > .83+shelf*.08) { return {8,15,27,255}; }
             const double dx = ((rock_[cell+1]-rock_[cell])*(1-v) +
-                               (rock_[cell+4]-rock_[cell+3])*v)*6*ux*(1-ux);
+                               (rock_[cell+4]-rock_[cell+3])*v);
             const double dy = ((rock_[cell+3]-rock_[cell])*(1-u) +
-                               (rock_[cell+4]-rock_[cell+1])*u)*6*vy*(1-vy);
+                               (rock_[cell+4]-rock_[cell+1])*u);
             const double facing = std::clamp(dx*.7 + dy*.6,-1.0,1.0);
-            if (high > .65) { return {32,44,67,255}; }
-            if (rock < .72)
+            if (high > .62+shelf*.06) { return {32,44,67,255}; }
+            if (rock < .66+shelf*.05)
             {
-                return facing > .15 ? RenderColor{154,167,175,255}
+                return facing > .15 && chip > -.28 ? RenderColor{154,167,175,255}
                                      : RenderColor{48,69,93,255};
             }
             return stone(x,y,facing);

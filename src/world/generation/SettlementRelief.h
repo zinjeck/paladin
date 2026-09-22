@@ -16,10 +16,49 @@ namespace Paladin
     public:
         SettlementRelief(int width, int height, std::uint64_t seed)
             : width_(width), height_(height), seed_(seed),
-              scale_(std::max(64.0, std::min(width, height) * .36)),
-              cosine_(std::cos(double(seed % 1009) * .006227)),
-              sine_(std::sin(double(seed % 1009) * .006227))
+              scale_(std::max(48.0, std::min(width, height) * .32)),
+              mountains_(width, height), shoulders_(width, height),
+              hills_(width, height)
         {
+            // Compact, overlapping fractured blocks make the mass first. There
+            // is no ridge spline, contour stripe or mandatory valley to carve.
+            const double pitch = scale_ * 1.6;
+            for (int cy = -1; cy <= int(height / pitch); ++cy)
+            for (int cx = -1; cx <= int(width / pitch); ++cx)
+            {
+                const auto key = cellKey(cx, cy, seed_ + 8191);
+                if (key % 13 == 0) { continue; }
+                const double x = (cx + .15 + random(key, 1) * .70) * pitch;
+                const double y = (cy + .15 + random(key, 2) * .70) * pitch;
+                const double radius = scale_ * (.48 + random(key, 3) * .25);
+                cluster(mountains_, x, y, radius, key, 3 + int(key % 3));
+
+                // Talus shoulders occupy selected sides, not an even collar
+                // tracing every mountain. Other sides end in exposed cliffs.
+                for (int i = 0; i < 1 + int((key >> 12) % 3); ++i)
+                {
+                    const double angle = random(key, 20 + i) * tau;
+                    const double reach = radius * (.88 + random(key, 30 + i) * .38);
+                    cluster(shoulders_, x + std::cos(angle) * reach,
+                        y + std::sin(angle) * reach,
+                        radius * (.22 + random(key, 40 + i) * .20),
+                        GenerationNoise::mix(key + 50 + i), 2);
+                }
+            }
+
+            // Hill country has its own smaller, intermittently grouped nuclei.
+            // It is not a threshold band around the mountain field.
+            const double hillPitch = scale_ * .72;
+            for (int cy = -1; cy <= int(height / hillPitch); ++cy)
+            for (int cx = -1; cx <= int(width / hillPitch); ++cx)
+            {
+                const auto key = cellKey(cx, cy, seed_ + 4561);
+                if (key % 5 == 0) { continue; }
+                const double x = (cx + .10 + random(key, 1) * .80) * hillPitch;
+                const double y = (cy + .10 + random(key, 2) * .80) * hillPitch;
+                cluster(hills_, x, y, scale_ * (.15 + random(key, 3) * .13),
+                        key, 2 + int(key % 2));
+            }
         }
 
         ReliefType classify(int x, int y, double mountain, double hills) const noexcept
@@ -27,28 +66,24 @@ namespace Paladin
             if (mountain < .18 && hills < .18) { return ReliefType::Lowland; }
             mountain = std::clamp(mountain, 0.0, 1.0);
             hills = std::clamp(hills, 0.0, 1.0);
-            const double u = (x * cosine_ + y * sine_) / scale_;
-            const double v = (y * cosine_ - x * sine_) / scale_;
-            const double wx = GenerationNoise::simplexFractal(u * .55, v * .55, seed_ + 7907, 2, .4, 2);
-            const double wy = GenerationNoise::simplexFractal(u * .55, v * .55, seed_ + 3911, 2, .4, 2);
-            const double a = u + wx * .8, b = v + wy * .8;
-            // Broad bodies determine topology; subordinate spurs roughen the
-            // shoulders without punching noisy holes through the interior.
-            const double spurs = GenerationNoise::simplexFractal(
-                a * 2.3, b * 1.3, seed_ + 6073, 2, .25, 2);
-            const double massif = GenerationNoise::simplexFractal(
-                a * .72, b, seed_ + 8191, 2, .3, 2) + spurs * .11;
-            const double threshold = -.10 + (1.0 - mountain) * .72;
-            if (mountain >= .18 && massif > threshold)
+            const double px = x + .5, py = y + .5;
+            // Piecewise-planar erosion preserves broken faces at three scales.
+            // Its bounded amplitude only bites the perimeter, leaving deep rock
+            // intact instead of perforating it with tile-sized noise.
+            const double chips = scale_ * (
+                .075 * fracture(px, py, scale_ * .22, seed_ + 6073) +
+                .048 * fracture(px, py, scale_ * .085, seed_ + 7907) +
+                .018 * fracture(px, py, scale_ * .033, seed_ + 3911));
+            if (mountain >= .18 && mountains_.sample(px, py) >
+                (1.0 - mountain) * scale_ * .62 + chips)
             {
                 return ReliefType::Mountain;
             }
-            // Foothills follow a massif's contour. Independent hill country
-            // uses smaller rounded landforms, not scaled-down mountain stripes.
-            const double apron = .075 + .075 * std::clamp(.5 + spurs, 0.0, 1.0);
-            if (mountain >= .35 && massif > threshold - apron) { return ReliefType::Hills; }
-            const double hill = GenerationNoise::simplexFractal(a * 1.8, b * 2.0, seed_ + 4561, 2, .25, 2);
-            if (hills >= .18 && hill > .16 + (1.0 - hills) * .55)
+            if (mountain >= .35 && shoulders_.sample(px, py) >
+                (1.0 - mountain) * scale_ * .25 + chips * .40)
+            { return ReliefType::Hills; }
+            if (hills >= .18 && hills_.sample(px, py) >
+                (1.0 - hills) * scale_ * .24 + chips * .48)
             { return ReliefType::Hills; }
             // Gaps are the actual low basins between landforms. Nothing carves
             // an obligatory constant-width channel across the entire map.
@@ -249,8 +284,119 @@ namespace Paladin
         }
 
     private:
+        static constexpr double tau = 6.2831853071795864769;
+
+        struct Face { double x, y, distance; };
+        struct Block
+        {
+            double x, y, bounds;
+            std::array<Face, 8> faces;
+        };
+
+        // Spatial bins are built once during generation. A tile only examines
+        // nearby blocks, with no per-tile allocations or all-map shape scans.
+        struct Field
+        {
+            static constexpr int binSize = 32;
+            int columns, rows;
+            std::vector<Block> blocks;
+            std::vector<std::vector<std::size_t>> bins;
+
+            Field(int width, int height)
+                : columns((width + binSize - 1) / binSize),
+                  rows((height + binSize - 1) / binSize),
+                  bins(std::size_t(columns) * rows) {}
+
+            void add(Block block)
+            {
+                const int left = std::max(0, int(std::floor((block.x-block.bounds)/binSize)));
+                const int top = std::max(0, int(std::floor((block.y-block.bounds)/binSize)));
+                const int right = std::min(columns-1, int(std::floor((block.x+block.bounds)/binSize)));
+                const int bottom = std::min(rows-1, int(std::floor((block.y+block.bounds)/binSize)));
+                if (left > right || top > bottom) { return; }
+                const auto index = blocks.size();
+                blocks.push_back(block);
+                for (int y = top; y <= bottom; ++y)
+                for (int x = left; x <= right; ++x)
+                { bins[std::size_t(y)*columns+x].push_back(index); }
+            }
+
+            double sample(double x, double y) const noexcept
+            {
+                double result = -1e9;
+                const auto bin = std::size_t(int(y)/binSize)*columns + int(x)/binSize;
+                for (const auto index : bins[bin])
+                {
+                    const auto& block = blocks[index];
+                    const double dx = x-block.x, dy = y-block.y;
+                    if (std::abs(dx) > block.bounds || std::abs(dy) > block.bounds) { continue; }
+                    double inside = 1e9;
+                    for (const auto& face : block.faces)
+                    { inside = std::min(inside, face.distance - dx*face.x - dy*face.y); }
+                    result = std::max(result, inside);
+                }
+                return result;
+            }
+        };
+
+        static std::uint64_t cellKey(int x, int y, std::uint64_t seed) noexcept
+        {
+            return GenerationNoise::mix(seed ^
+                std::uint64_t(std::uint32_t(x)) * 0x9E3779B185EBCA87ULL ^
+                std::uint64_t(std::uint32_t(y)) * 0xC2B2AE3D27D4EB4FULL);
+        }
+
+        static double random(std::uint64_t key, int channel) noexcept
+        {
+            return double(GenerationNoise::mix(key + std::uint64_t(channel) *
+                0x9E3779B185EBCA87ULL) >> 11) * (1.0 / 9007199254740992.0);
+        }
+
+        static double fracture(double x, double y, double size, std::uint64_t seed) noexcept
+        {
+            // Rotate away from the storage lattice. Linear triangular samples
+            // produce chipped shoulders rather than smoothly curving lobes.
+            const double u = (x * .913 + y * .408) / size;
+            const double v = (y * .913 - x * .408) / size;
+            const int ix = int(std::floor(u)), iy = int(std::floor(v));
+            const double a = u-ix, b = v-iy;
+            const auto value = [&](int dx, int dy)
+            { return random(cellKey(ix+dx, iy+dy, seed), 0)*2-1; };
+            if (a+b <= 1)
+            { return value(0,0)*(1-a-b) + value(1,0)*a + value(0,1)*b; }
+            return value(1,1)*(a+b-1) + value(0,1)*(1-a) + value(1,0)*(1-b);
+        }
+
+        void block(Field& field, double x, double y, double radius, std::uint64_t key)
+        {
+            Block shape{x, y, radius*1.65 + scale_*.12, {}};
+            const double rotation = random(key, 70)*tau;
+            for (int i = 0; i < int(shape.faces.size()); ++i)
+            {
+                const double angle = rotation + (i + random(key, 80+i)*.30)*tau/8;
+                shape.faces[i] = {std::cos(angle), std::sin(angle),
+                                  radius*(.80 + random(key, 90+i)*.35)};
+            }
+            field.add(shape);
+        }
+
+        void cluster(Field& field, double x, double y, double radius,
+                     std::uint64_t key, int count)
+        {
+            block(field, x, y, radius, key);
+            for (int i = 0; i < count; ++i)
+            {
+                const double angle = random(key, 100+i)*tau;
+                const double offset = radius*(.52 + random(key, 110+i)*.45);
+                block(field, x+std::cos(angle)*offset, y+std::sin(angle)*offset,
+                      radius*(.34 + random(key, 120+i)*.29),
+                      GenerationNoise::mix(key+130+i));
+            }
+        }
+
         int width_, height_;
         std::uint64_t seed_;
-        double scale_, cosine_, sine_;
+        double scale_;
+        Field mountains_, shoulders_, hills_;
     };
 }

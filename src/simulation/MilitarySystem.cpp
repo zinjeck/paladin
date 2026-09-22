@@ -63,13 +63,9 @@ namespace Paladin
         {
             return nullptr;
         }
-        auto& people = city->simulationState().citizens_.citizens_;
-        const auto it = std::find_if(
-            people.begin(),
-            people.end(),
-            [&](const auto& c) { return c.id == soldier.sourceCitizenId(); }
+        return city->simulationState().citizens_.mutableCitizen(
+            soldier.sourceCitizenId()
         );
-        return it == people.end() ? nullptr : &*it;
     }
     bool MilitarySystem::presentAt(
         const World& world,

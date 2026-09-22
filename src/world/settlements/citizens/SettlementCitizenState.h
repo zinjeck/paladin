@@ -308,6 +308,7 @@ namespace Paladin
         friend class SettlementActivitySystem;
         friend class SettlementFamilySystem;
         friend struct SettlementActivityTestFixture;
+        SettlementCitizen* mutableCitizen(CitizenId id) noexcept;
         bool appendCitizens(std::uint64_t count, bool child);
         void matchSingles();
         std::uint64_t familyVersion_ = 0;
@@ -318,6 +319,7 @@ namespace Paladin
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;
         std::size_t decisionCursor_ = 0;
+        // Increasing IDs, append-only creation and stable erasure keep this sorted.
         std::vector<SettlementCitizen> citizens_;
         std::vector<CitizenAncestry> ancestors_;
         IdGenerator<CitizenId> citizenIds_;

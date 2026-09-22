@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <deque>
 #include <string_view>
+#include <utility>
 
 namespace Paladin
 {
@@ -458,13 +459,23 @@ namespace Paladin
         CitizenId id
     ) const noexcept
     {
-        const auto iterator = std::find_if(
+        const auto iterator = std::lower_bound(
             citizens_.begin(),
             citizens_.end(),
-            [id](const SettlementCitizen& citizen) { return citizen.id == id; }
+            id,
+            [](const SettlementCitizen& citizen, CitizenId key)
+            { return citizen.id < key; }
         );
 
-        return iterator == citizens_.end() ? nullptr : &*iterator;
+        return iterator == citizens_.end() || iterator->id != id
+                   ? nullptr : &*iterator;
+    }
+
+    SettlementCitizen* SettlementCitizenState::mutableCitizen(
+        CitizenId id
+    ) noexcept
+    {
+        return const_cast<SettlementCitizen*>(std::as_const(*this).citizen(id));
     }
 
 

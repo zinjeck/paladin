@@ -201,11 +201,14 @@ namespace
         SettlementCitizenState people; SettlementInspectionController selection;
         SettlementObjectPlacementController placement; SettlementCommandController commands;
         TileRenderMetrics metrics; Camera2D camera(192,192); camera.setZoom(.4);
-        for(int warm=0;warm<20;++warm)
+        // Let the bounded terrain-page queue settle before judging a surface.
+        // A partially resident close view shows the coarse fallback, not cliffs.
+        constexpr int terrainWarmFrames=120;
+        for(int warm=0;warm<terrainWarmFrames;++warm)
         {
             renderer.beginFrame();
             city.render(renderer,*map,camera,metrics,placement,commands,people,selection,1,12);
-            if(warm==19) capture(window,"corrected-city-ranges-overview.png");
+            if(warm==terrainWarmFrames-1) capture(window,"corrected-city-ranges-overview.png");
             renderer.endFrame();
         }
         // Review more than one fortunate seed, and keep a close view of a
@@ -214,11 +217,11 @@ namespace
         {
             auto other=SettlementMapGenerator{}.generate(source,{2,2},3,3,seed,settings);
             PALADIN_CHECK(other);
-            for(int warm=0;warm<20;++warm)
+            for(int warm=0;warm<terrainWarmFrames;++warm)
             {
                 renderer.beginFrame();
                 city.render(renderer,*other,camera,metrics,placement,commands,people,selection,1,12);
-                if(warm==19) capture(window,"ranges-seed-"+std::to_string(seed)+"-day.png");
+                if(warm==terrainWarmFrames-1) capture(window,"ranges-seed-"+std::to_string(seed)+"-day.png");
                 renderer.endFrame();
             }
         }
@@ -228,11 +231,11 @@ namespace
         { if(map->grid().tile({xx,yy})->rockFloor) { entrance={xx,yy}; } }
         PALADIN_CHECK(entrance.x>=0);
         camera.setPosition(entrance.x+.5,entrance.y+.5); camera.setZoom(3);
-        for(const double hour : {12.,0.}) for(int warm=0;warm<16;++warm)
+        for(const double hour : {12.,0.}) for(int warm=0;warm<terrainWarmFrames;++warm)
         {
             renderer.beginFrame();
             city.render(renderer,*map,camera,metrics,placement,commands,people,selection,1,hour);
-            if(warm==15) capture(window,hour ? "range-cave-close-day.png" : "range-cave-close-night.png");
+            if(warm==terrainWarmFrames-1) capture(window,hour ? "range-cave-close-day.png" : "range-cave-close-night.png");
             renderer.endFrame();
         }
         std::cout << "[city-corrections/art] mixed mountain/hill overview from actual city generator\n";

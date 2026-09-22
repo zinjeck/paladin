@@ -1,0 +1,78 @@
+{
+  "executable": "out\\build\\x64-Debug\\Paladin.exe",
+  "icon": "assets\\icons\\paladin.ico",
+  "matched_images": 10,
+  "source_sha256": "1d70804077f9005c7dc5c2f5579c576e415a9666ec10d4f6767b50c9caf045b1",
+  "images": [
+    {
+      "width": 16,
+      "height": 16,
+      "resource": 1,
+      "bytes": 1128,
+      "sha256": "a4ca83c6f7e65833f3b057ecd5b9aba772ebf31296bb474e0b0c058ca835d8c4"
+    },
+    {
+      "width": 20,
+      "height": 20,
+      "resource": 2,
+      "bytes": 1720,
+      "sha256": "b99227854b473c609eb1436450666680343097189c096603a4df61dc80a0a5b2"
+    },
+    {
+      "width": 24,
+      "height": 24,
+      "resource": 3,
+      "bytes": 2440,
+      "sha256": "4b688642bce9af3aca75c14746051a44f167069ee90e100d702a2ecfb9912e12"
+    },
+    {
+      "width": 32,
+      "height": 32,
+      "resource": 4,
+      "bytes": 4264,
+      "sha256": "104450270f19a70da16c4abdfcf4400ccbafa0fb22d7d0430ec42982394626ec"
+    },
+    {
+      "width": 40,
+      "height": 40,
+      "resource": 5,
+      "bytes": 6760,
+      "sha256": "bee664a4d04118ed7e810147f34685210cdf9899a0584731ea0d02ea2e7dff98"
+    },
+    {
+      "width": 48,
+      "height": 48,
+      "resource": 6,
+      "bytes": 9640,
+      "sha256": "5914583edda1776ecc4a3cd97fc4ee5293d634b8e4d3b8853621a7e720d8ad8a"
+    },
+    {
+      "width": 64,
+      "height": 64,
+      "resource": 7,
+      "bytes": 16936,
+      "sha256": "350499faa9001e1405152dbe1be088fbceb79e955a1be1834ce1f505b5186ccf"
+    },
+    {
+      "width": 96,
+      "height": 96,
+      "resource": 8,
+      "bytes": 38056,
+      "sha256": "f961ab67ff5c2dbda4ccbddb3b0026b8e791771ea8b44ca60c1a5bd9fa6adadf"
+    },
+    {
+      "width": 128,
+      "height": 128,
+      "resource": 9,
+      "bytes": 67624,
+      "sha256": "f1a74776341ef51fd5c202af77a78aba44bb98d422a8b32b72036e4e31c3451a"
+    },
+    {
+      "width": 256,
+      "height": 256,
+      "resource": 10,
+      "bytes": 10600,
+      "sha256": "7b96ed9c738aa4783e3df5ab3ff0e6a6ecbcd7eaed727f7e237cea3bfb0b72eb"
+    }
+  ]
+}

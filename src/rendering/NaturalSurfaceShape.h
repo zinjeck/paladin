@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace Paladin
 {
@@ -28,12 +29,15 @@ namespace Paladin
     // A continuous material field sampled at logical pixel centres. Adjacent
     // cells share the same field, so their curved edges join without seams.
     template<class Occupied>
-    double surfaceField(double x, double y, const Occupied& occupied)
+    double surfaceField(double x, double y, const Occupied& occupied, bool rounded = true)
     {
         const int ix = int(std::floor(x - .5)), iy = int(std::floor(y - .5));
         double u = x - .5 - ix, v = y - .5 - iy;
-        u = u * u * (3 - 2 * u);
-        v = v * v * (3 - 2 * v);
+        if (rounded)
+        {
+            u = u * u * (3 - 2 * u);
+            v = v * v * (3 - 2 * v);
+        }
         return std::lerp(
             std::lerp(
                 double(occupied(ix, iy)),
@@ -47,6 +51,25 @@ namespace Paladin
             ),
             v
         );
+    }
+
+    // Rock shares the same continuous, camera-independent contour coordinates
+    // as other terrain, but its fractures have corners instead of sine curves.
+    inline double rockSurfaceNoise(double x, double y)
+    {
+        const double sx = x*.913 + y*.408, sy = y*.913 - x*.408;
+        const int ix = int(std::floor(sx)), iy = int(std::floor(sy));
+        const double u = sx-ix, v = sy-iy;
+        const auto corner = [&](int dx, int dy)
+        {
+            std::uint32_t h = std::uint32_t(ix+dx)*0x8da6b343U ^
+                              std::uint32_t(iy+dy)*0xd8163841U ^ 0xcb1ab31fU;
+            h ^= h >> 16; h *= 0x7feb352dU; h ^= h >> 15;
+            return double(h & 65535U)/32767.5-1.0;
+        };
+        if (u+v <= 1)
+        { return corner(0,0)*(1-u-v) + corner(1,0)*u + corner(0,1)*v; }
+        return corner(1,1)*(u+v-1) + corner(0,1)*(1-u) + corner(1,0)*(1-v);
     }
 
     // Stable settlement-space variation for road shoulders. Multiple spatial
