@@ -3,6 +3,7 @@
 #include "rendering/HomePresentation.h"
 #include "rendering/MarketPresentation.h"
 #include "rendering/MiningPresentation.h"
+#include "rendering/OutdoorGround.h"
 #include "rendering/PasturePresentation.h"
 #include "rendering/SettlementEnvironmentDetails.h"
 #include "rendering/StockpilePresentation.h"
@@ -640,7 +641,12 @@ namespace Paladin
             if (!policy.roofsVisible ||
                 !sprites.find(object.objectTypeId + ".roof.full"))
             {
-                sprites.surface(
+                if (style.mode != "enclosed")
+                {
+                    outdoorGround(queue, projection, sprites, style.floor,
+                        {x,y,0,w,h,0,0}, roof, y, id, 0, placeholder);
+                }
+                else sprites.surface(
                     queue,
                     projection,
                     style.floor,

@@ -103,6 +103,10 @@ namespace Paladin
                     const auto source = candidate;
                     const auto destination =
                         *map.logistics.inventory(destinationId);
+                    if (!map.logistics.importsMaySupply(source, destination.kind))
+                    {
+                        continue;
+                    }
                     const int amount = std::min(
                         {wanted,
                          map.logistics.available(source.id, resource),

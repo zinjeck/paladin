@@ -1,0 +1,124 @@
+[0/2] Re-checking globbed directories...
+[1/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=402 cache_hits=414 rebuilt=0 atlas_pages=10 output_bytes=23932627 errors=0 warnings=0
+[2/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementIndustry.cpp.obj
+[3/30] Building CXX object CMakeFiles\PaladinTests.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[4/30] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[5/30] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[6/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[7/30] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementIndustry.cpp.obj
+[8/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[9/30] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[10/30] Building CXX object CMakeFiles\Paladin.dir\src\simulation\WorldShipmentSystem.cpp.obj
+[11/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[12/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\WorldShipmentSystem.cpp.obj
+[13/30] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[14/30] Linking CXX executable PaladinTests.exe
+[15/30] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[16/30] Linking CXX static library PaladinSmokeCore.lib
+[17/30] Linking CXX executable Paladin.exe
+[18/30] Linking CXX executable PaladinMilitaryUiArtTests.exe
+[19/30] Linking CXX executable PaladinPr30RenderTests.exe
+[20/30] Linking CXX executable PaladinApplicationSmokeTests.exe
+[21/30] Building CXX object CMakeFiles\PaladinCityCorrectionsVisualTests.dir\tests\CityCorrectionsVisualTests.cpp.obj
+C:\Paladin\tests\CityCorrectionsChecks.h(20): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\CityCorrectionsChecks.h(181): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[22/30] Building CXX object CMakeFiles\PaladinPr31ApplicationTests.dir\tests\Pr31ApplicationTests.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\tests\Pr31ApplicationTests.cpp(376): warning C4244: 'argument': conversion from 'const double' to 'float', possible loss of data
+C:\Paladin\tests\Pr31ApplicationTests.cpp(376): warning C4244: 'argument': conversion from 'const double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[23/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software C:/Paladin/out/build/x64-Debug/PaladinPr30RenderTests.exe"
+PR30: 4000 border phases and four bottom-right minimap layouts passed
+PR30: panel drag capture, title-only routing, resize and focus cancellation passed
+PR30: 144 animated citizen silhouette comparisons passed
+[24/30] Building CXX object CMakeFiles\PaladinWorldSurfaceTests.dir\tests\WorldSurfaceRenderTests.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\tests\WorldSurfaceRenderingChecks.h(154): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Paladin::TribalInfluenceMap>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[25/30] Linking CXX executable PaladinCityCorrectionsVisualTests.exe
+[26/30] Linking CXX executable PaladinPr31ApplicationTests.exe
+[27/30] Linking CXX executable PaladinWorldSurfaceTests.exe
+[28/30] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && "C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software C:/Paladin/out/build/x64-Debug/PaladinPr31ApplicationTests.exe"
+[pr31/startup] real progress, every packaged asset resident, shared GPU/silhouette cache, no generated world passed
+[pr31/world] caravan pick/cargo/stop/no-click-through, active HUD focus, 12 tribal/civic zoom/projection selections, mass-conserving geographic density passed
+[pr31/battle-ui] flat/globe attack, modal capture, all 56 canonical soldiers, 3 fight/retreat cycles, shared asset reuse and single autoresolve passed
+[pr31/density] generated terrain and settlements, geographic census conservation and both projections passed
+[29/30] Verify coast alignment, native marker motion, solar optics and day/night art
+political coast sea_ink=0 land_ink=9979
+marker motion: 480 frames, identical translated plates
+world composite globe=0 political=0 black=0
+world composite globe=0 political=1 black=0
+world composite globe=1 political=0 black=0
+world composite globe=1 political=1 black=0
+Thematic government/population and selected civic/tribal frontiers: globe and flat passed
+Dynamic sun: changed_pixels=23867 mean_ms=3.06533
+600x300 thematic preparation mode=0 worst_slice_ms=123.07
+600x300 thematic preparation mode=2 worst_slice_ms=8.1675
+600x300 thematic preparation mode=3 worst_slice_ms=9.5134
+PR25 world-surface, marker, map-mode and solar raster checks passed
+world pan/zoom mean_ms=14.5125 worst_ms=41.0692
+Realm founding, name reload and fortress chooser checks passed
+globe renderer=software
+globe generation land=31131 hills=4322 mountains=7212 supported=7212
+globe measured mean=24.8007 worst=64.1365
+city coast zoom mean_ms=13.4299 worst_ms=29.7689
+globe warm zoom/rotation mean_ms=24.8007 worst_ms=64.1365 atlas_builds=1
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Debug\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Cannot load sprite C:\Paladin\out\build\x64-Debug\renderer-test-fixture\missing.png: Couldn't open C:\Paladin\out\build\x64-Debug\renderer-test-fixture\missing.png: The system cannot find the file specified.; retaining placeholder
+Invalid object presentation recipe; using flat fallback
+Rejected off-palette or partial-alpha artwork: alpha.png
+Rejected off-palette or partial-alpha artwork: alpha.png
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Debug\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Invalid object presentation recipe; using flat fallback
+Cannot load sprite missing.png: Couldn't open C:\Paladin\out\build\x64-Debug\renderer-test-fixture\missing.png: The system cannot find the file specified.
+Founded player settlement 3.
+Founded player settlement 4.
+City motion: stable geometry and shared pixel grid across day/night source-texel boundaries
+Fortress creation and AI map isolation routing passed
+Military actual event routing: portrait creation, large sprite/head/count picking, overlap cycling, rolled-globe tile order, pause and city detachment passed
+Diplomacy actual input: world toolbar, four map modes, no Back overlap, civic/tribal click selection in globe/flat and hidden army hitbox passed
+PR30 application routing: foreign/own city inspection, real quantities, cancel, one-off/sustained map dispatch, stop, dragged panels and pannable/zoomable Citizenship tree passed
+Application routing smoke test passed.
+Citizen alpha picking: adult/child bodies, three zooms, camera residual and house pass-through passed
+Diplomacy UI: blank/selected states, ordered actions, conserved gift, tributary toggle, five sorts, scroll and compact army overflow passed
+Upright world art: five geographic regions, six zooms, five rolls and former flip threshold passed.
+Mine render: continuous excavation, native day/night pixels, miner swing, pause and unique flags passed
+Military UI, universal markers, walking/gathering, sleep pixel blocks and pause checks passed.
+[city-corrections/art] four mine types, close/normal day/night, frozen pause and working hoist
+[city-corrections/art] mixed mountain/hill overview from actual city generator
+[city-corrections/ui] real order buttons, amount 2, one-shot/standing, cancellation and stale-click safety

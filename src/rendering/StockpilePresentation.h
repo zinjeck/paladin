@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/WorkYardFoundation.h"
+#include "rendering/OutdoorGround.h"
 #include "world/settlements/SettlementMap.h"
 namespace Paladin
 {
@@ -21,9 +22,10 @@ namespace Paladin
         const double x = f.topLeft.x, y = f.topLeft.y, w = f.width,
                      h = f.height;
         const auto floorStart = q.size();
-        sprites.surface(
+        outdoorGround(
             q,
             p,
+            sprites,
             "stockpile.floor",
             {x, y, 0, w, h, 0, 0},
             {},

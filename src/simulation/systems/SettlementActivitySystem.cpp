@@ -14,6 +14,36 @@
 
 namespace Paladin
 {
+    void SettlementActivitySystem::cancelDepotTasks(
+        SettlementMap& map, SettlementCitizenState& citizens,
+        SettlementObjectId depot, double minute)
+    {
+        const auto destination = map.logistics.forObject(depot);
+        for (auto& person : citizens.citizens_)
+        {
+            if (destination && person.task.kind == CitizenTaskKind::Haul &&
+                person.task.destination == destination)
+            { finish(map, person, minute); }
+        }
+    }
+    void SettlementActivitySystem::cancelConstructionTasks(
+        SettlementMap& map, SettlementCitizenState& citizens, double minute)
+    {
+        for (auto& person : citizens.citizens_)
+        {
+            if ((person.task.site &&
+                 !map.objectState().constructionSite(person.task.site)) ||
+                (person.task.kind == CitizenTaskKind::Haul &&
+                 person.task.destination &&
+                 !map.logistics.inventory(person.task.destination)))
+            {
+                // Same exit as interruption: release reservations and drop any
+                // already-carried cargo, including while the clock is paused.
+                finish(map, person, minute);
+            }
+        }
+    }
+
     void SettlementActivitySystem::retireCitizen(
         SettlementMap& map,
         SettlementCitizenState& citizens,
@@ -21,6 +51,7 @@ namespace Paladin
         double minute
     )
     {
+        citizens.recordDeath(deceased, minute);
         citizens.rememberAncestry(deceased);
         for (auto& survivor : citizens.citizens_)
         {
@@ -952,7 +983,8 @@ namespace Paladin
             const auto* source = map.logistics.inventory(c.task.source);
             const bool market = source && source->kind == InventoryKind::Market;
             const auto marketId =
-                source ? source->objectId : SettlementObjectId{};
+                source && source->kind != InventoryKind::TradeImports
+                    ? source->objectId : SettlementObjectId{};
             const bool publicFood =
                 source && (source->kind == InventoryKind::Keep ||
                            source->kind == InventoryKind::Stockpile);
@@ -994,6 +1026,15 @@ namespace Paladin
         }
         else if (c.task.kind == CitizenTaskKind::Haul)
         {
+            const auto* target = map.logistics.inventory(c.task.destination);
+            const auto* reserved = map.logistics.reservation(c.id);
+            if (target && target->kind == InventoryKind::TradeDepot &&
+                (!reserved || map.trade.exportTarget(target->objectId, reserved->resource) <=
+                                  target->amount(reserved->resource)))
+            {
+                finish(map, c, minute);
+                return;
+            }
             if (!c.task.delivering)
             {
                 const auto* claim = map.logistics.reservation(c.id);
@@ -1015,6 +1056,7 @@ namespace Paladin
                 const auto* sourceInventory =
                     map.logistics.inventory(copy.source);
                 if (!sourceInventory ||
+                    !map.logistics.importsMaySupply(*sourceInventory, destination->kind) ||
                     map.commerce.affordableTradeUnits(
                         *sourceInventory,
                         *destination,
@@ -1619,7 +1661,8 @@ namespace Paladin
                     atEntrance |= c.tilePosition == quarryEntrance(
                                                         footprint.topLeft,
                                                         footprint.width,
-                                                        entrance
+                                                        entrance,
+                                                        footprint.height
                                                     );
                 }
                 if (mine->tunnels && map.mining.depth(*object) >= .98 &&
@@ -1658,8 +1701,11 @@ namespace Paladin
                 executePastureWork(map, citizens, c, minute, elapsed);
                 return;
             }
-            if (object->objectTypeId == SettlementObjectTypes::Market)
+            if (object->objectTypeId == SettlementObjectTypes::Market ||
+                object->objectTypeId == SettlementObjectTypes::TradeDepot)
             {
+                // An idle depot attendant must notice a newly funded order
+                // without needing a shift change or reassignment.
                 if (minute >= c.task.startedMinute + policy.retryMinutes)
                 {
                     c.task.startedMinute = minute;

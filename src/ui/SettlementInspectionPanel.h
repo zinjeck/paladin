@@ -25,6 +25,7 @@ namespace Paladin
         {
             return tradeContent_;
         }
+        UiRectangle tradeOrdersBounds() const noexcept { return tradeOrders_; }
         CitizenId takeCitizenNavigation() noexcept
         {
             const auto id = navigateCitizen_;
@@ -87,7 +88,7 @@ namespace Paladin
         float viewportWidth_ = 0, viewportHeight_ = 0;
         BitmapFontRenderer retroFontRenderer_;
         NormalFontRenderer normalFontRenderer_;
-        UiRectangle renderedBounds_, tradeContent_;
+        UiRectangle renderedBounds_, tradeContent_, tradeOrders_;
         bool hasRenderedBounds_ = false;
         WorkplaceId workplaceId_;
         bool showingKeep_ = false;

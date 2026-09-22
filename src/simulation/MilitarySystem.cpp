@@ -522,6 +522,14 @@ namespace Paladin
                 continue;
             }
             auto& people = city.simulationState().citizens_;
+            for (auto& person : people.citizens_)
+            {
+                if (person.health <= 0 && !person.soldierId)
+                {
+                    people.recordDeath(person, double(world.time().totalGameMinutes()));
+                    people.rememberAncestry(person);
+                }
+            }
             const auto removedPeople = std::erase_if(
                 people.citizens_,
                 [](const auto& c) { return c.health <= 0 && !c.soldierId; }
@@ -1416,6 +1424,7 @@ namespace Paladin
                 }
                 else
                 {
+                    citizens.recordDeath(*c, minute);
                     citizens.rememberAncestry(*c);
                     for (auto& survivor : citizens.citizens_)
                     {

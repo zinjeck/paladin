@@ -679,6 +679,15 @@ namespace Paladin
         {
             return false;
         }
+        if (!map.logistics.importsMaySupply(*sourceInventory, targetInventory->kind))
+        { return false; }
+        if (targetInventory->kind == InventoryKind::TradeDepot)
+        {
+            amount = std::min(amount, std::max(0,
+                map.trade.exportTarget(targetInventory->objectId, resource) -
+                targetInventory->amount(resource) -
+                map.logistics.incoming(destination, resource)));
+        }
         amount = map.commerce.affordableTradeUnits(
             *sourceInventory,
             *targetInventory,
@@ -933,17 +942,8 @@ namespace Paladin
                         &citizens,
                         goods.resource
                     );
-                    int exportTarget = std::max(8, destination.capacity / 12);
-                    for (const auto& order : map.trade.orders)
-                    {
-                        if (depot && order.depot == destination.objectId &&
-                            order.resource == goods.resource && order.enabled &&
-                            order.direction == TradeDirection::Export)
-                        {
-                            exportTarget =
-                                std::max(exportTarget, order.quantity);
-                        }
-                    }
+                    const int exportTarget = depot
+                        ? map.trade.exportTarget(destination.objectId, goods.resource) : 0;
                     const int target =
                         depot ? exportTarget
                         : market
@@ -969,11 +969,10 @@ namespace Paladin
                             }
                         }
                     }
-                    const int incoming = std::max(
-                        0,
-                        destination.capacity - destination.used() -
-                            map.logistics.freeSpace(destination.id)
-                    );
+                    const int incoming = depot
+                        ? map.logistics.incoming(destination.id, goods.resource)
+                        : std::max(0, destination.capacity - destination.used() -
+                                         map.logistics.freeSpace(destination.id));
                     const int needed = std::max(0, target - held - incoming);
                     const int amount = std::min(
                         {policy.carryingCapacity,
@@ -1463,16 +1462,17 @@ namespace Paladin
                 mine->tunnels && map.mining.depth(*object) >= .98;
             for (std::size_t attempt = 0; attempt < 16; ++attempt)
             {
-                const auto i =
-                    site.cursor + (c.id.value() + attempt) %
-                                      (site.columns.size() - site.cursor);
-                auto target = site.columns[i];
+                // Extraction still debits the canonical ore columns, while
+                // workers stand at the cut face, never inside the service hut.
+                auto target = miningWorkTile(f.topLeft, f.width, f.height,
+                                             c.id.value() + attempt);
                 if (tunnel)
                 {
                     target = quarryEntrance(
                         f.topLeft,
                         f.width,
-                        c.id.value() + attempt
+                        c.id.value() + attempt,
+                        f.height
                     );
                 }
                 if (!tunnel &&

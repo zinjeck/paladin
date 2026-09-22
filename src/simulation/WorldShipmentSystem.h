@@ -55,7 +55,8 @@ namespace Paladin
             RealmId buyer = {},
             std::int64_t unitPrice = 0,
             SettlementObjectId sourceDepot = {},
-            SettlementObjectId destinationDepot = {}
+            SettlementObjectId destinationDepot = {},
+            bool collectBeforeLoading = false
         );
         // In-flight goods finish their delivery/return; stopping cannot delete
         // cargo.

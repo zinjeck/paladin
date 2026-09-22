@@ -77,6 +77,7 @@ namespace Paladin
         SoldierId soldierId;
         ArmyId militaryUnitId;
         bool militaryDeployed = false;
+        bool deathRecorded = false;
         // Sparse relationships: only citizens who have actually conversed.
         std::unordered_map<CitizenId, double, StrongIdHash> familiarities;
         double familiarityWith(CitizenId other) const
@@ -179,6 +180,15 @@ namespace Paladin
         std::size_t population = 0;
     };
 
+    struct CitizenDeathRecord
+    {
+        std::uint64_t sequence = 0;
+        CitizenId citizen;
+        std::string name;
+        double minute = 0;
+        bool deployed = false;
+    };
+
     class SettlementCitizenState
     {
         friend class SettlementCommerce;
@@ -191,6 +201,19 @@ namespace Paladin
             return ancestors_;
         }
         void rememberAncestry(const SettlementCitizen& person);
+        void recordDeath(SettlementCitizen& person, double minute)
+        {
+            if (person.deathRecorded || person.health > 1e-7) { return; }
+            person.deathRecorded = true;
+            deaths_.push_back({++deathSequence_, person.id, person.name,
+                               minute, person.militaryDeployed});
+            while (deaths_.size() > 128) { deaths_.pop_front(); }
+        }
+        const std::deque<CitizenDeathRecord>& deaths() const noexcept
+        {
+            return deaths_;
+        }
+        std::uint64_t deathSequence() const noexcept { return deathSequence_; }
 
         [[nodiscard]]
         bool initialize(std::uint64_t citizenCount, std::uint64_t nameSeed);
@@ -289,6 +312,8 @@ namespace Paladin
         void matchSingles();
         std::uint64_t familyVersion_ = 0;
         std::deque<PopulationSample> populationHistory_;
+        std::deque<CitizenDeathRecord> deaths_;
+        std::uint64_t deathSequence_ = 0;
         SettlementAttributeReport attributeReport_;
         SettlementNavigation navigation_;
         std::uint64_t behaviorSeed_ = 0;

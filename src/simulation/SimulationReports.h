@@ -33,6 +33,7 @@ namespace Paladin
         std::deque<ReportSample> history;
         std::unordered_map<std::string, bool> warnings;
         std::size_t starving = 0;
+        std::uint64_t lastDeathSequence = 0;
         bool detailed = false;
     };
     class SimulationReports

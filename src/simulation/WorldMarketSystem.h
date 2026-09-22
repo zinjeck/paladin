@@ -188,9 +188,18 @@ namespace Paladin
                 else
                 {
                     const auto* buyer = world.realm(partner->ownerRealmId());
+                    double reservedDemand = 0;
+                    for (const auto& shipment : world.shipments())
+                    {
+                        if (shipment.destination == id && shipment.buyer &&
+                            shipment.resource == resource && shipment.active() &&
+                            shipment.deliveries == 0 &&
+                            (shipment.awaitingCollection || shipment.cargo > 0))
+                        { reservedDemand += shipment.amount; }
+                    }
                     stock = int(std::min(
                         {1000000.,
-                         price.wanted,
+                         std::max(0.0, price.wanted - reservedDemand),
                          double(
                              buyer ? buyer->treasury->balance /
                                          std::max<Money>(1, unitPrice)
@@ -218,7 +227,8 @@ namespace Paladin
             std::string_view resource,
             TradeDirection direction,
             int quantity,
-            ShipmentId* created = nullptr
+            ShipmentId* created = nullptr,
+            bool collectBeforeLoading = false
         )
         {
             if (created)
@@ -313,7 +323,8 @@ namespace Paladin
                         partner->ownerRealmId(),
                         offer.unitPrice,
                         depot,
-                        {}
+                        {},
+                        collectBeforeLoading
                     );
                 }
                 if (last != ShipmentResult::NoLandRoute)
@@ -356,6 +367,11 @@ namespace Paladin
                 return false;
             }
             auto& order = map->trade.order(depot, resource);
+            if (order.shipment && enabled)
+            {
+                static_cast<void>(WorldShipmentSystem::stop(world, actor, order.shipment));
+                order.shipment = {};
+            }
             if (!enabled && order.shipment)
             {
                 static_cast<void>(
@@ -366,10 +382,62 @@ namespace Paladin
             order.quantity =
                 std::clamp(quantity, 1, WorldShipmentSystem::MaximumShipment);
             order.enabled = enabled;
+            order.standing = true;
+            order.fulfilled = false;
+            order.collectionAuthorized = false;
+            map->trade.nextOrderMinute = 0;
             order.nextAttemptMinute = double(world.time().totalGameMinutes());
             order.status = enabled ? "Waiting for the next caravan."
                                    : "Standing order stopped.";
             return true;
+        }
+        static bool placeOrder(
+            World& world, RealmId actor, SettlementId city,
+            SettlementObjectId depot, std::string_view resource,
+            TradeDirection direction, int quantity, bool standing)
+        {
+            auto* settlement = world.settlement(city);
+            if (!settlement || settlement->ownerRealmId() != actor ||
+                !SettlementResourceCatalog::definition(resource) || quantity < 1 ||
+                quantity > WorldShipmentSystem::MaximumShipment)
+            { return false; }
+            auto* map = settlement->simulationState().localMap_.get();
+            const auto* building = map ? map->objectState().completedObject(depot) : nullptr;
+            if (!building || building->objectTypeId != SettlementObjectTypes::TradeDepot ||
+                map->trade.orders.size() >= 64)
+            { return false; }
+            SettlementTradeOrder order;
+            order.id = ++map->trade.nextOrderId;
+            order.depot = depot;
+            order.resource = resource;
+            order.direction = direction;
+            order.quantity = quantity;
+            order.standing = standing;
+            order.enabled = true;
+            order.status = "Waiting for a funded buyer/supplier and land route.";
+            map->trade.orders.push_back(std::move(order));
+            map->trade.nextOrderMinute = 0;
+            return true;
+        }
+        static bool cancelOrder(World& world, RealmId actor, SettlementId city,
+                                SettlementObjectId depot, std::uint64_t id)
+        {
+            auto* settlement = world.settlement(city);
+            if (!settlement || settlement->ownerRealmId() != actor) { return false; }
+            auto* map = settlement->simulationState().localMap_.get();
+            if (!map) { return false; }
+            for (auto& order : map->trade.orders)
+            {
+                if (order.depot != depot || order.id != id) { continue; }
+                order.enabled = order.collectionAuthorized = false;
+                if (order.shipment)
+                { static_cast<void>(WorldShipmentSystem::stop(world, actor, order.shipment)); }
+                map->activities.cancelDepotTasks(*map, settlement->simulationState().citizens_, depot,
+                                                 double(world.time().totalGameMinutes()));
+                std::erase_if(map->trade.orders, [id](const auto& o) { return o.id == id; });
+                return true;
+            }
+            return false;
         }
         static void tickOrders(World& world, double minute)
         {
@@ -383,10 +451,24 @@ namespace Paladin
                     continue;
                 }
                 map->trade.expire(minute);
+                for (auto& order : map->trade.orders)
+                {
+                    if (!map->objectState().completedObject(order.depot))
+                    {
+                        if (order.shipment)
+                        { static_cast<void>(WorldShipmentSystem::stop(world, record.ownerRealmId(), order.shipment)); }
+                        order.enabled = order.collectionAuthorized = false;
+                    }
+                    const auto* shipment = world.shipment(order.shipment);
+                    order.collectionAuthorized = order.enabled && shipment &&
+                        shipment->awaitingCollection && shipment->active();
+                    if (shipment && shipment->deliveries) { order.fulfilled = true; }
+                }
                 std::erase_if(
                     map->trade.orders,
                     [&](const auto& order)
-                    { return !map->objectState().completedObject(order.depot); }
+                    { return !map->objectState().completedObject(order.depot) ||
+                             (!order.standing && order.fulfilled); }
                 );
                 if (minute < map->trade.nextOrderMinute ||
                     map->trade.orders.empty())
@@ -404,8 +486,10 @@ namespace Paladin
                 if (const auto* shipment = world.shipment(order.shipment);
                     shipment && shipment->active())
                 {
-                    order.status = shipment->cargo ? "Cargo in transit."
-                                                   : "Caravan returning.";
+                    order.status = shipment->awaitingCollection
+                        ? "Buyer paid into escrow; collecting exact batch."
+                        : shipment->phase == ShipmentPhase::Blocked ? "Route blocked; cargo retained."
+                        : shipment->cargo ? "Cargo in transit." : "Caravan returning.";
                     continue;
                 }
                 order.nextAttemptMinute = minute + 30;
@@ -417,9 +501,17 @@ namespace Paladin
                     order.resource,
                     order.direction,
                     order.quantity,
-                    &order.shipment
+                    &order.shipment,
+                    order.direction == TradeDirection::Export
                 );
                 order.status = shipmentResultText(result);
+                if (const auto* shipment = world.shipment(order.shipment))
+                {
+                    order.collectionAuthorized = shipment->awaitingCollection;
+                    order.fulfilled = false;
+                    if (order.collectionAuthorized)
+                    { order.status = "Buyer funded; collecting exact batch."; }
+                }
                 if (result == ShipmentResult::NoLandRoute)
                 {
                     order.nextAttemptMinute = minute + 5;

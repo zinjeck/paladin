@@ -168,7 +168,7 @@ namespace
         PALADIN_CHECK(!map.objectState().placeCompletedObject(
             map.grid(),
             *definition,
-            {{12, 12}, 3, 3}
+            {{12, 12}, 7, 7}
         ));
         for (int y = 12; y < 15; ++y)
         {
@@ -179,7 +179,11 @@ namespace
         }
         map.objectState().invalidateTerrainCache();
         map.objectState().rebuildOccupancy();
-        const auto mine = complete(map, "iron_mine", {{12, 12}, 3, 3});
+        // The service terrace now requires room for its hut and machinery;
+        // retain the nine ore-bearing cells so depletion assertions are unchanged.
+        PALADIN_CHECK(!map.objectState().placeCompletedObject(
+            map.grid(), *definition, {{12, 12}, 3, 3}));
+        const auto mine = complete(map, "iron_mine", {{12, 12}, 7, 7});
         const auto object = *map.objectState().completedObject(mine);
         PALADIN_CHECK(produceIndustry(map, mine, 2, 360, 120));
         PALADIN_CHECK(map.logistics.total("iron") == 2);

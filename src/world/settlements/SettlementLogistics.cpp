@@ -54,6 +54,9 @@ namespace Paladin
         std::string_view resource
     ) const
     {
+        // The loading counter is committed to world shipments, not a second
+        // public shop. Imports have their own independently saleable inventory.
+        if (inventory.kind == InventoryKind::TradeDepot) { return false; }
         const auto* object = objects.completedObject(inventory.objectId);
         if (!object)
         {

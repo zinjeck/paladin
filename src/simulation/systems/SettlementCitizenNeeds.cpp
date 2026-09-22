@@ -459,14 +459,20 @@ namespace Paladin
         {
             c.homelessMinutes += elapsed;
         }
-        const double hungerPressure = std::max(0.0, (c.hunger - 25) / 75) * 12;
+        // A normal interval between meals is not distress. Start at the same
+        // threshold that makes a citizen seek food, not at half that threshold.
+        const double hungerPressure =
+            std::clamp((c.hunger - policy.foodSeekThreshold) /
+                           std::max(1.0, 100.0 - policy.foodSeekThreshold),
+                       0.0, 1.0) * 12;
         const double healthPressure = (100 - c.health) / 100 * 24;
         const double homelessPressure =
             c.homeId
                 ? 0
                 : std::min(16.0, .5 + std::pow(c.homelessMinutes / 1440, 2));
         const double recovery =
-            c.hunger < 50 && c.homeId ? policy.happinessRecoveryPerDay : 0;
+            c.hunger < policy.foodSeekThreshold && c.homeId
+                ? policy.happinessRecoveryPerDay : 0;
         const int workHours =
             (policy.shiftEndMinute - policy.shiftStartMinute) / 60;
         const double unemploymentPressure =

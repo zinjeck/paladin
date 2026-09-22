@@ -22,6 +22,10 @@ namespace Paladin
         double nextAttemptMinute = 0;
         ShipmentId shipment;
         std::string status;
+        std::uint64_t id = 0;
+        bool standing = true;
+        bool collectionAuthorized = false;
+        bool fulfilled = false;
     };
     struct LocalTradeVisit
     {
@@ -65,6 +69,21 @@ namespace Paladin
         std::uint64_t routeTerrainRevision = ~std::uint64_t(0);
         double nextOrderMinute = 0;
         std::size_t orderCursor = 0;
+        std::uint64_t nextOrderId = 0;
+        int exportTarget(SettlementObjectId depot, std::string_view resource) const
+        {
+            int target = 0;
+            for (const auto& order : orders)
+            {
+                if (order.enabled && order.collectionAuthorized &&
+                    order.depot == depot && order.resource == resource &&
+                    order.direction == TradeDirection::Export)
+                { target = std::min(1000000, target + order.quantity); }
+            }
+            return target;
+        }
+        bool visible(const SettlementTradeOrder& order) const
+        { return order.enabled && (order.standing || !order.fulfilled); }
         void expire(double minute)
         {
             std::erase_if(
@@ -86,6 +105,7 @@ namespace Paladin
                 }
             }
             orders.push_back({depot, std::string(resource)});
+            orders.back().id = ++nextOrderId;
             return orders.back();
         }
     };

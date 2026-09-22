@@ -285,8 +285,14 @@ namespace Paladin
             else if (from && to)
             {
                 const auto source = *from, destination = *to;
+                if (!map.logistics.importsMaySupply(source, destination.kind)) { continue; }
+                const int authorized = destination.kind == InventoryKind::TradeDepot
+                    ? std::max(0, map.trade.exportTarget(destination.objectId, flow.resource) -
+                                     destination.amount(flow.resource) -
+                                     map.logistics.incoming(destination.id, flow.resource))
+                    : requested;
                 const int amount = std::min(
-                    {requested,
+                    {requested, authorized,
                      map.logistics.available(source.id, flow.resource),
                      map.logistics.receivable(destination.id, flow.resource),
                      affordableTradeUnits(
@@ -587,6 +593,14 @@ namespace Paladin
         const SettlementInventory& source
     ) const
     {
+        // Export stock is committed to a buyer. Imports are a separate sales
+        // counter, with direct retail allowed only in the absence of stockpiles.
+        if (source.kind == InventoryKind::TradeDepot) { return -1; }
+        if (source.kind == InventoryKind::TradeImports)
+        {
+            if (!map.logistics.importsMaySupply(source, InventoryKind::Home)) { return -1; }
+            return usesMoney() ? policy.retailFoodPrice : 0;
+        }
         if (!usesMoney())
         {
             return 0;

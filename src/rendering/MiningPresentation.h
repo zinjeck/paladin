@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/SceneSpriteLibrary.h"
+#include "rendering/MineSurface.h"
 #include "world/generation/GenerationNoise.h"
 #include "world/settlements/SettlementMap.h"
 #include <cmath>
@@ -86,41 +87,10 @@ namespace Paladin
         const auto& f = object.footprint;
         const double depth = map.mining.depth(object);
         const double x = f.topLeft.x, y = f.topLeft.y;
-        const RenderColor compoundTint =
-            job->deposit == MineralDeposit::Gold
-                ? RenderColor{183, 131, 80, 255}
-            : job->deposit == MineralDeposit::Iron
-                ? RenderColor{149, 101, 95, 255}
-            : job->deposit == MineralDeposit::Coal
-                ? RenderColor{57, 70, 88, 255}
-                : RenderColor{113, 109, 112, 255};
-        constexpr double compoundDepth = 2.0;
-        // Only the permanent surface compound is cleared and resource-coded.
-        // The excavation below keeps the established dark rock/strata palette.
-        const auto groundStart = queue.size();
-        sprites.surface(
-            queue,
-            view,
-            "market.floor",
-            {x, y, 0, double(f.width), std::min(compoundDepth, double(f.height)), 0, 0},
-            compoundTint,
-            y,
-            id,
-            0
-        );
-        sprites.surface(
-            queue,
-            view,
-            "road.floor",
-            {x + .25, y + 1.55, 0, f.width - .5, .45, 0, 0},
-            {116, 81, 63, 255},
-            y,
-            id,
-            1
-        );
-        queue.setLayerFrom(groundStart, -3);
-
-        // A permanent, orderly surface work strip stays above the expanding cut.
+        const double compoundDepth = mineServiceDepth(f);
+        const auto* progress = map.mining.find(object.id);
+        mineSurface(queue, view, sprites, object, id,
+                    progress ? progress->labor / 60.0 : 0);
         const auto part = [&](double px,
                               double py,
                               double w,
@@ -133,117 +103,15 @@ namespace Paladin
             );
         };
 
-        // Miner hut: a tiny but legible home, with foundation, plaster walls,
-        // timber frame, door, window and chimney under the shared thatch roof.
-        const bool compactCompound = f.width < 5;
-        const double hutWidth = compactCompound ? 1.35 : 1.7;
-        const double hutX = x + f.width - hutWidth - .35;
-        const double hutY = y + .28;
-        part(
-            hutX - .08,
-            hutY + .08,
-            hutWidth + .15,
-            1.22,
-            {57, 43, 60, 135},
-            -1
-        );
-        part(hutX, hutY + .12, hutWidth, 1.05, {215, 200, 162, 255});
-        part(hutX, hutY + 1.02, hutWidth, .15, {136, 96, 68, 255}, 1);
-        part(hutX + .10, hutY + .14, .10, .93, {116, 81, 63, 255}, 2);
-        part(
-            hutX + hutWidth - .20,
-            hutY + .14,
-            .10,
-            .93,
-            {116, 81, 63, 255},
-            2
-        );
-        part(hutX + .18, hutY + .42, .42, .65, {73, 53, 47, 255}, 3);
-        part(hutX + .25, hutY + .52, .28, .55, {57, 43, 60, 255}, 4);
-        const double windowX = hutX + hutWidth - .66;
-        part(windowX, hutY + .48, .38, .34, {57, 43, 60, 255}, 3);
-        part(windowX + .06, hutY + .54, .26, .20, {154, 167, 175, 255}, 4);
-        part(
-            hutX + hutWidth - .42,
-            hutY - .12,
-            .20,
-            .48,
-            {73, 53, 47, 255},
-            3
-        );
-        sprites.placed(
-            queue,
-            view,
-            "roof.thatch",
-            hutX - .12,
-            hutY - .25,
-            hutY + 1.34,
-            id,
-            5,
-            hutWidth + .25,
-            1.18
-        );
-
-        // Hoist and stores form one readable work line rather than scattered props.
-        const double hoistX = x + (compactCompound ? .25 : .45);
-        const double hoistY = y + .48;
-        sprites.submit(
-            queue,
-            view,
-            "mine.hoist",
-            hoistX,
-            hoistY,
-            id,
-            compactCompound ? .68 : .82
-        );
-        const double storeX = x + (compactCompound ? 1.02 : 1.55);
-        sprites.submit(
-            queue,
-            view,
-            "stockpile.crate",
-            storeX,
-            y + .70,
-            id,
-            compactCompound ? .60 : .72
-        );
-        if (!compactCompound)
-        {
-            sprites.submit(
-                queue,
-                view,
-                "stockpile.crate",
-                storeX + .52,
-                y + .70,
-                id,
-                .72
-            );
-            part(
-                storeX - .08,
-                y + 1.36,
-                1.18,
-                .10,
-                {116, 81, 63, 255},
-                1
-            );
-        }
-
-        // Small wheeled ore tub and its handles, authored on the native grid.
-        const double cartX = compactCompound ? x + .78 : x + 2.85;
-        const double cartY = compactCompound ? y + 1.22 : y + .92;
-        part(cartX, cartY, .625, .5, {57, 43, 60, 255});
-        part(cartX + .0625, cartY + .0625, .5, .3125, {136, 96, 68, 255}, 1);
-        part(cartX - .0625, cartY + .3125, .125, .25, {8, 15, 27, 255}, 2);
-        part(cartX + .5625, cartY + .3125, .125, .25, {8, 15, 27, 255}, 2);
-        part(cartX + .125, cartY + .5, .0625, .375, {136, 96, 68, 255}, 2);
-        part(cartX + .4375, cartY + .5, .0625, .375, {136, 96, 68, 255}, 2);
         if (depth <= 0)
         {
             return;
         }
         const double coverage = std::sqrt(depth / job->maximumDepth);
         const double rx = std::max(.3, (f.width * .5 - .2) * coverage);
-        const double ry = std::max(.3, ((f.height - 2) * .5 - .2) * coverage);
-        const double cx = x + f.width * .5, cy = y + 2 + (f.height - 2) * .5;
+        const double ry = std::max(.3, ((f.height - compoundDepth) * .5 - .2) * coverage);
+        const double cx = x + f.width * .5;
+        const double cy = y + compoundDepth + (f.height - compoundDepth) * .5;
         const double wall = depth * .85;
         // A worked cut follows the rectangular site, with stable native-pixel
         // chips along all four faces. Labor expands it without changing the
@@ -436,7 +304,7 @@ namespace Paladin
         {
             for (int i = 0; i < quarryEntranceCount(f.width); ++i)
             {
-                const auto entrance = quarryEntrance(f.topLeft, f.width, i);
+                const auto entrance = quarryEntrance(f.topLeft, f.width, i, f.height);
                 const double tx = entrance.x + .1875;
                 const double ty = cy - ry + edgeInset(tx + .325, 0) + wall - .5;
                 queue.submit(

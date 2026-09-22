@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/BuildingView.h"
+#include "rendering/OutdoorGround.h"
 #include "world/settlements/objects/WorkplaceCompound.h"
 
 namespace Paladin
@@ -24,9 +25,10 @@ namespace Paladin
         const auto room = workplaceRoom(yard);
         const auto door = workplaceRoomDoor(yard);
         const auto ground = queue.size();
-        sprites.surface(
+        outdoorGround(
             queue,
             view,
+            sprites,
             fishing ? "fishing_grounds.floor" : "market.floor",
             {double(yard.topLeft.x),
              double(yard.topLeft.y),

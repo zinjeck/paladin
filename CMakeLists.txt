@@ -377,6 +377,12 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
     target_link_libraries(PaladinApplicationSmokeTests PRIVATE PaladinSmokeCore)
     add_executable(PaladinMilitaryUiArtTests tests/MilitaryUiArtTests.cpp)
     target_link_libraries(PaladinMilitaryUiArtTests PRIVATE PaladinSmokeCore)
+    add_executable(PaladinCityCorrectionsVisualTests tests/CityCorrectionsVisualTests.cpp)
+    target_link_libraries(PaladinCityCorrectionsVisualTests PRIVATE PaladinSmokeCore)
+    add_dependencies(PaladinCityCorrectionsVisualTests Paladin)
+    add_test(NAME PaladinCityCorrectionsVisualTests COMMAND PaladinCityCorrectionsVisualTests)
+    set_tests_properties(PaladinCityCorrectionsVisualTests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software" TIMEOUT 120)
     add_dependencies(PaladinMilitaryUiArtTests Paladin)
     add_test(NAME PaladinMilitaryUiArtTests COMMAND PaladinMilitaryUiArtTests)
     set_tests_properties(PaladinMilitaryUiArtTests PROPERTIES
@@ -398,7 +404,9 @@ if(PALADIN_BUILD_APPLICATION_SMOKE_TESTS)
             $<TARGET_FILE:PaladinApplicationSmokeTests>
         COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
             $<TARGET_FILE:PaladinMilitaryUiArtTests>
-        DEPENDS PaladinApplicationSmokeTests PaladinWorldSurfaceTests PaladinMilitaryUiArtTests
+        COMMAND ${CMAKE_COMMAND} -E env SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software
+            $<TARGET_FILE:PaladinCityCorrectionsVisualTests>
+        DEPENDS PaladinApplicationSmokeTests PaladinWorldSurfaceTests PaladinMilitaryUiArtTests PaladinCityCorrectionsVisualTests
         COMMENT "Verify coast alignment, native marker motion, solar optics and day/night art"
         VERBATIM
     )

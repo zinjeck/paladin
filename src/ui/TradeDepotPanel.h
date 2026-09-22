@@ -15,9 +15,10 @@ namespace Paladin
     class TradeDepotPanel
     {
     public:
-        void embed(UiRectangle bounds)
+        void embed(UiRectangle bounds, UiRectangle orders = {})
         {
             embedded_ = bounds;
+            ordersBounds_ = orders;
             if (bounds.width <= 0 || bounds.height <= 0)
             {
                 close();
@@ -39,7 +40,7 @@ namespace Paladin
         }
         bool contains(float x, float y) const noexcept
         {
-            return isOpen() && bounds_.contains(x, y);
+            return isOpen() && (bounds_.contains(x, y) || ordersBounds_.contains(x, y));
         }
         bool wantsKeyboard() const noexcept
         {
@@ -70,6 +71,8 @@ namespace Paladin
             Dispatch,
             Start,
             Stop,
+            SelectOrder,
+            CancelOrder,
             ResourceFirst = 100
         };
         struct Control
@@ -77,11 +80,15 @@ namespace Paladin
             UiRectangle bounds;
             Kind kind;
             std::string text;
+            std::uint64_t orderId = 0;
         };
-        void act(Kind, World&, RealmId);
+        void act(Kind, World&, RealmId, std::uint64_t orderId = 0);
         int amount() const;
         std::string_view resource() const;
         UiRectangle bounds_, embedded_;
+        UiRectangle ordersBounds_;
+        int orderScroll_ = 0;
+        std::uint64_t pressedOrderId_ = 0;
         mutable SceneSpriteLibrary icons_;
         std::vector<TradeDirection> directions_;
         std::vector<int> quantities_;

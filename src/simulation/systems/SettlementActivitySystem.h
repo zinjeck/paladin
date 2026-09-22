@@ -179,6 +179,10 @@ namespace Paladin
             double elapsed
         );
         static std::string activityLabel(const SettlementCitizen&);
+        void cancelConstructionTasks(
+            SettlementMap&, SettlementCitizenState&, double minute);
+        void cancelDepotTasks(SettlementMap&, SettlementCitizenState&,
+                              SettlementObjectId, double minute);
         void synchronizeHomes(
             SettlementMap& map,
             SettlementCitizenState& citizens

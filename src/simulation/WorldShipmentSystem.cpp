@@ -64,6 +64,24 @@ namespace Paladin
                 shipment.escrow = 0;
             }
         }
+        void clearCollection(World& world, WorldShipment& shipment)
+        {
+            shipment.awaitingCollection = false;
+            if (auto* city = world.settlement(shipment.source))
+            {
+                if (const auto* local = city->simulationState().localMap())
+                {
+                    // The simulation owns the mutable map; no second goods or
+                    // cash reservation is kept on the UI's order record.
+                    auto& trade = const_cast<SettlementMap*>(local)->trade;
+                    for (auto& order : trade.orders)
+                    {
+                        if (order.shipment == shipment.id)
+                        { order.collectionAuthorized = false; }
+                    }
+                }
+            }
+        }
         bool publicStorage(InventoryKind kind)
         {
             return kind == InventoryKind::TradeDepot;
@@ -191,13 +209,16 @@ namespace Paladin
         if (shipment.buyer)
         {
             const auto* buyer = world.realm(shipment.buyer);
-            if (!buyer || shipment.unitPrice <= 0 || shipment.escrow ||
+            if (!buyer || shipment.unitPrice <= 0 ||
                 shipment.unitPrice >
                     std::numeric_limits<Money>::max() / shipment.amount)
             {
                 return false;
             }
-            payment = shipment.unitPrice * shipment.amount;
+            const Money price = shipment.unitPrice * shipment.amount;
+            if (shipment.escrow && shipment.escrow != price)
+            { return false; }
+            payment = shipment.escrow ? 0 : price;
             if (!buyer->treasury || buyer->treasury->balance < payment)
             {
                 return false;
@@ -257,6 +278,7 @@ namespace Paladin
             );
         }
         shipment.cargo = shipment.amount;
+        clearCollection(world, shipment);
         shipment.phase = ShipmentPhase::Outbound;
         shipment.stepMinutes = 0;
         return true;
@@ -352,7 +374,8 @@ namespace Paladin
         RealmId buyer,
         std::int64_t unitPrice,
         SettlementObjectId sourceDepot,
-        SettlementObjectId destinationDepot
+        SettlementObjectId destinationDepot,
+        bool collectBeforeLoading
     )
     {
         if (created)
@@ -417,9 +440,42 @@ namespace Paladin
                 return ShipmentResult::InsufficientMoney;
             }
         }
-        if (available(*source, resource, sourceDepot) < amount)
+        const bool collect = collectBeforeLoading && buyer && sourceDepot &&
+                             source->simulationState().localMap();
+        if (collect)
+        {
+            const auto* local = source->simulationState().localMap();
+            const auto* inventory = local->logistics.inventory(
+                local->logistics.forObject(sourceDepot));
+            if (!inventory || inventory->kind != InventoryKind::TradeDepot)
+            { return ShipmentResult::MissingTradeDepot; }
+            if (inventory->capacity < amount) { return ShipmentResult::DepotFull; }
+        }
+        if (!collect && available(*source, resource, sourceDepot) < amount)
         {
             return ShipmentResult::InsufficientGoods;
+        }
+        if (buyer)
+        {
+            if (const auto* local = target->simulationState().localMap())
+            {
+                std::int64_t room = 0;
+                for (const auto& inventory : local->logistics.inventories())
+                {
+                    if (inventory.kind == InventoryKind::TradeImports &&
+                        (!destinationDepot || inventory.objectId == destinationDepot))
+                    { room += local->logistics.freeSpace(inventory.id); }
+                }
+                for (const auto& pending : world.shipments_)
+                {
+                    if (pending.buyer && pending.destination == to && pending.active() &&
+                        pending.deliveries == 0 && (pending.cargo || pending.awaitingCollection) &&
+                        (!destinationDepot || !pending.destinationDepot ||
+                         pending.destinationDepot == destinationDepot))
+                    { room -= pending.amount; }
+                }
+                if (room < amount) { return ShipmentResult::DepotFull; }
+            }
         }
         auto path = worldLandRoute(
             world.grid(),
@@ -452,7 +508,16 @@ namespace Paladin
                 std::max(1.5, 20. / double(shipment.path.size() - 1));
         }
         shipment.wrapWidth = world.grid().width();
-        if (!load(world, shipment))
+        shipment.checkedTerrainRevision = world.grid().revision();
+        if (collect)
+        {
+            // Reserve the entire purchase before any worker is told to fetch.
+            // This is the shipment's escrow, not a duplicate order balance.
+            shipment.escrow = unitPrice * amount;
+            world.realm(buyer)->treasury->balance -= shipment.escrow;
+            shipment.awaitingCollection = true;
+        }
+        else if (!load(world, shipment))
         {
             return ShipmentResult::InsufficientGoods;
         }
@@ -488,7 +553,10 @@ namespace Paladin
                 shipment.repeating = false;
                 if (shipment.phase == ShipmentPhase::Waiting)
                 {
-                    shipment.phase = ShipmentPhase::Completed;
+                    clearCollection(world, shipment);
+                    refund(world, shipment);
+                    shipment.phase = shipment.escrow ? ShipmentPhase::Blocked
+                                                     : ShipmentPhase::Completed;
                 }
                 if (shipment.phase == ShipmentPhase::Blocked)
                 {
@@ -598,13 +666,35 @@ namespace Paladin
                 {
                     const auto* source = world.settlement(shipment.source);
                     const auto* target = world.settlement(shipment.destination);
+                    bool routeValid = true;
+                    if (shipment.awaitingCollection &&
+                        shipment.checkedTerrainRevision != world.grid().revision())
+                    {
+                        for (std::size_t i = 1; i < shipment.path.size(); ++i)
+                        {
+                            if (!worldLandStepAllowed(world.grid(),
+                                    shipment.path[i-1], shipment.path[i],
+                                    WorldLandMovement::Cardinal))
+                            { routeValid = false; break; }
+                        }
+                        shipment.checkedTerrainRevision = world.grid().revision();
+                    }
+                    const auto* local = source ? source->simulationState().localMap() : nullptr;
+                    const bool depotValid = !shipment.sourceDepot ||
+                        (local && local->objectState().completedObject(shipment.sourceDepot));
                     if (!source || !target || !hasTradeDepot(*source) ||
                         !hasTradeDepot(*target) ||
                         source->ownerRealmId() != shipment.owner ||
                         !authorizedDestination(world, shipment) ||
-                        !shipment.repeating)
+                        (!shipment.repeating && !shipment.awaitingCollection) ||
+                        !depotValid || !routeValid ||
+                        source->position() != shipment.path.front() ||
+                        target->position() != shipment.path.back())
                     {
-                        shipment.phase = ShipmentPhase::Completed;
+                        clearCollection(world, shipment);
+                        refund(world, shipment);
+                        shipment.phase = shipment.escrow ? ShipmentPhase::Blocked
+                                                        : ShipmentPhase::Completed;
                         break;
                     }
                     if (!load(world, shipment))
@@ -682,6 +772,17 @@ namespace Paladin
                         }
                         shipment.cargo = 0;
                         ++shipment.deliveries;
+                        for (const auto cityId : {shipment.source, shipment.destination})
+                        {
+                            auto* city = world.settlement(cityId);
+                            auto* local = city ? city->simulationState().localMap_.get() : nullptr;
+                            if (!local) { continue; }
+                            for (auto& order : local->trade.orders)
+                            {
+                                if (order.shipment == shipment.id)
+                                { order.fulfilled = true; order.collectionAuthorized = false; }
+                            }
+                        }
                     }
                     else
                     {

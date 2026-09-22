@@ -1,0 +1,788 @@
+[0/2] Re-checking globbed directories...
+[1/228] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=402 cache_hits=414 rebuilt=0 atlas_pages=10 output_bytes=23932627 errors=0 warnings=0
+[2/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[3/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\interaction\SettlementInspectionController.cpp.obj
+[4/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\interaction\SettlementCommandController.cpp.obj
+[5/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationDebug.cpp(100): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[6/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationCityInput.cpp(107): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(285): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[7/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationWorldInput.cpp(541): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[8/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationMilitary.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[9/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationCamera.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[10/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationReports.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[11/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationFrame.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[12/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\BattleScene.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[13/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(343): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[14/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\Application.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[15/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationCityScreen.cpp(47): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(176): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(243): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[16/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCameraBenchmark.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[17/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationCameraBenchmark.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[18/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationBattle.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationBattle.cpp(371): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationBattle.cpp(371): warning C4244: 'initializing': conversion from 'uint64_t' to 'const double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[19/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\core\ApplicationSession.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[20/228] Building CXX object CMakeFiles\Paladin.dir\src\core\Application.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[21/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\BattleScene.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[22/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationBattle.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationBattle.cpp(371): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationBattle.cpp(371): warning C4244: 'initializing': conversion from 'uint64_t' to 'const double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[23/228] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[24/228] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementInspectionController.cpp.obj
+[25/228] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementCommandController.cpp.obj
+[26/228] Building CXX object CMakeFiles\Paladin.dir\src\interaction\SettlementPlacementController.cpp.obj
+[27/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldScreen.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationWorldScreen.cpp(343): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[28/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationReports.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[29/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationWorldInput.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationWorldInput.cpp(541): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[30/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationMilitary.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[31/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityScreen.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationCityScreen.cpp(47): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(105): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(176): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityScreen.cpp(243): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[32/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCityInput.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationCityInput.cpp(107): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\core\ApplicationCityInput.cpp(285): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[33/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationCamera.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[34/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationDebug.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\core\ApplicationDebug.cpp(100): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+[35/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationSession.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[36/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementEnvironmentDetails.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[37/228] Building CXX object CMakeFiles\Paladin.dir\src\core\ApplicationFrame.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[38/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\CityRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[39/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[40/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[41/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[42/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(81): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(81): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(82): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[43/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[44/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[45/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[46/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\TerritoryRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[47/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[48/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[49/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\WorldShipmentSystem.cpp.obj
+[50/228] Building CXX object CMakeFiles\Paladin.dir\src\rendering\WorldRealmPresentationRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering\WorldRealmPresentationRenderer.cpp(776): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Paladin::WorldTribalSurfaceSource>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            InfluenceSource=Paladin::WorldTribalSurfaceSource
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[51/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\MilitarySystem.cpp.obj
+[52/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\BattleSystem.cpp.obj
+[53/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[54/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\SimulationReports.cpp.obj
+[55/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\Simulation.cpp.obj
+[56/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[57/228] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\AiRealmGenerator.cpp.obj
+[58/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\AiRealmSystem.cpp.obj
+[59/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\CitizenshipSystem.cpp.obj
+[60/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\DiplomacySystem.cpp.obj
+[61/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\RealmRulerSystem.cpp.obj
+[62/228] Building CXX object CMakeFiles\Paladin.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[63/228] Building CXX object CMakeFiles\Paladin.dir\src\world\World.cpp.obj
+[64/228] Building CXX object CMakeFiles\Paladin.dir\src\world\WorldPopulationField.cpp.obj
+[65/228] Building CXX object CMakeFiles\Paladin.dir\src\world\WorldEntities.cpp.obj
+[66/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementMap.cpp.obj
+[67/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[68/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[69/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[70/228] Building CXX object CMakeFiles\Paladin.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[71/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[72/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[73/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[74/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[75/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[76/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(340): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[77/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementIndustry.cpp.obj
+[78/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[79/228] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[80/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[81/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\jobs\fishery\FisheryJob.cpp.obj
+[82/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[83/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectDefinition.cpp.obj
+[84/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[85/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[86/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[87/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\LedgerPanel.cpp.obj
+[88/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[89/228] Building CXX object CMakeFiles\Paladin.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[90/228] Building CXX object CMakeFiles\Paladin.dir\src\world\territory\TribalInfluenceMap.cpp.obj
+[91/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\CityHud.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[92/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\WorldSettlementPanel.cpp.obj
+[93/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\LedgerPanelData.cpp.obj
+[94/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\DiplomacyPanel.cpp.obj
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[95/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\FoundingPanel.cpp.obj
+[96/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentTechnology.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[97/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPopulation.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[98/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\MilitaryPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[99/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\EmploymentPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[100/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(350): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[101/228] Building CXX object CMakeFiles\Paladin.dir\src\ui\TradeDepotPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[102/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\interaction\SettlementPlacementController.cpp.obj
+[103/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementEnvironmentDetails.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[104/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementLogisticsRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[105/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementNaturalFeatureRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[106/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementMarkerRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(80): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(81): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(81): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Paladin\src\rendering\SettlementMarkerRenderer.cpp(82): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[107/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\CityRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[108/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementStructurePresentation.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[109/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\WorldObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[110/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\WorldRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[111/228] Linking CXX executable Paladin.exe
+[112/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementCitizenRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[113/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[114/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[115/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\WorldShipmentSystem.cpp.obj
+[116/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\TerritoryRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+[117/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\Simulation.cpp.obj
+[118/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\SettlementObjectRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[119/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\SimulationReports.cpp.obj
+[120/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[121/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\AiRealmSystem.cpp.obj
+[122/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\rendering\WorldRealmPresentationRenderer.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering\WorldRealmPresentationRenderer.cpp(776): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Paladin::WorldTribalSurfaceSource>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            InfluenceSource=Paladin::WorldTribalSurfaceSource
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[123/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\MilitarySystem.cpp.obj
+[124/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\CitizenshipSystem.cpp.obj
+[125/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\RealmRulerSystem.cpp.obj
+[126/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\DiplomacySystem.cpp.obj
+[127/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\World.cpp.obj
+[128/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\generation\AiRealmGenerator.cpp.obj
+[129/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementMap.cpp.obj
+[130/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[131/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[132/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[133/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\WorldEntities.cpp.obj
+[134/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\BattleSystem.cpp.obj
+[135/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\WorldPopulationField.cpp.obj
+[136/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[137/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[138/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[139/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[140/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[141/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[142/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[143/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[144/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(340): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[145/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementIndustry.cpp.obj
+[146/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\objects\jobs\fishery\FisheryJob.cpp.obj
+[147/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[148/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\objects\SettlementObjectDefinition.cpp.obj
+[149/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementLogistics.cpp.obj
+[150/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\citizens\SettlementCitizenAttributes.cpp.obj
+[151/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[152/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[153/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[154/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[155/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\CityHud.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[156/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[157/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\world\territory\TribalInfluenceMap.cpp.obj
+[158/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\LedgerPanel.cpp.obj
+[159/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\WorldSettlementPanel.cpp.obj
+[160/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\EmploymentPopulation.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[161/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\MilitaryPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[162/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\LedgerPanelData.cpp.obj
+[163/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\EmploymentPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[164/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\DiplomacyPanel.cpp.obj
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[165/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\FoundingPanel.cpp.obj
+[166/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\EmploymentTechnology.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[167/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\SettlementInspectionPanel.cpp.obj
+C:\Paladin\src\ui\SettlementInspectionPanel.cpp(350): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+[168/228] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\ui\TradeDepotPanel.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[169/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\Simulation.cpp.obj
+[170/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\Pr30StrategyTests.cpp.obj
+C:\Paladin\tests\Pr30StrategyTests.cpp(450): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\tests\Pr30StrategyTests.cpp(450): warning C4244: 'initializing': conversion from 'uint64_t' to 'const double', possible loss of data
+[171/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\Pr30SocietyTests.cpp.obj
+[172/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\RealmFeatureTests.cpp.obj
+[173/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\MilitaryIndustryTests.cpp.obj
+C:\Paladin\tests\MilitaryIndustryTests.cpp(37): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\MilitaryIndustryTests.cpp(361): warning C4305: 'argument': truncation from 'double' to 'float'
+[174/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\DiplomacyTests.cpp.obj
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[175/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\Pr30ShipmentTests.cpp.obj
+[176/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\TestMain.cpp.obj
+[177/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\SimulationReports.cpp.obj
+[178/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementActivityTests.cpp.obj
+[179/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementEmploymentTests.cpp.obj
+[180/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldGenerationTests.cpp.obj
+[181/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\WorldShipmentSystem.cpp.obj
+[182/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\SettlementSimulationLoopTests.cpp.obj
+[183/228] Building CXX object CMakeFiles\PaladinTests.dir\tests\WorldTests.cpp.obj
+[184/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\MilitarySystem.cpp.obj
+[185/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\CitizenshipSystem.cpp.obj
+[186/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\BattleSystem.cpp.obj
+[187/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\generation\SettlementMapGenerator.cpp.obj
+[188/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\WorldPopulationField.cpp.obj
+[189/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\WorldEntities.cpp.obj
+[190/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\RealmRulerSystem.cpp.obj
+[191/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\generation\AiRealmGenerator.cpp.obj
+[192/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\AiRealmSystem.cpp.obj
+[193/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\World.cpp.obj
+[194/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\DiplomacySystem.cpp.obj
+[195/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementMap.cpp.obj
+[196/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementNavigation.cpp.obj
+[197/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementCitizenMovement.cpp.obj
+[198/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementEmploymentState.cpp.obj
+[199/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementAnimalWork.cpp.obj
+[200/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementActivitySelection.cpp.obj
+[201/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\entities\animals\SettlementAnimals.cpp.obj
+[202/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[203/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementLeisure.cpp.obj
+C:\Paladin\src\simulation\systems\SettlementLeisure.cpp(340): warning C4244: 'initializing': conversion from 'uint64_t' to 'double', possible loss of data
+[204/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementCitizenNeeds.cpp.obj
+[205/228] Linking CXX static library PaladinSmokeCore.lib
+[206/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementJobBoard.cpp.obj
+[207/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementFamilySystem.cpp.obj
+[208/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementIndustry.cpp.obj
+[209/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementCommerce.cpp.obj
+[210/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementImmigration.cpp.obj
+[211/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\objects\SettlementObjectDefinition.cpp.obj
+[212/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\objects\SettlementObjectState.cpp.obj
+[213/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\commands\SettlementCommandState.cpp.obj
+[214/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\citizens\SettlementCitizenState.cpp.obj
+[215/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\territory\TribalInfluenceMap.cpp.obj
+[216/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\objects\jobs\fishery\FisheryJob.cpp.obj
+[217/228] Building CXX object CMakeFiles\PaladinTests.dir\src\world\settlements\SettlementSimulationState.cpp.obj
+[218/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\WorldSimulationPipeline.cpp.obj
+[219/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementPopulationSystem.cpp.obj
+[220/228] Building CXX object CMakeFiles\PaladinTests.dir\src\interaction\SettlementObjectPlacementController.cpp.obj
+[221/228] Building CXX object CMakeFiles\PaladinTests.dir\src\interaction\SettlementCommandController.cpp.obj
+[222/228] Building CXX object CMakeFiles\PaladinTests.dir\src\simulation\systems\SettlementEconomySystem.cpp.obj
+[223/228] Building CXX object CMakeFiles\PaladinMilitaryUiArtTests.dir\tests\MilitaryUiArtTests.cpp.obj
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\tests\MilitaryUiArtTests.cpp(1108): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\MilitaryUiArtTests.cpp(1301): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\MilitaryUiArtTests.cpp(1379): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[224/228] Linking CXX executable PaladinTests.exe
+[225/228] Linking CXX executable PaladinMilitaryUiArtTests.exe
+[226/228] Building CXX object CMakeFiles\PaladinApplicationSmokeTests.dir\tests\ApplicationSmokeTests.cpp.obj
+cl : Command line warning D9025 : overriding '/Od' with '/O2'
+cl : Command line warning D9025 : overriding '/Ob0' with '/Ob2'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\tests\ApplicationSmokeTests.cpp(891): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1023): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\tests\ApplicationSmokeTests.cpp(1089): warning C4244: 'argument': conversion from 'uint64_t' to 'double', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(293): note: the template instantiation context (the oldest one first) is
+C:\Paladin\src\rendering/WorldRealmQuery.h(17): note: see reference to function template instantiation 'Paladin::RealmId Paladin::worldSurfaceRealm<Paladin::TribalInfluenceMap>(const Paladin::WorldPoliticalSurfaceSample &,const Influence &,double)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldRealmQuery.h(13): note: see reference to function template instantiation 'Paladin::TribalInfluenceSample Paladin::worldTribalSurfaceSample<Influence>(const InfluenceSource &,const Paladin::WorldPoliticalSurfaceSample &)' being compiled
+        with
+        [
+            Influence=Paladin::TribalInfluenceMap,
+            InfluenceSource=Paladin::TribalInfluenceMap
+        ]
+C:\Paladin\src\rendering/WorldPoliticalSurface.h(298): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+[227/228] Linking CXX executable PaladinApplicationSmokeTests.exe

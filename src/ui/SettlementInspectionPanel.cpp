@@ -73,6 +73,7 @@ namespace Paladin
         const SettlementObjectState& objectState = settlementMap.objectState();
         spouseId_ = {};
         tradeContent_ = {};
+        tradeOrders_ = {};
 
         const CompletedSettlementObject* object =
             controller.selectedObject(objectState);
@@ -575,8 +576,11 @@ namespace Paladin
                 y,
                 1.5F
             );
+            int shown = 0;
             for (const auto& goods : inventory->goods)
             {
+                if (goods.amount <= 0) { continue; }
+                if (tradeDepot && shown++ >= 3) { continue; }
                 y += 22;
                 const auto* resource =
                     SettlementResourceCatalog::definition(goods.resource);
@@ -589,6 +593,18 @@ namespace Paladin
                     y,
                     1.5F
                 );
+            }
+            if (tradeDepot)
+            {
+                const auto* imports = settlementMap.logistics.inventory(
+                    settlementMap.logistics.importsForObject(object->id));
+                y += 24;
+                grayUiRenderer.drawLabel(renderer,
+                    "Imports (separate): " + std::to_string(imports ? imports->used() : 0),
+                    renderedBounds_.x + 13, y, 1.25F);
+                tradeOrders_ = {renderedBounds_.x + 12, y + 27,
+                    contentWidth - 24,
+                    std::max(0.F, renderedBounds_.y + renderedBounds_.height - 43 - (y + 27))};
             }
         }
         else if (house)
@@ -708,6 +724,7 @@ namespace Paladin
     void SettlementInspectionPanel::clearLayout() noexcept
     {
         tradeContent_ = {};
+        tradeOrders_ = {};
         spouseId_ = {};
         navigateCitizen_ = {};
         spouseButton_.cancelPress();

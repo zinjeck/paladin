@@ -100,8 +100,7 @@ namespace Paladin
                 (windowFlags & SDL_WINDOW_INPUT_FOCUS) != 0 &&
                 (windowFlags & SDL_WINDOW_MOUSE_FOCUS) != 0 &&
                 mouseButtons == 0 && mouseX >= 0.0F && mouseY >= 0.0F &&
-                mouseX < viewportWidth && mouseY < viewportHeight &&
-                !activeHudContainsPoint(mouseX, mouseY);
+                mouseX < viewportWidth && mouseY < viewportHeight;
 
             if (edgeScrollEligible)
             {

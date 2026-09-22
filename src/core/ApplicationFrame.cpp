@@ -276,7 +276,8 @@ namespace Paladin
             if (screen_ == Screen::City && tradeDepotPanel_)
             {
                 tradeDepotPanel_->embed(
-                    settlementInspectionPanel_->tradeContentBounds()
+                    settlementInspectionPanel_->tradeContentBounds(),
+                    settlementInspectionPanel_->tradeOrdersBounds()
                 );
                 tradeDepotPanel_->layout(
                     renderer_->outputWidth(),

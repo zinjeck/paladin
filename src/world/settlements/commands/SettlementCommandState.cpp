@@ -181,11 +181,15 @@ namespace Paladin
         double minute
     )
     {
+        // Capture delivered site inventory before its owner is removed. The
+        // subsequent synchronization turns that inventory into physical piles.
+        map.logistics.synchronize(map.objectState(), minute);
         std::size_t removed = map.objectState().cancelConstructionWithin(area);
         removed += map.animals.cancel(area);
         if (removed)
         {
             map.logistics.synchronize(map.objectState(), minute);
+            map.activities.cancelConstructionTasks(map, citizens, minute);
         }
         if (removed)
         {

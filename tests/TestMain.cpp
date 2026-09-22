@@ -3,6 +3,7 @@
 
 #include "CelestialSunChecks.h"
 #include "CityResourceFlowChecks.h"
+#include "CityCorrectionsChecks.h"
 #include "CloseWorldStabilityChecks.h"
 #include "PastureDormancyRegression.h"
 #include "Pr31AnimalNavigationChecks.h"
@@ -31,6 +32,7 @@ int main()
 {
     try
     {
+        Paladin::Test::CityCorrections::run();
         Paladin::Test::Pr32::run();
         Paladin::Test::Pr32::hourlyEconomyCadence();
         runPr31BattleChecks();

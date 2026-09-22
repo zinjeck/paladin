@@ -1,0 +1,19 @@
+[0/2] Re-checking globbed directories...
+[1/12] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Paladin\out\build\x64-Debug && C:\Paladin\out\build\x64-Debug\PaladinAssetCompiler.exe compile C:/Paladin C:/Paladin/out/build/x64-Debug/assets/packages"
+sources=402 cache_hits=414 rebuilt=0 atlas_pages=10 output_bytes=23932627 errors=0 warnings=0
+[2/12] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[3/12] Building CXX object CMakeFiles\Paladin.dir\src\simulation\systems\SettlementActivitySystem.cpp.obj
+[4/12] Building CXX object CMakeFiles\PaladinSmokeCore.dir\src\simulation\MilitarySystem.cpp.obj
+[5/12] Linking CXX static library PaladinSmokeCore.lib
+[6/12] Building CXX object CMakeFiles\Paladin.dir\src\simulation\MilitarySystem.cpp.obj
+[7/12] Building CXX object CMakeFiles\PaladinTests.dir\tests\TestMain.cpp.obj
+C:\Paladin\tests\CityCorrectionsChecks.h(20): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\CityCorrectionsChecks.h(181): warning C4305: 'argument': truncation from 'double' to 'float'
+[8/12] Linking CXX executable PaladinTests.exe
+[9/12] Linking CXX executable Paladin.exe
+[10/12] Building CXX object CMakeFiles\PaladinCityCorrectionsVisualTests.dir\tests\CityCorrectionsVisualTests.cpp.obj
+C:\Paladin\tests\CityCorrectionsChecks.h(20): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\tests\CityCorrectionsChecks.h(181): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+C:\Paladin\src\rendering/SpriteSelection.h(28): warning C4018: '>': signed/unsigned mismatch
+[11/12] Linking CXX executable PaladinCityCorrectionsVisualTests.exe

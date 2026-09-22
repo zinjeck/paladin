@@ -35,6 +35,10 @@ namespace Paladin
         int amount = 1;
         int cargo = 0;
         bool repeating = false;
+        // A depot sale can reserve the buyer's money and route before the
+        // seller's worker brings its exact batch to the loading counter.
+        bool awaitingCollection = false;
+        std::uint64_t checkedTerrainRevision = 0;
         bool aiManaged = false;
         ShipmentPhase phase = ShipmentPhase::Waiting;
         std::vector<WorldTilePosition> path;

@@ -25,6 +25,26 @@ namespace Paladin
     )
     {
         const double minute = double(world.time().totalGameMinutes());
+        // Named deaths are terminal events, not a sampled population delta.
+        // Births, migration and deployment can otherwise conceal a death.
+        for (const auto& settlement : world.settlements())
+        {
+            const auto& citizens = settlement.simulationState().citizens();
+            if (!citizens.deathSequence()) { continue; }
+            auto& report = cities_[settlement.id()];
+            if (report.lastDeathSequence == citizens.deathSequence()) { continue; }
+            for (const auto& death : citizens.deaths())
+            {
+                if (death.sequence <= report.lastDeathSequence) { continue; }
+                emit({death.minute, "citizen-died",
+                      std::string(settlement.name()) + ": " + death.name +
+                          (death.deployed ? " has died on military service."
+                                          : " has died."),
+                      settlement.id(), settlement.ownerRealmId(), true});
+            }
+            report.lastDeathSequence = citizens.deathSequence();
+            ++version_;
+        }
         if (!force && minute < nextRefresh_)
         {
             return;
