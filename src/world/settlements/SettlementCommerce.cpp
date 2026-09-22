@@ -287,6 +287,8 @@ namespace Paladin
             {
                 const auto source = *from, destination = *to;
                 if (!map.logistics.importsMaySupply(source, destination.kind)) { continue; }
+                if (destination.kind == InventoryKind::TradeDepot &&
+                    !DepotCollection::source(map, source, flow.resource)) { continue; }
                 const int authorized = destination.kind == InventoryKind::TradeDepot
                     ? DepotCollection::needed(map, destination, flow.resource)
                     : requested;

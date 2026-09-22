@@ -704,6 +704,7 @@ namespace Paladin
         { return false; }
         if (targetInventory->kind == InventoryKind::TradeDepot)
         {
+            if (!DepotCollection::source(map, *sourceInventory, resource)) { return false; }
             amount = std::min(amount, DepotCollection::needed(map, *targetInventory, resource));
         }
         amount = map.commerce.affordableTradeUnits(
@@ -779,19 +780,34 @@ namespace Paladin
         const auto* target = map.logistics.inventory(destination);
         if (!target || target->kind != InventoryKind::TradeDepot) { return false; }
         struct Source { InventoryId id; int rank, distance; };
-        // Bounded by the order list and inventories, never a whole-map tile scan.
-        for (auto& order : map.trade.orders)
+        // Advance before searching: an inaccessible order must not consume
+        // every worker's route budget and starve all the other goods.
+        const auto orderCount = map.trade.orders.size();
+        for (std::size_t checked = 0; checked < orderCount; ++checked)
         {
+            auto& order = map.trade.orders[map.trade.collectionCursor++ % orderCount];
             if (!order.enabled || !order.collectionAuthorized ||
                 order.depot != target->objectId || order.direction != TradeDirection::Export)
             { continue; }
             const int needed = DepotCollection::needed(map, *target, order.resource);
             if (!needed) { continue; }
+            const int space = map.logistics.receivable(destination, order.resource);
+            if (space <= 0)
+            {
+                DepotCollection::report(map, target->objectId, order.resource,
+                                        DepotCollectionIssue::NoSpace);
+                continue;
+            }
             std::vector<Source> sources;
+            bool hasStock = false;
             for (const auto& inventory : map.logistics.inventories())
             {
                 if (!DepotCollection::source(map, inventory, order.resource) ||
                     map.logistics.available(inventory.id, order.resource) <= 0)
+                { continue; }
+                hasStock = true;
+                if (map.commerce.affordableTradeUnits(inventory, *target, 1,
+                                                     &citizens, order.resource) <= 0)
                 { continue; }
                 sources.push_back({inventory.id,
                     inventory.kind == InventoryKind::Stockpile ? 0 : 1,
@@ -803,17 +819,19 @@ namespace Paladin
             {
                 const int units = std::min({needed, policy.carryingCapacity,
                     map.logistics.available(source.id, order.resource),
-                    map.logistics.receivable(destination, order.resource)});
+                    space});
                 if (beginHaul(map, citizens, citizen, source.id, destination,
                               order.resource, units, minute))
                 {
-                    order.collectionIssue = DepotCollectionIssue::None;
+                    DepotCollection::report(map, target->objectId, order.resource,
+                                            DepotCollectionIssue::None);
                     return true;
                 }
                 if (routeBudgetLimited_ || pathsRemaining_ == 0) { return false; }
             }
-            order.collectionIssue = sources.empty() ? DepotCollectionIssue::NoStock
-                                                    : DepotCollectionIssue::NoPath;
+            DepotCollection::report(map, target->objectId, order.resource,
+                !sources.empty() ? DepotCollectionIssue::NoPath :
+                hasStock ? DepotCollectionIssue::NoMoney : DepotCollectionIssue::NoStock);
         }
         return false;
     }

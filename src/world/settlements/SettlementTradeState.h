@@ -16,7 +16,9 @@ namespace Paladin
     {
         None,
         NoStock,
-        NoPath
+        NoPath,
+        NoSpace,
+        NoMoney
     };
     struct SettlementTradeOrder
     {
@@ -76,6 +78,7 @@ namespace Paladin
         std::uint64_t routeTerrainRevision = ~std::uint64_t(0);
         double nextOrderMinute = 0;
         std::size_t orderCursor = 0;
+        std::size_t collectionCursor = 0;
         std::uint64_t nextOrderId = 0;
         int exportTarget(SettlementObjectId depot, std::string_view resource) const
         {

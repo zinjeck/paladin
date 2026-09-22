@@ -4,6 +4,8 @@
 #include "rendering/OutdoorGround.h"
 #include "rendering/StockpileShelter.h"
 #include "world/settlements/SettlementMap.h"
+#include <array>
+#include <string_view>
 namespace Paladin
 {
     inline bool stockpilePresentation(
@@ -41,23 +43,25 @@ namespace Paladin
         stockpileShelter(q, p, sprites, shelter, id);
         // Low raised rails outline the yard, with real footings and an open
         // loading side. They do not turn the drawable stockpile into a room.
+        constexpr double fenceHeight = .375;
+        const double backFoot = y + .1875, frontFoot = y + h - .1875;
         for (const double xx : {x + .0625, x + w - .1875})
         {
-            q.submit({p.bounds({xx,y+.1875,0,.1875,h-.375,0,0}),
+            q.submit({p.bounds({xx,backFoot,0,.1875,frontFoot-backFoot,0,0}),
                       {57,43,60,65},y+h,id,-1,1});
-            q.submit({p.bounds({xx,y-.125,0,.125,h-.375,0,0}),
+            q.submit({p.bounds({xx,backFoot-fenceHeight,0,.125,frontFoot-backFoot,0,0}),
                       {122,80,56,255},y+h,id,0,1});
-            q.submit({p.bounds({xx,y-.125,0,.0625,h-.375,0,0}),
+            q.submit({p.bounds({xx,backFoot-fenceHeight,0,.0625,frontFoot-backFoot,0,0}),
                       {193,139,90,255},y+h,id,0,2});
-            for (const double yy : {y+.1875,y+h-.1875})
+            for (const double yy : {backFoot,frontFoot})
             {
                 q.submit({p.bounds({xx-.0625,yy-.0625,0,.25,.1875,0,0}),
                           {73,53,47,255},yy,id,0,3});
-                q.submit({p.bounds({xx,yy,0,.1875,.5,0,1}),
+                q.submit({p.bounds({xx,yy,0,.1875,fenceHeight,0,1}),
                           {122,80,56,255},yy,id,0,4});
-                q.submit({p.bounds({xx,yy-.5,0,.1875,.0625,0,0}),
+                q.submit({p.bounds({xx,yy-fenceHeight,0,.1875,.0625,0,0}),
                           {215,200,162,255},yy,id,0,5});
-                q.submit({p.bounds({xx,yy-.5,0,.0625,.5,0,0}),
+                q.submit({p.bounds({xx,yy-fenceHeight,0,.0625,fenceHeight,0,0}),
                           {193,139,90,255},yy,id,0,6});
             }
         }
@@ -71,25 +75,30 @@ namespace Paladin
         const int columns = std::max(1, int((w - .5) / .8)),
                   rows = std::max(1, int((y + h - storageTop) / .625));
         const int capacity = std::min(48, columns * rows);
-        int slot = 0;
-        for (const auto& goods : inventory->goods)
+        // Show distinct stored goods before adding second/third stacks. A small
+        // mixed stockpile must not look like it contains only its first resource.
+        std::array<std::string_view,48> stacks{};
+        int stackCount = 0;
+        for (int round = 0; round < 4 && stackCount < capacity; ++round)
         {
-            if (goods.amount <= 0 || slot >= capacity)
+            for (const auto& goods : inventory->goods)
             {
-                continue;
+                if (stackCount >= capacity) { break; }
+                if (goods.amount > round * 20) { stacks[stackCount++] = goods.resource; }
             }
-            auto sprite = "resource." + goods.resource;
+        }
+        for (int slot = 0; slot < stackCount; ++slot)
+        {
+            auto sprite = "resource." + std::string(stacks[slot]);
             if (!sprites.find(sprite))
             {
                 sprite = "resource.pile";
             }
-            const int stacks =
-                std::min({4, 1 + (goods.amount - 1) / 20, capacity - slot});
-            for (int i = 0; i < stacks; ++i, ++slot)
             {
-                const double xx = x + .4 + (slot % columns) * w / columns,
-                             yy = storageTop + .4375 + (slot / columns) * .625;
-                const double baseY = std::min(y + h - .08, yy);
+                const double xx = std::round((x + .3125 +
+                    ((slot % columns) + .5) * (w - .625) / columns) * 16) / 16;
+                const double yy = storageTop + .5 + (slot / columns) * .625;
+                const double baseY = std::min(y + h - .1875, yy);
                 sprites.placed(
                     q,
                     p,
@@ -99,19 +108,19 @@ namespace Paladin
                     baseY + .1,
                     id,
                     10 + slot * 2,
-                    .66,
-                    .46
+                    .625,
+                    .4375
                 );
                 sprites.placed(
                     q,
                     p,
                     sprite,
                     xx,
-                    baseY - .10,
+                    baseY - .125,
                     baseY + .1,
                     id,
                     11 + slot * 2,
-                    .43,
+                    .4375,
                     .25
                 );
             }

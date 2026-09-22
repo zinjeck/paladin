@@ -75,24 +75,46 @@ namespace Paladin
             const auto inventoryId = map.logistics.forObject(order.depot);
             const auto* inventory = map.logistics.inventory(inventoryId);
             if (!inventory) { return "Depot no longer exists"; }
-            const int staged = std::min(order.quantity, inventory->amount(order.resource));
+            // Several orders can use the same resource. Count staged/incoming
+            // units once, in caravan-creation order, rather than reporting every
+            // batch as ready when only the first batch is actually present.
+            int earlier = 0;
+            for (const auto& other : map.trade.orders)
+            {
+                const bool loadsFirst = other.shipment && order.shipment
+                    ? other.shipment < order.shipment : other.id < order.id;
+                if (loadsFirst && other.enabled && other.collectionAuthorized &&
+                    other.direction == TradeDirection::Export &&
+                    other.depot == order.depot && other.resource == order.resource)
+                { earlier = std::min(1000000, earlier + other.quantity); }
+            }
+            const int held = inventory->amount(order.resource);
+            const int staged = std::clamp(held - earlier, 0, order.quantity);
             if (staged >= order.quantity) { return "Batch ready; loading caravan"; }
             const auto job = map.employment().forObject(order.depot);
             if (!job || !map.employment().employed(job, people))
             { return "Assign a depot worker to collect"; }
-            const int incoming = map.logistics.incoming(inventoryId, order.resource);
+            const int incoming = std::max(0,
+                map.logistics.incoming(inventoryId, order.resource) - std::max(0, earlier - held));
             const std::string progress = std::to_string(staged) + "/" +
                                         std::to_string(order.quantity);
-            if (incoming > 0) { return "Fetching goods | " + progress + " ready"; }
+            if (incoming > 0)
+            {
+                return "Collecting " + progress + " | " +
+                    std::to_string(std::min(incoming, order.quantity - staged)) + " on the way";
+            }
             if (!map.activities.policy.isWorkTime(minute))
             { return "Off shift | collection resumes at work"; }
             if (!map.logistics.receivable(inventoryId, order.resource))
             { return "Export counter full | waiting for space"; }
             if (!available(map, order.resource))
             { return "Waiting for unreserved city stock"; }
+            if (order.collectionIssue == DepotCollectionIssue::NoMoney)
+            { return "Treasury needs money to buy local goods"; }
             if (order.collectionIssue == DepotCollectionIssue::NoPath)
             { return "No usable route to stock or depot"; }
-            return "Sale secured | " + progress + " ready";
+            return earlier > held ? "Queued behind another batch | " + progress
+                                  : "Buyer secured | collecting " + progress;
         }
 
         static void report(SettlementMap& map, SettlementObjectId depot,

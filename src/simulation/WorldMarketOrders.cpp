@@ -46,6 +46,9 @@ namespace Paladin
         order.standing = true;
         order.fulfilled = false;
         order.collectionAuthorized = false;
+        order.collectionIssue = DepotCollectionIssue::None;
+        map->activities.cancelDepotTasks(*map, settlement->simulationState().citizens_, depot,
+                                         double(world.time().totalGameMinutes()));
         map->trade.nextOrderMinute = 0;
         order.nextAttemptMinute = double(world.time().totalGameMinutes());
         order.status = enabled ? "Waiting for the next caravan."
@@ -102,6 +105,10 @@ namespace Paladin
     }
     void WorldMarketSystem::tickOrders(World& world, double minute)
     {
+        SettlementTradeOrder* nextOrder = nullptr;
+        SettlementMap* nextMap = nullptr;
+        SettlementId nextCity;
+        RealmId nextActor;
         for (const auto& record : world.settlements())
         {
             auto* map = world.settlement(record.id())
@@ -122,8 +129,16 @@ namespace Paladin
                 }
                 const auto* shipment = world.shipment(order.shipment);
                 order.collectionAuthorized = order.enabled && shipment &&
-                    shipment->awaitingCollection && shipment->active();
+                    order.direction == TradeDirection::Export &&
+                    shipment->awaitingCollection && shipment->active() &&
+                    shipment->phase != ShipmentPhase::Blocked;
                 if (shipment && shipment->deliveries) { order.fulfilled = true; }
+            }
+            // Synchronize every batch before distributing staged stock between
+            // order cards. A loaded caravan must no longer claim that stock.
+            for (auto& order : map->trade.orders)
+            {
+                const auto* shipment = world.shipment(order.shipment);
                 if (shipment && shipment->active())
                 {
                     order.status = shipment->phase == ShipmentPhase::Blocked
@@ -145,46 +160,54 @@ namespace Paladin
             {
                 continue;
             }
-            map->trade.nextOrderMinute = minute + 5;
-            auto& order =
-                map->trade.orders
-                    [map->trade.orderCursor++ % map->trade.orders.size()];
-            if (!order.enabled || minute < order.nextAttemptMinute)
+            // Skip in-flight, disabled and cooling-down orders immediately.
+            // Previously each occupied slot consumed another five minutes, and
+            // returning here left every later city's statuses out of date.
+            for (std::size_t i = 0; i < map->trade.orders.size(); ++i)
             {
-                continue;
+                auto& order = map->trade.orders[
+                    (map->trade.orderCursor + i) % map->trade.orders.size()];
+                const auto* shipment = world.shipment(order.shipment);
+                if (!order.enabled || minute < order.nextAttemptMinute ||
+                    (shipment && shipment->active()))
+                { continue; }
+                if (!nextOrder || order.nextAttemptMinute < nextOrder->nextAttemptMinute)
+                {
+                    nextOrder = &order;
+                    nextMap = map;
+                    nextCity = record.id();
+                    nextActor = record.ownerRealmId();
+                }
             }
-            if (const auto* shipment = world.shipment(order.shipment);
-                shipment && shipment->active())
-            {
-                continue;
-            }
-            order.nextAttemptMinute = minute + 30;
-            order.collectionIssue = DepotCollectionIssue::None;
-            const auto result = dispatch(
-                world,
-                record.ownerRealmId(),
-                record.id(),
-                order.depot,
-                order.resource,
-                order.direction,
-                order.quantity,
-                &order.shipment,
-                order.direction == TradeDirection::Export
-            );
-            order.status = shipmentResultText(result);
-            if (const auto* shipment = world.shipment(order.shipment))
-            {
-                order.collectionAuthorized = shipment->awaitingCollection;
-                order.fulfilled = false;
-                if (order.collectionAuthorized)
-                { order.status = DepotCollection::status(*map, record.simulationState().citizens(), order, minute); }
-            }
-            if (result == ShipmentResult::NoLandRoute)
-            {
-                order.nextAttemptMinute = minute + 5;
-            }
-            // At most one human-configured route search per world tick.
-            return;
         }
+        // Oldest eligible attempt wins across cities. Route searches stay
+        // bounded to one per tick without starving the later settlements.
+        if (!nextOrder) { return; }
+        auto& order = *nextOrder;
+        nextMap->trade.nextOrderMinute = minute + 5;
+        nextMap->trade.orderCursor =
+            (std::size_t(nextOrder - nextMap->trade.orders.data()) + 1) %
+            nextMap->trade.orders.size();
+        order.nextAttemptMinute = minute + 30;
+        order.collectionIssue = DepotCollectionIssue::None;
+        order.shipment = {};
+        const auto result = dispatch(world, nextActor, nextCity, order.depot,
+            order.resource, order.direction, order.quantity, &order.shipment,
+            order.direction == TradeDirection::Export);
+        order.status = shipmentResultText(result);
+        order.collectionAuthorized = false;
+        if (const auto* shipment = world.shipment(order.shipment))
+        {
+            order.collectionAuthorized = order.enabled && shipment->active() &&
+                shipment->awaitingCollection && order.direction == TradeDirection::Export;
+            order.fulfilled = false;
+            if (order.collectionAuthorized)
+            {
+                order.status = DepotCollection::status(*nextMap,
+                    world.settlement(nextCity)->simulationState().citizens(), order, minute);
+            }
+        }
+        if (result == ShipmentResult::NoLandRoute)
+        { order.nextAttemptMinute = minute + 5; }
     }
 }

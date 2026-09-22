@@ -15,22 +15,29 @@ namespace Paladin
     {
     public:
         SettlementRelief(int width, int height, std::uint64_t seed)
-            : width_(width), height_(height), seed_(seed)
+            : width_(width), height_(height), seed_(seed),
+              scale_(std::max(64.0, std::min(width, height) * .36)),
+              cosine_(std::cos(double(seed % 1009) * .006227)),
+              sine_(std::sin(double(seed % 1009) * .006227))
         {
         }
 
         ReliefType classify(int x, int y, double mountain, double hills) const noexcept
         {
             if (mountain < .18 && hills < .18) { return ReliefType::Lowland; }
-            const double scale = std::max(64.0, std::min(width_, height_) * .36);
-            const double angle = double(seed_ % 1009) * .006227;
-            const double cs = std::cos(angle), sn = std::sin(angle);
-            const double u = (x * cs + y * sn) / scale;
-            const double v = (y * cs - x * sn) / scale;
+            mountain = std::clamp(mountain, 0.0, 1.0);
+            hills = std::clamp(hills, 0.0, 1.0);
+            const double u = (x * cosine_ + y * sine_) / scale_;
+            const double v = (y * cosine_ - x * sine_) / scale_;
             const double wx = GenerationNoise::simplexFractal(u * .55, v * .55, seed_ + 7907, 2, .4, 2);
             const double wy = GenerationNoise::simplexFractal(u * .55, v * .55, seed_ + 3911, 2, .4, 2);
             const double a = u + wx * .8, b = v + wy * .8;
-            const double massif = GenerationNoise::simplexFractal(a * .72, b, seed_ + 8191, 2, .3, 2);
+            // Broad bodies determine topology; subordinate spurs roughen the
+            // shoulders without punching noisy holes through the interior.
+            const double spurs = GenerationNoise::simplexFractal(
+                a * 2.3, b * 1.3, seed_ + 6073, 2, .25, 2);
+            const double massif = GenerationNoise::simplexFractal(
+                a * .72, b, seed_ + 8191, 2, .3, 2) + spurs * .11;
             const double threshold = -.10 + (1.0 - mountain) * .72;
             if (mountain >= .18 && massif > threshold)
             {
@@ -38,7 +45,8 @@ namespace Paladin
             }
             // Foothills follow a massif's contour. Independent hill country
             // uses smaller rounded landforms, not scaled-down mountain stripes.
-            if (mountain >= .35 && massif > threshold - .12) { return ReliefType::Hills; }
+            const double apron = .075 + .075 * std::clamp(.5 + spurs, 0.0, 1.0);
+            if (mountain >= .35 && massif > threshold - apron) { return ReliefType::Hills; }
             const double hill = GenerationNoise::simplexFractal(a * 1.8, b * 2.0, seed_ + 4561, 2, .25, 2);
             if (hills >= .18 && hill > .16 + (1.0 - hills) * .55)
             { return ReliefType::Hills; }
@@ -57,7 +65,7 @@ namespace Paladin
                 const auto index = std::size_t(y) * width_ + x;
                 if (seen[index] || grid.tile({x,y})->terrain == TerrainType::Water) { continue; }
                 const bool rock = grid.tile({x,y})->terrain == TerrainType::Mountain;
-                bool open = false;
+                bool open = false, highRim = false;
                 component.clear(); component.push_back({x,y}); seen[index] = 1;
                 for (std::size_t i = 0; i < component.size(); ++i)
                 {
@@ -66,7 +74,12 @@ namespace Paladin
                         const SettlementTilePosition p{component[i].x+d.x,component[i].y+d.y};
                         const auto* tile = grid.tile(p);
                         if (!tile || tile->terrain == TerrainType::Water) { open = true; continue; }
-                        if ((tile->terrain == TerrainType::Mountain) != rock) { continue; }
+                        if ((tile->terrain == TerrainType::Mountain) != rock)
+                        {
+                            highRim |= tile->terrain == TerrainType::Mountain &&
+                                       tile->relief == ReliefType::Mountain;
+                            continue;
+                        }
                         const auto at = std::size_t(p.y) * width_ + p.x;
                         if (!seen[at]) { seen[at] = 1; component.push_back(p); }
                     }
@@ -78,7 +91,10 @@ namespace Paladin
                 {
                     auto& tile = *grid.tile(p);
                     tile.terrain = fill ? TerrainType::Mountain : TerrainType::Land;
-                    tile.relief = fill ? ReliefType::Hills : ReliefType::Lowland;
+                    // A sealed pocket inherits its surrounding massif instead
+                    // of leaving an isolated hill-colored patch in solid rock.
+                    tile.relief = fill ? (highRim ? ReliefType::Mountain : ReliefType::Hills)
+                                       : ReliefType::Lowland;
                 }
             }
         }
@@ -92,6 +108,39 @@ namespace Paladin
                 const auto* t = grid.tile(p);
                 return t && t->terrain == TerrainType::Mountain;
             };
+            const auto index = [&](SettlementTilePosition p)
+            { return std::size_t(p.y) * width_ + p.x; };
+            // Keep cave walls inside the original massif. Measuring the rock
+            // apron once also prevents a chamber from opening onto a nearby
+            // valley or lake as its centreline bends through a narrow shoulder.
+            std::vector<std::uint8_t> depth(grid.tileCount(), 8);
+            std::vector<SettlementTilePosition> edge;
+            for (int y = 0; y < height_; ++y)
+            for (int x = 0; x < width_; ++x)
+            {
+                const SettlementTilePosition p{x,y};
+                if (!solid(p)) { depth[index(p)] = 0; continue; }
+                for (const auto d : steps)
+                {
+                    if (!solid({x+d.x,y+d.y}))
+                    { depth[index(p)] = 1; edge.push_back(p); break; }
+                }
+            }
+            for (std::size_t cursor = 0; cursor < edge.size(); ++cursor)
+            {
+                const auto p = edge[cursor];
+                const int nextDepth = depth[index(p)] + 1;
+                if (nextDepth > 6) { continue; }
+                for (const auto d : steps)
+                {
+                    const SettlementTilePosition at{p.x+d.x,p.y+d.y};
+                    if (solid(at) && depth[index(at)] > nextDepth)
+                    {
+                        depth[index(at)] = std::uint8_t(nextDepth);
+                        edge.push_back(at);
+                    }
+                }
+            }
             // At most one short cave per 128x128 district, reached from an
             // existing valley/lowland. No random chambers isolated in a range.
             constexpr int district = 128;
@@ -134,42 +183,63 @@ namespace Paladin
                             mountainCore |= core->relief == ReliefType::Mountain;
                         }
                         if (!mountainCore) { continue; }
-                        auto p = entry;
-                        const int length = 18 + int((hash >> 24) % 19);
-                        const SettlementTilePosition side{-dir.y, dir.x};
-                        for (int s = 0; s < length; ++s)
+                        std::vector<SettlementTilePosition> passage{entry};
+                        auto heading = dir;
+                        const int length = 14 + int((hash >> 24) % 17);
+                        for (int s = 1; s < length; ++s)
                         {
-                            const auto* center = grid.tile(p);
-                            if (!center || (!solid(p) && !center->rockFloor) ||
-                                !solid({p.x + dir.x * 3, p.y + dir.y * 3}))
-                            { break; }
-                            // Narrow entrance, a bending passage, then occasional
-                            // small chambers. Every floor cell joins the mouth.
-                            const int radius = s < 4 ? 0 : (s > 8 && s % 11 < 3 ? 2 : 1);
+                            const auto p = passage.back();
+                            const std::array<SettlementTilePosition,3> choices{
+                                heading, SettlementTilePosition{-heading.y,heading.x},
+                                SettlementTilePosition{heading.y,-heading.x}};
+                            int best = -1, bestScore = -1;
+                            for (int k = 0; k < (s < 4 ? 1 : 3); ++k)
+                            {
+                                const auto d = choices[k];
+                                const SettlementTilePosition at{p.x+d.x,p.y+d.y};
+                                if (!solid(at) || depth[index(at)] < (s < 3 ? 1 : 3))
+                                { continue; }
+                                bool loops = false;
+                                for (std::size_t old = 0; old + 2 < passage.size(); ++old)
+                                {
+                                    if (std::abs(at.x-passage[old].x) +
+                                        std::abs(at.y-passage[old].y) <= 1)
+                                    { loops = true; break; }
+                                }
+                                if (loops) { continue; }
+                                const int score = std::min(5, int(depth[index(at)])) * 4 +
+                                    (k == 0 ? 7 : 0) + int(GenerationNoise::mix(
+                                        hash + std::uint64_t(s/4)*104729 + k*7919) % 17);
+                                if (score > bestScore) { best = k; bestScore = score; }
+                            }
+                            if (best < 0) { break; }
+                            heading = choices[best];
+                            passage.push_back({p.x+heading.x,p.y+heading.y});
+                        }
+                        if (passage.size() < 6) { continue; }
+                        // Plan first, excavate second: previous cells do not
+                        // bias the route toward the next district's cave. Every
+                        // step is cardinally connected and has a rock roof/wall.
+                        for (std::size_t s = 0; s < passage.size(); ++s)
+                        {
+                            const auto p = passage[s];
+                            const bool chamber = s > 7 &&
+                                (GenerationNoise::mix(hash + s/5) % 3 == 0);
+                            const int desired = s < 4 ? 0 : chamber ? 2 : 1;
+                            const int radius = std::max(0,
+                                std::min(desired, int(depth[index(p)]) - 2));
                             for (int oy=-radius; oy<=radius; ++oy)
                             for (int ox=-radius; ox<=radius; ++ox)
                             {
                                 if (ox*ox + oy*oy > radius*radius) { continue; }
                                 const SettlementTilePosition at{p.x+ox,p.y+oy};
-                                if (solid(at))
+                                if (solid(at) && (s < 4 || depth[index(at)] >= 2))
                                 {
                                     auto* floor = grid.tile(at);
                                     floor->terrain = TerrainType::Land;
                                     floor->rockFloor = true;
                                 }
                             }
-                            if (s > 3 && s % 5 == 0)
-                            {
-                                const int turn = (GenerationNoise::mix(hash + s) & 1) ? 1 : -1;
-                                const SettlementTilePosition next{p.x+side.x*turn,p.y+side.y*turn};
-                                if (solid({next.x+dir.x*3,next.y+dir.y*3}))
-                                {
-                                    if (auto* floor = grid.tile(next); floor && floor->terrain != TerrainType::Water)
-                                    { floor->terrain = TerrainType::Land; floor->rockFloor = true; p = next; }
-                                }
-                            }
-                            p.x += dir.x;
-                            p.y += dir.y;
                         }
                         carved = true;
                         break;
@@ -181,5 +251,6 @@ namespace Paladin
     private:
         int width_, height_;
         std::uint64_t seed_;
+        double scale_, cosine_, sine_;
     };
 }

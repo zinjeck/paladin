@@ -1,4 +1,5 @@
 #include "rendering/WorldGridRenderer.h"
+#include "rendering/CityReliefSurface.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/SceneDetail.h"
 #include "rendering/TerrainMaterialField.h"
@@ -1246,6 +1247,10 @@ namespace Paladin
                         {
                             color = {78, 59, 57, 255};
                         }
+                        else if (tile.relief == ReliefType::Hills)
+                        {
+                            color = CityReliefSurface::stone(x+.5,y+.5);
+                        }
                     }
                     pixels
                         [static_cast<std::size_t>(y) *
@@ -1676,8 +1681,24 @@ namespace Paladin
                                     }
                                 }
                             }
-                            const bool buriedMountain =
-                                mountainInterior(grid, x, y);
+                            CityReliefSurface cityRelief;
+                            const SceneSprite* valleyMaterial = sprite;
+                            if constexpr (!world)
+                            {
+                                cityRelief = CityReliefSurface(grid,x,y);
+                                if (cityRelief.active())
+                                {
+                                    // A rounded cliff boundary needs the real
+                                    // adjoining ground beneath its outer edge.
+                                    for (int j=0; j<3; ++j) for (int i=0; i<3; ++i)
+                                    {
+                                        const auto* neighbor = grid.tile({x+i-1,y+j-1});
+                                        if (neighbor && neighbor->terrain == TerrainType::Land &&
+                                            materials[j*3+i])
+                                        { valleyMaterial = materials[j*3+i]; }
+                                    }
+                                }
+                            }
                             const bool uniformMaterial = std::all_of(
                                 std::begin(materials),
                                 std::end(materials),
@@ -1773,9 +1794,15 @@ namespace Paladin
                                         }
                                     }
                                 }
-                                if (buriedMountain)
+                                if constexpr (!world)
                                 {
-                                    color = {8, 15, 27, 255};
+                                    if (cityRelief.active() && tile.terrain != TerrainType::Water)
+                                    {
+                                        if (tile.terrain == TerrainType::Mountain &&
+                                            valleyMaterial != sprite && valleyMaterial->materialPixels)
+                                        { color = landscapePaint(*valleyMaterial,xx,yy,false); }
+                                        color = cityRelief.paint(xx,yy,color);
+                                    }
                                 }
                                 return color;
                             };
@@ -1838,47 +1865,6 @@ namespace Paladin
                                 item.fill = tileColor(tile);
                             }
                             items.push_back(item);
-                        }
-                    }
-                }
-                if constexpr (std::is_same_v<Grid, SettlementGrid>)
-                {
-                    // Low hill crags use the mountain art at a smaller height,
-                    // baked into the same bounded terrain pages as the valleys.
-                    if (const auto* peak = sprites.find("mountain.peak.small");
-                        peak && peak->texture)
-                    {
-                        const auto frame = sprites.frame(*peak, false);
-                        for (int yy = 0; yy < chunkSide; ++yy)
-                        {
-                            for (int xx = 0; xx < chunkSide; ++xx)
-                            {
-                                const auto* tile = grid.tile(
-                                    {cell.x * chunkSide + xx,
-                                     cell.y * chunkSide + yy}
-                                );
-                                if (!tile ||
-                                    tile->relief != ReliefType::Hills ||
-                                    tile->terrain != TerrainType::Mountain)
-                                {
-                                    continue;
-                                }
-                                TextureDrawItem item;
-                                item.texture = peak->texture.get();
-                                item.source = {
-                                    frame.x,
-                                    frame.y,
-                                    frame.width,
-                                    frame.height
-                                };
-                                item.destination = {
-                                    float(xx * resolution),
-                                    float((yy + .18) * resolution),
-                                    float(resolution),
-                                    float(.82 * resolution)
-                                };
-                                items.push_back(item);
-                            }
                         }
                     }
                 }

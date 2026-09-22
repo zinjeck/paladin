@@ -1,14 +1,14 @@
 [depot-regression] funded lumber batch fetched across city beyond ordinary hauling radius
-[depot-matrix] coal: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] iron: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] gold: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] fish: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] meat: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] stone: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] lumber: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] wheat: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] bread: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
-[depot-matrix] rations: no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed
+[depot-matrix] coal: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] iron: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] gold: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] fish: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] meat: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] stone: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] lumber: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] wheat: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] bread: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
+[depot-matrix] rations: funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed
 [city-corrections] delivered and carried construction refunds conserved, including pause
 [city-corrections] no hunger distress below 50; distress above threshold
 [relief-shape] hills=0 seed=17 rock=0.713921 components=1 largest=105272

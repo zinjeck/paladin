@@ -107,14 +107,36 @@ namespace Paladin::Test::DepotRegression
                 WorldShipmentSystem::tick(world,minute,1);
                 world.time().advanceMinutes(1);
             }
-            const auto* imports = map.logistics.inventory(map.logistics.importsForObject(f.depot));
+            auto* imports = map.logistics.inventory(map.logistics.importsForObject(f.depot));
             PALADIN_CHECK(imports && imports->amount(goods) == 2);
             PALADIN_CHECK(map.trade.orders.empty());
             PALADIN_CHECK(f.money() == importCash && total() == importGoods);
             PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Stockpile));
             PALADIN_CHECK(!map.logistics.importsMaySupply(*imports,InventoryKind::Market));
+            PALADIN_CHECK(WorldMarketSystem::placeOrder(world,f.seller,f.home,f.depot,
+                goods,TradeDirection::Import,2,true));
+            for (int i=0;i<800 && imports->amount(goods)<6;++i)
+            {
+                const double minute=double(world.time().totalGameMinutes());
+                WorldMarketSystem::tickOrders(world,minute);
+                WorldShipmentSystem::tick(world,minute,1);
+                world.time().advanceMinutes(1);
+                imports=map.logistics.inventory(map.logistics.importsForObject(f.depot));
+            }
+            PALADIN_CHECK(imports->amount(goods)==6);
+            PALADIN_CHECK(WorldMarketSystem::cancelOrder(world,f.seller,f.home,f.depot,map.trade.orders.front().id));
+            PALADIN_CHECK(f.money()==importCash && total()==importGoods);
+            PALADIN_CHECK(map.objectState().demolish(f.storage,{3,13}));
+            PALADIN_CHECK(map.objectState().demolish(storage,far));
+            map.logistics.synchronize(map.objectState(),double(world.time().totalGameMinutes()));
+            imports=map.logistics.inventory(map.logistics.importsForObject(f.depot));
+            PALADIN_CHECK(imports && imports->amount(goods)==6);
+            PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Market));
+            PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Workplace));
+            PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Home));
+            PALADIN_CHECK(total()==importGoods);
             std::cout << "[depot-matrix] " << goods
-                      << ": no blind pickup, funded physical collection, one-shot, repeat, carried cancellation, separate imports and conservation passed\n";
+                      << ": funded physical exports, one-shot/repeat in both directions, carried cancellation, separate imports, fallback buyers and conservation passed\n";
         }
     }
 }

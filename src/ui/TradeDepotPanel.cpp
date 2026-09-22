@@ -596,7 +596,10 @@ namespace Paladin
             if (order.depot == depot_ && order.resource == resource() &&
                 order.enabled)
             {
-                status = "Active: " + order.status;
+                status = "Active: " + (order.collectionAuthorized
+                    ? DepotCollection::status(*map, city->simulationState().citizens(),
+                        order, double(world.time().totalGameMinutes()))
+                    : order.status);
             }
         }
         const float bottom = y + 417;
@@ -644,7 +647,10 @@ namespace Paladin
                 label(std::string(order.direction == TradeDirection::Export ? "Export " : "Import ") +
                           std::to_string(order.quantity) + (order.standing ? " | Standing" : " | One order"),
                       b.x + 8, b.y + 35, b.width - 16, 1.15F);
-                label(order.status, b.x + 8, b.y + 55, b.width - 16, 1.F);
+                label(order.collectionAuthorized
+                    ? DepotCollection::status(*map, city->simulationState().citizens(),
+                        order, double(world.time().totalGameMinutes()))
+                    : order.status, b.x + 8, b.y + 55, b.width - 16, 1.F);
             }
             if (!any && ordersBounds_.height > 60)
             {
