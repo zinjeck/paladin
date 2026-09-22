@@ -8,12 +8,53 @@
 #include "world/settlements/objects/WorkplaceCompound.h"
 #include "world/settlements/objects/jobs/market/MarketJob.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <unordered_set>
 
 namespace Paladin
 {
+    CitizenRoutePlan::CitizenRoutePlan(const SettlementCitizen& c)
+        : CitizenRoutePlan(c, c.tilePosition)
+    {
+        destination = c.destination;
+        path = c.path;
+        pathIndex = c.pathIndex;
+        stepProgress = c.stepProgress;
+        explicitMovement = c.explicitMovement;
+    }
+
+    CitizenRoutePlan::CitizenRoutePlan(
+        const SettlementCitizen& c, SettlementTilePosition origin
+    )
+        : homeId(c.homeId), task{c.task.kind, c.task.delivering},
+          tilePosition(origin), destination(origin), stepDuration(c.stepDuration)
+    {
+    }
+
+    CitizenRoutePlan CitizenRoutePlan::fromPosition(
+        SettlementTilePosition origin
+    ) const
+    {
+        CitizenRoutePlan next;
+        next.homeId = homeId;
+        next.task = task;
+        next.tilePosition = next.destination = origin;
+        next.stepDuration = stepDuration;
+        return next;
+    }
+
+    void CitizenRoutePlan::applyTo(SettlementCitizen& c)
+    {
+        c.path = std::move(path);
+        c.pathIndex = pathIndex;
+        c.stepProgress = stepProgress;
+        c.stepDuration = stepDuration;
+        c.destination = destination;
+        c.explicitMovement = explicitMovement;
+    }
+
     namespace
     {
         int distance(
@@ -88,15 +129,6 @@ namespace Paladin
                  minute + 30}
             );
         }
-        void copyRoute(SettlementCitizen& to, SettlementCitizen& from)
-        {
-            to.path = std::move(from.path);
-            to.pathIndex = 0;
-            to.stepProgress = from.stepProgress;
-            to.stepDuration = from.stepDuration;
-            to.destination = from.destination;
-            to.explicitMovement = !to.path.empty();
-        }
         bool publicStorage(const SettlementInventory& inventory)
         {
             return inventory.kind == InventoryKind::Keep ||
@@ -155,10 +187,11 @@ namespace Paladin
         );
     }
 
-    bool SettlementActivitySystem::route(
+    template<typename RouteState>
+    bool SettlementActivitySystem::planRoute(
         SettlementMap& map,
         SettlementCitizenState& citizens,
-        SettlementCitizen& c,
+        RouteState& c,
         const SettlementObjectFootprint& f,
         bool inside
     )
@@ -174,7 +207,7 @@ namespace Paladin
         bool successful = false;
         struct RestorePosition
         {
-            SettlementCitizen& citizen;
+            RouteState& citizen;
             SettlementTilePosition original;
             std::vector<SettlementTilePosition>& exit;
             bool& successful;
@@ -388,6 +421,22 @@ namespace Paladin
         }
         return false;
     }
+    bool SettlementActivitySystem::route(
+        SettlementMap& map, SettlementCitizenState& citizens,
+        SettlementCitizen& c, const SettlementObjectFootprint& f, bool inside
+    )
+    {
+        return planRoute(map, citizens, c, f, inside);
+    }
+
+    bool SettlementActivitySystem::route(
+        SettlementMap& map, SettlementCitizenState& citizens,
+        CitizenRoutePlan& planned, const SettlementObjectFootprint& f, bool inside
+    )
+    {
+        return planRoute(map, citizens, planned, f, inside);
+    }
+
     bool SettlementActivitySystem::boatMealAvailable(
         SettlementMap& map,
         SettlementCitizenState& citizens,
@@ -445,13 +494,7 @@ namespace Paladin
         {
             // Land routing is checked from the physical landing, without
             // interrupting the boat or reserving food before arrival.
-            auto planned = c;
-            planned.tilePosition = c.boatLanding;
-            planned.path.clear();
-            planned.pathIndex = 0;
-            planned.stepProgress = 0;
-            planned.inFishingBoat = false;
-            planned.insideHome = false;
+            CitizenRoutePlan planned(c, c.boatLanding);
             if (route(
                     map,
                     citizens,
@@ -480,25 +523,28 @@ namespace Paladin
     {
         if (c.child)
         {
-            std::vector<SettlementCitizen*> parents;
-            for (auto& parent : citizens.citizens_)
+            std::array<SettlementCitizen*, 2> parents{};
+            std::size_t parentCount = 0;
+            for (const auto id : {c.motherId, c.fatherId})
             {
-                if ((parent.id == c.motherId || parent.id == c.fatherId) &&
-                    !parent.child && parent.health > 0)
+                auto* parent = citizens.mutableCitizen(id);
+                if (parent && !parent->child && parent->health > 0 &&
+                    (parentCount == 0 || parents[0] != parent))
                 {
-                    parents.push_back(&parent);
+                    parents[parentCount++] = parent;
                 }
             }
-            std::stable_sort(
+            std::sort(
                 parents.begin(),
-                parents.end(),
+                parents.begin() + parentCount,
                 [&](const auto* a, const auto* b)
                 {
-                    return distance(c.tilePosition, {a->tilePosition, 1, 1}) <
-                           distance(c.tilePosition, {b->tilePosition, 1, 1});
+                    const auto da = distance(c.tilePosition, {a->tilePosition, 1, 1});
+                    const auto db = distance(c.tilePosition, {b->tilePosition, 1, 1});
+                    return da != db ? da < db : a->id < b->id;
                 }
             );
-            for (auto* parent : parents)
+            for (auto* parent : std::span(parents).first(parentCount))
             {
                 if (parent->hunger >= policy.foodSeekThreshold ||
                     parent->task.kind == CitizenTaskKind::FamilyMeal ||
@@ -509,8 +555,8 @@ namespace Paladin
                 {
                     continue;
                 }
-                auto planned = c;
-                auto parentPlan = *parent;
+                CitizenRoutePlan planned(c);
+                CitizenRoutePlan parentPlan(*parent);
                 const auto* childHome =
                     map.objectState().completedObject(c.homeId);
                 const bool bringMealHome =
@@ -564,7 +610,7 @@ namespace Paladin
                 finish(map, *parent, minute);
                 if (!togetherAtHome)
                 {
-                    copyRoute(c, planned);
+                    planned.applyTo(c);
                 }
                 else
                 {
@@ -572,7 +618,7 @@ namespace Paladin
                 }
                 if (bringMealHome)
                 {
-                    copyRoute(*parent, parentPlan);
+                    parentPlan.applyTo(*parent);
                 }
                 else
                 {
@@ -588,7 +634,7 @@ namespace Paladin
             }
             // Living parents provide food, never access to their wallet.
             // Orphans may use free public supplies as a survival fallback.
-            if (!parents.empty())
+            if (parentCount != 0)
             {
                 return false;
             }
@@ -654,7 +700,7 @@ namespace Paladin
             {
                 continue;
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (!route(map, citizens, planned, inventory->footprint, true))
             {
                 if (routeBudgetLimited_)
@@ -674,7 +720,7 @@ namespace Paladin
             {
                 return false;
             }
-            copyRoute(c, planned);
+            planned.applyTo(c);
             c.task.kind = CitizenTaskKind::Eat;
             c.task.source = food.id;
             c.task.startedMinute = minute;
@@ -724,7 +770,7 @@ namespace Paladin
         {
             return false;
         }
-        auto planned = c;
+        CitizenRoutePlan planned(c);
         if (!route(map, citizens, planned, sourceFootprint, true))
         {
             if (!routeBudgetLimited_)
@@ -734,11 +780,7 @@ namespace Paladin
             return false;
         }
         // Prove both travel legs before reserving goods or destination space.
-        auto delivery = planned;
-        delivery.tilePosition = planned.destination;
-        delivery.path.clear();
-        delivery.pathIndex = 0;
-        delivery.stepProgress = 0;
+        auto delivery = planned.fromPosition(planned.destination);
         if (failedRoute(c, destination, delivery.tilePosition, map, minute))
         {
             return false;
@@ -761,7 +803,7 @@ namespace Paladin
         {
             return false;
         }
-        copyRoute(c, planned);
+        planned.applyTo(c);
         c.task = {};
         c.task.kind = CitizenTaskKind::Haul;
         c.haulDeliveryPath = std::move(delivery.path);
@@ -1354,7 +1396,7 @@ namespace Paladin
                     }
                 }
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (!route(map, citizens, planned, {goal, 1, 1}, true) ||
                 !site.footprint.contains(planned.destination))
             {
@@ -1377,7 +1419,7 @@ namespace Paladin
             }
             task.workTile = planned.destination;
             task.startedMinute = minute;
-            copyRoute(c, planned);
+            planned.applyTo(c);
             c.task = task;
             c.activity = CitizenActivity::Constructing;
             return true;
@@ -1680,7 +1722,7 @@ namespace Paladin
             {
                 return false;
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (!route(
                     map,
                     citizens,
@@ -1692,7 +1734,7 @@ namespace Paladin
             {
                 return false;
             }
-            copyRoute(c, planned);
+            planned.applyTo(c);
             c.task = {};
             c.task.kind = CitizenTaskKind::Work;
             c.task.object = workplace.objectId;

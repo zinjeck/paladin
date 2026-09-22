@@ -110,7 +110,9 @@ void runSettlementEmploymentTests()
     for (const auto& c : sample.citizens())
     {
         males += c.sex == CitizenSex::Male;
+        PALADIN_CHECK(sample.citizen(c.id) == &c);
     }
+    PALADIN_CHECK(!sample.citizen(CitizenId{}) && !sample.citizen(CitizenId{10001}));
     PALADIN_CHECK(males > 4700 && males < 5300);
 
     SettlementGrid grid(40, 40);
@@ -158,8 +160,8 @@ void runSettlementEmploymentTests()
     auto& jobs = map.employment();
     jobs.synchronize(map.objectState(), citizens);
     PALADIN_CHECK(jobs.workplaces().size() == 2);
-    const auto pendingFishId =
-        jobs.forConstruction(map.objectState().constructionSites().front().id);
+    const auto pendingSiteId = map.objectState().constructionSites().front().id;
+    const auto pendingFishId = jobs.forConstruction(pendingSiteId);
     const auto storeId =
         jobs.forObject(map.objectState().completedObjects().back().id);
     PALADIN_CHECK(pendingFishId && storeId && pendingFishId != storeId);
@@ -186,6 +188,7 @@ void runSettlementEmploymentTests()
     );
     PALADIN_CHECK(map.objectState().constructionSites().empty());
     PALADIN_CHECK(!jobs.workplace(pendingFishId));
+    PALADIN_CHECK(!jobs.forConstruction(pendingSiteId));
     PALADIN_CHECK(
         map.objectState().canPlace(map.grid(), fishing, {{10, 10}, 8, 5})
     );

@@ -27,6 +27,10 @@ namespace Paladin
 {
     struct SettlementActivityTestFixture
     {
+        static void planBreak(SettlementMap& map, SettlementCitizen& c, double minute)
+        {
+            map.activities.planBreak(map, c, minute);
+        }
         static bool boatMealAvailable(
             SettlementMap& map,
             SettlementCitizenState& citizens,
@@ -197,6 +201,108 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    {
+        auto map = land(80);
+        auto road = *SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
+        road.bypassesConstruction = true;
+        for (int x = 2; x <= 67; ++x)
+        {
+            PALADIN_CHECK(map.objectState().placeCompletedObject(map.grid(), road, {{x, 2}, 1, 1}));
+        }
+        SettlementNavigation navigation;
+        navigation.synchronize(map);
+        CitizenMovementPolicy policy;
+        const auto faster = navigation.findPath(map, {2, 5}, {67, 5}, policy);
+        PALADIN_CHECK(!faster.empty() && faster.back() == SettlementTilePosition(67, 5));
+        PALADIN_CHECK(navigation.lastCost < 50);
+        PALADIN_CHECK(std::any_of(faster.begin(), faster.end(), [](auto p) { return p.y == 2; }));
+        policy.maximumExpandedNodes = 1;
+        const auto fallback = navigation.findPath(map, {2, 5}, {67, 5}, policy);
+        PALADIN_CHECK(fallback.size() == 65 && navigation.lastCost == 65);
+        PALADIN_CHECK(navigation.expandedNodes <= policy.maximumExpandedNodes);
+    }
+    {
+        auto map = land();
+        SettlementCitizenState people;
+        found(map, people, 3);
+        const auto source = map.logistics.forObject(map.objectState().completedObjects().front().id);
+        const auto store = completed(map, SettlementObjectTypes::Stockpile, {{12, 12}, 3, 3});
+        const auto destination = map.logistics.forObject(store);
+        const auto pile = map.logistics.drop({11, 12}, "stone", 2, 0);
+        const auto room = map.logistics.freeSpace(destination);
+        auto& goods = map.logistics;
+        const CitizenId a{1}, b{2}, c{3};
+        PALADIN_CHECK(goods.reserve(a, source, destination, "fish", 4));
+        PALADIN_CHECK(goods.reserve(b, source, destination, "fish", 4));
+        PALADIN_CHECK(goods.reserve(c, pile, destination, "stone", 2));
+        PALADIN_CHECK(goods.available(source, "fish") == 12 && goods.incoming(destination, "fish") == 8);
+        PALADIN_CHECK(goods.freeSpace(destination) == room - 10);
+        goods.release(a);
+        PALADIN_CHECK(!goods.reservation(a) && goods.reservation(c)->resource == "stone");
+        PALADIN_CHECK(goods.available(source, "fish") == 16 && goods.incoming(destination, "fish") == 4);
+        PALADIN_CHECK(goods.pickUp(b) && goods.consumeCarriedUnit(b));
+        PALADIN_CHECK(goods.incoming(destination, "fish") == 3);
+        PALADIN_CHECK(goods.deliver(b) && goods.pickUp(c));
+        PALADIN_CHECK(!goods.inventory(pile) && goods.incoming(destination, "stone") == 2);
+        PALADIN_CHECK(goods.deliver(c));
+        PALADIN_CHECK(goods.freeSpace(destination) == room - 5);
+        PALADIN_CHECK(goods.incoming(destination, "fish") == 0 && goods.incoming(destination, "stone") == 0);
+    }
+    {
+        SettlementCitizen c;
+        c.id = CitizenId{1};
+        c.name = "Route owner";
+        c.homeId = SettlementObjectId{7};
+        c.tilePosition = {3, 4};
+        c.path = {{4, 4}, {5, 4}};
+        c.destination = {5, 4};
+        c.stepProgress = .25;
+        c.stepDuration = 2;
+        c.explicitMovement = true;
+        c.task.kind = CitizenTaskKind::Haul;
+        c.carriedResource = "lumber";
+        c.carriedAmount = 3;
+        CitizenRoutePlan plan(c);
+        plan.path.push_back({6, 4});
+        plan.destination = {6, 4};
+        PALADIN_CHECK(c.path.size() == 2);
+        const auto onward = plan.fromPosition(plan.destination);
+        PALADIN_CHECK(onward.path.empty() && onward.stepProgress == 0);
+        PALADIN_CHECK(onward.homeId == c.homeId && onward.task.kind == c.task.kind);
+        plan.applyTo(c);
+        PALADIN_CHECK(c.path.size() == 3 && c.stepProgress == .25 && c.stepDuration == 2);
+        PALADIN_CHECK(c.tilePosition == SettlementTilePosition(3, 4));
+        PALADIN_CHECK(c.name == "Route owner" && c.carriedResource == "lumber" && c.carriedAmount == 3);
+    }
+    {
+        auto map = land();
+        auto& policy = map.activities.policy;
+        double expectedLocalDue = -1;
+        for (const double offset : {-600., 0., 660.})
+        {
+            policy.solarTimeOffsetMinutes = offset;
+            SettlementCitizen worker;
+            worker.id = CitizenId{1};
+            worker.workplaceId = WorkplaceId{1};
+            const double start = 7 * 1440 + policy.shiftStartMinute - offset;
+            SettlementActivityTestFixture::planBreak(map, worker, start);
+            const double localDue = worker.breakDue + offset;
+            PALADIN_CHECK(worker.breakDay == 7 && policy.isWorkTime(worker.breakDue));
+            PALADIN_CHECK(localDue >= 7 * 1440 + policy.shiftStartMinute + 10);
+            PALADIN_CHECK(localDue <= 7 * 1440 + policy.shiftEndMinute - policy.workBreakMinutes - 10);
+            if (expectedLocalDue >= 0) { PALADIN_CHECK(std::abs(localDue - expectedLocalDue) < 1e-9); }
+            expectedLocalDue = localDue;
+            worker.breakTaken = true;
+            const double worldMidnight = (std::floor(start / 1440) + 1) * 1440;
+            if (std::floor((worldMidnight + offset) / 1440) == 7)
+            {
+                SettlementActivityTestFixture::planBreak(map, worker, worldMidnight);
+                PALADIN_CHECK(worker.breakTaken && worker.breakDay == 7);
+            }
+            SettlementActivityTestFixture::planBreak(map, worker, 8 * 1440 - offset);
+            PALADIN_CHECK(!worker.breakTaken && worker.breakDay == 8);
+        }
+    }
     {
         auto map = land(24);
         SettlementCitizenState people;

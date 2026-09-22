@@ -16,6 +16,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <utility>
 namespace Paladin
 {
     namespace
@@ -65,40 +66,30 @@ namespace Paladin
         WorkplaceId id
     ) const noexcept
     {
-        for (const auto& w : workplaces_)
-        {
-            if (w.id == id)
-            {
-                return &w;
-            }
-        }
-        return nullptr;
+        const auto found = std::lower_bound(
+            workplaces_.begin(), workplaces_.end(), id,
+            [](const Workplace& w, WorkplaceId key) { return w.id < key; });
+        return found == workplaces_.end() || found->id != id ? nullptr : &*found;
+    }
+    Workplace* SettlementEmploymentState::mutableWorkplace(
+        WorkplaceId id
+    ) noexcept
+    {
+        return const_cast<Workplace*>(std::as_const(*this).workplace(id));
     }
     WorkplaceId SettlementEmploymentState::forObject(
         SettlementObjectId id
     ) const noexcept
     {
-        for (const auto& w : workplaces_)
-        {
-            if (id && w.objectId == id)
-            {
-                return w.id;
-            }
-        }
-        return {};
+        const auto found = objectWorkplaces_.find(id);
+        return found == objectWorkplaces_.end() ? WorkplaceId{} : found->second;
     }
     WorkplaceId SettlementEmploymentState::forConstruction(
         ConstructionSiteId id
     ) const noexcept
     {
-        for (const auto& w : workplaces_)
-        {
-            if (id && w.constructionId == id)
-            {
-                return w.id;
-            }
-        }
-        return {};
+        const auto found = constructionWorkplaces_.find(id);
+        return found == constructionWorkplaces_.end() ? WorkplaceId{} : found->second;
     }
     void SettlementEmploymentState::synchronize(
         const SettlementObjectState& objects,
@@ -111,6 +102,7 @@ namespace Paladin
         }
         objectVersion_ = objects.navigationVersion();
         std::vector<WorkplaceId> retained;
+        retained.reserve(workplaces_.size());
         const auto add = [&](std::string_view type,
                              const SettlementObjectFootprint& footprint,
                              SettlementObjectId objectId,
@@ -121,16 +113,8 @@ namespace Paladin
             {
                 return;
             }
-            Workplace* found = nullptr;
-            for (auto& w : workplaces_)
-            {
-                if ((objectId && w.objectId == objectId) ||
-                    (siteId && w.constructionId == siteId))
-                {
-                    found = &w;
-                    break;
-                }
-            }
+            Workplace* found = mutableWorkplace(
+                objectId ? forObject(objectId) : forConstruction(siteId));
             // A completed replacement preserves staffing/name from its exact
             // site.
             if (!found && objectId)
@@ -173,6 +157,16 @@ namespace Paladin
                 );
                 found = &workplaces_.back();
             }
+            if (found->objectId && found->objectId != objectId)
+            {
+                objectWorkplaces_.erase(found->objectId);
+            }
+            if (found->constructionId && found->constructionId != siteId)
+            {
+                constructionWorkplaces_.erase(found->constructionId);
+            }
+            if (objectId) { objectWorkplaces_.insert_or_assign(objectId, found->id); }
+            if (siteId) { constructionWorkplaces_.insert_or_assign(siteId, found->id); }
             found->objectId = objectId;
             found->constructionId = siteId;
             found->footprint = footprint;
@@ -212,32 +206,56 @@ namespace Paladin
         {
             add(site.objectTypeId, site.footprint, {}, site.id);
         }
+        std::sort(retained.begin(), retained.end());
         std::erase_if(
             workplaces_,
             [&](const auto& w)
             {
-                return std::find(retained.begin(), retained.end(), w.id) ==
-                       retained.end();
+                if (std::binary_search(retained.begin(), retained.end(), w.id))
+                {
+                    return false;
+                }
+                if (w.objectId) { objectWorkplaces_.erase(w.objectId); }
+                if (w.constructionId) { constructionWorkplaces_.erase(w.constructionId); }
+                return true;
             }
         );
+        std::vector<std::size_t> staff(workplaces_.size(), 0);
         for (auto& citizen : citizens.citizens_)
         {
-            if (citizen.workplaceId && !workplace(citizen.workplaceId))
+            if (!citizen.workplaceId) { continue; }
+            if (const auto* w = workplace(citizen.workplaceId))
+            {
+                ++staff[std::size_t(w - workplaces_.data())];
+            }
+            else
             {
                 citizen.workplaceId = {};
                 ++citizens.version_;
             }
         }
-        for (auto& w : workplaces_)
+        // Preserve first-person dismissal order and protected military staff,
+        // without recounting the entire population for every workplace.
+        for (auto& citizen : citizens.citizens_)
         {
-            while (employed(w.id, citizens) > w.capacity)
+            if (!citizen.workplaceId || citizen.militaryUnitId || citizen.militaryDeployed)
             {
-                if (!adjust(w.id, -1, citizens))
-                {
-                    w.capacity = std::uint32_t(employed(w.id, citizens));
-                    break;
-                }
+                continue;
             }
+            auto* w = mutableWorkplace(citizen.workplaceId);
+            auto& count = staff[std::size_t(w - workplaces_.data())];
+            if (count > w->capacity)
+            {
+                citizen.workplaceId = {};
+                citizen.nextWorkCheckMinutes = 0;
+                --count;
+                ++citizens.version_;
+            }
+        }
+        for (std::size_t i = 0; i < workplaces_.size(); ++i)
+        {
+            workplaces_[i].capacity = std::max(workplaces_[i].capacity,
+                                             std::uint32_t(staff[i]));
         }
     }
     std::size_t SettlementEmploymentState::employed(
@@ -267,13 +285,10 @@ namespace Paladin
     }
     void SettlementEmploymentState::citizenDeparted(WorkplaceId id)
     {
-        for (auto& workplace : workplaces_)
+        if (auto* workplace = mutableWorkplace(id);
+            workplace && workplace->capacity > 0)
         {
-            if (workplace.id == id && workplace.capacity > 0)
-            {
-                --workplace.capacity;
-                return;
-            }
+            --workplace->capacity;
         }
     }
     bool SettlementEmploymentState::adjust(
@@ -282,16 +297,11 @@ namespace Paladin
         SettlementCitizenState& citizens
     )
     {
-        auto found = std::find_if(
-            workplaces_.begin(),
-            workplaces_.end(),
-            [id](const auto& w) { return w.id == id; }
-        );
-        if (found == workplaces_.end())
+        auto* w = mutableWorkplace(id);
+        if (!w)
         {
             return false;
         }
-        auto* w = &*found;
         if (delta == 0 || (delta > 0 && (!w->operational ||
                                          w->capacity >= w->maximumCapacity)))
         {
@@ -359,13 +369,10 @@ namespace Paladin
         {
             return false;
         }
-        for (auto& w : workplaces_)
+        if (auto* w = mutableWorkplace(id))
         {
-            if (w.id == id)
-            {
-                w.name = trimmed;
-                return true;
-            }
+            w->name = trimmed;
+            return true;
         }
         return false;
     }
@@ -374,13 +381,17 @@ namespace Paladin
         const SettlementCitizenState& citizens
     )
     {
-        const auto adults = std::count_if(
-            citizens.citizens().begin(),
-            citizens.citizens().end(),
-            [](const auto& c) { return !c.child && !c.militaryDeployed && c.health > 0; }
-        );
+        std::size_t adults = 0, withoutWork = 0;
+        for (const auto& c : citizens.citizens())
+        {
+            if (!c.child && !c.militaryDeployed && c.health > 0)
+            {
+                ++adults;
+                withoutWork += !c.workplaceId;
+            }
+        }
         const double percent =
-            adults ? 100.0 * unemployed(citizens) / adults : 0;
+            adults ? 100.0 * withoutWork / adults : 0;
         if (!history_.empty())
         {
             if (minute < history_.back().gameMinute)

@@ -85,13 +85,7 @@ namespace Paladin
             double minute
         );
         int available(InventoryId id, std::string_view resource) const;
-        int incoming(InventoryId id, std::string_view resource) const
-        {
-            int result = 0;
-            for (const auto& claim : reservations_)
-            { if (claim.destination == id && claim.resource == resource) { result += claim.amount; } }
-            return result;
-        }
+        int incoming(InventoryId id, std::string_view resource) const;
         bool importsMaySupply(const SettlementInventory& source,
                               InventoryKind destination) const
         {
@@ -160,6 +154,10 @@ namespace Paladin
         }
 
     private:
+        using InventoryClaims = std::unordered_map<
+            InventoryId, std::vector<CitizenId>, StrongIdHash>;
+        static std::span<const CitizenId> claimsFor(const InventoryClaims&, InventoryId);
+        static void unindexClaim(InventoryClaims&, InventoryId, CitizenId);
         void synchronizeIndexes() const;
         mutable std::size_t indexedSize_ = 0;
         mutable std::unordered_map<InventoryId, std::size_t, StrongIdHash>
@@ -181,6 +179,10 @@ namespace Paladin
         );
         std::vector<SettlementInventory> inventories_;
         std::vector<HaulReservation> reservations_;
+        // Index canonical claims by person and endpoint. These contain IDs,
+        // never a second copy of cargo quantities or reservation state.
+        std::unordered_map<CitizenId, std::size_t, StrongIdHash> reservationIndex_;
+        InventoryClaims sourceClaims_, destinationClaims_;
         IdGenerator<InventoryId> ids_;
         std::uint64_t objectVersion_ = ~std::uint64_t(0);
         std::uint64_t version_ = 0;

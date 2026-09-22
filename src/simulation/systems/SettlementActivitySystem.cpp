@@ -693,7 +693,7 @@ namespace Paladin
                         map.objectState().completedObject(c.homeId);
                     if (home)
                     {
-                        auto planned = c;
+                        CitizenRoutePlan planned(c);
                         if (c.insideHome || route(
                                                 map,
                                                 citizens,
@@ -935,12 +935,8 @@ namespace Paladin
             {
                 return;
             }
-            auto parent = std::find_if(
-                citizens.citizens_.begin(),
-                citizens.citizens_.end(),
-                [&](const auto& p) { return p.id == c.task.partner; }
-            );
-            if (parent == citizens.citizens_.end())
+            auto* parent = citizens.mutableCitizen(c.task.partner);
+            if (!parent)
             {
                 finish(map, c, minute);
                 return;
@@ -1546,16 +1542,11 @@ namespace Paladin
                         outside.y + int((random >> 8) % (2 * radius + 1)) -
                             radius
                     };
-                    auto planned = c;
+                    CitizenRoutePlan planned(c);
                     if (route(map, citizens, planned, {nearby, 1, 1}, true) &&
-                        childRouteIsLocal(map, planned))
+                        childRouteIsLocal(map, c, planned))
                     {
-                        c.path = std::move(planned.path);
-                        c.pathIndex = planned.pathIndex;
-                        c.stepProgress = planned.stepProgress;
-                        c.stepDuration = planned.stepDuration;
-                        c.destination = planned.destination;
-                        c.explicitMovement = planned.explicitMovement;
+                        planned.applyTo(c);
                         c.task.endMinute = minute + 30 + random % 31;
                         return;
                     }
@@ -1587,12 +1578,8 @@ namespace Paladin
         }
         else if (c.task.kind == CitizenTaskKind::Talk)
         {
-            auto other = std::find_if(
-                citizens.citizens_.begin(),
-                citizens.citizens_.end(),
-                [&](const auto& person) { return person.id == c.task.partner; }
-            );
-            if (other == citizens.citizens_.end() ||
+            auto* other = citizens.mutableCitizen(c.task.partner);
+            if (!other ||
                 other->task.partner != c.id ||
                 (c.task.endMinute == 0 && minute - c.task.startedMinute > 12))
             {

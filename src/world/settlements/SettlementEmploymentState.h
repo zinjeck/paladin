@@ -5,6 +5,7 @@
 #include <deque>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 namespace Paladin
 {
@@ -56,7 +57,13 @@ namespace Paladin
 
     private:
         friend class MilitarySystem;
+        Workplace* mutableWorkplace(WorkplaceId) noexcept;
+        // IDs increase at creation and erasure preserves their order.
         std::vector<Workplace> workplaces_;
+        std::unordered_map<SettlementObjectId, WorkplaceId, StrongIdHash>
+            objectWorkplaces_;
+        std::unordered_map<ConstructionSiteId, WorkplaceId, StrongIdHash>
+            constructionWorkplaces_;
         IdGenerator<WorkplaceId> ids_;
         std::uint64_t objectVersion_ = ~std::uint64_t(0);
         std::deque<UnemploymentSample> history_;

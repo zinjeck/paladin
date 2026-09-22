@@ -737,6 +737,18 @@ namespace Paladin
                     [&](auto p) { return inChildNeighborhood(map, c, p); }
                 ));
     }
+    bool SettlementActivitySystem::childRouteIsLocal(
+        const SettlementMap& map,
+        const SettlementCitizen& c,
+        const CitizenRoutePlan& planned
+    ) const
+    {
+        return !c.child ||
+               (inChildNeighborhood(map, c, planned.destination) &&
+                std::all_of(planned.path.begin(), planned.path.end(),
+                    [&](auto p) { return inChildNeighborhood(map, c, p); }));
+    }
+
     bool SettlementActivitySystem::manageToddler(
         SettlementMap& map,
         SettlementCitizenState& citizens,
@@ -819,7 +831,7 @@ namespace Paladin
         {
             return true;
         }
-        auto planned = c;
+        CitizenRoutePlan planned(c);
         if (home && route(map, citizens, planned, home->footprint, false))
         {
             finish(map, c, minute);

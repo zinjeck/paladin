@@ -7,7 +7,6 @@
 #include <array>
 #include <span>
 #include <unordered_map>
-#include <vector>
 
 namespace Paladin
 {
@@ -29,7 +28,16 @@ namespace Paladin
         std::span<SettlementCitizen> people
     )
     {
-        std::unordered_map<SettlementObjectId, unsigned, StrongIdHash> occupied;
+        struct HouseholdBeds
+        {
+            unsigned occupied = 0;
+            std::array<SettlementCitizen*, 4> residents{};
+            std::size_t count = 0;
+            const CompletedSettlementObject* home = nullptr;
+        };
+        std::unordered_map<SettlementObjectId, HouseholdBeds, StrongIdHash>
+            households;
+        households.reserve(people.size() / 4 + 1);
         for (auto& c : people)
         {
             c.doubleBed = false;
@@ -42,7 +50,9 @@ namespace Paladin
                 c.bedSlot = -1;
                 continue;
             }
-            auto& mask = occupied[c.homeId];
+            auto& household = households[c.homeId];
+            household.home = home;
+            auto& mask = household.occupied;
             if (c.bedHomeId != c.homeId || c.bedSlot < 0 || c.bedSlot >= 4 ||
                 (mask & (1u << c.bedSlot)))
             {
@@ -60,7 +70,7 @@ namespace Paladin
             {
                 continue;
             }
-            auto& mask = occupied[c.bedHomeId];
+            auto& mask = households[c.bedHomeId].occupied;
             for (int slot = 0; slot < 4; ++slot)
             {
                 if (!(mask & (1u << slot)))
@@ -73,21 +83,19 @@ namespace Paladin
         }
         // Pair co-resident spouses into rows. Keep navigation destinations
         // distinct; presentation brings their sleeping positions together.
-        std::unordered_map<
-            SettlementObjectId,
-            std::vector<SettlementCitizen*>,
-            StrongIdHash>
-            households;
         for (auto& c : people)
         {
             if (c.bedHomeId && c.bedSlot >= 0)
             {
-                households[c.bedHomeId].push_back(&c);
+                auto& household = households[c.bedHomeId];
+                // The occupancy pass above admits at most four distinct slots.
+                household.residents[household.count++] = &c;
             }
         }
-        for (auto& [homeId, residents] : households)
+        for (auto& [homeId, household] : households)
         {
-            std::stable_sort(
+            auto residents = std::span(household.residents).first(household.count);
+            std::sort(
                 residents.begin(),
                 residents.end(),
                 [](auto* a, auto* b) { return a->id.value() < b->id.value(); }
@@ -156,9 +164,7 @@ namespace Paladin
                 }
                 if (c->doubleBed)
                 {
-                    const auto* home =
-                        map.objectState().completedObject(homeId);
-                    const double half = (home->footprint.width - 1) * .5;
+                    const double half = (household.home->footprint.width - 1) * .5;
                     c->bedVisualOffsetX =
                         c->bedSlot % 2 ? .26 - half : half - .26;
                 }

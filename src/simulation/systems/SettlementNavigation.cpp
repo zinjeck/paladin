@@ -139,12 +139,21 @@ namespace Paladin
             return {};
         }
         const int width = map.grid().width();
+        const auto heuristic = [&](SettlementTilePosition p)
+        {
+            const int dx = std::abs(goal.x - p.x), dy = std::abs(goal.y - p.y);
+            // Fastest possible terrain keeps A* admissible even with roads.
+            return (std::max(dx, dy) +
+                    (policy.diagonalCost - 1) * std::min(dx, dy)) /
+                   (hasRoads_ ? std::max(1.0, policy.roadSpeedMultiplier) : 1.0);
+        };
+        std::vector<SettlementTilePosition> direct;
+        double directCost = std::numeric_limits<double>::infinity();
         // Long unobstructed journeys need O(distance), not an expanding area
         // search that hits the node budget and masquerades as "too far".
         if (std::max(std::abs(goal.x - start.x), std::abs(goal.y - start.y)) >
             32)
         {
-            std::vector<SettlementTilePosition> direct;
             auto p = start;
             double cost = 0;
             while (p != goal)
@@ -169,24 +178,22 @@ namespace Paladin
             }
             if (p == goal)
             {
-                --failures;
-                lastCost = cost;
-                return direct;
+                if (cost <= heuristic(start) + 1e-9)
+                {
+                    --failures;
+                    lastCost = cost;
+                    return direct;
+                }
+                // A nearby road may beat the straight walk. Keep this proven
+                // route as the fallback if the bounded search cannot improve it.
+                directCost = cost;
             }
+            else { direct.clear(); }
         }
         const auto index = [width](SettlementTilePosition p)
         { return std::size_t(p.y) * width + p.x; };
         const auto position = [width](std::size_t i)
         { return SettlementTilePosition{int(i % width), int(i / width)}; };
-        const auto heuristic = [&](SettlementTilePosition p)
-        {
-            const int dx = std::abs(goal.x - p.x), dy = std::abs(goal.y - p.y);
-            // Fastest possible terrain keeps A* admissible even with roads.
-            return (std::max(dx, dy) +
-                    (policy.diagonalCost - 1) * std::min(dx, dy)) /
-                   (hasRoads_ ? std::max(1.0, policy.roadSpeedMultiplier)
-                              : 1.0);
-        };
         struct Record
         {
             double cost;
@@ -212,7 +219,10 @@ namespace Paladin
             }
         };
         std::unordered_map<std::size_t, Record> records;
-        records.reserve(policy.maximumExpandedNodes * 2);
+        const auto distance = std::size_t(std::abs(goal.x - start.x)) +
+                              std::size_t(std::abs(goal.y - start.y));
+        records.reserve(std::min(policy.maximumExpandedNodes * 2,
+                                 std::max<std::size_t>(64, distance * 8)));
         std::priority_queue<Entry> frontier;
         const auto startIndex = index(start), goalIndex = index(goal);
         records.emplace(startIndex, Record{0, startIndex});
@@ -222,6 +232,7 @@ namespace Paladin
         {
             const auto current = frontier.top();
             frontier.pop();
+            if (current.estimate >= directCost) { break; }
             if (current.cost != records.at(current.tile).cost)
             {
                 continue;
@@ -271,6 +282,12 @@ namespace Paladin
                     frontier.push({cost + heuristic(next), cost, ni});
                 }
             }
+        }
+        if (!direct.empty())
+        {
+            --failures;
+            lastCost = directCost;
+            return direct;
         }
         return {};
     }

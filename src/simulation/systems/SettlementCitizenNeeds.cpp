@@ -99,20 +99,6 @@ namespace Paladin
             const double sinceShiftEnd =
                 std::fmod(time - policy.shiftEndMinute + 1440, 1440.0);
             const double untilShift = offMinutes - sinceShiftEnd;
-            // Allocate available leisure before bed, without delaying needed
-            // recovery. Changing the workday or energy rates changes this
-            // window.
-            const double leisure =
-                std::max(
-                    0.0,
-                    offMinutes -
-                        std::max(policy.requiredSleepMinutes, recoveryMinutes)
-                ) *
-                policy.postWorkLeisureShare;
-            if (sinceShiftEnd < leisure && c.energy > policy.fatigueEnergy)
-            {
-                return false;
-            }
             const double nextShiftCost =
                 policy.awakeEnergyPerMinute * (untilShift + workMinutes) +
                 policy.workEnergyPerMinute * workMinutes;
@@ -269,7 +255,7 @@ namespace Paladin
         {
             return false;
         }
-        auto planned = c;
+        CitizenRoutePlan planned(c);
         bool atHome = false;
         if (const auto* home = map.objectState().completedObject(c.homeId))
         {
@@ -323,7 +309,7 @@ namespace Paladin
                         {
                             continue;
                         }
-                        planned = c;
+                        planned = CitizenRoutePlan(c);
                         found =
                             route(map, citizens, planned, {target, 1, 1}, true);
                         if (!found && routeBudgetLimited_)
@@ -357,22 +343,12 @@ namespace Paladin
                 {
                     return false;
                 }
-                planned = c;
-                planned.path.clear();
-                planned.pathIndex = 0;
-                planned.stepProgress = 0;
-                planned.destination = c.tilePosition;
+                planned = CitizenRoutePlan(c, c.tilePosition);
+                planned.explicitMovement = c.explicitMovement;
             }
         }
         finish(map, c, minute);
-        {
-            c.path = std::move(planned.path);
-            c.pathIndex = planned.pathIndex;
-            c.stepProgress = planned.stepProgress;
-            c.stepDuration = planned.stepDuration;
-            c.destination = planned.destination;
-            c.explicitMovement = planned.explicitMovement;
-        }
+        planned.applyTo(c);
         c.sleptMinutes = 0;
         c.task.kind = CitizenTaskKind::Sleep;
         c.task.object = atHome ? c.homeId : SettlementObjectId{};

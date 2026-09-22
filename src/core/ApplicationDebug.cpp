@@ -6,7 +6,8 @@
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
 #include "rendering/CityRenderer.h"
-#include "rendering/GlobeView.h"
+#include "rendering/WorldMapNavigation.h"
+#include "rendering/WorldRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "simulation/Simulation.h"
@@ -237,32 +238,32 @@ namespace Paladin
                 {
                     s << "\n" << entry.resourceId << ": " << entry.amount;
                 }
-                s << "\nLoose/physical resource conservation: not implemented";
             }
             float mx = 0, my = 0;
             SDL_GetMouseState(&mx, &my);
             const auto pixels =
                 tileRenderMetrics_->scaledTilePixels(camera_->zoom());
-            int x = int(std::floor(
-                camera_->tileX() + (mx - renderer_->outputWidth() * .5) / pixels
-            ));
-            int y = int(std::floor(
-                camera_->tileY() +
-                (my - renderer_->outputHeight() * .5) / pixels
-            ));
+            int x = -1, y = -1;
             const WorldTile* tile = nullptr;
             if (screen_ == Screen::City)
             {
                 if (const auto* map =
                         simulation_->settlementMap(activeCitySettlementId_))
                 {
-                    tile = map->grid().tile({x, y});
+                    if (const auto hit = cityTileAtScreen(mx, my))
+                    {
+                        x = hit->x;
+                        y = hit->y;
+                        tile = map->grid().tile(*hit);
+                    }
                 }
             }
             else
             {
-                const auto view = GlobeView::from(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight());
-                if (const auto hit = view.pick(mx,my))
+                if (const auto hit = WorldMapNavigation::pick(
+                        *camera_, world.grid(), renderer_->outputWidth(),
+                        renderer_->outputHeight(), pixels,
+                        worldRenderer_->globeEnabled, mx, my))
                 {
                     x = std::clamp(int(hit->u*world.grid().width()),0,world.grid().width()-1);
                     y = std::clamp(int(hit->v*world.grid().height()),0,world.grid().height()-1);
@@ -336,8 +337,6 @@ namespace Paladin
                     }
                 }
             }
-            s << "\nFertility, animals, ground piles, production: not "
-                 "implemented";
             cachedStats_ = s.str();
         }
         debugConsole_->layout(

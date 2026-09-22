@@ -331,12 +331,8 @@ namespace Paladin
             }
             else if (from && flow.consumer)
             {
-                auto person = std::find_if(
-                    people.citizens_.begin(),
-                    people.citizens_.end(),
-                    [&](const auto& c) { return c.id == flow.consumer; }
-                );
-                if (person == people.citizens_.end() ||
+                auto* person = people.mutableCitizen(flow.consumer);
+                if (!person ||
                     person->militaryDeployed ||
                     !map.logistics.canEat(flow.resource))
                 {

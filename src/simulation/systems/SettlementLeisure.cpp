@@ -4,21 +4,13 @@
 #include "world/settlements/citizens/SettlementCitizenState.h"
 #include "world/settlements/objects/SettlementDoor.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace Paladin
 {
     namespace
     {
-        void useRoute(SettlementCitizen& c, const SettlementCitizen& planned)
-        {
-            c.path = planned.path;
-            c.pathIndex = planned.pathIndex;
-            c.stepProgress = planned.stepProgress;
-            c.stepDuration = planned.stepDuration;
-            c.destination = planned.destination;
-            c.explicitMovement = planned.explicitMovement;
-        }
         int separation(SettlementTilePosition a, SettlementTilePosition b)
         {
             return std::abs(a.x - b.x) + std::abs(a.y - b.y);
@@ -27,7 +19,7 @@ namespace Paladin
     double SettlementActivitySystem::routeMinutes(
         const SettlementMap& map,
         const SettlementCitizenState& citizens,
-        const SettlementCitizen& planned
+        const CitizenRoutePlan& planned
     ) const
     {
         double cost = 0;
@@ -51,7 +43,8 @@ namespace Paladin
         double minute
     )
     {
-        const auto day = std::int64_t(std::floor(minute / 1440));
+        const auto day = std::int64_t(std::floor(
+            (minute + policy.solarTimeOffsetMinutes) / 1440));
         if (c.breakDay != day)
         {
             c.breakDay = day;
@@ -80,7 +73,8 @@ namespace Paladin
             const auto random = GenerationNoise::mix(
                 c.id.value() ^ map.instanceId() ^ std::uint64_t(day)
             );
-            c.breakDue = day * 1440 + policy.shiftStartMinute + 10 +
+            c.breakDue = day * 1440 - policy.solarTimeOffsetMinutes +
+                         policy.shiftStartMinute + 10 +
                          double(random % 10001) / 10000 * span;
         }
         if (c.breakUntil > 0 &&
@@ -127,7 +121,7 @@ namespace Paladin
         SettlementMap& map,
         SettlementCitizenState& citizens,
         const SettlementCitizen& c,
-        const SettlementCitizen& planned,
+        const CitizenRoutePlan& planned,
         double minute,
         double stay
     )
@@ -136,11 +130,7 @@ namespace Paladin
         {
             return false;
         }
-        auto returning = planned;
-        returning.tilePosition = planned.destination;
-        returning.path.clear();
-        returning.pathIndex = 0;
-        returning.stepProgress = 0;
+        auto returning = planned.fromPosition(planned.destination);
         if (!route(map, citizens, returning, {c.breakAnchor, 1, 1}, true) ||
             returning.destination != c.breakAnchor)
         {
@@ -172,7 +162,7 @@ namespace Paladin
             }
             return true;
         }
-        auto returning = c;
+        CitizenRoutePlan returning(c);
         if (!route(map, citizens, returning, {c.breakAnchor, 1, 1}, true))
         {
             return true;
@@ -181,7 +171,7 @@ namespace Paladin
         if (minute + returnTime + 1 >= c.breakUntil)
         {
             finish(map, c, minute);
-            useRoute(c, returning);
+            returning.applyTo(c);
             c.breakReturning = true;
             c.task.kind = CitizenTaskKind::Break;
             c.activity = CitizenActivity::ReturningHome;
@@ -213,11 +203,11 @@ namespace Paladin
             c.breakAnchor.x + int(random % 5) - 2,
             c.breakAnchor.y + int((random >> 8) % 5) - 2
         };
-        auto planned = c;
+        CitizenRoutePlan planned(c);
         if (route(map, citizens, planned, {target, 1, 1}, true) &&
             breakTripFits(map, citizens, c, planned, minute, 3))
         {
-            useRoute(c, planned);
+            planned.applyTo(c);
         }
         return true;
     }
@@ -266,42 +256,59 @@ namespace Paladin
             return false;
         }
         c.nextSocialMinute = minute + 5;
-        std::vector<std::size_t> candidates;
-        for (std::size_t i = 0; i < citizens.citizens_.size(); ++i)
+        struct SocialCandidate
         {
-            if (citizens.citizens_[i].id == c.spouseId)
+            std::size_t index;
+            double score;
+            bool spouse;
+        };
+        std::array<SocialCandidate, 65> candidates;
+        std::size_t count = 0;
+        bool spouseIncluded = false;
+        const auto append = [&](std::size_t index, bool spouse, int distance)
+        {
+            candidates[count++] = {
+                index,
+                distance - policy.familiarityPreference *
+                               c.familiarityWith(citizens.citizens_[index].id) -
+                    (spouse ? 4.0 : 0.0),
+                spouse
+            };
+            spouseIncluded |= spouse;
+        };
+        for (std::size_t i = 0; i < citizens.citizens_.size() && count < 64; ++i)
+        {
+            const auto& person = citizens.citizens_[i];
+            const bool spouse = person.id == c.spouseId;
+            const int distance = separation(c.tilePosition, person.tilePosition);
+            if (spouse || distance <= policy.leisureRadius)
             {
-                candidates.insert(candidates.begin(), i);
-            }
-            else if (
-                candidates.size() < 64 && separation(
-                                              c.tilePosition,
-                                              citizens.citizens_[i].tilePosition
-                                          ) <= policy.leisureRadius
-            )
-            {
-                candidates.push_back(i);
+                append(i, spouse, distance);
             }
         }
-        std::stable_sort(
-            candidates.begin(),
-            candidates.end(),
-            [&](auto a, auto b)
+        // Preserve the existing extra spouse candidate after the 64-person
+        // limit without continuing through the rest of a large population.
+        if (!spouseIncluded)
+        {
+            if (const auto* spouse = citizens.citizen(c.spouseId))
             {
-                const auto score = [&](auto index)
-                {
-                    const auto& person = citizens.citizens_[index];
-                    return separation(c.tilePosition, person.tilePosition) -
-                           policy.familiarityPreference *
-                               c.familiarityWith(person.id) -
-                           (person.id == c.spouseId ? 4.0 : 0.0);
-                };
-                return score(a) < score(b);
+                append(std::size_t(spouse - citizens.citizens_.data()), true,
+                       separation(c.tilePosition, spouse->tilePosition));
+            }
+        }
+        std::sort(
+            candidates.begin(),
+            candidates.begin() + count,
+            [](const auto& a, const auto& b)
+            {
+                if (a.score != b.score) { return a.score < b.score; }
+                if (a.spouse != b.spouse) { return a.spouse; }
+                return a.index < b.index;
             }
         );
-        for (auto index : candidates)
+        for (const auto& candidate : std::span(candidates).first(count))
         {
-            auto& other = citizens.citizens_[index];
+            auto& other = citizens.citizens_[candidate.index];
             if (other.id == c.id || other.child != c.child ||
                 !available(other) ||
                 separation(c.tilePosition, other.tilePosition) >
@@ -309,9 +316,9 @@ namespace Paladin
             {
                 continue;
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             auto meeting = other.tilePosition;
-            auto waitingPlan = other;
+            CitizenRoutePlan waitingPlan(other);
             if (other.insideHome)
             {
                 const auto* home =
@@ -330,17 +337,17 @@ namespace Paladin
             {
                 continue;
             }
-            if (!childRouteIsLocal(map, planned) ||
-                !childRouteIsLocal(map, waitingPlan) ||
+            if (!childRouteIsLocal(map, c, planned) ||
+                !childRouteIsLocal(map, other, waitingPlan) ||
                 !inChildNeighborhood(map, other, planned.destination))
             {
                 continue;
             }
             const double travel = routeMinutes(map, citizens, planned);
             double duration =
-                2 + GenerationNoise::mix(
+                2 + double(GenerationNoise::mix(
                         c.id.value() ^ other.id.value() ^ ++c.choiceSequence
-                    ) % 14;
+                    ) % 14);
             if (c.breakUntil > 0)
             {
                 while (
@@ -352,7 +359,7 @@ namespace Paladin
             }
             if (other.breakUntil > 0)
             {
-                auto waiting = other;
+                CitizenRoutePlan waiting(other);
                 while (duration >= 2 && !breakTripFits(
                                             map,
                                             citizens,
@@ -371,8 +378,8 @@ namespace Paladin
             }
             finish(map, c, minute);
             finish(map, other, minute);
-            useRoute(c, planned);
-            useRoute(other, waitingPlan);
+            planned.applyTo(c);
+            waitingPlan.applyTo(other);
             c.task.kind = other.task.kind = CitizenTaskKind::Talk;
             c.task.partner = other.id;
             other.task.partner = c.id;

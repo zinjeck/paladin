@@ -9,15 +9,6 @@ namespace Paladin
 {
     namespace
     {
-        void adoptRoute(SettlementCitizen& citizen, SettlementCitizen& planned)
-        {
-            citizen.path = std::move(planned.path);
-            citizen.pathIndex = planned.pathIndex;
-            citizen.stepProgress = planned.stepProgress;
-            citizen.stepDuration = planned.stepDuration;
-            citizen.destination = planned.destination;
-            citizen.explicitMovement = planned.explicitMovement;
-        }
         std::uint64_t animalPastureRouteKey(
             EntityId animal,
             SettlementObjectId pasture
@@ -118,7 +109,7 @@ namespace Paladin
                     continue;
                 }
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (!route(
                     map,
                     citizens,
@@ -161,10 +152,7 @@ namespace Paladin
                 {
                     continue;
                 }
-                auto delivery = planned;
-                delivery.tilePosition = animal->tilePosition;
-                delivery.insideHome = false;
-                delivery.path.clear();
+                auto delivery = planned.fromPosition(animal->tilePosition);
                 delivery.task.kind = CitizenTaskKind::AnimalWork;
                 delivery.task.delivering = true;
                 if (route(
@@ -204,7 +192,7 @@ namespace Paladin
             {
                 continue;
             }
-            adoptRoute(c, planned);
+            planned.applyTo(c);
             c.task.kind = CitizenTaskKind::AnimalWork;
             c.task.animal = id;
             c.task.startedMinute = minute;
@@ -238,7 +226,7 @@ namespace Paladin
             {
                 return;
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (route(
                     map,
                     citizens,
@@ -247,7 +235,7 @@ namespace Paladin
                     true
                 ))
             {
-                adoptRoute(c, planned);
+                planned.applyTo(c);
                 c.task.delivering = false;
                 if (animal->beingLed && !animal->pasture)
                 {
@@ -300,7 +288,7 @@ namespace Paladin
             finish(map, c, minute);
             return;
         }
-        auto planned = c;
+        CitizenRoutePlan planned(c);
         planned.task.delivering = true;
         if (!route(map, citizens, planned, pasture->footprint, true))
         {
@@ -310,7 +298,7 @@ namespace Paladin
             }
             return;
         }
-        adoptRoute(c, planned);
+        planned.applyTo(c);
         c.task.delivering = true;
         animal->beingLed = true;
     }
@@ -404,7 +392,7 @@ namespace Paladin
                     {
                         continue;
                     }
-                    auto planned = c;
+                    CitizenRoutePlan planned(c);
                     if (!route(map, citizens, planned, {target, 1, 1}, true) ||
                         planned.destination != target)
                     {
@@ -427,7 +415,7 @@ namespace Paladin
                         continue;
                     }
                     map.animals.release(c.id);
-                    adoptRoute(c, planned);
+                    planned.applyTo(c);
                     c.task = {};
                     c.task.kind = CitizenTaskKind::Work;
                     c.task.object = job->objectId;
@@ -488,7 +476,7 @@ namespace Paladin
             {
                 continue;
             }
-            auto planned = c;
+            CitizenRoutePlan planned(c);
             if (!route(map, citizens, planned, {target, 1, 1}, true) ||
                 planned.destination != target)
             {
@@ -511,7 +499,7 @@ namespace Paladin
                 continue;
             }
             map.animals.release(c.id);
-            adoptRoute(c, planned);
+            planned.applyTo(c);
             c.task = {};
             c.task.kind = CitizenTaskKind::Work;
             c.task.object = job->objectId;

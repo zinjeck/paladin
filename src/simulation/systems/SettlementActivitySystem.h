@@ -54,6 +54,33 @@ namespace Paladin
         std::string partnerName;
         double endMinute = 0;
     };
+
+    // A speculative path owns only movement data, not a copy of the person,
+    // their relationships, attributes, cargo or other activity state.
+    struct CitizenRoutePlan
+    {
+        explicit CitizenRoutePlan(const SettlementCitizen&);
+        CitizenRoutePlan(const SettlementCitizen&, SettlementTilePosition origin);
+        CitizenRoutePlan fromPosition(SettlementTilePosition) const;
+        void applyTo(SettlementCitizen&);
+
+        SettlementObjectId homeId;
+        struct RoutingTask
+        {
+            CitizenTaskKind kind = CitizenTaskKind::None;
+            bool delivering = false;
+        } task;
+        SettlementTilePosition tilePosition{-1, -1};
+        SettlementTilePosition destination{-1, -1};
+        std::vector<SettlementTilePosition> path;
+        std::size_t pathIndex = 0;
+        double stepProgress = 0;
+        double stepDuration = 1;
+        bool explicitMovement = false;
+
+    private:
+        CitizenRoutePlan() = default;
+    };
     struct CitizenSimulationPolicy
     {
         // Probability per full day of eligible time for each mother.
@@ -281,14 +308,14 @@ namespace Paladin
             SettlementMap&,
             SettlementCitizenState&,
             const SettlementCitizen&,
-            const SettlementCitizen& planned,
+            const CitizenRoutePlan& planned,
             double minute,
             double stay
         );
         double routeMinutes(
             const SettlementMap&,
             const SettlementCitizenState&,
-            const SettlementCitizen&
+            const CitizenRoutePlan&
         ) const;
         bool chooseSocial(
             SettlementMap&,
@@ -323,6 +350,11 @@ namespace Paladin
             const SettlementMap&,
             const SettlementCitizen&
         ) const;
+        bool childRouteIsLocal(
+            const SettlementMap&,
+            const SettlementCitizen&,
+            const CitizenRoutePlan&
+        ) const;
         void produce(
             SettlementMap&,
             const SettlementCitizenState&,
@@ -335,6 +367,21 @@ namespace Paladin
             SettlementMap&,
             SettlementCitizenState&,
             SettlementCitizen&,
+            const SettlementObjectFootprint&,
+            bool inside
+        );
+        bool route(
+            SettlementMap&,
+            SettlementCitizenState&,
+            CitizenRoutePlan&,
+            const SettlementObjectFootprint&,
+            bool inside
+        );
+        template<typename RouteState>
+        bool planRoute(
+            SettlementMap&,
+            SettlementCitizenState&,
+            RouteState&,
             const SettlementObjectFootprint&,
             bool inside
         );

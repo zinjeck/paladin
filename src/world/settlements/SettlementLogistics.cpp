@@ -106,17 +106,9 @@ namespace Paladin
             {
                 return 0;
             }
-            int reserved = 0;
-            for (const auto& claim : reservations_)
-            {
-                if (claim.destination == id && claim.resource == output)
-                {
-                    reserved += claim.amount;
-                }
-            }
             amount = std::min(
                 amount,
-                limit->amount - entry->amount(output) - reserved
+                limit->amount - entry->amount(output) - incoming(id, output)
             );
         }
         if (amount <= 0)
@@ -239,10 +231,10 @@ namespace Paladin
     {
         const auto* entry = inventory(id);
         int amount = entry ? entry->amount(resource) : 0;
-        for (const auto& claim : reservations_)
+        for (const auto citizen : claimsFor(sourceClaims_, id))
         {
-            if (claim.source == id && claim.resource == resource &&
-                !claim.pickedUp)
+            const auto& claim = reservations_[reservationIndex_.at(citizen)];
+            if (claim.resource == resource)
             {
                 amount -= claim.amount;
             }
@@ -273,12 +265,9 @@ namespace Paladin
         int amount = entry && entry->kind != InventoryKind::Keep
                          ? entry->capacity - entry->used()
                          : 0;
-        for (const auto& claim : reservations_)
+        for (const auto citizen : claimsFor(destinationClaims_, id))
         {
-            if (claim.destination == id)
-            {
-                amount -= claim.amount;
-            }
+            amount -= reservations_[reservationIndex_.at(citizen)].amount;
         }
         return std::max(0, amount);
     }
@@ -302,14 +291,7 @@ namespace Paladin
             {
                 continue;
             }
-            int remaining = limit.amount - entry->amount(resource);
-            for (const auto& claim : reservations_)
-            {
-                if (claim.destination == id && claim.resource == resource)
-                {
-                    remaining -= claim.amount;
-                }
-            }
+            const int remaining = limit.amount - entry->amount(resource) - incoming(id, resource);
             return std::max(0, std::min(remaining, freeSpace(id)));
         }
         return 0;
@@ -389,18 +371,38 @@ namespace Paladin
         }
         return result;
     }
+    std::span<const CitizenId> SettlementLogistics::claimsFor(
+        const InventoryClaims& index, InventoryId id
+    )
+    {
+        const auto found = index.find(id);
+        return found == index.end() ? std::span<const CitizenId>{} : found->second;
+    }
+    void SettlementLogistics::unindexClaim(
+        InventoryClaims& index, InventoryId id, CitizenId citizen
+    )
+    {
+        const auto found = index.find(id);
+        if (found == index.end()) { return; }
+        std::erase(found->second, citizen);
+        if (found->second.empty()) { index.erase(found); }
+    }
+    int SettlementLogistics::incoming(InventoryId id, std::string_view resource) const
+    {
+        int amount = 0;
+        for (const auto citizen : claimsFor(destinationClaims_, id))
+        {
+            const auto& claim = reservations_[reservationIndex_.at(citizen)];
+            if (claim.resource == resource) { amount += claim.amount; }
+        }
+        return amount;
+    }
     const HaulReservation* SettlementLogistics::reservation(
         CitizenId citizen
     ) const
     {
-        for (const auto& claim : reservations_)
-        {
-            if (claim.citizen == citizen)
-            {
-                return &claim;
-            }
-        }
-        return nullptr;
+        const auto found = reservationIndex_.find(citizen);
+        return found == reservationIndex_.end() ? nullptr : &reservations_[found->second];
     }
     bool SettlementLogistics::reserve(
         CitizenId citizen,
@@ -419,6 +421,9 @@ namespace Paladin
         reservations_.push_back(
             {citizen, source, destination, std::string(resource), amount}
         );
+        reservationIndex_.emplace(citizen, reservations_.size() - 1);
+        sourceClaims_[source].push_back(citizen);
+        destinationClaims_[destination].push_back(citizen);
         ++version_;
         return true;
     }
@@ -453,52 +458,38 @@ namespace Paladin
     }
     bool SettlementLogistics::pickUp(CitizenId citizen)
     {
-        for (auto& claim : reservations_)
+        const auto found = reservationIndex_.find(citizen);
+        if (found == reservationIndex_.end()) { return false; }
+        auto& claim = reservations_[found->second];
+        if (claim.pickedUp) { return false; }
+        auto* entry = edit(claim.source);
+        if (!entry || entry->amount(claim.resource) < claim.amount)
         {
-            if (claim.citizen != citizen || claim.pickedUp)
-            {
-                continue;
-            }
-            auto* entry = edit(claim.source);
-            if (!entry || entry->amount(claim.resource) < claim.amount)
-            {
-                return false;
-            }
-            change(*entry, claim.resource, -claim.amount);
-            claim.pickedUp = true;
-            if (entry->kind == InventoryKind::Groundpile && entry->used() == 0)
-            {
-                const auto id = entry->id;
-                indexedSize_ = std::size_t(-1);
-                std::erase_if(
-                    inventories_,
-                    [id](const auto& i) { return i.id == id; }
-                );
-            }
-            return true;
+            return false;
         }
-        return false;
+        change(*entry, claim.resource, -claim.amount);
+        unindexClaim(sourceClaims_, claim.source, citizen);
+        claim.pickedUp = true;
+        if (entry->kind == InventoryKind::Groundpile && entry->used() == 0)
+        {
+            const auto id = entry->id;
+            indexedSize_ = std::size_t(-1);
+            std::erase_if(inventories_, [id](const auto& i) { return i.id == id; });
+        }
+        return true;
     }
     bool SettlementLogistics::consumeCarriedUnit(CitizenId citizen)
     {
-        for (auto& claim : reservations_)
+        const auto found = reservationIndex_.find(citizen);
+        if (found == reservationIndex_.end()) { return true; }
+        auto& claim = reservations_[found->second];
+        if (!claim.pickedUp || claim.amount <= 0)
         {
-            if (claim.citizen != citizen)
-            {
-                continue;
-            }
-            if (!claim.pickedUp || claim.amount <= 0)
-            {
-                return false;
-            }
-            --claim.amount;
-            if (claim.amount == 0)
-            {
-                release(citizen);
-            }
-            ++version_;
-            return true;
+            return false;
         }
+        --claim.amount;
+        if (claim.amount == 0) { release(citizen); }
+        ++version_;
         return true;
     }
     bool SettlementLogistics::deliver(CitizenId citizen)
@@ -520,13 +511,20 @@ namespace Paladin
     }
     void SettlementLogistics::release(CitizenId citizen)
     {
-        if (std::erase_if(
-                reservations_,
-                [citizen](const auto& r) { return r.citizen == citizen; }
-            ))
+        const auto found = reservationIndex_.find(citizen);
+        if (found == reservationIndex_.end()) { return; }
+        const auto index = found->second;
+        const auto& claim = reservations_[index];
+        if (!claim.pickedUp) { unindexClaim(sourceClaims_, claim.source, citizen); }
+        unindexClaim(destinationClaims_, claim.destination, citizen);
+        if (index + 1 != reservations_.size())
         {
-            ++version_;
+            reservations_[index] = std::move(reservations_.back());
+            reservationIndex_.at(reservations_[index].citizen) = index;
         }
+        reservations_.pop_back();
+        reservationIndex_.erase(found);
+        ++version_;
     }
     void SettlementLogistics::consumeSite(ConstructionSiteId id)
     {

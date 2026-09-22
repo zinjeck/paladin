@@ -737,6 +737,7 @@ namespace Paladin
         const PersonnelIndex* indexed
     )
     {
+        std::unordered_set<SettlementId, StrongIdHash> changedHomes;
         for (auto id : unit.soldiers_)
         {
             const auto* soldier = world.soldier(id);
@@ -780,10 +781,11 @@ namespace Paladin
             c->insideHome = false;
             c->hasVisualSnapshot = false;
             c->activity = CitizenActivity::Idle;
-            if (auto* home = world.settlement(soldier->homeSettlementId()))
-            {
-                home->simulationState().synchronizeCitizenPopulation();
-            }
+            changedHomes.insert(soldier->homeSettlementId());
+        }
+        for (const auto id : changedHomes)
+        {
+            world.settlement(id)->simulationState().synchronizeCitizenPopulation();
         }
     }
     void MilitarySystem::returnSurplus(World& world, Army& unit, double minute)
@@ -966,6 +968,7 @@ namespace Paladin
                 std::size_t(-std::int64_t(delta))
             );
             std::size_t removed = 0;
+            std::unordered_set<SettlementId, StrongIdHash> changedHomes;
             for (std::size_t i = unit->soldiers_.size();
                  i > 0 && removed < count;
                  --i)
@@ -987,14 +990,16 @@ namespace Paladin
                     c->militaryDeployed = false;
                     c->hasVisualSnapshot = false;
                     c->nextWorkCheckMinutes = 0;
-                    world.settlement(s->homeSettlementId())
-                        ->simulationState()
-                        .synchronizeCitizenPopulation();
+                    changedHomes.insert(s->homeSettlementId());
                 }
                 unit->soldiers_.erase(
                     unit->soldiers_.begin() + std::ptrdiff_t(i - 1)
                 );
                 ++removed;
+            }
+            for (const auto homeId : changedHomes)
+            {
+                world.settlement(homeId)->simulationState().synchronizeCitizenPopulation();
             }
             if (count > 0 && removed == 0)
             {
@@ -1040,6 +1045,17 @@ namespace Paladin
             SettlementTilePosition tile;
         };
         std::vector<Return> returns;
+        returns.reserve(existing->soldierCount());
+        struct HomeReturnLocation
+        {
+            std::optional<SettlementTilePosition> keep;
+            std::optional<SettlementTilePosition> destination;
+        };
+        std::unordered_map<SettlementId, HomeReturnLocation, StrongIdHash> locations;
+        std::unordered_map<SettlementId, std::uint64_t, StrongIdHash> returnCounts;
+        // Walkability reads live terrain/objects; it needs no per-person road
+        // cache allocation or full-map synchronization.
+        const SettlementNavigation navigation;
         for (const auto soldierId : existing->soldiers())
         {
             const auto* soldier = world.soldier(soldierId);
@@ -1050,19 +1066,13 @@ namespace Paladin
             {
                 return MilitaryResult::PersonnelOrigin;
             }
+            const auto returningCount = ++returnCounts[soldier->homeSettlementId()];
             if (!local)
             {
                 const auto* home =
                     world.settlement(soldier->homeSettlementId());
                 if (!home || !home->simulationState().isInitialized() ||
-                    std::uint64_t(
-                        std::count_if(
-                            returns.begin(),
-                            returns.end(),
-                            [&](const auto& ret)
-                            { return ret.home == home->id(); }
-                        )
-                    ) + 1 >
+                    returningCount >
                         std::numeric_limits<std::uint64_t>::max() -
                             home->population())
                 {
@@ -1074,18 +1084,22 @@ namespace Paladin
                 continue;
             }
             SettlementTilePosition anchor = c->tilePosition;
-            for (const auto& object : local->objectState().completedObjects())
+            auto [locationEntry, inserted] = locations.try_emplace(soldier->homeSettlementId());
+            auto& location = locationEntry->second;
+            if (inserted)
             {
-                if (object.objectTypeId == SettlementObjectTypes::CityKeep)
+                for (const auto& object : local->objectState().completedObjects())
                 {
-                    anchor = object.footprint.topLeft;
-                    break;
+                    if (object.objectTypeId == SettlementObjectTypes::CityKeep)
+                    {
+                        location.keep = object.footprint.topLeft;
+                        break;
+                    }
                 }
             }
-            SettlementNavigation navigation;
-            navigation.synchronize(*local);
-            bool found = false;
-            SettlementTilePosition destination = anchor;
+            if (location.keep) { anchor = *location.keep; }
+            bool found = location.destination.has_value();
+            SettlementTilePosition destination = location.destination.value_or(anchor);
             for (int radius = 0; radius <= 16 && !found; ++radius)
             {
                 for (int y = -radius; y <= radius && !found; ++y)
@@ -1113,6 +1127,7 @@ namespace Paladin
             {
                 return MilitaryResult::PersonnelOrigin;
             }
+            if (location.keep) { location.destination = destination; }
             returns.push_back(
                 {soldierId, soldier->homeSettlementId(), destination}
             );
@@ -1155,15 +1170,16 @@ namespace Paladin
             c.activity = CitizenActivity::Idle;
             c.nextWorkCheckMinutes = 0;
             ++home.citizens_.version_;
-            if (local)
-            {
-                home.synchronizeCitizenPopulation();
-            }
-            else
+            if (!local)
             {
                 static_cast<void>(home.population_.transferResidents(1));
             }
             world.soldiers_.erase(ret.soldier);
+        }
+        for (const auto& [homeId, count] : returnCounts)
+        {
+            auto& state = world.settlement(homeId)->simulationState();
+            if (state.localMap()) { state.synchronizeCitizenPopulation(); }
         }
         if (!returns.empty() && unit->rations_ > 0)
         {
