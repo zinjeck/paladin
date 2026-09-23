@@ -49,6 +49,7 @@ namespace Paladin
         double laborMinutes = 0;
         double startedMinute = 0;
         bool delivering = false;
+        bool treasuryPurchase = false;
         CitizenId partner;
         EntityId animal;
         std::string partnerName;

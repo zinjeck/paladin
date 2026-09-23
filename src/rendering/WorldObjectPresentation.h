@@ -22,6 +22,14 @@ namespace Paladin
         return std::max(1.0, effectiveTilePixels / WorldObjectPixelsPerTile);
     }
 
+    // Shared world-screen silhouette height for armies, carts and future boats.
+    // Always an integral count of the strategic scene's source pixels.
+    inline double worldMovingObjectHeight(double pixels) noexcept
+    {
+        const double pitch = worldObjectPixelPitch(pixels);
+        return std::round(std::max(pixels * .65, 22.) / pitch) * pitch;
+    }
+
     // Cartographic symbols are screen-sized annotations, not world sprites.
     // Quantize their finished origin to ONE physical pixel. Never divide their
     // 18 px dimensions by the zoom-dependent 32-art-pixel world raster.

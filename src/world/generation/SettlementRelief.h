@@ -90,7 +90,7 @@ namespace Paladin
             return ReliefType::Lowland;
         }
 
-        void consolidate(SettlementGrid& grid) const
+        void consolidate(SettlementGrid& grid, bool afterCaves = false) const
         {
             constexpr SettlementTilePosition steps[]{{1,0},{0,1},{-1,0},{0,-1}};
             std::vector<std::uint8_t> seen(grid.tileCount());
@@ -100,7 +100,7 @@ namespace Paladin
                 const auto index = std::size_t(y) * width_ + x;
                 if (seen[index] || grid.tile({x,y})->terrain == TerrainType::Water) { continue; }
                 const bool rock = grid.tile({x,y})->terrain == TerrainType::Mountain;
-                bool open = false, highRim = false;
+                bool open = false, highRim = false, caveRim = false;
                 component.clear(); component.push_back({x,y}); seen[index] = 1;
                 for (std::size_t i = 0; i < component.size(); ++i)
                 {
@@ -111,6 +111,7 @@ namespace Paladin
                         if (!tile || tile->terrain == TerrainType::Water) { open = true; continue; }
                         if ((tile->terrain == TerrainType::Mountain) != rock)
                         {
+                            caveRim |= tile->rockFloor;
                             highRim |= tile->terrain == TerrainType::Mountain &&
                                        tile->relief == ReliefType::Mountain;
                             continue;
@@ -119,13 +120,20 @@ namespace Paladin
                         if (!seen[at]) { seen[at] = 1; component.push_back(p); }
                     }
                 }
-                const bool remove = rock && component.size() < 48;
-                const bool fill = !rock && !open && component.size() < 20;
+                const bool remove = rock && component.size() < 48 && (!afterCaves || caveRim);
+                // Excavation may sever a thin shoulder into tiny pillars. Clear
+                // those remnants as cave floor, but never refill cave passages.
+                const bool fill = !afterCaves && !rock && !open && component.size() < 20;
                 if (!remove && !fill) { continue; }
                 for (auto p : component)
                 {
                     auto& tile = *grid.tile(p);
                     tile.terrain = fill ? TerrainType::Mountain : TerrainType::Land;
+                    if (afterCaves)
+                    {
+                        tile.rockFloor = true;
+                        continue;
+                    }
                     // A sealed pocket inherits its surrounding massif instead
                     // of leaving an isolated hill-colored patch in solid rock.
                     tile.relief = fill ? (highRim ? ReliefType::Mountain : ReliefType::Hills)

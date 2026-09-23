@@ -97,6 +97,21 @@ namespace Paladin
             const SettlementMap&, const SettlementCitizenState&, double minute
         ) const;
         CommercePolicy policy;
+        // Per resident, per local solar day; only keep/stockpile food qualifies.
+        int foodServings = 1;
+        void setFoodServings(int value) { foodServings = std::clamp(value, 0, 10); }
+        bool unpaidFoodWarning() const { return currentMinute_ < unpaidFoodUntil_; }
+        Money reliefPaid = 0;
+        std::uint64_t reliefMeals = 0, unpaidReliefMeals = 0;
+        static int sourcePreference(InventoryKind kind)
+        {
+            return kind == InventoryKind::Market ? 0 :
+                   kind == InventoryKind::Groundpile ? 2 : 1;
+        }
+        bool canAccessMeal(const SettlementMap&, const SettlementInventory&,
+                           const SettlementCitizen&, const SettlementCitizenState&) const;
+        bool payForMeal(const SettlementMap&, const SettlementInventory&,
+                        const SettlementCitizen&, const SettlementCitizenState&);
         std::shared_ptr<Treasury> treasury = std::make_shared<Treasury>();
         IncomeTaxPolicy cityIncomeTax{10, 40, 10};
         bool cityTaxOverride = false;
@@ -155,7 +170,8 @@ namespace Paladin
             InventoryId destination,
             std::string_view resource,
             int amount,
-            CitizenId consumer = {}
+            CitizenId consumer = {},
+            bool publicPurchase = false
         );
         void captureInactive(
             const SettlementMap&,
@@ -188,14 +204,16 @@ namespace Paladin
             const SettlementInventory& destination,
             int requested,
             const SettlementCitizenState* households = nullptr,
-            std::string_view resource = {}
+            std::string_view resource = {},
+            bool publicPurchase = false
         ) const;
         bool buyGoods(
             const SettlementInventory& source,
             const SettlementInventory& destination,
             int amount,
             const SettlementCitizenState* households = nullptr,
-            std::string_view resource = {}
+            std::string_view resource = {},
+            bool publicPurchase = false
         );
         Money mealPrice(const SettlementMap&, const SettlementInventory&) const;
         bool canBuyMeal(
@@ -221,6 +239,8 @@ namespace Paladin
         static bool transfer(Money& from, Money& to, Money amount);
 
     private:
+        double dailyWageFor(const SettlementMap&,const SettlementCitizen&,
+                            std::size_t householdAdults,double minute) const;
         std::unordered_map<std::string, ResourceTotals> resourceTotals_;
         ResourceFlowHistory resourceFlows_;
         ResourceFlowHistory nonMealFlows_;
@@ -233,6 +253,7 @@ namespace Paladin
             CitizenId consumer;
             std::string resource;
             double units = 0, lastMinute = 0, rate = 0, accrued = 0;
+            bool publicPurchase = false;
         };
         std::unordered_map<std::string, FrozenFlow> recentFlows_;
         std::vector<FrozenFlow> frozenFlows_;
@@ -244,6 +265,7 @@ namespace Paladin
             surplusRecipients_;
         bool inactive_ = false;
         double currentMinute_ = 0;
+        double unpaidFoodUntil_ = -1;
         double nextFlowCleanupMinute_ = 0;
         struct Wallet
         {
@@ -251,6 +273,8 @@ namespace Paladin
             double accrued = 0;
             double supportAccrued = 0;
             bool adultFunded = false;
+            std::int64_t reliefDay = -1;
+            int reliefServed = 0;
             Money realmTaxRemainder = 0, cityTaxRemainder = 0;
         };
         std::unordered_map<CitizenId, Wallet, StrongIdHash> citizens_;

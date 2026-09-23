@@ -430,6 +430,9 @@ namespace
         PALADIN_CHECK(
             coast.at({33, 32}) == 0 && std::abs(coast.total() - census) < .001
         );
+        const auto beforeEvent=WorldPopulationField::fingerprint(world);
+        world.populationDistributionChanged();
+        PALADIN_CHECK(WorldPopulationField::fingerprint(world)!=beforeEvent);
         const auto fingerprint = WorldPopulationField::fingerprint(world);
         PALADIN_CHECK(world.assignSettlementToRealm(f.home, f.player));
         const WorldPopulationField conquered{world};
@@ -461,6 +464,14 @@ namespace
         PALADIN_CHECK(
             GovernmentCivic.alpha == 255 && GovernmentTribal.alpha == 255
         );
+        WorldPopulationField pending{world,true};
+        pending.advance(world);
+        PALADIN_CHECK(world.settlement(f.home)->simulationState().spawnCitizens(7));
+        world.populationDistributionChanged();
+        while(!pending.complete()) pending.advance(world);
+        PALADIN_CHECK(std::abs(pending.total()-(census+seamPeople))<.001);
+        const WorldPopulationField refreshed{world};
+        PALADIN_CHECK(std::abs(refreshed.total()-(census+seamPeople+7))<.001);
         std::cout << "[pr30/population] geographic census mass, coast and "
                      "longitude seam, ownership independence and "
                      "terrain-preserving ink passed\n";

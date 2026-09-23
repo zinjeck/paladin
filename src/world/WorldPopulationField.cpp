@@ -16,6 +16,8 @@ namespace Paladin
         std::uint64_t hash=1469598103934665603ULL;
         const auto mix=[&](std::uint64_t value) { hash=(hash^value)*1099511628211ULL; };
         mix(world.grid().revision());
+        mix(world.populationDistributionRevision());
+        mix(world.worldRoadCount());
         for(const auto& city:world.settlements())
         {
             mix(city.id().value()); mix(city.position().x); mix(city.position().y); mix(city.population()); mix(city.isFortress());
@@ -31,6 +33,9 @@ namespace Paladin
         : cityCount_(world.settlements().size()), width_(world.grid().width()),
           height_(world.grid().height()), people_(world.grid().tileCount(), 0)
     {
+        census_.reserve(cityCount_);
+        for(const auto& city:world.settlements())
+            census_.push_back({city.id(),city.position(),double(city.population()),city.isFortress()});
         for (const auto& road : world.worldRoads())
         {
             for (const auto p : road.points())
@@ -53,19 +58,21 @@ namespace Paladin
     void WorldPopulationField::advance(const World& world)
     {
         if (complete() || width_ <= 0 || height_ <= 0 ||
-            nextCity_ >= world.settlements().size())
+            width_ != world.grid().width() || height_ != world.grid().height())
         {
             nextCity_ = cityCount_;
             return;
         }
-        // One bounded catchment per renderer work slice. No world pointer is
-        // retained, and a topology change replaces this in-progress estimate.
-        const auto& city = world.settlements()[nextCity_++];
-        if (!city.population())
+        // One bounded catchment per slice, identified by stable city ID.
+        // Headcounts stay at the requested census; a subsequent refresh picks
+        // up newer migration/death events without starving this build.
+        const auto& snapshot = census_[nextCity_++];
+        const auto* city = world.settlement(snapshot.id);
+        if (!snapshot.population)
         {
             return;
         }
-        const auto centre = city.position();
+        const auto centre = snapshot.centre;
         const auto dry = [&](WorldTilePosition p)
         {
             const auto* t = world.grid().tile(p);
@@ -81,9 +88,9 @@ namespace Paladin
                 people_[index(p)] += float(count);
             }
         };
-        if (const auto* map = city.simulationState().localMap())
+        if (const auto* map = city ? city->simulationState().localMap() : nullptr)
         {
-            const auto& citizens = city.simulationState().citizens();
+            const auto& citizens = city->simulationState().citizens();
             const double residents = double(citizens.residentCount());
             if (residents > 0)
             {
@@ -133,7 +140,7 @@ namespace Paladin
                     tile.x = (tile.x % width_ + width_) % width_;
                     deposit(
                         dry(tile) ? tile : centre,
-                        double(city.population()) / residents
+                        double(snapshot.population) / residents
                     );
                 }
                 return;
@@ -143,11 +150,11 @@ namespace Paladin
         // people to tint ownership. Paths may reach unclaimed countryside but
         // never cross water. Ownership changes do not relocate residents.
         const int radius =
-            city.isFortress()
+            snapshot.fortress
                 ? 1
                 : std::clamp(
                       int(9 +
-                          std::log2(1 + double(city.population()) / 200) * 2),
+                          std::log2(1 + double(snapshot.population) / 200) * 2),
                       9,
                       28
                   );
@@ -197,7 +204,7 @@ namespace Paladin
                     .05 + std::pow(std::clamp((field + 1) * .5, 0., 1.), 3) * 3;
                 const double access = roads_.contains(index(p)) ? 2.5 : 1;
                 const double u =
-                    std::exp(-d2 / (city.isFortress() ? .7 : 3.8)) *
+                    std::exp(-d2 / (snapshot.fortress ? .7 : 3.8)) *
                     std::max(.1, fertility * relief);
                 const double v = fertility * relief * patch * access *
                                  std::exp(-d2 / (radius * radius * .42));
@@ -226,15 +233,15 @@ namespace Paladin
         }
         if (urbanSum <= 0)
         {
-            deposit(centre, double(city.population()));
+            deposit(centre, double(snapshot.population));
             return;
         }
-        const double urbanShare = city.isFortress() || ruralSum <= 0 ? 1 : .58;
+        const double urbanShare = snapshot.fortress || ruralSum <= 0 ? 1 : .58;
         for (std::size_t i = 0; i < cells.size(); ++i)
         {
             deposit(
                 cells[i],
-                double(city.population()) *
+                double(snapshot.population) *
                     (urbanShare * urban[i] / urbanSum +
                      (1 - urbanShare) * rural[i] / std::max(1e-30, ruralSum))
             );

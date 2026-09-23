@@ -1,5 +1,6 @@
 #pragma once
 #include "world/WorldTilePosition.h"
+#include "core/StrongId.h"
 #include <cstdint>
 #include <unordered_set>
 #include <vector>
@@ -23,6 +24,16 @@ namespace Paladin
         double total() const noexcept;
         static std::uint64_t fingerprint(const World&) noexcept;
     private:
+        struct CityCensus
+        {
+            SettlementId id;
+            WorldTilePosition centre;
+            double population;
+            bool fortress;
+        };
+        // Snapshot headcounts before sliced work: a birth, famine or migration
+        // during rendering cannot mix different demographic totals in one map.
+        std::vector<CityCensus> census_;
         std::size_t nextCity_ = 0, cityCount_ = 0;
         std::unordered_set<std::size_t> roads_;
         int width_=0,height_=0;

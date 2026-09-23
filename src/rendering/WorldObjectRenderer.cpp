@@ -427,7 +427,8 @@ namespace Paladin
                     }
                     if (const auto* art =
                             artwork ? artwork->find(
-                                          std::string("transport.cart.") +
+                                          std::string(caravan.transportDomain == TransportDomain::Water
+                                              ? "transport.boat." : "transport.cart.") +
                                           transportDirection(dx, to.y - from.y)
                                       )
                                     : nullptr)
@@ -477,6 +478,9 @@ namespace Paladin
                         );
                         continue;
                     }
+                    // A future water shipment must never masquerade as a cart
+                    // if its directional boat artwork is absent.
+                    if (caravan.transportDomain == TransportDomain::Water) continue;
                     const auto& rows = WorldCaravanRows;
                     const float step =
                         worldCaravanPixelStep(effectiveTilePixels);

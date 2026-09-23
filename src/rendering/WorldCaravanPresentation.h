@@ -33,7 +33,7 @@ namespace Paladin
     }
     inline float worldCaravanPixelStep(double pixels) noexcept
     {
-        return float(std::max(worldObjectPixelPitch(pixels), pixels / 16.));
+        return float(worldMovingObjectHeight(pixels) / 24.);
     }
     inline UiRectangle worldCaravanBounds(
         double x,

@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/GlobeLighting.h"
 #include "rendering/GlobeView.h"
+#include "rendering/WorldProjectionTransition.h"
 #include "rendering/NaturalSurfaceShape.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/SceneDetail.h"
@@ -1295,6 +1296,7 @@ namespace Paladin
             const int gridWidth = g.width(), gridHeight = g.height();
             const double seconds =
                 (world.time().secondsIntoDay() + solarSecondsOffset);
+            const double transition=worldPresentationState(view.radius*2*PlanetAstronomy::Pi/gridWidth).localWorldWeight;
             const auto shadeVertex = [&](const V& v)
             {
                 auto light = globeLight(v.u, v.v, seconds, v.p.z);
@@ -1346,9 +1348,10 @@ namespace Paladin
                     light.green = std::uint8_t(light.green * shade);
                     light.blue = std::uint8_t(light.blue * shade);
                 }
+                const auto screen=worldTransitionPoint(view,v.u,v.v,gridWidth,gridHeight,transition);
                 return MeshVertex{
-                    float(view.cx + v.p.x * view.radius),
-                    float(view.cy - v.p.y * view.radius),
+                    float(transition>0 ? screen.x : view.cx + v.p.x * view.radius),
+                    float(transition>0 ? screen.y : view.cy - v.p.y * view.radius),
                     float(v.u),
                     float(v.v),
                     light

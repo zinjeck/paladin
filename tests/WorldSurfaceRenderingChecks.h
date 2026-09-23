@@ -530,6 +530,53 @@ namespace Paladin::Test
         PALADIN_CHECK(!map.politicalWorkPending());
         saveWorldReview(native,"world-zoom-blended-political.png");
 
+        // Atmospheric density wraps at longitude and freezes with game time.
+        PALADIN_CHECK(WorldAtmosphere::wind(0)<0 && WorldAtmosphere::wind(.75)>0);
+        PALADIN_CHECK(WorldAtmosphere::opacity(40)==0);
+        double movingClouds=0;
+        for(int y=1;y<20;++y) for(int x=0;x<30;++x)
+        {
+            const double u=x/30.,v=y/20.;
+            PALADIN_CHECK(std::abs(WorldAtmosphere::density(u,v,0)-WorldAtmosphere::density(u+1,v,0))<1.e-10);
+            movingClouds+=std::abs(WorldAtmosphere::density(u,v,0)-WorldAtmosphere::density(u,v,1));
+        }
+        PALADIN_CHECK(movingClouds>1);
+        for(const double pixels:{2.,12.,28.,31.,34.,37.,40.,64.})
+        {
+            map.globeEnabled=true; map.setMapMode(WorldMapMode::Terrain);
+            camera.setPlanetRotation(GlobeView::orientationAt({30./64,24./48},.37),64,48);
+            camera.setZoom(pixels*64/(640*.4*2*PlanetAstronomy::Pi));
+            renderer.beginFrame(); map.render(renderer,world,camera,metrics);
+            saveWorldReview(native,"economy-pass-descent-"+std::to_string(int(pixels))+".png");
+            if(pixels>28 && pixels<40)
+            {
+                const auto source=pixelStableWorldCamera(camera,world.grid(),960,640,true);
+                const auto view=GlobeView::from(source,world.grid(),960,640);
+                const auto projected=worldTransitionPoint(view,31./64,25./48,64,48,worldPresentationState(pixels).localWorldWeight);
+                const auto picked=WorldMapNavigation::pick(camera,world.grid(),960,640,pixels,true,projected.x,projected.y);
+                PALADIN_CHECK(picked && std::abs(picked->u-31./64)<.0001 && std::abs(picked->v-25./48)<.0001);
+            }
+        }
+        // First-click rendering must keep visible geography, even while new
+        // census pages are built; warmed switches retain their bounded caches.
+        for(const auto mode:{WorldMapMode::Resources,WorldMapMode::Government,WorldMapMode::Population,WorldMapMode::Terrain,WorldMapMode::Population})
+        {
+            map.setMapMode(mode); renderer.beginFrame(); map.render(renderer,world,camera,metrics);
+            saveWorldReview(native,"economy-pass-mode-"+std::to_string(int(mode))+".png");
+            const auto screen=readWorldReview(native);
+            std::size_t visible=0;
+            for(int y=100;y<500;y+=4) for(int x=150;x<800;x+=4)
+            {
+                const auto c=reviewPixel(screen.get(),x,y);
+                visible+=(c.green>35 || c.red>35);
+            }
+            PALADIN_CHECK(visible>100);
+        }
+        for(const auto b:{WorldMapNavigation::politicalModeButtonBounds(960,640),WorldMapNavigation::resourceModeButtonBounds(960,640),
+                         WorldMapNavigation::terrainModeButtonBounds(960,640),WorldMapNavigation::governmentModeButtonBounds(960,640),
+                         WorldMapNavigation::populationModeButtonBounds(960,640)})
+            PALADIN_CHECK(std::string_view(WorldMapNavigation::modeTooltip(b.x+5,b.y+5,960,640)).size()>0);
+
         // Solar optical field, immutable cache and full occultation regression.
         CelestialSunRenderer sun;
         PALADIN_CHECK(

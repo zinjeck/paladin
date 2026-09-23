@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/CelestialSun.h"
+#include "rendering/WorldAtmosphere.h"
 #include "rendering/GlobeRenderer.h"
 #include "rendering/OverlayRenderer.h"
 #include "rendering/Renderer.h"
@@ -86,6 +87,7 @@ namespace Paladin
             sunRenderer_.reset();
             territoryPresentationRenderer_.reset();
             preparedPoliticalWorld_ = nullptr;
+            preparingWorld_ = nullptr; preparedMode_=0;
             pixelStabilityActive_ = false;
         }
 
@@ -149,9 +151,12 @@ namespace Paladin
         mutable RegionResourceTooltip resourceTooltip_;
         mutable GlobeRenderer globe_;
         mutable CelestialSunRenderer sunRenderer_;
+        mutable WorldAtmosphere atmosphere_;
         OverlayRenderer overlayRenderer_;
         mutable WorldRealmPresentationRenderer territoryPresentationRenderer_;
         mutable const World* preparedPoliticalWorld_ = nullptr;
+        mutable const World* preparingWorld_ = nullptr;
+        mutable int preparedMode_ = 0;
         WorldObjectRenderer worldObjectRenderer_;
         WorldPresentationPolicy worldPresentationPolicy_;
         WorldPixelStabilityPolicy pixelStabilityPolicy_;

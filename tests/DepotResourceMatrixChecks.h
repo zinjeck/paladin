@@ -112,7 +112,7 @@ namespace Paladin::Test::DepotRegression
             PALADIN_CHECK(map.trade.orders.empty());
             PALADIN_CHECK(f.money() == importCash && total() == importGoods);
             PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Stockpile));
-            PALADIN_CHECK(!map.logistics.importsMaySupply(*imports,InventoryKind::Market));
+            PALADIN_CHECK(map.logistics.importsMaySupply(*imports,InventoryKind::Market));
             PALADIN_CHECK(WorldMarketSystem::placeOrder(world,f.seller,f.home,f.depot,
                 goods,TradeDirection::Import,2,true));
             for (int i=0;i<800 && imports->amount(goods)<6;++i)

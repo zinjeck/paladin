@@ -228,7 +228,9 @@ void runSettlementEmploymentTests()
         );
     }
     PALADIN_CHECK(jobs.unemployed(citizens) == 0);
-    PALADIN_CHECK(!jobs.adjust(storeId, 1, citizens));
+    PALADIN_CHECK(jobs.adjust(storeId, 1, citizens));
+    PALADIN_CHECK(jobs.workplace(storeId)->capacity == 5);
+    PALADIN_CHECK(jobs.adjust(storeId,-1,citizens));
     PALADIN_CHECK(
         jobs.employed(fishId, citizens) + jobs.employed(storeId, citizens) ==
         citizens.citizens().size()

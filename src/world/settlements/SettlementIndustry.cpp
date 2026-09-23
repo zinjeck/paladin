@@ -67,13 +67,12 @@ namespace Paladin
             int wanted = requested;
             // No inventory creation during transfer: IDs/copies stay valid and
             // both reservations and cash are checked before committing.
-            for (int marketFallback = 0; marketFallback < 2 && wanted > 0;
+            for (int marketFallback = 0; marketFallback < 3 && wanted > 0;
                  ++marketFallback)
             {
                 for (const auto& candidate : map.logistics.inventories())
                 {
-                    if ((candidate.kind == InventoryKind::Market) !=
-                        bool(marketFallback))
+                    if (SettlementCommerce::sourcePreference(candidate.kind) != marketFallback)
                     {
                         continue;
                     }

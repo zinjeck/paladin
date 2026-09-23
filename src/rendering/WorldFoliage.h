@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/GlobeLighting.h"
 #include "rendering/GlobeView.h"
+#include "rendering/WorldProjectionTransition.h"
 #include "rendering/SceneDetail.h"
 #include "rendering/TerrainMaterialField.h"
 #include "world/Settlement.h"
@@ -164,7 +165,7 @@ namespace Paladin
                 WorldSurface::Point3 p;
                 if (globe)
                 {
-                    p = view.project(u, v);
+                    p = worldTransitionPoint(view,u,v,g.width(),g.height(),worldPresentationState(pixels).localWorldWeight);
                 }
                 else
                 {

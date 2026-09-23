@@ -18,6 +18,10 @@ namespace Paladin
         Blocked
     };
 
+    // Presentation/routing contract for future water routes. Existing route
+    // creation remains land-only; a visual kind never authorizes a sea path.
+    enum class TransportDomain { Land, Water };
+
     // One route owns one caravan and its physical cargo. The route never owns a
     // second copy in either city's inventory. Paths include both endpoints.
     struct WorldShipment
@@ -31,6 +35,7 @@ namespace Paladin
         SettlementId source, destination;
         SettlementObjectId sourceDepot, destinationDepot;
         double minutesPerTile = MinutesPerTile;
+        TransportDomain transportDomain = TransportDomain::Land;
         std::string resource;
         int amount = 1;
         int cargo = 0;
@@ -60,12 +65,14 @@ namespace Paladin
         }
         WorldTilePosition position() const noexcept
         {
-            return path.empty() ? WorldTilePosition{} : path[tileIndex];
+            return path.empty() ? WorldTilePosition{} : path[std::min(tileIndex,path.size()-1)];
         }
         std::size_t nextIndex() const noexcept
         {
-            return phase == ShipmentPhase::Returning ? tileIndex - 1
-                                                     : tileIndex + 1;
+            if (path.empty()) return 0;
+            const auto current = std::min(tileIndex,path.size()-1);
+            return phase == ShipmentPhase::Returning ? (current ? current-1 : 0)
+                                                     : std::min(current+1,path.size()-1);
         }
         double visualX() const noexcept
         {
@@ -79,7 +86,7 @@ namespace Paladin
                 dx += dx > 0 ? -wrapWidth : wrapWidth;
             }
             return position().x +
-                   dx * std::clamp(stepMinutes / minutesPerTile, 0.0, 1.0);
+                   dx * std::clamp(stepMinutes / std::max(.001,minutesPerTile), 0.0, 1.0);
         }
         double visualY() const noexcept
         {
@@ -87,7 +94,7 @@ namespace Paladin
                        ? position().y
                        : position().y + (path[nextIndex()].y - position().y) *
                                             std::clamp(
-                                                stepMinutes / minutesPerTile,
+                                                stepMinutes / std::max(.001,minutesPerTile),
                                                 0.0,
                                                 1.0
                                             );

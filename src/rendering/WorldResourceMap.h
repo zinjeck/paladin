@@ -114,7 +114,7 @@ namespace Paladin
             }
             std::size_t selected = 0;
             while (selected + 1 < levels_.size() &&
-                   levels_[selected].side * pixels < 68)
+                   levels_[selected].side * pixels < 100)
             {
                 ++selected;
             }
@@ -212,7 +212,7 @@ namespace Paladin
                     int count = 0;
                     for (auto index : order)
                     {
-                        if (index == 2 || index == 3)
+                        if (index == 0 || index == 1 || index == 2 || index == 3)
                         {
                             continue;
                         }
@@ -222,6 +222,18 @@ namespace Paladin
                         {
                             continue;
                         }
+                        // Keep a regional maximum, not a symbol in every cell.
+                        bool peak=true;
+                        for(int dy=-1;dy<=1 && peak;++dy) for(int dx=-1;dx<=1;++dx)
+                        {
+                            const int yy=row+dy, xx=(column+dx+level.width)%level.width;
+                            if(yy<0 || yy>=level.height || (!dx && !dy)) continue;
+                            const auto other=std::size_t(yy)*level.width+xx;
+                            const auto here=std::size_t(row)*level.width+column;
+                            const double rival=level.cells[other].amounts[index];
+                            if(rival>cell.amounts[index] || (rival==cell.amounts[index] && other<here)) peak=false;
+                        }
+                        if(!peak) continue;
                         const auto* sprite =
                             art.find("ui.goods." + std::string(ids[index]));
                         if (!sprite || !sprite->texture)
@@ -229,30 +241,20 @@ namespace Paladin
                             continue;
                         }
                         const auto frame = art.frame(*sprite, false);
-                        const float px = std::round(
-                            float(point->x) + (count == 0 ? -24 : 2)
-                        );
-                        const float py =
-                            std::round(float(point->y) - frame.height * .5F);
-                        renderer.fillRectangle(
-                            px - 2,
-                            py - 2,
-                            frame.width + 4,
-                            frame.height + 4,
-                            {8, 15, 27, 190}
-                        );
-                        renderer.drawTexture(
-                            *sprite->texture,
-                            frame.x,
-                            frame.y,
-                            frame.width,
-                            frame.height,
-                            px,
-                            py,
-                            frame.width,
-                            frame.height
-                        );
-                        if (++count == 2)
+                        constexpr float size=18;
+                        const float scale=size/std::max(frame.width,frame.height);
+                        const float w=frame.width*scale,h=frame.height*scale;
+                        const float px=std::round(float(point->x)-w*.5F);
+                        const float py=std::round(float(point->y)-h*.5F);
+                        // Neighbor bins prevent overlap at screen-cell boundaries.
+                        bool blocked=false;
+                        const int bx=int(point->x)/64,by=int(point->y)/48;
+                        for(int yy=std::max(0,by-1);yy<=std::min(rows-1,by+1);++yy)
+                        for(int xx=std::max(0,bx-1);xx<=std::min(columns-1,bx+1);++xx)
+                            blocked |= occupied_[std::size_t(yy)*columns+xx]!=0;
+                        if(blocked) break;
+                        renderer.drawTexture(*sprite->texture,frame.x,frame.y,frame.width,frame.height,px,py,w,h);
+                        if (++count == 1)
                         {
                             break;
                         }

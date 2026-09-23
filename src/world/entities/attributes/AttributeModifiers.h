@@ -76,7 +76,7 @@ namespace Paladin
         AttributeEffectDefinition{EntityAttribute::Happiness, "Tax policy"},
         AttributeEffectDefinition{
             EntityAttribute::Happiness,
-            "Reliance on public meals"
+            "Unpaid food relief"
         },
         AttributeEffectDefinition{
             EntityAttribute::Happiness,

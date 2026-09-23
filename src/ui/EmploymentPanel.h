@@ -26,6 +26,7 @@ namespace Paladin
             }
             pressed_ = -1;
             dragging_ = false;
+            foodServingsDrag_ = false;
             dragCandidate_ = false;
             techPointer_ = false;
             techPanned_ = false;
@@ -36,6 +37,7 @@ namespace Paladin
             open_ = false;
             pressed_ = -1;
             dragging_ = false;
+            foodServingsDrag_ = false;
             dragCandidate_ = false;
             techPointer_ = false;
             techPanned_ = false;
@@ -56,7 +58,7 @@ namespace Paladin
         bool pointerPressed(float, float);
         bool capturingPointer() const noexcept
         {
-            return dragging_ || dragCandidate_ || techPointer_;
+            return dragging_ || dragCandidate_ || techPointer_ || foodServingsDrag_;
         }
         bool pointerMoved(float, float);
         std::string tooltipAt(float, float) const;
@@ -162,6 +164,9 @@ namespace Paladin
         );
         bool worldMode_ = false, foundSettlement_ = false;
         bool immigrationOriginAvailable_ = false;
+        UiRectangle foodServingsBounds_;
+        bool foodServingsDrag_ = false;
+        int foodServingsPreview_ = 1;
         bool dragCandidate_ = false;
         float pressX_ = 0, pressY_ = 0;
         bool dragging_ = false;

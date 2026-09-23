@@ -31,7 +31,7 @@ namespace Paladin
     inline double worldArmySpriteScale(double pixels, const SceneSprite* sprite)
     {
         const double height = sprite ? sprite->height : 1.25;
-        return std::max(WorldArmySpriteScale,36. / std::max(1.e-9,pixels*height));
+        return worldMovingObjectHeight(pixels) / std::max(1.e-9,pixels*height);
     }
 
     inline UiRectangle worldArmySpriteBounds(

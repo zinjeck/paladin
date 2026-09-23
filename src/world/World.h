@@ -333,7 +333,12 @@ namespace Paladin
         std::size_t worldRoadCount() const noexcept;
 
 
+        // Migration, displacement, siege and mortality systems can invalidate
+        // spatial census estimates even when settlement headcounts are unchanged.
+        void populationDistributionChanged() noexcept { ++populationDistributionRevision_; }
+        std::uint64_t populationDistributionRevision() const noexcept { return populationDistributionRevision_; }
     private:
+        std::uint64_t populationDistributionRevision_ = 0;
         friend class MilitarySystem;
         std::uint64_t militaryRosterStamp_ = 0;
         std::uint64_t militaryRosterRebuilds_ = 0;

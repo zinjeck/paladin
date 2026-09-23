@@ -979,15 +979,14 @@ namespace Paladin
             const auto* source = map.logistics.inventory(c.task.source);
             const bool market = source && source->kind == InventoryKind::Market;
             const auto marketId =
-                source && source->kind != InventoryKind::TradeImports
-                    ? source->objectId : SettlementObjectId{};
+                source ? source->objectId : SettlementObjectId{};
             const bool publicFood =
                 source && (source->kind == InventoryKind::Keep ||
                            source->kind == InventoryKind::Stockpile);
             const auto price =
                 source ? map.commerce.mealPrice(map, *source) : 0;
             if (price < 0 ||
-                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                (!source || !map.commerce.canAccessMeal(map, *source, c, citizens)) ||
                 (market && !map.commerce.marketOpen(map, citizens, marketId)))
             {
                 finish(map, c, minute);
@@ -998,20 +997,19 @@ namespace Paladin
                 mealReservation ? mealReservation->resource : "";
             // Recheck at the actual meal, not only when the route was planned:
             // fresh ordinary food may have arrived while this person walked.
-            if (!map.logistics.canEat(mealResource))
+            if (!mealReservation || mealReservation->pickedUp ||
+                !source || source->amount(mealResource) < mealReservation->amount ||
+                !map.logistics.canEat(mealResource))
             {
                 finish(map, c, minute);
                 c.nextWorkCheckMinutes = minute;
                 return;
             }
-            if (map.logistics.pickUp(c.id))
+            if (source && map.commerce.payForMeal(map, *source, c, citizens) &&
+                map.logistics.pickUp(c.id))
             {
                 map.commerce
                     .recordFlow(c.task.source, {}, mealResource, 1, c.id);
-                if (price > 0)
-                {
-                    map.commerce.buyMeal(marketId, c, citizens, price);
-                }
                 map.commerce.recordMeal(c, publicFood && price == 0);
                 c.modifyAttributes(
                     {{AttributeEffect::Meals, -policy.mealRestoration}}
@@ -1058,7 +1056,7 @@ namespace Paladin
                         *destination,
                         copy.amount,
                         &citizens,
-                        copy.resource
+                        copy.resource, c.task.treasuryPurchase
                     ) < copy.amount ||
                     (market && sourceInventory &&
                      sourceInventory->kind == InventoryKind::Keep))
@@ -1109,7 +1107,7 @@ namespace Paladin
                         destinationForTrade,
                         copy.amount,
                         &citizens,
-                        copy.resource
+                        copy.resource, c.task.treasuryPurchase
                     ))
                 {
                     finish(map, c, minute);
@@ -1136,7 +1134,7 @@ namespace Paladin
                         c.task.source,
                         c.task.destination,
                         c.carriedResource,
-                        c.carriedAmount
+                        c.carriedAmount, {}, c.task.treasuryPurchase
                     );
                     c.carriedAmount = 0;
                     if (siteId)

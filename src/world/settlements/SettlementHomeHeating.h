@@ -10,6 +10,10 @@ namespace Paladin
     class SettlementHomeHeating
     {
     public:
+        static double dailyFuelUnits(double minute)
+        {
+            return seasonAtMinute(minute) == Season::Winter ? 6.0 : 3.0;
+        }
         // The burn fraction persists through season changes. Empty houses do
         // not burn fuel. A delivered log supplies 8 hours, or 4 in winter.
         void advance(
@@ -42,7 +46,7 @@ namespace Paladin
                     continue;
                 }
                 const double duration =
-                    seasonAtMinute(minute) == Season::Winter ? 240 : 480;
+                    1440.0 / dailyFuelUnits(minute);
                 double remaining = elapsed / duration;
                 while (remaining > 1e-9)
                 {

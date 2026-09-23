@@ -246,6 +246,8 @@ namespace Paladin
                     founded && sample.food <= 0,
                     "Public food stores are empty"
                 );
+                warn("food-relief", founded && map->commerce.unpaidFoodWarning(),
+                     "Food relief is unpaid; food workers are losing happiness");
                 warn(
                     "treasury",
                     founded && map->commerce.treasury->moneyEconomyStarted &&

@@ -1,3 +1,4 @@
+#include "rendering/WorldMapNavigation.h"
 #include "core/Application.h"
 #include "core/SimulationClock.h"
 #include "interaction/SettlementCommandController.h"
@@ -260,11 +261,13 @@ namespace Paladin
         {
             text = cityHud_->tooltipAt(x, y);
         }
+        if (screen_ == Screen::World && text.empty())
+            text = WorldMapNavigation::modeTooltip(x,y,renderer_->outputWidth(),renderer_->outputHeight());
         if (key.empty())
         {
             key = text;
         }
-        if (text.empty() && !activeHudContainsPoint(x, y))
+        if (screen_ == Screen::City && text.empty() && !activeHudContainsPoint(x, y))
         {
             const auto* map =
                 simulation_->settlementMap(activeCitySettlementId_);

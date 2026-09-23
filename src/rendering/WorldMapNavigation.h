@@ -4,12 +4,22 @@
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldPixelStability.h"
 #include "rendering/WorldPresentation.h"
+#include "rendering/WorldProjectionTransition.h"
 #include "ui/UiTypes.h"
 namespace Paladin
 {
     // All views address the same canonical tile coordinates and longitude seam.
     struct WorldMapNavigation
     {
+        static const char* modeTooltip(float x, float y, int width, int height)
+        {
+            if (politicalModeButtonBounds(width,height).contains(x,y)) return "Political map";
+            if (resourceModeButtonBounds(width,height).contains(x,y)) return "Resource map";
+            if (terrainModeButtonBounds(width,height).contains(x,y)) return "Terrain map";
+            if (governmentModeButtonBounds(width,height).contains(x,y)) return "Government map";
+            if (populationModeButtonBounds(width,height).contains(x,y)) return "Population map";
+            return "";
+        }
         static UiRectangle mapBounds(int width, int height)
         {
             const float w = std::min(260.F, float(width) * .27F), h = w * .5F;
@@ -137,6 +147,33 @@ namespace Paladin
                         : 0.0;
                 const auto presentation =
                     worldPresentationState(effectivePixels);
+                if (presentation.localWorldWeight > 0 && presentation.localWorldWeight < .999F)
+                {
+                    const auto source=pixelStableWorldCamera(c,g,w,h,true);
+                    const auto view=GlobeView::from(source,g,w,h);
+                    const auto chart=LocalTangentWorldView::from(source,g,w,h,effectivePixels);
+                    auto uv=presentation.localWorldWeight<.5 ? view.pick(x,y) : chart.pick(x,y);
+                    if (!uv) return std::nullopt;
+                    // Invert the same smooth surface used by terrain and objects.
+                    // Bounded Newton iterations avoid a picking jump mid-descent.
+                    constexpr double step=1.e-5;
+                    for(int i=0;i<8;++i)
+                    {
+                        const auto project=[&](double u,double v) {
+                            return worldTransitionPoint(view,u,v,g.width(),g.height(),presentation.localWorldWeight);
+                        };
+                        const auto p=project(uv->u,uv->v),a=project(uv->u+step,uv->v),b=project(uv->u,uv->v+step);
+                        const double ax=(a.x-p.x)/step,ay=(a.y-p.y)/step,bx=(b.x-p.x)/step,by=(b.y-p.y)/step;
+                        const double det=ax*by-ay*bx;
+                        if(std::abs(det)<1.e-8) return std::nullopt;
+                        uv->u+=std::clamp(((x-p.x)*by-(y-p.y)*bx)/det,-.05,.05);
+                        uv->v+=std::clamp(((y-p.y)*ax-(x-p.x)*ay)/det,-.05,.05);
+                        uv->u-=std::floor(uv->u);
+                        uv->v=std::clamp(uv->v,0.,1.);
+                        if(std::hypot(x-p.x,y-p.y)<.05) break;
+                    }
+                    return uv;
+                }
                 if (presentation.localWorldWeight >= 0.5F)
                 {
                     // The close renderer rasterizes around a snapped 1/16-tile

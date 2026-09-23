@@ -459,7 +459,7 @@ namespace Paladin
             }
             const auto price = map.commerce.mealPrice(map, inventory);
             if (price < 0 ||
-                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                !map.commerce.canAccessMeal(map, inventory, c, citizens) ||
                 (inventory.kind == InventoryKind::Market &&
                  !map.commerce.marketOpen(map, citizens, inventory.objectId)))
             {
@@ -644,7 +644,7 @@ namespace Paladin
             InventoryId id;
             std::string resource;
             int distance;
-            bool market = false;
+            int preference = 0;
         };
         std::vector<Food> foods;
         for (const auto& inventory : map.logistics.inventories())
@@ -656,7 +656,7 @@ namespace Paladin
             const bool market = inventory.kind == InventoryKind::Market;
             const auto price = map.commerce.mealPrice(map, inventory);
             if (price < 0 ||
-                (price > 0 && !map.commerce.canBuyMeal(c, citizens, price)) ||
+                !map.commerce.canAccessMeal(map, inventory, c, citizens) ||
                 (market &&
                  !map.commerce.marketOpen(map, citizens, inventory.objectId)))
             {
@@ -666,14 +666,14 @@ namespace Paladin
             {
                 const auto* definition =
                     SettlementResourceCatalog::definition(goods.resource);
-                if (definition && map.logistics.canEat(goods.resource) &&
+                if (definition && map.logistics.mayExport(map.objectState(),inventory,goods.resource) && map.logistics.canEat(goods.resource) &&
                     map.logistics.available(inventory.id, goods.resource) > 0)
                 {
                     foods.push_back(
                         {inventory.id,
                          goods.resource,
                          distance(c.tilePosition, inventory.footprint),
-                         market || price > 0}
+                         SettlementCommerce::sourcePreference(inventory.kind)}
                     );
                 }
             }
@@ -683,8 +683,8 @@ namespace Paladin
             foods.end(),
             [](const auto& a, const auto& b)
             {
-                return a.market != b.market ? a.market
-                                            : a.distance < b.distance;
+                return a.preference != b.preference ? a.preference < b.preference
+                                                    : a.distance < b.distance;
             }
         );
         // Nearest sources first; unlike ordinary hauling, food searches have no
@@ -746,7 +746,8 @@ namespace Paladin
         {
             return false;
         }
-        if (!map.logistics.importsMaySupply(*sourceInventory, targetInventory->kind))
+        if (!map.logistics.mayExport(map.objectState(),*sourceInventory,resource) ||
+            !map.logistics.importsMaySupply(*sourceInventory, targetInventory->kind))
         { return false; }
         if (targetInventory->kind == InventoryKind::TradeDepot)
         {
@@ -758,7 +759,7 @@ namespace Paladin
             *targetInventory,
             amount,
             &citizens,
-            resource
+            resource, !c.workplaceId
         );
         if (amount <= 0)
         {
@@ -806,6 +807,7 @@ namespace Paladin
         planned.applyTo(c);
         c.task = {};
         c.task.kind = CitizenTaskKind::Haul;
+        c.task.treasuryPurchase = !c.workplaceId;
         c.haulDeliveryPath = std::move(delivery.path);
         c.haulDeliveryTarget = delivery.destination;
         c.haulDeliveryTopology = map.objectState().navigationVersion();
@@ -922,10 +924,10 @@ namespace Paladin
                 {
                     if (source.kind == InventoryKind::Home ||
                         source.kind == InventoryKind::Construction ||
-                        distance(c.tilePosition, source.footprint) >
-                            policy.stockpile.collectionRadius ||
-                        distance(source.footprint.topLeft, home.footprint) >
-                            policy.stockpile.collectionRadius)
+                        !map.logistics.mayExport(map.objectState(),source,SettlementResourceTypes::Lumber) ||
+                        (source.kind != InventoryKind::TradeImports &&
+                         (distance(c.tilePosition, source.footprint) > policy.stockpile.collectionRadius ||
+                          distance(source.footprint.topLeft, home.footprint) > policy.stockpile.collectionRadius)))
                     {
                         continue;
                     }
@@ -955,8 +957,7 @@ namespace Paladin
                              std::string(SettlementResourceTypes::Lumber),
                              amount,
                              -10000 +
-                                 (source.kind == InventoryKind::Market ? 100000
-                                                                       : 0) +
+                                 SettlementCommerce::sourcePreference(source.kind)*100000 +
                                  distance(c.tilePosition, source.footprint) +
                                  distance(
                                      source.footprint.topLeft,
@@ -977,7 +978,7 @@ namespace Paladin
                 source.kind == InventoryKind::Stockpile ||
                 source.kind == InventoryKind::Workplace ||
                 source.kind == InventoryKind::Groundpile ||
-                (market && source.kind == InventoryKind::TradeImports);
+                source.kind == InventoryKind::TradeImports;
             if ((market
                      ? !wholesaleSource
                      : (source.kind != InventoryKind::Groundpile &&
@@ -987,7 +988,7 @@ namespace Paladin
             {
                 continue;
             }
-            if (!assignedDestination &&
+            if (!assignedDestination && source.kind != InventoryKind::TradeImports &&
                 distance(c.tilePosition, source.footprint) >
                     policy.localSearchRadius)
             {
@@ -1038,8 +1039,9 @@ namespace Paladin
                        destination.id == assignedDestination)) ||
                     (assignedDestination &&
                      destination.id != assignedDestination) ||
-                    distance(source.footprint.topLeft, destination.footprint) >
-                        policy.stockpile.collectionRadius)
+                    (source.kind != InventoryKind::TradeImports &&
+                     distance(source.footprint.topLeft, destination.footprint) >
+                        policy.stockpile.collectionRadius))
                 {
                     continue;
                 }
@@ -1064,7 +1066,7 @@ namespace Paladin
                         destination,
                         policy.carryingCapacity,
                         &citizens,
-                        goods.resource
+                        goods.resource, !c.workplaceId
                     );
                     const int target =
                         market
@@ -1322,8 +1324,7 @@ namespace Paladin
                     sources.push_back(
                         {source.id,
                          distance(c.tilePosition, source.footprint) +
-                             (source.kind == InventoryKind::Market ? 100000
-                                                                   : 0)}
+                             (SettlementCommerce::sourcePreference(source.kind) * 100000)}
                     );
                 }
                 std::stable_sort(

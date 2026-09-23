@@ -96,6 +96,12 @@ namespace Paladin
         {
             return false;
         }
+        if (open_ && section_ == "Population" && !worldMode_ && foodServingsBounds_.contains(x,y))
+        {
+            foodServingsDrag_=true; dragCandidate_=false;
+            foodServingsPreview_=std::clamp(int(std::lround(10*(x-foodServingsBounds_.x)/foodServingsBounds_.width)),0,10);
+            return true;
+        }
         for (std::size_t i = 0; i < hits_.size(); ++i)
         {
             if (hits_[i].bounds.contains(x, y))
@@ -117,6 +123,11 @@ namespace Paladin
     }
     bool EmploymentPanel::pointerMoved(float x, float y)
     {
+        if (foodServingsDrag_)
+        {
+            foodServingsPreview_=std::clamp(int(std::lround(10*(x-foodServingsBounds_.x)/foodServingsBounds_.width)),0,10);
+            return true;
+        }
         if (techPointer_)
         {
             if (std::hypot(x - pressX_, y - pressY_) >= 4)
@@ -161,6 +172,12 @@ namespace Paladin
         double minute
     )
     {
+        if (foodServingsDrag_)
+        {
+            foodServingsDrag_=false;
+            map.commerce.setFoodServings(foodServingsPreview_);
+            return;
+        }
         dragCandidate_ = false;
         techPointer_ = false;
         if (techPanned_)
@@ -1006,15 +1023,15 @@ namespace Paladin
             left + 18,
             top + 47
         );
-        if (population)
+        if (population && !worldMode_)
         {
-            ui.drawLabel(
-                renderer,
-                "Adults can work | Children cannot work",
-                left + 18,
-                top + 73,
-                1.25F
-            );
+            if (!foodServingsDrag_) foodServingsPreview_=map.commerce.foodServings;
+            ui.drawLabel(renderer,"Food servings: " + std::to_string(foodServingsPreview_) + " / person / day",
+                left+18,top+73,1.25F);
+            foodServingsBounds_={left+width*.59F,top+69,width*.34F,22};
+            renderer.fillRectangle(foodServingsBounds_.x,top+77,foodServingsBounds_.width,5,{69,76,86,255});
+            renderer.fillRectangle(foodServingsBounds_.x,top+77,foodServingsBounds_.width*foodServingsPreview_/10,5,{110,176,129,255});
+            renderer.fillRectangle(foodServingsBounds_.x+foodServingsBounds_.width*foodServingsPreview_/10-4,top+70,8,20,{216,223,229,255});
         }
         const float summaryWidth = (width - 112) / 3;
         const UiRectangle graph{
@@ -1249,7 +1266,14 @@ namespace Paladin
         }
         if (population)
         {
-            renderImmigration(renderer, ui, map, graph.y + graph.height + 36);
+            ui.drawLabel(renderer,"Food aid: keep/stockpiles only, for residents unable to pay.",
+                left+18,graph.y+graph.height+49,1.2F);
+            ui.drawLabel(renderer,map.commerce.unpaidFoodWarning()
+                ? "Treasury shortfall: free meals continue; food workers are unhappy."
+                : "The realm treasury pays for aid meals.",
+                left+18,graph.y+graph.height+67,1.2F,
+                map.commerce.unpaidFoodWarning() ? RenderColor{236,168,88,255} : RenderColor{185,198,207,255});
+            renderImmigration(renderer, ui, map, graph.y + graph.height + 88);
             for (const auto& sample : history)
             {
                 if (sample.gameMinute / 1440 + 1 < startDay)
@@ -1355,14 +1379,14 @@ namespace Paladin
                 {card.x + 8, card.y + card.height - 27, 28, 23},
                 "<",
                 {{}, std::string(d.objectTypeId), {}, -1},
-                count > 0
+                capacity > 0
             );
             button(
                 {card.x + 39, card.y + card.height - 27, 28, 23},
                 ">",
                 {{}, std::string(d.objectTypeId), {}, 1},
                 capacity < maximumCapacity &&
-                    map.employment().unemployed(citizens) > 0
+                    (d.objectTypeId != SettlementObjectTypes::Barracks || map.employment().unemployed(citizens) > 0)
             );
             hits_.push_back({card, std::string(d.objectTypeId), {}, 0, true});
             ++index;
@@ -1464,6 +1488,8 @@ namespace Paladin
         {
             return {};
         }
+        if (section_ == "Population" && !worldMode_ && foodServingsBounds_.contains(x,y))
+            return "Daily food servings per resident who cannot afford a meal (0-10).";
         for (std::size_t i = 0; i < attributeBounds_.size(); ++i)
         {
             if (section_ == "Population" && attributeBounds_[i].contains(x, y))

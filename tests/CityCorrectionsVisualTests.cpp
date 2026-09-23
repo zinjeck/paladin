@@ -11,6 +11,7 @@
 #include "ui/GrayUiRenderer.h"
 #include "ui/SettlementInspectionPanel.h"
 #include "ui/TradeDepotPanel.h"
+#include "ui/EmploymentPanel.h"
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <filesystem>
@@ -41,6 +42,28 @@ namespace
             pixels.insert(pixels.end(),row,row+image->w);
         }
         return pixels;
+    }
+    void reliefUi(Renderer& renderer, SDL_Window* window)
+    {
+        TradeFixture f;
+        auto& map=*f.map;
+        auto& citizens=f.sim.world().settlement(f.home)->simulationState().citizens();
+        EmploymentPanel panel; GrayUiRenderer ui; panel.toggle("Population");
+        renderer.beginFrame(); panel.render(renderer,ui,map,citizens,0);
+        capture(window,"population-food-relief.png"); renderer.endFrame();
+        // Find the actual slider by its tooltip; exercise click/drag/release.
+        bool found=false;
+        for(int y=0;y<640 && !found;++y) for(int x=0;x<960 && !found;++x)
+        {
+            if(panel.tooltipAt(float(x),float(y))!="Daily food servings per resident who cannot afford a meal (0-10).") continue;
+            PALADIN_CHECK(panel.pointerPressed(float(x),float(y)));
+            PALADIN_CHECK(panel.capturingPointer());
+            panel.pointerMoved(960,float(y));
+            panel.pointerReleased(960,float(y),map,citizens,0);
+            PALADIN_CHECK(map.commerce.foodServings==10 && !panel.capturingPointer());
+            found=true;
+        }
+        PALADIN_CHECK(found);
     }
     void mineViews(Renderer& renderer, SDL_Window* window)
     {
@@ -240,12 +263,51 @@ namespace
         }
         std::cout << "[city-corrections/art] mixed mountain/hill overview from actual city generator\n";
     }
+    void mountainFragmentViews(Renderer& renderer, SDL_Window* window)
+    {
+        WorldGrid source(5,5);
+        for (int y=0;y<5;++y) for (int x=0;x<5;++x)
+        {
+            auto& t=*source.tile({x,y});
+            t.terrain=TerrainType::Mountain; t.relief=ReliefType::Mountain;
+            t.biome=BiomeType::Plain; t.temperature=Temperature{.5};
+        }
+        SettlementMapGenerationSettings settings; settings.localTilesPerWorldTile=128;
+        auto map=SettlementMapGenerator{}.generate(source,{2,2},3,3,42,settings);
+        PALADIN_CHECK(map);
+        CityRenderer city; city.animationTimeOverride=42; city.presentation.cloudsEnabled=false;
+        city.artRootOverride=std::string(PALADIN_TEST_SOURCE_ROOT)+"/assets/sprites";
+        SettlementCitizenState people; SettlementInspectionController selection;
+        SettlementObjectPlacementController placement; SettlementCommandController commands;
+        TileRenderMetrics metrics; Camera2D camera(192,192); camera.setZoom(.4);
+        const auto draw=[&](const std::string& name)
+        {
+            for (int warm=0;warm<120;++warm)
+            {
+                renderer.beginFrame();
+                city.render(renderer,*map,camera,metrics,placement,commands,people,selection,1,12);
+                if (warm==119) capture(window,name);
+                renderer.endFrame();
+            }
+        };
+        draw("mountain-seed-42-overview.png");
+        // Fixed regression views remain comparable after the fragments vanish.
+        for (const auto p : {SettlementTilePosition{302,172}, {348,252}, {82,190}})
+        {
+            camera.setPosition(p.x+.5,p.y+.5); camera.setZoom(3);
+            draw("mountain-seed-42-fragment-"+std::to_string(p.x)+"-"+std::to_string(p.y)+".png");
+        }
+    }
     void orderUi(Renderer& renderer, SDL_Window* window)
     {
         TradeFixture f;
         auto& world=f.sim.world(); auto& map=*f.map;
         auto& people=world.settlement(f.home)->simulationState().citizens();
         map.employment().synchronize(map.objectState(),people);
+        const auto imports=map.logistics.importsForObject(f.depot);
+        PALADIN_CHECK(map.logistics.add(imports,"fish",12));
+        PALADIN_CHECK(map.logistics.add(imports,"iron",3));
+        PALADIN_CHECK(map.logistics.add(imports,"coal",4));
         SettlementInspectionController selection; selection.selectWorkplace(f.depot,{});
         SettlementInspectionPanel inspector; TradeDepotPanel panel; GrayUiRenderer ui;
         Camera2D camera(15,15); camera.setZoom(3); TileRenderMetrics metrics;
@@ -316,7 +378,9 @@ int main()
         mineViews(renderer,window.nativeHandle());
         stockpileViews(renderer,window.nativeHandle());
         rangeViews(renderer,window.nativeHandle());
+        mountainFragmentViews(renderer,window.nativeHandle());
         orderUi(renderer,window.nativeHandle());
+        reliefUi(renderer,window.nativeHandle());
     }
     catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; result=1; }
     SDL_Quit(); return result;

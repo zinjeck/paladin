@@ -513,7 +513,7 @@ namespace Paladin
                 );
                 const auto body =
                     worldArmySpriteBounds(pos->x, pos->y, pixels, sprite);
-                PALADIN_CHECK(pos->y - (body.y + 8) > 22);
+                PALADIN_CHECK(body.height >= 20 && body.height <= std::max(24.,pixels*.70));
                 app.selectedWorldArmy_ = {};
                 PALADIN_CHECK(
                     click(app, body.x + body.width * .5F, body.y + 8)

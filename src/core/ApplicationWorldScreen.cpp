@@ -288,6 +288,7 @@ namespace Paladin
             );
         }
         foundingPanel_->render(*renderer_, *grayUiRenderer_);
+        if (!foundingPanel_->isOpen()) renderCityTooltip();
     }
 
 

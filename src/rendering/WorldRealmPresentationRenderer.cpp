@@ -1,6 +1,7 @@
 #include "rendering/WorldRealmPresentationRenderer.h"
 #include "rendering/Camera2D.h"
 #include "rendering/GlobeView.h"
+#include "rendering/WorldProjectionTransition.h"
 #include "rendering/Renderer.h"
 #include "rendering/Texture.h"
 #include "rendering/TileRenderMetrics.h"
@@ -1080,8 +1081,9 @@ namespace Paladin
             };
             const auto vertex = [&](double tx, double ty)
             {
+                const auto point=worldTransitionPoint(view,tx/width,ty/height,width,height,p.localWorldWeight);
                 return V{
-                    view.orient(WorldSurface::sphere(tx / width, ty / height)),
+                    {(point.x-view.cx)/view.radius,(view.cy-point.y)/view.radius,point.z},
                     (tx - t.x) / t.width,
                     (ty - t.y) / t.height
                 };
@@ -1328,7 +1330,7 @@ namespace Paladin
                                              ty = y + h * j / 4.;
                                 const auto at =
                                     globe
-                                        ? view.project(tx / width, ty / height)
+                                        ? worldTransitionPoint(view,tx/width,ty/height,width,height,p.localWorldWeight)
                                         : WorldSurface::Point3{
                                               r.outputWidth() * .5 +
                                                   (tx - c.tileX()) * pixels,
@@ -1421,10 +1423,9 @@ namespace Paladin
                        : m == WorldMapMode::Population ? 2
                                                        : 0;
             };
-            // Keep only the coarse off-screen presentations; the active mode
-            // retains the existing bounded detail budget.
-            cache_->detail.clear();
-            cache_->detailRaster.reset();
+            // Retain the bounded per-mode pages. Repeated mode switching must
+            // not discard finished textures and restart their rasterization.
+            // Three modes each have the fixed MaximumDetailChunks limit.
             const auto previous = slot(cache_->mode);
             parked_[previous] = std::move(cache_);
             cache_ = std::move(parked_[slot(cacheMode)]);

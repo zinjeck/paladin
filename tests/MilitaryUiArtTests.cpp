@@ -663,7 +663,7 @@ namespace
         {
             const auto* sprite = worldArmySprite(art, world, *world.army(unit));
             const auto body = worldArmySpriteBounds(480, 320, scale, sprite);
-            PALADIN_CHECK(body.height >= 36.F);
+            PALADIN_CHECK(body.height >= 20.F && body.height <= std::max(24.,scale*.70));
             const bool visible = worldArmyVisibility(scale) > .001F;
             const auto plate = worldArmyCountBounds(480, 320, 2, scale, sprite);
             PALADIN_CHECK(

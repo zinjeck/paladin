@@ -533,10 +533,11 @@ namespace Paladin
             increaseButton_.setBounds(
                 {renderedBounds_.x + contentWidth - 43, y, 28, 28}
             );
-            decreaseButton_.setEnabled(employed > 0);
+            decreaseButton_.setEnabled(workplace->capacity > 0);
             increaseButton_.setEnabled(
                 workplace->capacity < workplace->maximumCapacity &&
-                settlementMap.employment().unemployed(citizenState) > 0
+                (workplace->objectTypeId != SettlementObjectTypes::Barracks ||
+                 settlementMap.employment().unemployed(citizenState) > 0)
             );
             decreaseButton_.render(renderer, grayUiRenderer);
             increaseButton_.render(renderer, grayUiRenderer);
@@ -600,8 +601,22 @@ namespace Paladin
                     settlementMap.logistics.importsForObject(object->id));
                 y += 24;
                 grayUiRenderer.drawLabel(renderer,
-                    "Imports (separate): " + std::to_string(imports ? imports->used() : 0),
+                    "Imports for city use: " + std::to_string(imports ? imports->used() : 0),
                     renderedBounds_.x + 13, y, 1.25F);
+                if (imports)
+                {
+                    int index=0;
+                    for (const auto& goods : imports->goods)
+                    {
+                        if (goods.amount<=0) continue;
+                        const auto* d = SettlementResourceCatalog::definition(goods.resource);
+                        grayUiRenderer.drawLabel(renderer,
+                            (d ? std::string(d->displayName) : goods.resource) + ": " + std::to_string(goods.amount),
+                            renderedBounds_.x+13+(index%2)*(contentWidth-26)/2, y+22+(index/2)*19,1.1F);
+                        ++index;
+                    }
+                    y += ((index+1)/2)*19;
+                }
                 tradeOrders_ = {renderedBounds_.x + 12, y + 27,
                     contentWidth - 24,
                     std::max(0.F, renderedBounds_.y + renderedBounds_.height - 43 - (y + 27))};

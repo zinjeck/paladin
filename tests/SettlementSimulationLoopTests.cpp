@@ -201,6 +201,143 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    std::cout << "Checking monetary food access, relief, depot supply and vacancies...\n";
+    {
+        auto map=land(); SettlementCitizenState people; found(map,people,1);
+        map.commerce.policy.startingSavings=0;
+        map.commerce.policy.operatingReservePerWorker=0;
+        const auto farm=completed(map,SettlementObjectTypes::WheatFarm,{{12,12},3,3});
+        map.employment().synchronize(map.objectState(),people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(farm),1,people));
+        map.commerce.update(map,people,360,0);
+        const auto keepObject=map.objectState().completedObjects().front().id;
+        const auto keep=map.logistics.forObject(keepObject);
+        const auto& worker=people.citizens().front();
+        PALADIN_CHECK(map.commerce.payForMeal(map,*map.logistics.inventory(keep),worker,people));
+        PALADIN_CHECK(map.commerce.businessCash(keepObject)==100);
+        map.commerce.update(map,people,360,720);
+        PALADIN_CHECK(map.commerce.businessCash(keepObject)==0);
+        PALADIN_CHECK(map.commerce.savings(worker.id)>=100);
+        PALADIN_CHECK(map.commerce.treasury->balance+map.commerce.businessTotal()+map.commerce.householdTotal()==100000);
+    }
+
+    {
+        auto map=land(); SettlementCitizenState people; found(map,people,1);
+        map.commerce.policy.startingSavings=0;
+        map.commerce.treasury->balance=0;
+        map.commerce.treasury->moneyEconomyStarted=true;
+        const auto farm=completed(map,SettlementObjectTypes::WheatFarm,{{12,12},3,3});
+        map.employment().synchronize(map.objectState(),people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(farm),1,people));
+        map.commerce.update(map,people,360,0);
+        auto& worker=SettlementActivityTestFixture::resident(people);
+        const auto keep=map.logistics.forObject(map.objectState().completedObjects().front().id);
+        PALADIN_CHECK(map.commerce.payForMeal(map,*map.logistics.inventory(keep),worker,people));
+        map.commerce.update(map,people,360,720);
+        PALADIN_CHECK(worker.publicFoodDissatisfaction>0);
+        worker.happiness=100; worker.enforceHappinessModifiers();
+        PALADIN_CHECK(worker.happiness<100);
+        PALADIN_CHECK(map.commerce.savings(worker.id)==0);
+        // Treasury recovery pays conserved wage arrears rather than losing them.
+        map.commerce.treasury->balance=10000;
+        map.commerce.update(map,people,1800,0);
+        PALADIN_CHECK(map.commerce.savings(worker.id)>=map.commerce.policy.retailFoodPrice);
+        PALADIN_CHECK(map.commerce.treasury->balance+map.commerce.businessTotal()+map.commerce.householdTotal()==10000);
+    }
+    {
+        auto map=land(80); SettlementCitizenState people; found(map,people,1);
+        map.activities.policy.dailyBirthChance=0;
+        const auto keep=map.logistics.forObject(map.objectState().completedObjects().front().id);
+        PALADIN_CHECK(map.logistics.consumeAvailable(keep,"lumber",40));
+        const auto depot=completed(map,SettlementObjectTypes::TradeDepot,{{60,60},8,5});
+        const auto imports=map.logistics.importsForObject(depot);
+        PALADIN_CHECK(map.logistics.add(imports,"lumber",9,0));
+        PALADIN_CHECK(map.objectState().createConstructionSites(map.grid(),
+            *SettlementObjectCatalog::definition(SettlementObjectTypes::Stockpile),{{10,12},3,3}));
+        advance(map,people,360,3*1440);
+        if(!map.objectState().completedObjectAt({10,12}))
+        {
+            const auto& c=people.citizens().front();
+            std::cout<<"Import haul pending: at="<<c.tilePosition.x<<","<<c.tilePosition.y<<" task="<<int(c.task.kind)<<" carried="<<c.carriedAmount<<" imports="<<map.logistics.inventory(imports)->amount("lumber")<<"\n";
+        }
+        PALADIN_CHECK(map.objectState().completedObjectAt({10,12}));
+        PALADIN_CHECK(map.logistics.inventory(imports)->amount("lumber")==0);
+        PALADIN_CHECK(map.commerce.treasury->balance+map.commerce.businessTotal()+map.commerce.householdTotal()==100000);
+    }
+
+    {
+        auto map=land(); SettlementCitizenState citizens; found(map,citizens,1);
+        map.commerce.policy.startingSavings=0;
+        map.commerce.policy.operatingReservePerWorker=0;
+        const auto store=completed(map,SettlementObjectTypes::Stockpile,{{12,12},3,3});
+        const auto market=completed(map,SettlementObjectTypes::Market,{{22,12},5,5});
+        const auto depot=completed(map,SettlementObjectTypes::TradeDepot,{{22,22},8,5});
+        map.employment().synchronize(map.objectState(),citizens);
+        map.commerce.update(map,citizens,9*1440,0);
+        auto& c=SettlementActivityTestFixture::resident(citizens);
+        const auto storage=map.logistics.forObject(store);
+        const auto imports=map.logistics.importsForObject(depot);
+        PALADIN_CHECK(map.logistics.add(storage,"fish",51,0));
+        PALADIN_CHECK(map.logistics.add(imports,"lumber",8,0));
+        const auto cash=[&] { return map.commerce.treasury->balance+map.commerce.businessTotal()+map.commerce.householdTotal(); };
+        const auto initial=cash();
+        PALADIN_CHECK(map.commerce.foodServings==1);
+        PALADIN_CHECK(map.commerce.canAccessMeal(map,*map.logistics.inventory(storage),c,citizens));
+        PALADIN_CHECK(!map.commerce.canAccessMeal(map,*map.logistics.inventory(map.logistics.forObject(market)),c,citizens));
+        const auto treasury=map.commerce.treasury->balance;
+        PALADIN_CHECK(map.commerce.payForMeal(map,*map.logistics.inventory(storage),c,citizens));
+        PALADIN_CHECK(map.commerce.treasury->balance==treasury-100);
+        PALADIN_CHECK(cash()==initial);
+        PALADIN_CHECK(!map.commerce.canAccessMeal(map,*map.logistics.inventory(storage),c,citizens));
+        map.commerce.update(map,citizens,10*1440,0);
+        // Empty treasury does not switch the city back to free commerce.
+        const auto reserve=map.commerce.treasury->balance;
+        map.commerce.treasury->balance=0;
+        PALADIN_CHECK(map.commerce.payForMeal(map,*map.logistics.inventory(storage),c,citizens));
+        PALADIN_CHECK(map.commerce.unpaidFoodWarning() && map.commerce.unpaidReliefMeals==1);
+        PALADIN_CHECK(map.commerce.usesMoney());
+        map.commerce.setFoodServings(0);
+        PALADIN_CHECK(!map.commerce.canAccessMeal(map,*map.logistics.inventory(storage),c,citizens));
+        map.commerce.setFoodServings(50); PALADIN_CHECK(map.commerce.foodServings==10);
+        map.commerce.treasury->balance=reserve;
+        const auto source=*map.logistics.inventory(imports),destination=*map.logistics.inventory(storage);
+        PALADIN_CHECK(map.logistics.importsMaySupply(source,InventoryKind::Construction));
+        PALADIN_CHECK(map.logistics.importsMaySupply(source,InventoryKind::Workplace));
+        PALADIN_CHECK(!map.logistics.importsMaySupply(source,InventoryKind::TradeDepot));
+        const auto before=map.commerce.treasury->balance;
+        const auto seller=map.commerce.businessCash(depot);
+        PALADIN_CHECK(map.commerce.buyGoods(source,destination,4,&citizens,"lumber",true));
+        PALADIN_CHECK(map.commerce.treasury->balance<before);
+        PALADIN_CHECK(map.commerce.businessCash(depot)>seller);
+        PALADIN_CHECK(cash()==initial);
+        // Demand can be opened before workers exist and survives roster changes.
+        const auto job=map.employment().forObject(store);
+        PALADIN_CHECK(map.employment().adjust(job,1,citizens));
+        PALADIN_CHECK(map.employment().adjust(job,1,citizens));
+        PALADIN_CHECK(map.employment().employed(job,citizens)==1);
+        PALADIN_CHECK(citizens.spawn(1));
+        map.employment().synchronize(map.objectState(),citizens);
+        PALADIN_CHECK(map.employment().employed(job,citizens)==2);
+        PALADIN_CHECK(map.employment().workplace(job)->capacity==2);
+    }
+    {
+        // Reproduce day-nine starvation with money, a depot, no market and 51 fish.
+        auto map=land(); SettlementCitizenState citizens; found(map,citizens,1);
+        map.commerce.policy.startingSavings=0;
+        emptyFood(map);
+        const auto store=completed(map,SettlementObjectTypes::Stockpile,{{12,12},3,3});
+        completed(map,SettlementObjectTypes::TradeDepot,{{22,22},8,5});
+        map.employment().synchronize(map.objectState(),citizens);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(store),1,citizens));
+        PALADIN_CHECK(map.logistics.add(map.logistics.forObject(store),"fish",51,0));
+        const auto initial=map.commerce.treasury->balance;
+        for(int day=0;day<10;++day) advance(map,citizens,day*1440,1440);
+        const auto& person=citizens.citizens().front();
+        PALADIN_CHECK(person.health>0 && person.hunger<95);
+        PALADIN_CHECK(map.logistics.inventory(map.logistics.forObject(store))->amount("fish")<51);
+        PALADIN_CHECK(map.commerce.treasury->balance+map.commerce.businessTotal()+map.commerce.householdTotal()==initial);
+    }
+
     {
         auto map = land(80);
         auto road = *SettlementObjectCatalog::definition(SettlementObjectTypes::Road);
@@ -1224,6 +1361,8 @@ void runSettlementSimulationLoopTests()
         auto map = land(50);
         SettlementCitizenState citizens;
         found(map, citizens, 6);
+        // Founding production before money; monetary feeding has its own ten-day regression.
+        map.commerce.treasury->balance=0;
         map.activities.policy.dailyBirthChance = 0;
         completed(map, SettlementObjectTypes::House, {{8, 3}, 5, 5});
         completed(map, SettlementObjectTypes::House, {{14, 3}, 5, 5});
@@ -1365,7 +1504,8 @@ void runSettlementSimulationLoopTests()
         );
     }
     {
-        // Unreachable or unaffordable food must not repeatedly recall boats.
+        // Unreachable food must not repeatedly recall boats; reachable paid
+        // storage and ground food remain eligible without a market.
         auto map = land();
         SettlementCitizenState citizens;
         found(map, citizens, 1);
@@ -1374,6 +1514,7 @@ void runSettlementSimulationLoopTests()
         {
             map.grid().tile({20, y})->terrain = TerrainType::Water;
         }
+        map.commerce.update(map,citizens,600,0);
         const auto inaccessible = map.logistics.drop({26, 12}, "fish", 4, 0);
         auto& person = SettlementActivityTestFixture::resident(citizens);
         person.hunger = 70;
@@ -1405,12 +1546,13 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(
             map.commerce.mealPrice(map, *map.logistics.inventory(stock)) > 0
         );
-        PALADIN_CHECK(!SettlementActivityTestFixture::boatMealAvailable(
+        PALADIN_CHECK(SettlementActivityTestFixture::boatMealAvailable(
             map,
             citizens,
             person,
             640
         ));
+        PALADIN_CHECK(map.logistics.consumeAvailable(stock,"fish",4));
         map.logistics.drop({18, 12}, "fish", 1, 641);
         PALADIN_CHECK(
             SettlementActivityTestFixture::boatMealAvailable(
@@ -1871,6 +2013,7 @@ void runSettlementSimulationLoopTests()
         auto& worker = SettlementActivityTestFixture::resident(citizens, 0);
         worker.task.kind = CitizenTaskKind::Work;
         map.commerce.policy.dailyWage = 300;
+        map.commerce.policy.retailFoodPrice = 10; // Isolate fractional withholding from the basic-needs wage floor.
         worker.happiness = 50;
         map.commerce.update(map, citizens, 720, 720);
         PALADIN_CHECK(map.commerce.realmTaxCollected == 30);
@@ -1910,6 +2053,7 @@ void runSettlementSimulationLoopTests()
         auto& person = SettlementActivityTestFixture::resident(citizens, 0);
         map.commerce.policy.startingSavings = 0;
         map.commerce.policy.dailyWage = 300;
+        map.commerce.policy.retailFoodPrice = 10; // This case isolates income-tax arithmetic.
         // Idle government workers do not receive wages. Care support is exempt.
         map.commerce.treasury->incomeTax.setPercent(40);
         map.commerce.cityIncomeTax.setPercent(40);
@@ -2060,10 +2204,13 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(
             map.logistics.reserve(buyer.id, buyer.task.source, {}, "bread", 1)
         );
-        const auto wallet = map.commerce.savings(buyer.id);
+        const auto wallet = map.commerce.householdTotal();
+        const auto retailCash = map.commerce.businessCash(market);
         const auto bread = map.logistics.total("bread");
-        advance(map, citizens, 530, 1);
-        PALADIN_CHECK(map.commerce.savings(buyer.id) < wallet - 98);
+        // Execute this transaction without unrelated staff breaks or payroll.
+        SettlementActivityTestFixture::executeWithoutPathSearch(map,citizens,buyer,530);
+        PALADIN_CHECK(map.commerce.householdTotal() == wallet - 100);
+        PALADIN_CHECK(map.commerce.businessCash(market) == retailCash + 100);
         PALADIN_CHECK(buyer.hunger < 25);
         PALADIN_CHECK(map.logistics.total("bread") == bread - 1);
         PALADIN_CHECK(
@@ -2074,12 +2221,12 @@ void runSettlementSimulationLoopTests()
         Money empty = 0, receiver = 10;
         PALADIN_CHECK(!SettlementCommerce::transfer(empty, receiver, 1));
         PALADIN_CHECK(!SettlementCommerce::transfer(receiver, empty, -1));
-        // Persistent reliance on free public meals limits contentment even
-        // when ordinary needs are met; market meals let it recover.
+        // Paid public aid does not penalize its recipients. Only food workers
+        // experience dissatisfaction when the treasury cannot fund relief.
         map.commerce.policy.publicFoodGraceDays = 0;
         buyer.publicMealShare = 1;
         map.commerce.update(map, citizens, 1971, 1440);
-        PALADIN_CHECK(buyer.publicFoodDissatisfaction == 2);
+        PALADIN_CHECK(buyer.publicFoodDissatisfaction == 0);
         for (int meal = 0; meal < 12; ++meal)
         {
             map.commerce.recordMeal(buyer, false);
@@ -2720,7 +2867,9 @@ void runSettlementSimulationLoopTests()
         {
             PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
         }
-        PALADIN_CHECK(!map.employment().adjust(job, 1, citizens));
+        PALADIN_CHECK(map.employment().adjust(job, 1, citizens));
+        PALADIN_CHECK(map.employment().workplace(job)->capacity==5);
+        PALADIN_CHECK(map.employment().employed(job,citizens)==4);
         PALADIN_CHECK(!citizens.citizen(babyId)->workplaceId);
         PALADIN_CHECK(map.objectState().createConstructionSites(
             map.grid(),

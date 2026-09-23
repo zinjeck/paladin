@@ -13,6 +13,17 @@
 
 namespace Paladin
 {
+    double SettlementCommerce::dailyWageFor(const SettlementMap& map,
+        const SettlementCitizen& c,std::size_t householdAdults,double minute) const
+    {
+        const double food=citizenFoodPerDay(c,map.activities.policy)*policy.retailFoodPrice;
+        const double fuel=c.homeId ? SettlementHomeHeating::dailyFuelUnits(minute)*
+            (policy.retailLumberPrice+policy.bypassPremium)/std::max<std::size_t>(1,householdAdults) : 0;
+        // Net pay covers meals, this adult's share of household heat, and a
+        // modest reserve. Higher taxes/shorter shifts never lower this floor.
+        return std::max(double(policy.dailyWage),(food+fuel)*1.25/
+            std::max(.1,1.0-effectiveTaxPercent()/100.0));
+    }
     void SettlementCommerce::recordProduction(
         std::string_view resource,
         int amount
@@ -135,7 +146,7 @@ namespace Paladin
         InventoryId destination,
         std::string_view resource,
         int amount,
-        CitizenId consumer
+        CitizenId consumer, bool publicPurchase
     )
     {
         if (inactive_ || amount <= 0)
@@ -153,12 +164,13 @@ namespace Paladin
         const auto key = std::to_string(source.value()) + ":" +
                          std::to_string(destination.value()) + ":" +
                          std::to_string(consumer.value()) + ":" +
-                         std::string(resource);
+                         std::string(resource) + (publicPurchase ? ":public" : ":private");
         auto [it, inserted] = recentFlows_.try_emplace(
             key,
             FrozenFlow{source, destination, consumer, std::string(resource)}
         );
         auto& flow = it->second;
+        flow.publicPurchase = publicPurchase;
         flow.units =
             flow.units *
                 std::exp(
@@ -213,9 +225,9 @@ namespace Paladin
                 return rank(a) < rank(b);
             }
         );
-        const double workShare = (map.activities.policy.shiftEndMinute -
-                                  map.activities.policy.shiftStartMinute) /
-                                 1440.0;
+        std::unordered_map<SettlementObjectId,std::size_t,StrongIdHash> householdAdults;
+        for(const auto& c:people.citizens())
+            if(!c.child && c.health>0 && !c.militaryDeployed && c.homeId) ++householdAdults[c.homeId];
         for (const auto& c : people.citizens())
         {
             const bool generalLabor =
@@ -228,7 +240,7 @@ namespace Paladin
                                  c.task.kind == CitizenTaskKind::Demolish ||
                                  c.task.kind == CitizenTaskKind::Haul);
             frozenPayRates_[c.id] = !c.child && (c.workplaceId || governmentJob)
-                                        ? policy.dailyWage / 720.0 * workShare
+                                        ? dailyWageFor(map,c,householdAdults[c.homeId],currentMinute_) / 1440.0
                                         : (!c.child && c.youngDependents > 0
                                                ? policy.dailyAllowance / 1440.0
                                                : 0);
@@ -301,7 +313,7 @@ namespace Paladin
                          destination,
                          requested,
                          &people,
-                         flow.resource
+                         flow.resource, flow.publicPurchase
                      )}
                 );
                 if (amount > 0 && buyGoods(
@@ -309,7 +321,7 @@ namespace Paladin
                                       destination,
                                       amount,
                                       &people,
-                                      flow.resource
+                                      flow.resource, flow.publicPurchase
                                   ))
                 {
                     map.logistics.moveAvailable(
@@ -354,8 +366,7 @@ namespace Paladin
                     {
                         break;
                     }
-                    if (price > 0 &&
-                        !buyMeal(source.objectId, *person, people, price))
+                    if (!payForMeal(map, source, *person, people))
                     {
                         break;
                     }
@@ -477,7 +488,7 @@ namespace Paladin
         const SettlementInventory& destination,
         int requested,
         const SettlementCitizenState* households,
-        std::string_view resource
+        std::string_view resource, bool publicPurchase
     ) const
     {
         if (destination.kind == InventoryKind::TradeDepot &&
@@ -508,7 +519,11 @@ namespace Paladin
             }
             return int(std::min<Money>(requested, cash / price));
         }
-        const auto payer = destination.kind == InventoryKind::TradeDepot
+        const bool civic = (publicPurchase && destination.kind != InventoryKind::Home &&
+            destination.kind != InventoryKind::Market) || destination.kind == InventoryKind::Construction ||
+            destination.kind == InventoryKind::Keep ||
+            (source.kind == InventoryKind::TradeImports && destination.kind == InventoryKind::Stockpile);
+        const auto payer = (civic || destination.kind == InventoryKind::TradeDepot)
                                ? businessAccounts_.end()
                                : businessAccounts_.find(destination.objectId);
         const Money cash =
@@ -516,7 +531,7 @@ namespace Paladin
                 ? payer->second
                 : ((destination.kind == InventoryKind::Construction ||
                     destination.kind == InventoryKind::Keep ||
-                    destination.kind == InventoryKind::TradeDepot)
+                    destination.kind == InventoryKind::TradeDepot || civic)
                        ? treasury->balance
                        : 0);
         return price > 0 ? int(std::min<Money>(requested, cash / price))
@@ -527,7 +542,7 @@ namespace Paladin
         const SettlementInventory& destination,
         int amount,
         const SettlementCitizenState* households,
-        std::string_view resource
+        std::string_view resource, bool publicPurchase
     )
     {
         if (amount <= 0 || affordableTradeUnits(
@@ -535,16 +550,19 @@ namespace Paladin
                                destination,
                                amount,
                                households,
-                               resource
+                               resource, publicPurchase
                            ) < amount)
         {
             return false;
         }
-        auto buyer = destination.kind == InventoryKind::TradeDepot
+        const bool civic = (publicPurchase && destination.kind != InventoryKind::Home &&
+            destination.kind != InventoryKind::Market) || destination.kind == InventoryKind::Construction ||
+            destination.kind == InventoryKind::Keep ||
+            (source.kind == InventoryKind::TradeImports && destination.kind == InventoryKind::Stockpile);
+        auto buyer = (civic || destination.kind == InventoryKind::TradeDepot)
                          ? businessAccounts_.end()
                          : businessAccounts_.find(destination.objectId),
-             seller = (source.kind == InventoryKind::TradeDepot ||
-                       source.kind == InventoryKind::TradeImports)
+             seller = (source.kind == InventoryKind::TradeDepot)
                           ? businessAccounts_.end()
                           : businessAccounts_.find(source.objectId);
         Money& from = buyer == businessAccounts_.end() ? treasury->balance
@@ -586,52 +604,52 @@ namespace Paladin
         return transfer(from, to, payment);
     }
     Money SettlementCommerce::mealPrice(
-        const SettlementMap& map,
+        const SettlementMap&,
         const SettlementInventory& source
     ) const
     {
-        // Export stock is committed to a buyer. Imports are a separate sales
-        // counter, with direct retail allowed only in the absence of stockpiles.
-        if (source.kind == InventoryKind::TradeDepot) { return -1; }
-        if (source.kind == InventoryKind::TradeImports)
-        {
-            if (!map.logistics.importsMaySupply(source, InventoryKind::Home)) { return -1; }
-            return usesMoney() ? policy.retailFoodPrice : 0;
-        }
-        if (!usesMoney())
-        {
-            return 0;
-        }
-        const bool stockpileExists = std::any_of(
-            map.logistics.inventories().begin(),
-            map.logistics.inventories().end(),
-            [](const auto& i) { return i.kind == InventoryKind::Stockpile; }
-        );
-        if (source.kind == InventoryKind::Market)
-        {
-            return policy.retailFoodPrice +
-                   (stockpileExists ? 0 : policy.bypassPremium);
-        }
-        const bool marketExists = std::any_of(
-            map.logistics.inventories().begin(),
-            map.logistics.inventories().end(),
-            [](const auto& i) { return i.kind == InventoryKind::Market; }
-        );
-        if ((source.kind == InventoryKind::Workplace ||
-             source.kind == InventoryKind::TradeDepot ||
-             source.kind == InventoryKind::TradeImports) &&
-            (marketExists || stockpileExists))
-        {
-            return -1;
-        }
-        if (!marketExists && (source.kind == InventoryKind::Stockpile ||
-                              source.kind == InventoryKind::Workplace))
-        {
-            return policy.retailFoodPrice +
-                   policy.bypassPremium *
-                       (source.kind == InventoryKind::Stockpile ? 1 : 2);
-        }
-        return 0; // Public keep/groundpile meals remain emergency relief.
+        // Availability and price never depend on another building existing.
+        if (source.kind == InventoryKind::TradeDepot ||
+            source.kind == InventoryKind::Construction || source.kind == InventoryKind::Home)
+        { return -1; }
+        return usesMoney() ? policy.retailFoodPrice : 0;
+    }
+    bool SettlementCommerce::canAccessMeal(
+        const SettlementMap& map, const SettlementInventory& source,
+        const SettlementCitizen& c, const SettlementCitizenState& people) const
+    {
+        const auto price = mealPrice(map, source);
+        if (price < 0 || c.health <= 0) { return false; }
+        if (price == 0 || canBuyMeal(c, people, price)) { return true; }
+        if (source.kind != InventoryKind::Keep && source.kind != InventoryKind::Stockpile)
+        { return false; }
+        const auto day = std::int64_t(std::floor((currentMinute_ +
+            map.activities.policy.solarTimeOffsetMinutes) / 1440));
+        const auto it = citizens_.find(c.id);
+        const int served = it != citizens_.end() && it->second.reliefDay == day
+            ? it->second.reliefServed : 0;
+        return served < std::clamp(foodServings, 0, 10);
+    }
+    bool SettlementCommerce::payForMeal(
+        const SettlementMap& map, const SettlementInventory& source,
+        const SettlementCitizen& c, const SettlementCitizenState& people)
+    {
+        if (!canAccessMeal(map, source, c, people)) { return false; }
+        const auto price = mealPrice(map, source);
+        if (price == 0) { return true; }
+        if (canBuyMeal(c, people, price)) { return buyMeal(source.objectId,c,people,price); }
+        auto& wallet = citizens_[c.id];
+        const auto day = std::int64_t(std::floor((currentMinute_ +
+            map.activities.policy.solarTimeOffsetMinutes) / 1440));
+        if (wallet.reliefDay != day) { wallet.reliefDay = day; wallet.reliefServed = 0; }
+        ++wallet.reliefServed; ++reliefMeals;
+        // Public keep provisions still compensate the food supply account.
+        Money& recipient = businessAccounts_[source.objectId];
+        const Money paid = std::min(price, std::max<Money>(0,treasury->balance));
+        transfer(treasury->balance,recipient,paid);
+        reliefPaid += paid;
+        if (paid < price) { ++unpaidReliefMeals; unpaidFoodUntil_ = currentMinute_ + 1440; }
+        return true;
     }
     bool SettlementCommerce::transfer(Money& from, Money& to, Money amount)
     {
@@ -844,6 +862,22 @@ namespace Paladin
         std::unordered_map<CitizenId, const SettlementCitizen*, StrongIdHash>
             living;
         living.reserve(people.citizens().size());
+        std::unordered_map<SettlementObjectId,std::size_t,StrongIdHash> householdAdults;
+        std::unordered_map<WorkplaceId,std::uint32_t,StrongIdHash> employees;
+        for(const auto& c:people.citizens())
+        {
+            if(c.health<=0 || c.militaryDeployed) continue;
+            if(c.workplaceId) ++employees[c.workplaceId];
+            if(!c.child && c.homeId) ++householdAdults[c.homeId];
+        }
+        Money* publicFoodPayroll=nullptr;
+        for(const auto& object:map.objectState().completedObjects())
+        {
+            if(object.objectTypeId!=SettlementObjectTypes::CityKeep) continue;
+            const auto account=businessAccounts_.find(object.id);
+            if(account!=businessAccounts_.end()) publicFoodPayroll=&account->second;
+            break;
+        }
         for (auto& c : people.citizens_)
         {
             if (c.health <= 0)
@@ -870,6 +904,7 @@ namespace Paladin
                 );
             }
             const bool working =
+                (!c.child && c.workplaceId && map.activities.policy.isWorkTime(minute)) ||
                 map.activities.caregivingAtWorkTime(map, c, minute) ||
                 c.task.kind == CitizenTaskKind::AnimalWork ||
                 c.task.kind == CitizenTaskKind::Work ||
@@ -879,6 +914,11 @@ namespace Paladin
                 c.task.kind == CitizenTaskKind::Haul;
             const auto* assignedWorkplace =
                 map.employment().workplace(c.workplaceId);
+            const bool foodWorker = assignedWorkplace &&
+                (assignedWorkplace->objectTypeId == SettlementObjectTypes::FishingGrounds ||
+                 assignedWorkplace->objectTypeId == SettlementObjectTypes::WheatFarm ||
+                 assignedWorkplace->objectTypeId == SettlementObjectTypes::Pastureland ||
+                 assignedWorkplace->objectTypeId == SettlementObjectTypes::Bakery);
             const bool pastureCivicLabor =
                 assignedWorkplace &&
                 assignedWorkplace->objectTypeId ==
@@ -890,13 +930,13 @@ namespace Paladin
             const double rate = !monetary   ? 0
                                 : inactive_ ? frozenPayRates_[c.id]
                                 : !c.child && working
-                                    ? policy.dailyWage / 720.0
+                                    ? dailyWageFor(map,c,householdAdults[c.homeId],minute) /
+                                        std::max(1.0,double(map.activities.policy.shiftEndMinute-map.activities.policy.shiftStartMinute))
                                     : (!c.child && c.youngDependents > 0
                                            ? policy.dailyAllowance / 1440.0
                                            : 0);
             wallet.accrued += rate * elapsed;
             const Money due = Money(wallet.accrued);
-            wallet.accrued -= double(due);
             Money* employer = &treasury->balance;
             if ((working || inactive_) && c.workplaceId && !pastureCivicLabor)
             {
@@ -907,8 +947,24 @@ namespace Paladin
                         &businessAccounts_.at(assignedWorkplace->objectId);
                 }
             }
-            const Money paid = std::min(*employer, due);
-            transfer(*employer, wallet.cash, paid);
+            Money paid = 0;
+            // Keep relief payments are earmarked for the food sector. Release
+            // them into real payroll instead of trapping circulating cash in
+            // a public storage account with no employees of its own.
+            if(foodWorker && publicFoodPayroll)
+            {
+                paid=std::min(*publicFoodPayroll,due);
+                transfer(*publicFoodPayroll,wallet.cash,paid);
+            }
+            const Money employerPaid=std::min(*employer,due-paid);
+            transfer(*employer,wallet.cash,employerPaid);
+            paid+=employerPaid;
+            if (employer != &treasury->balance && paid < due)
+            {
+                const Money support = std::min(treasury->balance, due-paid);
+                transfer(treasury->balance,wallet.cash,support); paid += support;
+            }
+            wallet.accrued -= double(paid);
             // Withhold only from wages actually paid. Savings, allowances,
             // child support and starting grants are not income-taxed.
             if (!c.child &&
@@ -949,19 +1005,10 @@ namespace Paladin
                 {{AttributeEffect::Taxes,
                   c.taxHappinessAdjustment - previousTaxMood}}
             );
-            if (monetary && !c.child &&
-                monetaryMinutes_ >= policy.publicFoodGraceDays * 1440)
-            {
-                c.publicFoodDissatisfaction = std::clamp(
-                    c.publicFoodDissatisfaction +
-                        (policy.publicFoodPenaltyPerDay * c.publicMealShare -
-                         policy.publicFoodRecoveryPerDay *
-                             (1 - c.publicMealShare)) *
-                            elapsed / 1440,
-                    0.0,
-                    policy.maximumPublicFoodPenalty
-                );
-            }
+            c.publicFoodDissatisfaction = std::clamp(c.publicFoodDissatisfaction +
+                ((monetary && foodWorker && unpaidFoodWarning()) ? policy.publicFoodPenaltyPerDay
+                    : -policy.publicFoodRecoveryPerDay) * elapsed / 1440,
+                0.0, policy.maximumPublicFoodPenalty);
         }
         // Child support goes to a living parent, so dependent children never
         // need a job or an independently replenished wallet to afford food.
@@ -996,22 +1043,23 @@ namespace Paladin
                 continue;
             }
             auto [it, created] = businessAccounts_.try_emplace(w.objectId, 0);
-            const Money reserve = policy.operatingReservePerWorker * w.capacity;
+            const auto workers=employees[w.id];
+            const Money reserve = policy.operatingReservePerWorker * workers;
             auto& funded = fundedWorkers_[w.objectId];
-            if (monetary && w.capacity > funded)
+            if (monetary && workers > funded)
             {
                 transfer(
                     treasury->balance,
                     it->second,
                     std::min(
                         treasury->balance,
-                        policy.operatingReservePerWorker * (w.capacity - funded)
+                        policy.operatingReservePerWorker * (workers - funded)
                     )
                 );
             }
             if (monetary)
             {
-                funded = w.capacity;
+                funded = workers;
             }
             if (it->second > reserve)
             {

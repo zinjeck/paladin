@@ -98,6 +98,7 @@ namespace Paladin
     {
         if (objectVersion_ == objects.navigationVersion())
         {
+            if (citizenVersion_ != citizens.version()) { fillVacancies(citizens); }
             return;
         }
         objectVersion_ = objects.navigationVersion();
@@ -257,6 +258,25 @@ namespace Paladin
             workplaces_[i].capacity = std::max(workplaces_[i].capacity,
                                              std::uint32_t(staff[i]));
         }
+        fillVacancies(citizens);
+    }
+    void SettlementEmploymentState::fillVacancies(SettlementCitizenState& citizens)
+    {
+        std::unordered_map<WorkplaceId, std::size_t, StrongIdHash> staff;
+        for (const auto& c : citizens.citizens_) { if(c.workplaceId) ++staff[c.workplaceId]; }
+        std::size_t cursor=0;
+        for (const auto& w : workplaces_)
+        {
+            if (!w.operational || w.objectTypeId==SettlementObjectTypes::Barracks) continue;
+            while (staff[w.id] < w.capacity && cursor < citizens.citizens_.size())
+            {
+                auto& c=citizens.citizens_[cursor++];
+                if (c.child || c.health<=0 || c.workplaceId || c.militaryUnitId || c.militaryDeployed) continue;
+                c.workplaceId=w.id; c.nextWorkCheckMinutes=0;
+                ++staff[w.id]; ++citizens.version_;
+            }
+        }
+        citizenVersion_=citizens.version();
     }
     std::size_t SettlementEmploymentState::employed(
         WorkplaceId id,
@@ -286,7 +306,7 @@ namespace Paladin
     void SettlementEmploymentState::citizenDeparted(WorkplaceId id)
     {
         if (auto* workplace = mutableWorkplace(id);
-            workplace && workplace->capacity > 0)
+            workplace && workplace->objectTypeId==SettlementObjectTypes::Barracks && workplace->capacity > 0)
         {
             --workplace->capacity;
         }
@@ -307,30 +327,28 @@ namespace Paladin
         {
             return false;
         }
-        for (auto& citizen : citizens.citizens_)
+        if (w->objectTypeId != SettlementObjectTypes::Barracks)
         {
-            if (delta > 0 ? (citizen.child || citizen.militaryDeployed || citizen.health <= 0 || bool(citizen.workplaceId))
-                          : (citizen.workplaceId != id || citizen.militaryUnitId ||
-                             citizen.militaryDeployed))
+            if (delta > 0) { ++w->capacity; fillVacancies(citizens); return true; }
+            if (w->capacity == 0) return false;
+            --w->capacity;
+            auto count=employed(id,citizens);
+            for(auto& c:citizens.citizens_)
             {
-                continue;
+                if(count<=w->capacity) break;
+                if(c.workplaceId!=id || c.militaryUnitId || c.militaryDeployed) continue;
+                c.workplaceId={}; c.nextWorkCheckMinutes=0; --count; ++citizens.version_;
             }
-            if (delta>0 && w->objectTypeId==SettlementObjectTypes::Barracks && !citizens.militaryEligible(citizen)) continue;
-            citizen.workplaceId = delta > 0 ? id : WorkplaceId{};
-            if (delta > 0)
-            {
-                ++w->capacity;
-            }
-            else
-            {
-                w->capacity = std::min(
-                    w->capacity,
-                    std::uint32_t(employed(id, citizens))
-                );
-            }
-            citizen.nextWorkCheckMinutes = 0;
-            ++citizens.version_;
+            citizenVersion_=citizens.version();
             return true;
+        }
+        for (auto& c : citizens.citizens_)
+        {
+            if (delta>0 ? (c.child || c.militaryDeployed || c.health<=0 || bool(c.workplaceId) || !citizens.militaryEligible(c))
+                        : (c.workplaceId!=id || c.militaryUnitId || c.militaryDeployed)) continue;
+            c.workplaceId=delta>0 ? id : WorkplaceId{};
+            if(delta>0) ++w->capacity; else --w->capacity;
+            c.nextWorkCheckMinutes=0; ++citizens.version_; return true;
         }
         return false;
     }
@@ -351,10 +369,10 @@ namespace Paladin
             }
             const auto count = employed(w.id, citizens);
             if (delta > 0 ? (w.capacity < w.maximumCapacity && count < best)
-                          : (count > best))
+                          : (w.capacity > best))
             {
                 choice = &w;
-                best = count;
+                best = delta > 0 ? count : w.capacity;
             }
         }
         return choice && adjust(choice->id, delta, citizens);

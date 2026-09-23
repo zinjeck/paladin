@@ -4,6 +4,7 @@
 #include "simulation/SimulationReports.h"
 #include "simulation/WorldMarketSystem.h"
 #include "world/generation/SettlementMapGenerator.h"
+#include "world/generation/SettlementRelief.h"
 #include <iostream>
 #include <queue>
 
@@ -137,11 +138,13 @@ namespace Paladin::Test::CityCorrections
                     { seen[p.y*w+p.x]=true; queue.push_back(p); }
                 }
                 total+=int(queue.size()); ++components; tiny += queue.size()<32;
+                if (queue.size()<32)
+                { std::cout << "[relief-fragment] seed=" << seed << " at=" << x << ',' << y << " tiles=" << queue.size() << '\n'; }
                 largest = std::max(largest,int(queue.size()));
             }
             std::cout << "[relief-shape] hills=" << hill << " seed=" << seed
                       << " rock=" << double(total)/(w*h) << " components=" << components
-                      << " largest=" << largest << '\n';
+                      << " largest=" << largest << " tiny=" << tiny << '\n';
             // Mountain country is a few broad barriers; hill country has
             // smaller separated forms. Neither requires an almost-solid map
             // cut by compulsory cross-map channels.
@@ -172,6 +175,37 @@ namespace Paladin::Test::CityCorrections
             if(!hill) { PALADIN_CHECK(caves > 0 && caves < w*h*.015); }
         }
         std::cout << "[city-corrections] six 384x384 range maps: coherent ranges, sparse accessible caves\n";
+    }
+    inline void caveFragmentCleanup()
+    {
+        auto map=flatMap();
+        auto& grid=map.grid();
+        for (int y=10;y<40;++y) for (int x=10;x<40;++x)
+        {
+            auto& tile=*grid.tile({x,y});
+            tile.terrain=TerrainType::Mountain; tile.relief=ReliefType::Mountain;
+            if (x>=12 && x<38 && y>=12 && y<38)
+            { tile.terrain=TerrainType::Land; tile.rockFloor=true; }
+        }
+        // Small severed remnant and a substantial pillar within the same cave.
+        for (int y=16;y<18;++y) for (int x=16;x<18;++x)
+        { auto& t=*grid.tile({x,y}); t.terrain=TerrainType::Mountain; t.rockFloor=false; }
+        for (int y=24;y<32;++y) for (int x=24;x<32;++x)
+        { auto& t=*grid.tile({x,y}); t.terrain=TerrainType::Mountain; t.rockFloor=false; }
+        // A small pocket must not be filled by the post-excavation pass.
+        grid.tile({11,11})->terrain=TerrainType::Land;
+        grid.tile({11,11})->rockFloor=true;
+        const auto before=grid;
+        SettlementRelief(48,48,42).consolidate(grid,true);
+        for (int y=0;y<48;++y) for (int x=0;x<48;++x)
+        {
+            const auto& old=*before.tile({x,y}); const auto& now=*grid.tile({x,y});
+            const bool remnant=x>=16 && x<18 && y>=16 && y<18;
+            PALADIN_CHECK(now.terrain==(remnant ? TerrainType::Land : old.terrain));
+            PALADIN_CHECK(now.rockFloor==(remnant || old.rockFloor));
+            PALADIN_CHECK(now.relief==old.relief && now.mineral==old.mineral);
+        }
+        std::cout << "[relief-cleanup] cave floors, substantial pillars and surrounding massif preserved\n";
     }
     struct TradeFixture
     {
@@ -286,8 +320,8 @@ namespace Paladin::Test::CityCorrections
         PALADIN_CHECK(imports && imports!=deposit);
         PALADIN_CHECK(map.logistics.add(imports,"fish",3,220));
         PALADIN_CHECK(map.logistics.importsMaySupply(*map.logistics.inventory(imports),InventoryKind::Stockpile));
-        PALADIN_CHECK(!map.logistics.importsMaySupply(*map.logistics.inventory(imports),InventoryKind::Market));
-        PALADIN_CHECK(map.commerce.mealPrice(map,*map.logistics.inventory(imports))<0);
+        PALADIN_CHECK(map.logistics.importsMaySupply(*map.logistics.inventory(imports),InventoryKind::Market));
+        PALADIN_CHECK(map.commerce.mealPrice(map,*map.logistics.inventory(imports))>=0);
         PALADIN_CHECK(map.objectState().demolish(f.storage,{3,13}));
         map.logistics.synchronize(map.objectState(),220);
         PALADIN_CHECK(map.logistics.importsMaySupply(*map.logistics.inventory(imports),InventoryKind::Market));
@@ -391,6 +425,6 @@ namespace Paladin::Test::CityCorrections
             PALADIN_CHECK(p.x >= 10 && p.x < 10 + width);
             PALADIN_CHECK(p.y >= 20 + miningServiceRows(height) && p.y < 20 + height);
         }
-        refunds(); hunger(); relief(); trade(); deaths(); depotWorker();
+        refunds(); hunger(); caveFragmentCleanup(); relief(); trade(); deaths(); depotWorker();
     }
 }

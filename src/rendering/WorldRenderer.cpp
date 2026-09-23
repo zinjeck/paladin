@@ -49,6 +49,7 @@ namespace Paladin
         // existing preparation path so the first interactive globe frame never
         // pays that one-time cost.
         sunRenderer_.prepare(renderer);
+        atmosphere_.prepare(renderer);
 
         // This path is shown only while world interaction is blocked. Advance
         // several of GlobeRenderer's existing bounded upload slices per present
@@ -77,10 +78,17 @@ namespace Paladin
         // work budget, without interrupting interaction with a loading screen.
         if (preparedPoliticalWorld_ != &world)
         {
-            if (!territoryPresentationRenderer_.prepare(renderer, world))
+            if (preparingWorld_ != &world) { preparingWorld_=&world; preparedMode_=0; }
+            constexpr WorldMapMode modes[]{WorldMapMode::Political,WorldMapMode::Government,WorldMapMode::Population};
+            if (preparedMode_<3)
             {
+                territoryPresentationRenderer_.configure(modes[preparedMode_]);
+                if (territoryPresentationRenderer_.prepare(renderer,world)) ++preparedMode_;
                 return false;
             }
+            resourceMap_.prepare(world);
+            if (!resourceMap_.ready()) return false;
+            territoryPresentationRenderer_.configure(mapMode_==WorldMapMode::Resources ? WorldMapMode::Terrain : mapMode_);
             preparedPoliticalWorld_ = &world;
         }
         return true;
@@ -189,27 +197,10 @@ namespace Paladin
                                                 : mapMode_,
             selectedRealm
         );
-        if (thematicMapMode(mapMode_) &&
-            !territoryPresentationRenderer_.preparationReady() &&
-            !territoryPresentationRenderer_.prepare(renderer, world))
-        {
-            renderer.fillRectangle(
-                0,
-                0,
-                float(renderer.outputWidth()),
-                float(renderer.outputHeight()),
-                ThematicWater
-            );
-            BitmapFontRenderer{}.drawText(
-                renderer,
-                "Preparing thematic map",
-                20,
-                78,
-                2,
-                {239, 226, 207, 255}
-            );
-            return;
-        }
+        // Keep the current terrain visible while a replacement overlay is built.
+        // Initial mode caches are warmed during world loading.
+        if (thematicMapMode(mapMode_) && !territoryPresentationRenderer_.preparationReady())
+            territoryPresentationRenderer_.prepare(renderer, world);
         artwork_.setTime(animationSeconds);
         globe_.solarSecondsOffset = solarSecondsOffset;
         stage(0);
@@ -245,7 +236,7 @@ namespace Paladin
             }
 
             stage(2);
-            if (localWeight > 0.001F)
+            if (localWeight >= 0.999F)
             {
                 const LocalTangentWorldView tangent =
                     LocalTangentWorldView::from(
@@ -282,7 +273,7 @@ namespace Paladin
                 planarMetrics.tilePixels = planarTilePixels;
                 const std::uint8_t opacity =
                     static_cast<std::uint8_t>(std::clamp(
-                        std::lround(255.0 * double(localWeight)),
+                        255L,
                         0L,
                         255L
                     ));
@@ -359,6 +350,10 @@ namespace Paladin
                 );
             }
 
+            if (!thematicMapMode(mapMode_))
+                atmosphere_.render(renderer,GlobeView::from(renderCamera,world.grid(),renderer.outputWidth(),renderer.outputHeight()),
+                    presentationTilePixels,(world.time().totalGameMinutes()+solarSecondsOffset/60.)/1440.,
+                    world.time().secondsIntoDay()+solarSecondsOffset);
             stage(6);
             // Geometry and native annotations share the source camera and the
             // same final residual. No independently snapped object camera.

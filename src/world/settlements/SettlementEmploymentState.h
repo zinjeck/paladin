@@ -66,6 +66,8 @@ namespace Paladin
             constructionWorkplaces_;
         IdGenerator<WorkplaceId> ids_;
         std::uint64_t objectVersion_ = ~std::uint64_t(0);
+        std::uint64_t citizenVersion_ = ~std::uint64_t(0);
+        void fillVacancies(SettlementCitizenState&);
         std::deque<UnemploymentSample> history_;
     };
 } // namespace Paladin

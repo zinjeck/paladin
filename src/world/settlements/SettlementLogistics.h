@@ -91,9 +91,7 @@ namespace Paladin
         {
             if (source.kind != InventoryKind::TradeImports) { return true; }
             if (destination == InventoryKind::TradeDepot) { return false; }
-            if (destination == InventoryKind::Stockpile) { return true; }
-            return std::none_of(inventories_.begin(), inventories_.end(),
-                [](const auto& i) { return i.kind == InventoryKind::Stockpile; });
+            return destination != InventoryKind::TradeImports;
         }
         int freeSpace(InventoryId id) const;
         int receivable(InventoryId id, std::string_view resource) const;

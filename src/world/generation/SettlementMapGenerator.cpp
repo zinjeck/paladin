@@ -352,6 +352,7 @@ namespace Paladin
 
         relief.consolidate(cityGrid);
         relief.caves(cityGrid);
+        relief.consolidate(cityGrid, true);
         cityGrid.classifyCoast(seed);
         auto result = std::make_unique<SettlementMap>(
             std::move(cityGrid),
