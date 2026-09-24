@@ -541,6 +541,45 @@ namespace Paladin::Test
             movingClouds+=std::abs(WorldAtmosphere::density(u,v,0)-WorldAtmosphere::density(u,v,1));
         }
         PALADIN_CHECK(movingClouds>1);
+        // Exercise actual filtered cloud output: identical paused frames,
+        // continuous small camera movements, and visible clock-driven winds.
+        WorldAtmosphere atmosphere;
+        atmosphere.prepare(renderer);
+        GlobeView cloudView{480,320,270,0,0,GlobeView::orientationAt({.52,.4},.2)};
+        const auto cloudsAt=[&](const GlobeView& view,double days) {
+            renderer.beginFrame();
+            atmosphere.render(renderer,view,2,days,43200);
+            return readWorldReview(native);
+        };
+        const auto cloudStill=cloudsAt(cloudView,0);
+        saveWorldReview(native,"atmosphere-detail.png");
+        const auto cloudPaused=cloudsAt(cloudView,0);
+        const auto cloudLater=cloudsAt(cloudView,1);
+        saveWorldReview(native,"atmosphere-next-day.png");
+        auto movedView=cloudView; movedView.cx+=.25;
+        const auto cloudMoved=cloudsAt(movedView,0);
+        double cameraDifference=0,timeDifference=0;
+        for(int y=100;y<540;++y) for(int x=260;x<700;++x)
+        {
+            const auto a=reviewPixel(cloudStill.get(),x,y);
+            const auto b=reviewPixel(cloudPaused.get(),x,y);
+            PALADIN_CHECK(a.red==b.red && a.green==b.green && a.blue==b.blue);
+            cameraDifference+=std::abs(int(a.red)-reviewPixel(cloudMoved.get(),x,y).red);
+            timeDifference+=std::abs(int(a.red)-reviewPixel(cloudLater.get(),x,y).red);
+        }
+        PALADIN_CHECK(timeDifference>1000 && cameraDifference<timeDifference*.25);
+        double cloudWorstMs=0;
+        for(int frame=0;frame<24;++frame)
+        {
+            cloudView.rotation=GlobeView::orientationAt({.52+frame*.002,.4},.2);
+            renderer.beginFrame();
+            const auto start=std::chrono::steady_clock::now();
+            atmosphere.render(renderer,cloudView,2,frame/1440.,43200);
+            const double elapsed=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+            cloudWorstMs=std::max(cloudWorstMs,elapsed);
+        }
+        std::cout<<"Atmosphere worst frame: "<<cloudWorstMs<<" ms\n";
+        PALADIN_CHECK(cloudWorstMs<80);
         for(const double pixels:{2.,12.,28.,31.,34.,37.,40.,64.})
         {
             map.globeEnabled=true; map.setMapMode(WorldMapMode::Terrain);

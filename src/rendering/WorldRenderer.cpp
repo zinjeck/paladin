@@ -351,7 +351,7 @@ namespace Paladin
             }
 
             if (!thematicMapMode(mapMode_))
-                atmosphere_.render(renderer,GlobeView::from(renderCamera,world.grid(),renderer.outputWidth(),renderer.outputHeight()),
+                atmosphere_.render(renderer,GlobeView::from(camera,world.grid(),renderer.outputWidth(),renderer.outputHeight()),
                     presentationTilePixels,(world.time().totalGameMinutes()+solarSecondsOffset/60.)/1440.,
                     world.time().secondsIntoDay()+solarSecondsOffset);
             stage(6);
