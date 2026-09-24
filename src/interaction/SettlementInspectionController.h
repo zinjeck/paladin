@@ -18,7 +18,8 @@ namespace Paladin
         CompletedObject,
         ConstructionSite,
         Citizen,
-        Groundpile
+        Groundpile,
+        Grave
     };
 
     class SettlementInspectionController
@@ -42,6 +43,7 @@ namespace Paladin
                        ? logistics.inventory(inventoryId_)
                        : nullptr;
         }
+        std::uint64_t graveSequence() const noexcept { return graveSequence_; }
         void clear() noexcept;
         void selectCitizen(CitizenId id) noexcept
         {
@@ -92,6 +94,7 @@ namespace Paladin
         ConstructionSiteId constructionSiteId_;
         CitizenId citizenId_;
         InventoryId inventoryId_;
+        std::uint64_t graveSequence_=0;
         bool placePanelOnRight_ = true;
     };
 } // namespace Paladin

@@ -144,6 +144,9 @@ namespace Paladin
                 { draw(.75 + .24 * double(done) / double(std::max<std::size_t>(1, total)), stage); });
             if (startupCancelled_) return false;
             if (!sprites.ready()) throw std::runtime_error("Compiled sprite catalogue is missing or invalid. Reinstall the assets/packages directory.");
+            draw(.99, "Preparing shared drawing buffers");
+            renderer_->prepareSceneBuffers();
+            CityClouds{}.prepare(*renderer_);
             draw(1, "Ready");
             return true;
         }

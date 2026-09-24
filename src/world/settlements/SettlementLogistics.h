@@ -37,6 +37,7 @@ namespace Paladin
     {
         std::string resource;
         int amount = 0;
+        double batchMinute = 0;
     };
 
     struct SettlementInventory
@@ -173,8 +174,9 @@ namespace Paladin
         void change(
             SettlementInventory& inventory,
             std::string_view resource,
-            int amount
+            int amount, double minute = -1
         );
+        double currentMinute_ = 0;
         std::vector<SettlementInventory> inventories_;
         std::vector<HaulReservation> reservations_;
         // Index canonical claims by person and endpoint. These contain IDs,

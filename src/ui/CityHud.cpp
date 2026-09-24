@@ -40,8 +40,9 @@ namespace Paladin
             std::string_view secondLine;
         };
 
-        constexpr std::array<MenuOptionDefinition, 24> menuOptions{
-            {{0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
+        constexpr std::array<MenuOptionDefinition, 25> menuOptions{
+            {{8,SettlementObjectTypes::Graveyard,"","","Graveyard",""},
+             {0, SettlementObjectTypes::CityKeep, "", "", "City", "Keep"},
              {6, SettlementObjectTypes::Barracks, "", "", "Barracks", ""},
              {6,
               SettlementObjectTypes::ArmySupplyDepot,
@@ -124,7 +125,8 @@ namespace Paladin
               UiButton("Production"),
               UiButton("Logistics"),
               UiButton("Warfare"),
-              UiButton("Command")
+              UiButton("Command"),
+              UiButton("Wellness")
           }
     {
         for (const auto& resource : SettlementResourceCatalog::definitions())
@@ -1135,6 +1137,20 @@ namespace Paladin
             }
 
             const UiRectangle& bounds = optionBounds_[index];
+            if (definition.objectTypeId == SettlementObjectTypes::Graveyard)
+            {
+                const float x = std::round(bounds.x + (bounds.width - 32) * .5F);
+                const float y = std::round(bounds.y + 5);
+                renderer.fillRectangle(x + 2, y + 25, 28, 5, {35, 87, 71, 255});
+                renderer.fillRectangle(x + 7, y + 6, 14, 20, {57, 70, 88, 255});
+                renderer.fillRectangle(x + 9, y + 4, 10, 20, {154, 167, 175, 255});
+                renderer.fillRectangle(x + 11, y + 12, 6, 2, {89, 102, 121, 255});
+                renderer.fillRectangle(x + 25, y + 20, 2, 8, {35, 87, 71, 255});
+                renderer.fillRectangle(x + 23, y + 18, 6, 4, {243, 182, 154, 255});
+                uiRenderer.drawLabel(renderer, "Graveyard",
+                    centeredLabelX(bounds, "Graveyard", 1.25F), bounds.y + 40, 1.25F);
+                continue;
+            }
             if (const auto art =
                     optionIcons_.find(std::string(definition.objectTypeId));
                 art != optionIcons_.end())

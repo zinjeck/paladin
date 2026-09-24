@@ -33,7 +33,7 @@ namespace Paladin
     }
     inline float worldCaravanPixelStep(double pixels) noexcept
     {
-        return float(worldMovingObjectHeight(pixels) / 24.);
+        return float(worldMovingObjectHeight(pixels) * .60 / 24.);
     }
     inline UiRectangle worldCaravanBounds(
         double x,

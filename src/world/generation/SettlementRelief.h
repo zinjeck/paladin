@@ -281,6 +281,7 @@ namespace Paladin
                                     auto* floor = grid.tile(at);
                                     floor->terrain = TerrainType::Land;
                                     floor->rockFloor = true;
+                                    floor->caveInterior = true;
                                 }
                             }
                         }

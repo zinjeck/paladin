@@ -2,6 +2,7 @@
 #include "ui/PanelDrag.h"
 #include "platform/Window.h"
 #include "rendering/Renderer.h"
+#include "rendering/Texture.h"
 #include "rendering/SceneSpriteLibrary.h"
 #include "rendering/SelectionOutline.h"
 #include "rendering/WorldMapNavigation.h"
@@ -34,6 +35,44 @@ namespace
             result.insert(result.end(),row,row+rgba->w);
         }
         return result;
+    }
+    void scaledBlendParity(Renderer& renderer, SDL_Window* window)
+    {
+        auto* native=SDL_GetRenderer(window);
+        for(bool opaque : {false,true})
+        {
+        std::vector<RenderColor> colors(17*13);
+        for(std::size_t i=0;i<colors.size();++i)
+            colors[i]={Uint8(i*23),Uint8(i*53),Uint8(i*97),opaque ? Uint8(255) : Uint8(i*71)};
+        auto candidate=renderer.createTextureFromPixels(17,13,colors,opaque);
+        auto* reference=SDL_CreateTexture(native,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STATIC,17,13);
+        PALADIN_CHECK(reference);
+        PALADIN_CHECK(SDL_UpdateTexture(reference,nullptr,colors.data(),17*4));
+        SDL_SetTextureBlendMode(reference,SDL_BLENDMODE_BLEND);
+        const SDL_FRect destination{0,0,640,480};
+        for(bool linear : {false,true}) for(Uint8 alpha : {Uint8(255),Uint8(117)})
+        {
+            renderer.setTextureFiltering(*candidate,linear);
+            SDL_SetTextureScaleMode(reference,linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+            SDL_SetTextureAlphaMod(reference,alpha);
+            renderer.beginFrame();
+            SDL_RenderTexture(native,reference,nullptr,&destination);
+            auto expected=capture(window,"scaled-blend-reference.png");
+            renderer.beginFrame();
+            renderer.drawTexture(*candidate,0,0,17,13,0,0,640,480,alpha);
+            auto actual=capture(window,"scaled-blend-candidate.png");
+            // SDL's unscaled SIMD blend and generic scaled blend differ by
+            // one rounding unit. No geometric, alpha, or larger color change
+            // is permitted when splitting scaling from composition.
+            PALADIN_CHECK(actual.size()==expected.size());
+            for(std::size_t i=0;i<actual.size();++i)
+                for(int channel=0;channel<4;++channel)
+                    PALADIN_CHECK(std::abs(int((actual[i]>>(8*channel))&255)-
+                        int((expected[i]>>(8*channel))&255)) <= (channel==3 ? 0 : 1));
+        }
+        SDL_DestroyTexture(reference);
+        }
+        std::cout<<"Scaled texture blend parity passed\n";
     }
     void panelDragging()
     {
@@ -137,6 +176,7 @@ int main()
         Window window("Paladin PR30 regressions",640,480);
         PALADIN_CHECK(window.isValid()); SDL_HideWindow(window.nativeHandle());
         Renderer renderer(window.nativeHandle()); PALADIN_CHECK(renderer.isValid());
+        scaledBlendParity(renderer,window.nativeHandle());
         SceneSpriteLibrary art; art.load(renderer,std::string(PALADIN_TEST_SOURCE_ROOT)+"/assets/sprites");
         silhouettes(renderer,window.nativeHandle(),art);
     }

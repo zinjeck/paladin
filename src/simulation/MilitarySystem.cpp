@@ -1648,6 +1648,7 @@ namespace Paladin
                             source->commerce
                                 .payFieldSoldier(c.id, *realm->treasury, dt);
                         }
+                        const double hungerBefore=c.hunger;
                         c.hunger = std::min(
                             100.0,
                             c.hunger + policy.hungerPerDay * dt / 1440
@@ -1665,12 +1666,13 @@ namespace Paladin
                         }
                         // A hungry army is not an infinite-food loophole. This
                         // replaces (never supplements) its absent city needs.
-                        if (c.hunger > policy.starvationThreshold)
+                        if (c.hunger >= policy.starvationThreshold)
                         {
+                            const double starvationDays=std::max(0.,dt/1440-
+                                std::max(0.,policy.starvationThreshold-hungerBefore)/std::max(1.e-9,policy.hungerPerDay));
                             c.modifyAttributes(
                                 {{AttributeEffect::Starvation,
-                                  -(c.hunger - policy.starvationThreshold) *
-                                      dt / 1440}}
+                                  -policy.starvationHealthPerDay*starvationDays}}
                             );
                         }
                         else

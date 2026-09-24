@@ -34,11 +34,30 @@ namespace Paladin
         }
     public:
         static double wind(double latitude) { return -.018*std::cos(4*latitude); }
-        static double opacity(double pixels) { return .66*(1-detailBlend(pixels,4.,30.)); }
+        static double opacity(double pixels) { return .42*(1-detailBlend(pixels,4.,30.)); }
+        // Bounded shear plus a rigid rotation: the latitude derivative must
+        // never grow with world age. No modulo reset or discontinuous reseed.
+        static double advectedLongitude(double u,double v,double days)
+        {
+            return u-.012*std::remainder(days,1000.)+
+                wind(PlanetAstronomy::latitude(v))*1.5*std::sin(days*.35);
+        }
+        struct WeatherSample
+        {
+            double cloudCover=1;
+            double storm=0;
+            double precipitation=0; // presentation signal for future weather consumers
+        };
+        static WeatherSample weather(double u,double v,double days,double land)
+        {
+            const auto p=WorldSurface::sphere(u-.006*days,v);
+            const double front=detailBlend(noise(p.x*3+41,p.y*4,p.z*3),.64,.85);
+            return {std::lerp(.85,.12+.78*front,std::clamp(land,0.,1.)),front,front*front};
+        }
         static double density(double u,double v,double days)
         {
             const double lat=PlanetAstronomy::latitude(v);
-            const auto p=WorldSurface::sphere(u-wind(lat)*days,v);
+            const auto p=WorldSurface::sphere(advectedLongitude(u,v,days),v);
             // Domain-warped spherical noise: coherent weather systems with
             // feathered fine structure, continuous across the seam and poles.
             const double warp=noise(p.x*4+19,p.y*4,p.z*4)*2;
@@ -69,7 +88,7 @@ namespace Paladin
             if(clouds_) r.setTextureFiltering(*clouds_,true);
             airlight_=r.createTextureFromPixels(1,1,std::array<RenderColor,1>{{{255,255,255,255}}});
         }
-        void render(Renderer& r,const GlobeView& view,double pixels,double days,double solarSeconds)
+        void render(Renderer& r,const GlobeView& view,double pixels,double days,double solarSeconds,const WorldGrid* terrain=nullptr)
         {
             const double alpha=opacity(pixels);
             if(alpha<.001 || view.radius<=0) return;
@@ -95,9 +114,22 @@ namespace Paladin
                 const auto p=inverse.apply({nx,ny,z});
                 const auto uv=WorldSurface::coordinates(p);
                 const double light=detailBlend(p.x*sun.x+p.y*sun.y+p.z*sun.z,-.18,.5);
-                const double u=uv.u-wind(PlanetAstronomy::latitude(uv.v))*days;
+                const double u=advectedLongitude(uv.u,uv.v,days);
+                double land=0;
+                if(terrain)
+                {
+                    const double tx=uv.u*terrain->width()-.5,ty=uv.v*terrain->height()-.5;
+                    const int ix=int(std::floor(tx)),iy=int(std::floor(ty));
+                    const double fx=tx-ix,fy=ty-iy;
+                    for(int j=0;j<2;++j) for(int i=0;i<2;++i)
+                    {
+                        const auto* tile=terrain->tile({(ix+i+terrain->width())%terrain->width(),std::clamp(iy+j,0,terrain->height()-1)});
+                        if(tile->terrain!=TerrainType::Water) land+=(i?fx:1-fx)*(j?fy:1-fy);
+                    }
+                }
+                const auto weatherState=weather(uv.u,uv.v,days,land);
                 const RenderColor c{std::uint8_t(55+200*light),std::uint8_t(74+181*light),
-                    std::uint8_t(110+145*light),std::uint8_t(255*alpha*detailBlend(z,0.,.22))};
+                    std::uint8_t(110+145*light),std::uint8_t(255*alpha*weatherState.cloudCover*detailBlend(z,0.,.22))};
                 grid_.push_back({float(sx),float(sy),float(u-std::floor(u)),float(uv.v),c});
             }
             const auto triangle=[&](int a,int b,int c)

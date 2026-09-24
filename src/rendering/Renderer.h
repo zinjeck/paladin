@@ -11,6 +11,8 @@
 
 struct SDL_Renderer;
 struct SDL_Surface;
+struct SDL_Texture;
+struct SDL_FRect;
 
 struct SDL_Window;
 
@@ -59,7 +61,9 @@ namespace Paladin
 
     public:
         explicit Renderer(SDL_Window* window);
-        std::shared_ptr<AssetManager> compiledAssets(const AssetLoadProgress& progress = {});
+        // Opening another scene/HUD reuses resident assets without disk I/O.
+        // Explicit artwork reloads may validate a replacement generation.
+        std::shared_ptr<AssetManager> compiledAssets(const AssetLoadProgress& progress = {}, bool refresh = false);
         // The startup loader and scene facades share atlas views, alpha masks,
         // presentations and recipes. No planet or city is retained here.
         std::shared_ptr<SceneSpriteLibrary> sceneSpriteCache() const { return sceneSpriteCache_; }
@@ -82,6 +86,8 @@ namespace Paladin
         void beginFrame();
         std::uint64_t frameId() const noexcept { return frameId_; }
         void compositeLighting(Texture& light, Texture& glow);
+        void compositeAmbientLight(RenderColor color);
+        void prepareSceneBuffers();
 
         void endFrame();
 
@@ -142,12 +148,14 @@ namespace Paladin
         );
 
         [[nodiscard]]
+        // opaqueOnly is for terrain buffers whose later uploads remain opaque.
         std::unique_ptr<Texture> createTextureFromPixels(
             int width,
             int height,
-            std::span<const RenderColor> pixels
+            std::span<const RenderColor> pixels,
+            bool opaqueOnly = false
         );
-        std::unique_ptr<Texture> createEmptyTexture(int width, int height);
+        std::unique_ptr<Texture> createEmptyTexture(int width, int height, bool opaqueOnly = false);
         std::shared_ptr<Texture> createTextureView(
             std::shared_ptr<Texture>,
             int x,
@@ -229,6 +237,10 @@ namespace Paladin
         std::string assetPackageSignature_;
         SDL_Renderer* renderer_ = nullptr;
         std::unique_ptr<Texture> pixelScene_;
+        std::unique_ptr<Texture> softwareScaleScratch_;
+        friend class CityClouds;
+        std::shared_ptr<Texture> cityCloudBody_, cityCloudShadow_;
+        void copyTexture(SDL_Texture*, const SDL_FRect*, const SDL_FRect*);
         double pixelPitch_ = 1;
         bool pixelSceneTransparent_ = false;
     };

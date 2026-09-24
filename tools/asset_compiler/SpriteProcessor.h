@@ -16,7 +16,8 @@ namespace Paladin
         double width,
         double height,
         int frames,
-        bool applySunlight = false
+        bool applySunlight = false,
+        bool repairActorTorso = false
     )
     {
         auto* rgba = SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32);
@@ -56,6 +57,20 @@ namespace Paladin
                 pixels[std::size_t(y) * stride + x] =
                     {Uint8(color >> 16), Uint8(color >> 8), Uint8(color), c[3]};
             }
+        }
+        if(repairActorTorso)
+        {
+            // Articulated walk exports can separate the upper/lower torso by
+            // one sample. Repair only the narrow body core, never limb gaps.
+            const auto sourcePixels=pixels;
+            for(int f=0;f<frames;++f) for(int y=int(th*.4);y<int(th*.72);++y)
+                for(int x=int(tw*.38);x<int(tw*.63);++x)
+                {
+                    const int i=y*stride+f*tw+x;
+                    if(sourcePixels[i][3] || y<1 || y+1>=th) continue;
+                    if(sourcePixels[i-stride][3] && sourcePixels[i+stride][3])
+                        pixels[i]=sourcePixels[i-stride];
+                }
         }
         for (int y = 0; y < th; ++y)
         {

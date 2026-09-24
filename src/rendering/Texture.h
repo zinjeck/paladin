@@ -36,6 +36,7 @@ namespace Paladin
         int width_ = 0;
         int height_ = 0;
         bool premultiplied_ = false;
+        bool opaque_ = false;
         std::shared_ptr<Texture> parent_;
         int atlasX_ = 0, atlasY_ = 0;
         float uvX(float u) const

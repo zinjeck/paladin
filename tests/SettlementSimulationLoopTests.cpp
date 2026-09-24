@@ -19,6 +19,8 @@
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <chrono>
+#include <cstdlib>
 #include <limits>
 #include <set>
 
@@ -201,6 +203,62 @@ namespace
 } // namespace
 void runSettlementSimulationLoopTests()
 {
+    if(std::getenv("PALADIN_CITY_BENCHMARK"))
+    {
+        {
+            auto map=land(160); SettlementNavigation nav; nav.synchronize(map);
+            for(int y=0;y<148;++y) map.grid().tile({80,y})->terrain=TerrainType::Water;
+            CitizenMovementPolicy policy;
+            const auto begin=std::chrono::steady_clock::now();
+            for(int i=0;i<120;++i) nav.findPath(map,{70,20+i%10},{90,20+i%10},policy);
+            std::cout<<"Obstructed route mean_ms="<<std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count()/120<<std::endl;
+        }
+        for(int count:{26,1000})
+        {
+            auto map=land(160); SettlementCitizenState people; found(map,people,count);
+            map.activities.policy.dailyBirthChance=0;
+            double worst=0,total=0;
+            for(int step=0;step<240;++step)
+            {
+                const auto start=std::chrono::steady_clock::now();
+                map.activities.tick(map,people,360+step*.24,.24);
+                const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+                worst=std::max(worst,ms); total+=ms;
+            }
+            std::cout<<"City benchmark residents="<<count<<" mean_ms="<<total/240<<" worst_ms="<<worst<<" paths="<<people.navigationDiagnostics().requests<<std::endl;
+        }
+        return;
+    }
+    {
+        auto map=land(); SettlementCitizenState people; found(map,people,2);
+        map.activities.policy.hungerPerDay=0; map.activities.policy.dailyBirthChance=0;
+        auto& person=SettlementActivityTestFixture::resident(people);
+        person.hunger=99; person.energy=100; person.health=100;
+        SettlementActivityTestFixture::needs(map,person,2880,360);
+        PALADIN_CHECK(std::abs(person.energy-50)<1e-6 && person.health==100);
+        person.energy=100; person.hunger=100; person.health=100;
+        SettlementActivityTestFixture::needs(map,person,1440,360);
+        PALADIN_CHECK(std::abs(person.health-60)<1e-6);
+    }
+    {
+        auto map=land(); SettlementCitizenState people; found(map,people,2);
+        map.activities.policy.hungerPerDay=0; map.activities.policy.dailyBirthChance=0;
+        const auto yard=completed(map,SettlementObjectTypes::Graveyard,{{15,15},9,9});
+        map.employment().synchronize(map.objectState(),people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(yard),1,people));
+        const auto worker=std::find_if(people.citizens().begin(),people.citizens().end(),[](const auto& c){return bool(c.workplaceId);});
+        const auto workerId=worker->id;
+        for(std::size_t i=0;i<2;++i) if(people.citizens()[i].id!=workerId)
+        { auto& victim=SettlementActivityTestFixture::resident(people,i); victim.tilePosition={10,10};victim.health=0; }
+        advance(map,people,360,300);
+        PALADIN_CHECK(people.residentCount()==1 && people.remains().size()==1);
+        PALADIN_CHECK(people.remains().front().buried);
+        PALADIN_CHECK(people.graveAt(people.remains().front().grave)->citizen!=workerId);
+        auto* cave=map.grid().tile({30,30}); cave->rockFloor=true;cave->caveInterior=true;map.objectState().terrainChanged();
+        PALADIN_CHECK(map.objectState().placementStatusAt(map.grid(),*SettlementObjectCatalog::definition(SettlementObjectTypes::House),{30,30})==SettlementTilePlacementStatus::InvalidTerrain);
+        cave->caveInterior=false;map.objectState().terrainChanged();
+        PALADIN_CHECK(map.objectState().placementStatusAt(map.grid(),*SettlementObjectCatalog::definition(SettlementObjectTypes::House),{30,30})!=SettlementTilePlacementStatus::InvalidTerrain);
+    }
     std::cout << "Checking monetary food access, relief, depot supply and vacancies...\n";
     {
         auto map=land(); SettlementCitizenState people; found(map,people,1);
@@ -613,7 +671,7 @@ void runSettlementSimulationLoopTests()
             victim.carriedResource = "lumber";
             victim.carriedAmount = 2;
             victim.hunger = 100;
-            victim.health = alreadyDead ? 0 : .1;
+            victim.health = alreadyDead ? 0 : .01;
             const auto before = allGoods(map, citizens, "lumber");
             advance(map, citizens, 600, 1);
             // Never retain a reference into the compacted citizen vector.
@@ -2462,6 +2520,10 @@ void runSettlementSimulationLoopTests()
         advance(map, citizens, 9 * 1440 + 1140, 239);
         PALADIN_CHECK(citizens.citizens().front().sleptMinutes == 0);
         advance(map, citizens, 9 * 1440 + 1379, 361);
+        PALADIN_CHECK(citizens.citizens().front().sleptMinutes == 0);
+        // Night and shift boundaries do not force sleep above 50 energy.
+        SettlementActivityTestFixture::resident(citizens).energy = 50;
+        advance(map, citizens, 9 * 1440 + 1740, 180);
         PALADIN_CHECK(citizens.citizens().front().sleptMinutes > 0);
     }
     {
@@ -2617,7 +2679,7 @@ void runSettlementSimulationLoopTests()
         map.activities.policy.decisionsPerMinute = 0;
         advance(map, citizens, 720, 120);
         const auto& c = citizens.citizens().front();
-        PALADIN_CHECK(std::abs(c.energy - (100 - 25.0 / 8)) < 1e-8);
+        PALADIN_CHECK(std::abs(c.energy - (100 - 50.0*120/2880)) < 1e-8);
         PALADIN_CHECK(c.task.kind != CitizenTaskKind::Sleep);
     }
     {
@@ -2953,7 +3015,7 @@ void runSettlementSimulationLoopTests()
         PALADIN_CHECK(
             std::abs(
                 beforeEnergy - citizens.citizens()[worker].energy -
-                (25.0 / 960 + 25.0 / 720)
+                (50.0 / 2880)
             ) < 1e-8
         );
         advance(map, citizens, 362, 118);
@@ -3091,12 +3153,14 @@ void runSettlementSimulationLoopTests()
         c.health = 100;
         advance(map, citizens, 700, 180);
         PALADIN_CHECK(std::abs(c.hunger - 87.5) < 1e-6);
-        PALADIN_CHECK(std::abs(c.health - 75) < 1e-6);
+        PALADIN_CHECK(std::abs(c.health - 100) < 1e-6);
         PALADIN_CHECK(c.happiness < 100);
         c.carriedResource = "lumber";
         c.carriedAmount = 4;
         const double lumber = allGoods(map, citizens, "lumber");
         advance(map, citizens, 880, 181);
+        PALADIN_CHECK(!citizens.citizens().empty() && c.health>99);
+        advance(map, citizens, 1061, 3*1440);
         PALADIN_CHECK(citizens.citizens().empty());
         PALADIN_CHECK(map.logistics.total("lumber") == lumber);
         PALADIN_CHECK(!map.logistics.reservation(CitizenId{1}));

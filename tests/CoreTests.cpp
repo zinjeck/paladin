@@ -231,12 +231,12 @@ namespace
         PALADIN_CHECK(realm.settlementMarkerWeight < 0.001F);
         PALADIN_CHECK(realm.localWorldWeight < 0.001F);
 
-        PALADIN_CHECK(firstTransition.realmFillWeight > 0.52F);
+        PALADIN_CHECK(firstTransition.realmFillWeight > 0.20F);
         PALADIN_CHECK(firstTransition.realmFillWeight < 1.0F);
         PALADIN_CHECK(firstTransition.settlementMarkerWeight > 0.0F);
         PALADIN_CHECK(firstTransition.settlementMarkerWeight < 1.0F);
 
-        PALADIN_CHECK(std::abs(regional.realmFillWeight - 0.52F) < 1e-5F);
+        PALADIN_CHECK(std::abs(regional.realmFillWeight - 0.20F) < 1e-5F);
         PALADIN_CHECK(regional.realmLabelWeight < 0.001F);
         PALADIN_CHECK(regional.settlementMarkerWeight > 0.999F);
         PALADIN_CHECK(regional.localWorldWeight < 0.001F);
@@ -248,7 +248,7 @@ namespace
         PALADIN_CHECK(secondTransition.localWorldWeight < 1.0F);
         PALADIN_CHECK(secondTransition.realmBorderWeight == 1.0F);
 
-        PALADIN_CHECK(std::abs(local.realmFillWeight - 0.52F) < 1e-5F);
+        PALADIN_CHECK(std::abs(local.realmFillWeight - 0.20F) < 1e-5F);
         PALADIN_CHECK(local.realmLabelWeight < 0.001F);
         PALADIN_CHECK(local.settlementMarkerWeight < 0.001F);
         PALADIN_CHECK(local.localWorldWeight > 0.999F);

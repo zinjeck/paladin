@@ -462,20 +462,43 @@ namespace Paladin
                                 color
                             );
                         }
-                        renderer.drawTexture(
-                            *art->texture,
-                            source.x,
-                            source.y,
-                            source.width,
-                            source.height,
-                            point->x - width * .5F,
-                            point->y - height * .75F,
-                            width,
-                            height,
-                            std::uint8_t(
-                                255 * point->visibility * armyVisibility
-                            )
-                        );
+                        const float left=point->x-width*.5F, top=point->y-height*.75F;
+                        const auto opacity=std::uint8_t(255*point->visibility*armyVisibility);
+                        const auto slice=[&](float sx,float sy,float sw,float sh,float ox=0,float oy=0) {
+                            renderer.drawTexture(*art->texture,source.x+sx,source.y+sy,sw,sh,
+                                left+width*sx/source.width+ox,top+height*sy/source.height+oy,
+                                width*sw/source.width,height*sh/source.height,opacity);
+                        };
+                        if(caravan.transportDomain==TransportDomain::Water || !caravan.moving())
+                        { slice(0,0,source.width,source.height); continue; }
+                        const int phase=int(std::fmod(artwork->time()*6,4));
+                        const float pixel=float(worldObjectPixelPitch(effectiveTilePixels));
+                        if(source.width>source.height)
+                        {
+                            const bool east=dx>=0;
+                            const float split=std::floor(source.width*(east?.60F:.40F));
+                            const float horseX=east?split:0,horseW=east?source.width-split:split;
+                            slice(east?0:split,0,east?split:source.width-split,source.height);
+                            const float shoulder=std::floor(source.height*.66F);
+                            slice(horseX,0,horseW,shoulder,0,phase==1?-pixel:0);
+                            for(int leg=0;leg<4;++leg)
+                            {
+                                const float sx=std::floor(horseX+horseW*leg/4),ex=std::floor(horseX+horseW*(leg+1)/4);
+                                const float step=((leg+phase)%4==0?1:(leg+phase)%4==2?-1:0)*pixel;
+                                slice(sx,shoulder,ex-sx,source.height-shoulder,step,0);
+                            }
+                        }
+                        else
+                        {
+                            const bool north=to.y<from.y;
+                            const float split=std::floor(source.height*.5F);
+                            const float horseY=north?0:split,horseH=north?split:source.height-split;
+                            slice(0,north?split:0,source.width,north?source.height-split:split);
+                            const float flank=std::floor(source.width/3);
+                            slice(flank,horseY,source.width-2*flank,horseH,0,phase==1?-pixel:0);
+                            slice(0,horseY,flank,horseH,0,(phase<2?-1:1)*pixel);
+                            slice(source.width-flank,horseY,flank,horseH,0,(phase<2?1:-1)*pixel);
+                        }
                         continue;
                     }
                     // A future water shipment must never masquerade as a cart

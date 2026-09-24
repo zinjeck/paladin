@@ -36,6 +36,7 @@ namespace Paladin
                         const WorldPresentationPolicy&);
         void renderGlobe(Renderer&, const World&, const Camera2D&,
                          const WorldPresentationState&, const WorldPresentationPolicy&);
+        void renderOutlines(Renderer&,const World&,const Camera2D&,double,bool,const WorldPresentationState&);
         std::uint64_t cacheBuilds() const noexcept;
         std::size_t detailCacheBytes() const noexcept;
     private:

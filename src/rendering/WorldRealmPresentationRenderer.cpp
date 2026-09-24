@@ -134,12 +134,12 @@ namespace Paladin
         }
 
 
-        struct FrontierPixel { int x, y; RealmId realm; };
+        struct FrontierPixel { int x, y; RealmId realm; unsigned edges=0; bool civic=false; };
         struct PoliticalTextures
         {
             int density=1;
             std::vector<FrontierPixel> frontiers;
-            std::unique_ptr<Texture> fill, border, selectedBorder;
+            std::unique_ptr<Texture> fill, border;
             RealmId selectedFor;
             int x = 0, y = 0, width = 0, height = 0;
             std::uint64_t used = 0;
@@ -223,6 +223,11 @@ namespace Paladin
         std::uint64_t coarseGeneration=0;
         std::uint64_t influenceSnapshotRevision = ~std::uint64_t(0);
         PoliticalTextures coarse;
+        std::unique_ptr<Texture> outlineWhite;
+        std::vector<MeshVertex> outlineVertices;
+        std::vector<int> outlineIndices;
+        std::vector<MeshVertex> outlineInkVertices;
+        std::vector<int> outlineInkIndices;
         std::unordered_map<std::uint64_t, PoliticalTextures> detail;
         std::vector<float> distance;
         std::vector<Label> labels;
@@ -700,7 +705,9 @@ namespace Paladin
                         const bool frontier=surface.land && region &&
                             (job.regions[n-1]!=region || job.regions[n+1]!=region ||
                              job.regions[above+i+1]!=region || job.regions[below+i+1]!=region);
-                        if (job.recordFrontiers && frontier) job.result.frontiers.push_back({i,j,region});
+                        if (job.recordFrontiers && frontier) job.result.frontiers.push_back({i,j,region,
+                            unsigned(job.regions[n-1]!=region) | (unsigned(job.regions[n+1]!=region)<<1) |
+                            (unsigned(job.regions[above+i+1]!=region)<<2) | (unsigned(job.regions[below+i+1]!=region)<<3),bool(surface.civic)});
                         if (mode==WorldMapMode::Population)
                         {
                             // Density is geographic, not a realm-treasury-like
@@ -1020,8 +1027,7 @@ namespace Paladin
                 r.drawMesh(*tex, vertices, indices);
             };
             layer(t.fill.get(), p.realmFillWeight);
-            layer(t.border.get(), p.realmBorderWeight);
-            if (selected && t.selectedFor == selected) layer(t.selectedBorder.get(), 1.F);
+            if(thematicMapMode(mode)) layer(t.border.get(), p.realmBorderWeight);
         }
 
         void flatPage(
@@ -1239,26 +1245,6 @@ namespace Paladin
             }
         }
 
-        void prepareSelection(Renderer& renderer, PoliticalTextures& page)
-        {
-            if (!selected || page.selectedFor == selected) return;
-            if (std::none_of(page.frontiers.begin(), page.frontiers.end(),
-                [&](const auto& point) { return point.realm == selected; }))
-            { page.selectedBorder.reset(); page.selectedFor = selected; return; }
-            const int pw = page.width * page.density, ph = page.height * page.density;
-            if (pw <= 0 || ph <= 0) return;
-            std::vector<RenderColor> pixels(std::size_t(pw)*ph, {0,0,0,0});
-            for (const auto& point : page.frontiers)
-                if (point.realm == selected) pixels[std::size_t(point.y)*pw+point.x] = {235,196,107,255};
-            if (!page.selectedBorder || page.selectedBorder->width()!=pw || page.selectedBorder->height()!=ph)
-                page.selectedBorder = renderer.createTextureFromPixels(pw,ph,pixels);
-            else if (!renderer.updateTexturePixels(*page.selectedBorder,pixels))
-                throw std::runtime_error("Selection mask upload failed");
-            if (!page.selectedBorder) throw std::runtime_error("Selection mask allocation failed");
-            renderer.setTextureFiltering(*page.selectedBorder,false);
-            page.selectedFor = selected;
-        }
-
         void render(
             Renderer& r,
             const World& world,
@@ -1296,7 +1282,7 @@ namespace Paladin
             );
             if (pixels < 12)
             {
-                prepareSelection(r, coarse);
+                // Selection is a sparse native contour; no full-planet mask upload.
                 if (globe)
                 {
                     spherePage(r, coarse, view, 0, 0, width, height, false, p);
@@ -1381,7 +1367,7 @@ namespace Paladin
                     const auto found = detail.find(key(v.x, v.y));
                     auto* page =
                         found == detail.end() ? &coarse : &found->second;
-                    prepareSelection(r, *page);
+                    // Native contours retain screen-space stroke width.
                     const int w = std::min(ChunkSide, width - v.x),
                               h = std::min(ChunkSide, height - v.y);
                     // Exactly one contribution per surface patch. Painting an
@@ -1497,6 +1483,68 @@ namespace Paladin
             policy
         );
     }
+    void WorldRealmPresentationRenderer::renderOutlines(Renderer& r,const World& world,const Camera2D& camera,double pixels,bool globe,const WorldPresentationState& presentation)
+    {
+        auto& c=*cache_;
+        if(!c.ready || (!c.selected && presentation.realmBorderWeight<.001F)) return;
+        if(!c.outlineWhite) c.outlineWhite=r.createTextureFromPixels(1,1,std::array<RenderColor,1>{{{255,255,255,255}}});
+        if(!c.outlineWhite) return;
+        c.outlineVertices.clear(); c.outlineIndices.clear();
+        c.outlineInkVertices.clear(); c.outlineInkIndices.clear();
+        const auto view=GlobeView::from(camera,world.grid(),r.outputWidth(),r.outputHeight());
+        const auto project=[&](double x,double y) {
+            if(globe) return worldTransitionPoint(view,x/world.grid().width(),y/world.grid().height(),world.grid().width(),world.grid().height(),presentation.localWorldWeight);
+            return WorldSurface::Point3{r.outputWidth()*.5+(x-camera.tileX())*pixels,r.outputHeight()*.5+(y-camera.tileY())*pixels,1};
+        };
+        const auto line=[&](double ax,double ay,double bx,double by,RenderColor color,double stroke,bool ink=false) {
+            auto a=project(ax,ay),b=project(bx,by);
+            if(a.z<.02 || b.z<.02 || std::max(a.x,b.x)<-4 || std::min(a.x,b.x)>r.outputWidth()+4 || std::max(a.y,b.y)<-4 || std::min(a.y,b.y)>r.outputHeight()+4) return;
+            const double length=std::hypot(b.x-a.x,b.y-a.y); if(length<.001 || length>pixels*3) return;
+            const float dx=float((b.y-a.y)/length*stroke*.5),dy=float((a.x-b.x)/length*stroke*.5);
+            auto& vertices=ink?c.outlineInkVertices:c.outlineVertices;
+            auto& indices=ink?c.outlineInkIndices:c.outlineIndices;
+            const int base=int(vertices.size());
+            vertices.insert(vertices.end(),{{float(a.x)+dx,float(a.y)+dy,.5F,.5F,color},{float(b.x)+dx,float(b.y)+dy,.5F,.5F,color},{float(b.x)-dx,float(b.y)-dy,.5F,.5F,color},{float(a.x)-dx,float(a.y)-dy,.5F,.5F,color}});
+            indices.insert(indices.end(),{base,base+1,base+2,base,base+2,base+3});
+        };
+        const auto page=[&](const PoliticalTextures& t,bool coarse) {
+            for(const auto& point:t.frontiers)
+            {
+                if(!point.civic && point.realm!=c.selected) continue;
+                if(point.realm!=c.selected && thematicMapMode(c.mode)) continue;
+                const double x=t.x+double(point.x)/t.density,y=t.y+double(point.y)/t.density,d=1./t.density;
+                if(coarse && pixels>=12)
+                { const auto found=c.detail.find(c.key(int(x)/ChunkSide*ChunkSide,int(y)/ChunkSide*ChunkSide));
+                  if(found!=c.detail.end() && found->second.used==c.frame) continue; }
+                const auto ink=c.presentedPalette.find(point.realm);
+                if(ink==c.presentedPalette.end()) continue;
+                const bool selected=point.realm==c.selected;
+                const auto color=selected?RenderColor{235,196,107,255}:RenderColor{ink->second.color.red,ink->second.color.green,ink->second.color.blue,235};
+                const auto edge=[&](double ax,double ay,double bx,double by) {line(ax,ay,bx,by,{8,15,27,225},selected?4:3);line(ax,ay,bx,by,color,2,true);};
+                // Keep coastal ink on its dry side, including the dark outer
+                // stroke. It must never spill into the water contour.
+                const double inset=std::min(d*.5,(selected?2.5:2.)/pixels+d*.15);
+                // Inset corners meet on their dry side. Extend through a
+                // concave join into the neighboring dry cell, and shorten at
+                // convex corners where this cell supplies both sides.
+                const double left=x+((point.edges&1)?inset:-inset);
+                const double right=x+d+((point.edges&2)?-inset:inset);
+                const double top=y+((point.edges&4)?inset:-inset);
+                const double bottom=y+d+((point.edges&8)?-inset:inset);
+                if(point.edges&1) edge(x+inset,top,x+inset,bottom);
+                if(point.edges&2) edge(x+d-inset,top,x+d-inset,bottom);
+                if(point.edges&4) edge(left,y+inset,right,y+inset);
+                if(point.edges&8) edge(left,y+d-inset,right,y+d-inset);
+            }
+        };
+        page(c.coarse,true);
+        if(pixels>=12) for(const auto& [key,t]:c.detail) if(t.used==c.frame) page(t,false);
+        r.drawMesh(*c.outlineWhite,c.outlineVertices,c.outlineIndices);
+        // Paint all dark edges before any colored ink. Interleaving the two
+        // per segment erases the preceding segment at every shared endpoint.
+        r.drawMesh(*c.outlineWhite,c.outlineInkVertices,c.outlineInkIndices);
+    }
+
     std::uint64_t WorldRealmPresentationRenderer::cacheBuilds() const noexcept
     {
         return cache_->builds;
@@ -1508,7 +1556,6 @@ namespace Paladin
         for (const auto& [key, t] : cache_->detail)
         {
             n += t.bytes;
-            if (t.selectedBorder) n += std::size_t(t.selectedBorder->width()) * t.selectedBorder->height() * 4;
         }
         return n;
     }

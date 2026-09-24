@@ -118,7 +118,7 @@ namespace Paladin
         // Input and output have the same bulk. Conversion creates exactly the
         // slots it needs, including when freeSpace() is zero.
         change(*entry, input, -amount);
-        change(*entry, output, amount);
+        change(*entry, output, amount, minute);
         entry->createdMinute = minute;
         return amount;
     }
@@ -209,19 +209,21 @@ namespace Paladin
     void SettlementLogistics::change(
         SettlementInventory& entry,
         std::string_view resource,
-        int amount
+        int amount, double minute
     )
     {
+        if (minute < 0) minute = currentMinute_;
         for (auto& goods : entry.goods)
         {
             if (goods.resource == resource)
             {
+                if (goods.amount <= 0 && amount > 0) goods.batchMinute = minute;
                 goods.amount += amount;
                 ++version_;
                 return;
             }
         }
-        entry.goods.push_back({std::string(resource), amount});
+        entry.goods.push_back({std::string(resource), amount, minute});
         ++version_;
     }
     int SettlementLogistics::available(
@@ -317,7 +319,7 @@ namespace Paladin
         {
             entry->createdMinute = minute;
         }
-        change(*entry, resource, amount);
+        change(*entry, resource, amount, minute);
         return true;
     }
     InventoryId SettlementLogistics::drop(
@@ -344,7 +346,7 @@ namespace Paladin
             {
                 continue;
             }
-            change(entry, resource, deposited);
+            change(entry, resource, deposited, minute);
             result = entry.id;
             amount -= deposited;
             if (amount == 0)
@@ -364,7 +366,7 @@ namespace Paladin
                  {tile, 1, 1},
                  100,
                  minute,
-                 {{std::string(resource), deposited}}}
+                 {{std::string(resource), deposited, minute}}}
             );
             amount -= deposited;
             ++version_;
@@ -560,6 +562,7 @@ namespace Paladin
         double minute
     )
     {
+        currentMinute_ = minute;
         if (objectVersion_ == objects.navigationVersion())
         {
             return;

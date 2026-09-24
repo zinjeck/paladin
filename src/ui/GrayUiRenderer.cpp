@@ -89,7 +89,7 @@ namespace Paladin
                          enabled && (selected || hovered), pressed);
         }
 
-        if (enabled && selected) paladinSelectionOutline(renderer, bounds);
+        if (enabled && (selected || pressed)) paladinSelectionOutline(renderer, bounds);
 
         constexpr float preferredTextPixelSize = 3.0F;
         const float horizontalTextPadding =

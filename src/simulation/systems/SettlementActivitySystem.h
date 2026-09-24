@@ -34,7 +34,8 @@ namespace Paladin
         Talk,
         Care,
         FamilyMeal,
-        AnimalWork
+        AnimalWork,
+        Burial
     };
     struct CitizenTask
     {
@@ -50,6 +51,7 @@ namespace Paladin
         double startedMinute = 0;
         bool delivering = false;
         bool treasuryPurchase = false;
+        std::uint64_t remainsSequence=0;
         CitizenId partner;
         EntityId animal;
         std::string partnerName;
@@ -115,12 +117,13 @@ namespace Paladin
         double foodSeekThreshold = 50;
         double urgentFoodThreshold = 70;
         double requiredSleepMinutes = 5 * 60;
-        double awakeEnergyPerMinute = 25.0 / (16 * 60);
-        double workEnergyPerMinute = 25.0 / 720;
+        double awakeEnergyPerMinute = 50.0 / (2 * 1440);
+        double workEnergyPerMinute = 0;
         double sleepEnergyPerMinute = 50.0 / 300;
         double fatigueHealthPerDay = 20;
         double workBreakMinutes = 30;
-        double starvationThreshold = 75;
+        double starvationThreshold = 100;
+        double starvationHealthPerDay = 40;
         double mealRestoration = 50;
         double healthRecoveryPerDay = 25;
         double happinessRecoveryPerDay = 12;
@@ -177,6 +180,10 @@ namespace Paladin
     class SettlementActivitySystem
     {
     public:
+        bool chooseBurial(SettlementMap&,SettlementCitizenState&,SettlementCitizen&,double);
+        void executeBurial(SettlementMap&,SettlementCitizenState&,SettlementCitizen&,double,double);
+        std::uint64_t bedsTopology_=~std::uint64_t(0), bedsFamily_=~std::uint64_t(0);
+        std::size_t bedsPopulation_=0;
         CitizenSimulationPolicy policy;
         bool caregivingAtWorkTime(
             const SettlementMap&,

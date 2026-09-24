@@ -158,10 +158,7 @@ namespace Paladin
             }
         }
     }
-    std::uint64_t SettlementNaturalFeatures::chunkVersion(
-        int x,
-        int y
-    ) const noexcept
+    std::uint64_t SettlementNaturalFeatures::chunkVersion(int x, int y) const noexcept
     {
         return versions_[std::size_t(y) * chunkColumns_ + x];
     }

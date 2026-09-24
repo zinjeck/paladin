@@ -47,8 +47,21 @@ namespace Paladin
 #ifdef PALADIN_SOURCE_ART
             // Tiny authoring fixtures / development overrides use the same
             // importer.
+            // Normal scene/HUD paths are configured roots, not arbitrary
+            // imports. Avoid several filesystem canonicalization calls each
+            // time a new facade attaches to the resident library.
+            const auto requestedRoot=std::filesystem::path(root).lexically_normal();
+            bool standardRoot=requestedRoot ==
+                (std::filesystem::path(SDL_GetBasePath())/"assets/sprites").lexically_normal();
+#ifdef PALADIN_ART_ROOT
+            standardRoot |= requestedRoot == std::filesystem::path(PALADIN_ART_ROOT).lexically_normal();
+#endif
+#ifdef PALADIN_TEST_SOURCE_ROOT
+            standardRoot |= requestedRoot ==
+                (std::filesystem::path(PALADIN_TEST_SOURCE_ROOT)/"assets/sprites").lexically_normal();
+#endif
             if (
-                std::filesystem::exists(std::filesystem::path(root)) &&
+                !standardRoot && std::filesystem::exists(std::filesystem::path(root)) &&
                 std::filesystem::weakly_canonical(root) !=
                     std::filesystem::weakly_canonical(
                         std::filesystem::path(SDL_GetBasePath()) /
@@ -102,28 +115,33 @@ namespace Paladin
                 objects_ = std::move(source.objects_);
                 pieces_ = std::move(source.pieces_);
                 lights_ = std::move(source.lights_);
+                shared_.reset();
                 loaded_ = true;
                 return;
             }
 #ifdef PALADIN_ART_ROOT
-            // F6 resets this facade; incremental import is content-keyed.
-            static std::mutex compileMutex;
-            std::lock_guard lock(compileMutex);
-            ensureDevelopmentAssets(
-                PALADIN_ART_ROOT,
-                std::filesystem::path(SDL_GetBasePath()) / "assets/packages",
-                std::filesystem::path(PALADIN_ART_ROOT) / "../../.cache/assets"
-            );
+            // Scan development sources once during startup, or explicitly on
+            // F6. A new scene/HUD facade must not rescan hundreds of source
+            // files merely to reuse the already prepared generation.
+            if (refreshAssets_ || !renderer.sceneSpriteCache())
+            {
+                static std::mutex compileMutex;
+                std::lock_guard lock(compileMutex);
+                ensureDevelopmentAssets(
+                    PALADIN_ART_ROOT,
+                    std::filesystem::path(SDL_GetBasePath()) / "assets/packages",
+                    std::filesystem::path(PALADIN_ART_ROOT) / "../../.cache/assets"
+                );
+                refreshAssets_ = true;
+            }
 #endif
 #endif
-            auto manager = renderer.compiledAssets();
-            if (const auto cache = renderer.sceneSpriteCache(); cache && cache->assets_ == manager)
+            auto manager = renderer.compiledAssets({}, refreshAssets_);
+            refreshAssets_ = false;
+            if (const auto cache = renderer.sceneSpriteCache(); cache && cache.get() != this && cache->assets_ == manager)
             {
                 assets_ = manager;
-                sprites_ = cache->sprites_;
-                objects_ = cache->objects_;
-                pieces_ = cache->pieces_;
-                lights_ = cache->lights_;
+                shared_ = cache;
                 loaded_ = true;
                 if (progress) progress(1, 1, "Reusing prepared sprites");
                 return;
@@ -220,6 +238,7 @@ namespace Paladin
             objects_ = std::move(objects);
             pieces_ = std::move(pieces);
             lights_ = std::move(lights);
+            shared_.reset();
             loaded_ = true;
             renderer.cacheSceneSprites(std::make_shared<SceneSpriteLibrary>(*this));
             if (progress) progress(records.size(), records.size(), "Sprites ready");
@@ -461,6 +480,7 @@ namespace Paladin
     }
     const SceneSprite* SceneSpriteLibrary::find(const std::string& id) const
     {
+        if (shared_) return shared_->find(id);
         if (!environmentArtEnabled_ && id != "citizen" &&
             !id.starts_with("citizen.") && !id.starts_with("animal."))
         {
@@ -474,6 +494,7 @@ namespace Paladin
     ) const
     {
         static const ObjectPresentation fallback;
+        if (shared_) return shared_->objectStyle(id);
         const auto it = objects_.find(id);
         return it == objects_.end() ? fallback : it->second;
     }
@@ -500,7 +521,7 @@ namespace Paladin
                 return true;
             }
         }
-        for (const auto& p : pieces_)
+        for (const auto& p : pieces())
         {
             if (p.object == id && find(p.sprite))
             {

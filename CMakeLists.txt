@@ -437,7 +437,7 @@ if(MSVC)
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
     file(GLOB_RECURSE PALADIN_DEBUG_SOURCES CONFIGURE_DEPENDS "src/*.cpp" "tests/*.cpp")
     foreach(PALADIN_DEBUG_SOURCE IN LISTS PALADIN_DEBUG_SOURCES)
-        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/(rendering|assets)/|/tests/(ApplicationSmokeTests|WorldSurfaceRenderTests)\\.cpp$")
+        if(NOT PALADIN_DEBUG_SOURCE MATCHES "/src/(rendering|assets)/|/src/ui/(BitmapFontRenderer|GrayUiRenderer|NormalFontRenderer)\\.cpp$|/tests/(ApplicationSmokeTests|WorldSurfaceRenderTests)\\.cpp$")
             set_property(SOURCE ${PALADIN_DEBUG_SOURCE} APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Debug>:/RTC1>")
         endif()
     endforeach()
@@ -446,9 +446,15 @@ if(MSVC)
     # GlobeRenderer). Match the game's rendering flags, retaining symbols and
     # every assertion; otherwise the timing gates benchmark a different path.
     list(APPEND PALADIN_RENDER_SOURCES
-        tests/ApplicationSmokeTests.cpp tests/WorldSurfaceRenderTests.cpp)
+        tests/ApplicationSmokeTests.cpp tests/WorldSurfaceRenderTests.cpp
+        src/ui/BitmapFontRenderer.cpp src/ui/GrayUiRenderer.cpp src/ui/NormalFontRenderer.cpp)
     set_property(SOURCE ${PALADIN_RENDER_SOURCES} APPEND PROPERTY COMPILE_OPTIONS
         "$<$<CONFIG:Debug>:/O2>" "$<$<CONFIG:Debug>:/Ob2>")
+    # These large terrain submission functions otherwise exceed MSVC's
+    # conservative inline budget and call Debug STL/grid accessors per tile.
+    set_property(SOURCE src/rendering/WorldGridRenderer.cpp
+        src/rendering/SettlementNaturalFeatureRenderer.cpp APPEND PROPERTY
+        COMPILE_OPTIONS "$<$<CONFIG:Debug>:/Ob3>")
 endif()
 
 add_executable(PaladinAssetTests tests/AssetCompilerTests.cpp)

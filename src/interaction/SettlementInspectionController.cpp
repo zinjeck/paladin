@@ -27,6 +27,8 @@ namespace Paladin
             return true;
         }
 
+        if(const auto* grave=citizenState.graveAt(position))
+        { clear(); kind_=SettlementInspectionKind::Grave; graveSequence_=grave->sequence; placePanelOnRight_=placePanelOnRight; return true; }
         const SettlementConstructionSite* constructionSite =
             objectState.constructionSiteAt(position);
 
@@ -79,6 +81,7 @@ namespace Paladin
     {
         kind_ = SettlementInspectionKind::None;
         inventoryId_ = {};
+        graveSequence_=0;
         objectId_ = {};
         constructionSiteId_ = {};
         citizenId_ = {};

@@ -130,7 +130,7 @@ namespace Paladin
         struct OverviewData
         {
             int width = 0, height = 0;
-            std::vector<RenderColor> pixels;
+            std::vector<std::vector<RenderColor>> bands;
         };
         mutable std::future<OverviewData> overviewPending_;
         mutable std::shared_ptr<std::atomic_bool> overviewCancelled_;

@@ -51,6 +51,33 @@ namespace Paladin
         auto& fishing = fishing_;
         fishing.clear();
 
+        // Grounded, non-graphic remains use the same scene lattice and queue
+        // as residents. Graves retain identity after the body has disappeared.
+        for(const auto& r:citizens.remains())
+        {
+            const auto pos=r.buried ? r.grave : r.position;
+            const double age=citizens.remainsMinute()-r.diedMinute;
+            if(!r.buried && age>=3*1440) continue;
+            const auto* carrier=r.pickedUp?citizens.citizen(r.carrier):nullptr;
+            const double px=carrier?carrier->renderX(carrier->visualX(),interpolationAlpha):pos.x;
+            const double py=carrier?carrier->renderY(carrier->visualY(),interpolationAlpha):pos.y;
+            const double cx=renderer.outputWidth()*.5+(px+.5-camera.tileX())*tilePixels;
+            const double cy=renderer.outputHeight()*.5+(py+(carrier?.24:.5)-camera.tileY())*tilePixels;
+            if(cx<-tilePixels || cy<-tilePixels || cx>renderer.outputWidth()+tilePixels || cy>renderer.outputHeight()+tilePixels) continue;
+            const char* body[]{"             ","  hh tttllll  "," hhhhtttlllll ","  hh tttllll  ","             "};
+            const char* bones[]{"             ","  oo b b b   "," oooo bbbbb  ","  oo b b b   ","             "};
+            const char* grave[]{"   sss       ","   sss  f    ","   sss fgf   ","   ddddd     ","   ddddd     "};
+            const auto rows=r.buried ? grave : age>=1440 ? bones : body;
+            const float step=float(tilePixels/16);
+            for(int y=0;y<5;++y) for(int x=0;rows[y][x];++x)
+            {
+                const char ch=rows[y][x]; if(ch==' ') continue;
+                RenderColor color=ch=='h'?RenderColor{189,134,76,255}:ch=='t'?RenderColor{89,102,121,255}:ch=='l'?RenderColor{99,62,75,255}:ch=='s'?RenderColor{154,167,175,255}:ch=='d'?RenderColor{78,59,57,255}:ch=='f'?RenderColor{243,182,154,255}:ch=='g'?RenderColor{35,87,71,255}:RenderColor{239,226,207,255};
+                if(carrier) color={239,226,207,255};
+                if(!r.buried && !carrier && age>2*1440) color.alpha=std::uint8_t(255*std::clamp((3*1440-age)/1440.,0.,1.));
+                queue.submit({{float(cx)+(x-6)*step,float(cy)+(y-2)*step,step,step},color,py+(carrier?1.1:.55),(std::uint64_t(3)<<62)|r.sequence,0,y*16+x});
+            }
+        }
         for (const SettlementCitizen& citizen : citizens.citizens())
         {
             if (citizen.militaryDeployed ||
@@ -169,7 +196,7 @@ namespace Paladin
             const bool working =
                 !walking &&
                 (gathering || citizen.task.kind == CitizenTaskKind::Build ||
-                 citizen.activity == CitizenActivity::Mining);
+                 citizen.activity == CitizenActivity::Mining || citizen.activity==CitizenActivity::AtWork);
             const int pose =
                 walking ? int(std::fmod(citizen.walkDistance, 1.0) * 4.0)
                 : working

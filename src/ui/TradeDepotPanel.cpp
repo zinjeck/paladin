@@ -225,43 +225,49 @@ namespace Paladin
         add(x, bottom, span * .5F - 4, Kind::Dispatch, "Send once");
         add(x + span * .5F + 4, bottom, span * .5F - 4,
             Kind::Start, "Repeat batch");
-        std::vector<const SettlementTradeOrder*> orders;
-        for (const auto& order : map->trade.orders)
+        struct OrderCard { const SettlementTradeOrder* order; SettlementId city; };
+        std::vector<OrderCard> orders;
+        for (const auto& settlement : world.settlements())
         {
-            if (order.depot == depot_ && map->trade.visible(order))
-            { orders.push_back(&order); }
+            if (settlement.ownerRealmId() != actor) continue;
+            if (const auto* local = settlement.simulationState().localMap())
+                for (const auto& order : local->trade.orders)
+                    if (local->trade.visible(order)) orders.push_back({&order,settlement.id()});
         }
         const int slots = std::max(0, int((ordersBounds_.height - 25) / 80));
         orderScroll_ = std::clamp(orderScroll_, 0, std::max(0, int(orders.size()) - slots));
         for (int row = 0; row < slots && row + orderScroll_ < int(orders.size()); ++row)
         {
-            const auto& order = *orders[row + orderScroll_];
+            const auto& entry = orders[row + orderScroll_];
+            const auto& order = *entry.order;
             const UiRectangle card{ordersBounds_.x,
                 ordersBounds_.y + 25 + row * 80.F, ordersBounds_.width, 74};
             controls_.push_back({{card.x + card.width - 58, card.y + 6, 52, 24},
-                                 Kind::CancelOrder, "Cancel", order.id});
-            controls_.push_back({card, Kind::SelectOrder, "", order.id});
+                                 Kind::CancelOrder, "Cancel", order.id, entry.city, order.depot});
+            controls_.push_back({card, Kind::SelectOrder, "", order.id, entry.city, order.depot});
         }
     }
-    void TradeDepotPanel::act(Kind kind, World& world, RealmId actor, std::uint64_t orderId)
+    void TradeDepotPanel::act(Kind kind, World& world, RealmId actor, std::uint64_t orderId, SettlementId orderCity, SettlementObjectId orderDepot)
     {
         quoteSignature_ = ~std::uint64_t(0);
         editing_ = kind == Kind::Quantity;
         const auto count = SettlementResourceCatalog::definitions().size();
         if (kind == Kind::CancelOrder)
         {
-            WorldMarketSystem::cancelOrder(world, actor, city_, depot_, orderId);
+            WorldMarketSystem::cancelOrder(world, actor, orderCity, orderDepot, orderId);
             message_ = "Order cancelled. Paid cargo already travelling is preserved.";
             layout(width_, height_, world, actor);
             return;
         }
         if (kind == Kind::SelectOrder)
         {
-            const auto* city = world.settlement(city_);
+            const auto* city = world.settlement(orderCity);
             const auto* map = city ? city->simulationState().localMap() : nullptr;
             if (map) for (const auto& order : map->trade.orders)
             {
-                if (order.id != orderId || order.depot != depot_) { continue; }
+                if (order.id != orderId || order.depot != orderDepot) { continue; }
+                if (orderCity != city_ || orderDepot != depot_)
+                { message_ = std::string(city->name()) + " | " + order.status; break; }
                 const auto resources = SettlementResourceCatalog::definitions();
                 for (std::size_t i = 0; i < resources.size(); ++i)
                 { if (resources[i].id == order.resource) { resourceIndex_ = i; break; } }
@@ -486,6 +492,8 @@ namespace Paladin
                     {
                         pressed_ = control.kind;
                         pressedOrderId_ = control.orderId;
+                        pressedOrderCity_ = control.city;
+                        pressedOrderDepot_ = control.depot;
                         break;
                     }
                 }
@@ -506,9 +514,10 @@ namespace Paladin
                 {
                     if (control.kind == *pressed &&
                         control.orderId == pressedOrderId_ &&
+                        control.city == pressedOrderCity_ && control.depot == pressedOrderDepot_ &&
                         control.bounds.contains(event.button.x, event.button.y))
                     {
-                        act(*pressed, world, actor, control.orderId);
+                        act(*pressed, world, actor, control.orderId, control.city, control.depot);
                         break;
                     }
                 }
@@ -616,20 +625,23 @@ namespace Paladin
         );
         if (ordersBounds_.width > 0 && ordersBounds_.height > 0)
         {
-            ui.drawLabel(renderer, "Orders (scroll for more)", ordersBounds_.x,
+            ui.drawLabel(renderer, "Realm orders (scroll for more)", ordersBounds_.x,
                          ordersBounds_.y + 3, 1.15F);
             bool any = false;
             for (const auto& control : controls_)
             {
                 if (control.kind != Kind::SelectOrder) { continue; }
-                const auto found = std::find_if(map->trade.orders.begin(), map->trade.orders.end(),
-                    [&](const auto& order) { return order.id == control.orderId && map->trade.visible(order); });
-                if (found == map->trade.orders.end()) { continue; }
+                const auto* orderCity = world.settlement(control.city);
+                const auto* orderMap = orderCity ? orderCity->simulationState().localMap() : nullptr;
+                if (!orderMap || orderCity->ownerRealmId() != actor) continue;
+                const auto found = std::find_if(orderMap->trade.orders.begin(), orderMap->trade.orders.end(),
+                    [&](const auto& order) { return order.id == control.orderId && order.depot == control.depot && orderMap->trade.visible(order); });
+                if (found == orderMap->trade.orders.end()) continue;
                 any = true;
                 const auto& order = *found;
                 const auto& b = control.bounds;
                 ui.drawButton(renderer, b, "", b.contains(mouseX_, mouseY_),
-                              pressed_ == Kind::SelectOrder && pressedOrderId_ == order.id, false, true);
+                              pressed_ == Kind::SelectOrder && pressedOrderId_ == order.id && pressedOrderCity_ == control.city, false, true);
                 const auto* definition = SettlementResourceCatalog::definition(order.resource);
                 const auto label = [&](std::string value, float xx, float yy, float width, float scale)
                 {
@@ -645,10 +657,10 @@ namespace Paladin
                 label(definition ? std::string(definition->displayName) : order.resource,
                       b.x + 44, b.y + 9, b.width - 112, 1.25F);
                 label(std::string(order.direction == TradeDirection::Export ? "Export " : "Import ") +
-                          std::to_string(order.quantity) + (order.standing ? " | Standing" : " | One order"),
+                          std::to_string(order.quantity) + " | " + (orderCity->name().empty()?"Settlement "+std::to_string(orderCity->id().value()):std::string(orderCity->name())) + (order.standing ? " | Repeat" : ""),
                       b.x + 8, b.y + 35, b.width - 16, 1.15F);
                 label(order.collectionAuthorized
-                    ? DepotCollection::status(*map, city->simulationState().citizens(),
+                    ? DepotCollection::status(*orderMap, orderCity->simulationState().citizens(),
                         order, double(world.time().totalGameMinutes()))
                     : order.status, b.x + 8, b.y + 55, b.width - 16, 1.F);
             }

@@ -70,6 +70,22 @@ namespace Paladin
         const TileRenderMetrics& metrics
     )
     {
+        if(controller.kind()==SettlementInspectionKind::Grave)
+        {
+            clearLayout();
+            for(const auto& grave:citizenState.remains())
+            {
+                if(grave.sequence!=controller.graveSequence()) continue;
+                renderedBounds_={20,180,340,150};
+                grayUiRenderer.drawPanel(renderer,renderedBounds_);
+                grayUiRenderer.drawLabel(renderer,"In memory of",34,194,2);
+                grayUiRenderer.drawLabel(renderer,grave.name,34,222,2);
+                grayUiRenderer.drawLabel(renderer,"Age "+std::to_string(grave.age)+" - "+(grave.sex==CitizenSex::Female ? "Woman" : "Man"),34,250,2);
+                grayUiRenderer.drawLabel(renderer,"Died on day "+std::to_string(int(grave.diedMinute/1440)+1),34,278,2);
+                return;
+            }
+            return;
+        }
         const SettlementObjectState& objectState = settlementMap.objectState();
         spouseId_ = {};
         tradeContent_ = {};

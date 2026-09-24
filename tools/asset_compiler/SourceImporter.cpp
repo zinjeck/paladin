@@ -354,7 +354,8 @@ namespace Paladin
                                 palette.contains(0x49975B) &&
                                 palette.contains(0x337A58) &&
                                 palette.contains(0xD9C79F) &&
-                                palette.contains(0xB78350)
+                                palette.contains(0xB78350),
+                            id.starts_with("citizen.") && id.ends_with(".walk")
                         ))
                     {
                         SDL_DestroySurface(source);

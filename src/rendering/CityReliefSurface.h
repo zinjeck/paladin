@@ -23,7 +23,9 @@ namespace Paladin
                 const bool solid = tile->terrain == TerrainType::Mountain;
                 rock_[j*3+i] = solid ? 1.0 : 0.0;
                 high_[j*3+i] = solid && tile->relief != ReliefType::Hills ? 1.0 : 0.0;
-                active_ |= solid;
+                floors_[j*3+i]=tile->rockFloor?1.:0.;
+                caves_[j*3+i]=tile->caveInterior?1.:0.;
+                active_ |= solid || tile->rockFloor;
             }
             buried_ = std::all_of(high_.begin(),high_.end(),[](double value) { return value == 1; });
         }
@@ -46,6 +48,14 @@ namespace Paladin
         RenderColor paint(double x, double y, RenderColor ground) const
         {
             if (!active_) { return ground; }
+            const auto floorValue=surfaceField(x,y,[&](int xx,int yy){return floors_[(yy-y_+1)*3+xx-x_+1];},false);
+            if(floorValue>.48+rockSurfaceNoise(x*5,y*5)*.08)
+            {
+                const double cave=surfaceField(x,y,[&](int xx,int yy){return caves_[(yy-y_+1)*3+xx-x_+1];},false);
+                const double grain=rockSurfaceNoise(x*8,y*8);
+                if(cave>.4) return grain>.3?RenderColor{32,44,67,255}:RenderColor{8,15,27,255};
+                return grain>.2?RenderColor{89,102,121,255}:RenderColor{57,70,88,255};
+            }
             if (buried_) { return {8,15,27,255}; }
             // Bounded, faceted chipping moves the boundary by less than a
             // quarter tile. Tile centres retain their navigation/mining meaning;
@@ -73,6 +83,15 @@ namespace Paladin
             const double dy = ((rock_[cell+3]-rock_[cell])*(1-u) +
                                (rock_[cell+4]-rock_[cell+1])*u);
             const double facing = std::clamp(dx*.7 + dy*.6,-1.0,1.0);
+            if(high<.15)
+            {
+                // Broad grassy shoulders and slope lighting distinguish hills
+                // from exposed mountain walls; isolated stones break the turf.
+                if(chip>.90) return stone(x,y,facing);
+                const double rise=landscapeField(x*.09,y*.09,9271);
+                const double shade=.78+.20*rock+.18*facing+.15*(rise-.5);
+                return {std::uint8_t(std::clamp(ground.red*shade,0.,255.)),std::uint8_t(std::clamp(ground.green*shade,0.,255.)),std::uint8_t(std::clamp(ground.blue*shade,0.,255.)),255};
+            }
             if (high > .62+shelf*.06) { return {32,44,67,255}; }
             if (rock < .66+shelf*.05)
             {
@@ -83,7 +102,7 @@ namespace Paladin
         }
 
     private:
-        std::array<double,9> rock_{}, high_{};
+        std::array<double,9> rock_{}, high_{}, floors_{}, caves_{};
         int x_ = 0, y_ = 0;
         bool active_ = false;
         bool buried_ = false;

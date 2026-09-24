@@ -1545,6 +1545,22 @@ namespace Paladin
             PALADIN_CHECK(r == 99 && g == 62 && b == 75 && a == 255);
             SDL_DestroySurface(simple);
             SDL_DestroySurface(art);
+            // Walk poses may leave an isolated transparent waist sample. Keep
+            // deliberate arm/leg gaps while reconnecting the body core.
+            art=SDL_CreateSurface(16,20,SDL_PIXELFORMAT_RGBA32);
+            PALADIN_CHECK(art);
+            SDL_FillSurfaceRect(art,nullptr,SDL_MapSurfaceRGBA(art,0,0,0,0));
+            SDL_Rect torso{5,6,6,9};
+            SDL_FillSurfaceRect(art,&torso,SDL_MapSurfaceRGBA(art,99,62,75,255));
+            SDL_Rect waist{7,11,1,1};
+            SDL_FillSurfaceRect(art,&waist,SDL_MapSurfaceRGBA(art,0,0,0,0));
+            simple=simplifySprite(art,1,1.25,1,false,true);
+            PALADIN_CHECK(simple);
+            SDL_ReadSurfacePixel(simple,7,11,&r,&g,&b,&a);
+            PALADIN_CHECK(a==255 && r==99);
+            SDL_ReadSurfacePixel(simple,3,11,&r,&g,&b,&a);
+            PALADIN_CHECK(a==0);
+            SDL_DestroySurface(simple);SDL_DestroySurface(art);
             const SettlementObjectFootprint facingFootprint{{10, 10}, 3, 3};
             PALADIN_CHECK(
                 buildingView(facingFootprint, SettlementTilePosition{11, 10}) ==
@@ -4207,7 +4223,7 @@ namespace Paladin
                                .settlement(capital)
                                ->simulationState()
                                .citizens();
-            SettlementActivityTestFixture::setNeeds(people, 90, 50);
+            SettlementActivityTestFixture::setNeeds(people, 100, 50);
             app.simulation_->reports.update(
                 app.simulation_->world(),
                 app.simulation_->playerRealmId(),

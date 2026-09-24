@@ -1,4 +1,5 @@
 #include <exception>
+#include <cstdlib>
 #include <iostream>
 
 #include "CelestialSunChecks.h"
@@ -34,6 +35,7 @@ int main()
 {
     try
     {
+        if (std::getenv("PALADIN_CITY_BENCHMARK")) { runSettlementSimulationLoopTests(); return 0; }
         Paladin::Test::DepotRegression::run();
         Paladin::Test::DepotRegression::allResources();
         Paladin::Test::CityCorrections::run();

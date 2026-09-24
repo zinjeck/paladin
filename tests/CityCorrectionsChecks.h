@@ -94,7 +94,7 @@ namespace Paladin::Test::CityCorrections
         {
             auto& c = const_cast<SettlementCitizen&>(people.citizens()[i]);
             c.health = c.energy = 100; c.happiness = 70;
-            c.hunger = i == 0 ? 0 : i == 1 ? 49.99 : i == 2 ? 50 : 80;
+            c.hunger = i == 0 ? 0 : i == 1 ? 49.99 : i == 2 ? 99.99 : 100;
             c.homeId = {}; c.workplaceId = {}; c.child = false;
             c.homelessMinutes = 0;
         }
@@ -103,7 +103,7 @@ namespace Paladin::Test::CityCorrections
         PALADIN_CHECK(std::abs(a - people.citizens()[1].happiness) < 1e-7);
         PALADIN_CHECK(std::abs(a - people.citizens()[2].happiness) < 1e-7);
         PALADIN_CHECK(people.citizens()[3].happiness < a);
-        std::cout << "[city-corrections] no hunger distress below 50; distress above threshold\n";
+        std::cout << "[city-corrections] no hunger distress below 100; distress at starvation\n";
     }
     inline void relief()
     {

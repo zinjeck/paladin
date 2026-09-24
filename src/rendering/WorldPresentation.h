@@ -41,7 +41,7 @@ namespace Paladin
 
         // Political color remains as a quiet wash in the closest world view so
         // terrain features stay readable without making realm identity vanish.
-        float closeRealmFillOpacity = 0.52F;
+        float closeRealmFillOpacity = 0.20F;
 
         // Border lines retain their far-view strength at close zoom. This is
         // independent of the stronger close-up political fill.

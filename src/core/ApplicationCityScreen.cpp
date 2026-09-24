@@ -19,6 +19,7 @@
 #include "world/settlements/objects/SettlementObjectDefinition.h"
 #include <SDL3/SDL.h>
 #include <array>
+#include <iostream>
 
 namespace Paladin
 {
@@ -150,6 +151,13 @@ namespace Paladin
 
     void Application::renderCityScreen()
     {
+        auto profileStart=SDL_GetTicksNS();
+        const auto profile=[&](const char* name) {
+            const auto now=SDL_GetTicksNS();
+            const double ms=double(now-profileStart)/1e6;
+            if(SDL_getenv("PALADIN_CAMERA_PROFILE") && ms>25) std::cout<<"city_section="<<name<<" ms="<<ms<<'\n';
+            profileStart=now;
+        };
         cityRenderer_->gameMinute = double(simulation_->world().time().totalGameMinutes());
         auto* settlementMap =
             simulation_->settlementMap(activeCitySettlementId_);
@@ -191,10 +199,12 @@ namespace Paladin
         }
 
 
+        profile("scene");
         const auto* citySettlement =
             simulation_->world().settlement(activeCitySettlementId_);
         const auto& worldTime = simulation_->world().time();
         cityHud_->render(*renderer_, *grayUiRenderer_);
+        profile("hud");
         if (settlementMap)
         {
             cityRenderer_->renderMinimap(
@@ -206,6 +216,7 @@ namespace Paladin
             );
         }
 
+        profile("minimap");
         simulationSpeedControls_->render(*renderer_, *grayUiRenderer_);
         // The inspector and its embedded depot controls are one foreground
         // surface. Paint its background after the HUD and minimap so those
@@ -245,6 +256,7 @@ namespace Paladin
             );
         }
         renderCityTooltip();
+        profile("panels");
     }
 
     void Application::renderCityTooltip()

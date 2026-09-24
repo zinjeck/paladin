@@ -252,9 +252,12 @@ namespace Paladin::Test
         const auto drawMask=[&] {
             renderer.beginFrame();
             renderer.fillRectangle(0,0,960,640,{0,0,0,255});
-            WorldPixelScene scene(renderer,64);
-            renderer.fillRectangle(0,0,960,640,{0,0,0,255});
-            politics.renderFlat(renderer,world,camera,metrics,weights,{});
+            {
+                WorldPixelScene scene(renderer,64);
+                renderer.fillRectangle(0,0,960,640,{0,0,0,255});
+                politics.renderFlat(renderer,world,camera,metrics,weights,{});
+            }
+            politics.renderOutlines(renderer,world,camera,64,false,weights);
         };
         const auto settleMask=[&] {
             const auto deadline=SDL_GetTicks()+30000;
@@ -303,7 +306,7 @@ namespace Paladin::Test
             PALADIN_CHECK(!color.red && !color.green && !color.blue);
         }
         PALADIN_CHECK(
-            std::abs(worldPresentationState(256).realmFillWeight - .52F) <
+            std::abs(worldPresentationState(256).realmFillWeight - .20F) <
             .0001F
         );
         weights.realmFillWeight=1; weights.realmBorderWeight=1;
@@ -336,9 +339,12 @@ namespace Paladin::Test
         do {
             renderer.beginFrame();
             renderer.fillRectangle(0,0,960,640,{0,0,0,255});
-            WorldPixelScene scene(renderer,64);
-            renderer.fillRectangle(0,0,960,640,{0,0,0,255});
-            referencePolitics.renderFlat(renderer,world,camera,metrics,weights,{});
+            {
+                WorldPixelScene scene(renderer,64);
+                renderer.fillRectangle(0,0,960,640,{0,0,0,255});
+                referencePolitics.renderFlat(renderer,world,camera,metrics,weights,{});
+            }
+            referencePolitics.renderOutlines(renderer,world,camera,64,false,weights);
         } while (referencePolitics.hasPendingWork() && SDL_GetTicks()<referenceDeadline);
         PALADIN_CHECK(!referencePolitics.hasPendingWork());
         const auto referenceMask=readWorldReview(native);
@@ -540,6 +546,13 @@ namespace Paladin::Test
             PALADIN_CHECK(std::abs(WorldAtmosphere::density(u,v,0)-WorldAtmosphere::density(u+1,v,0))<1.e-10);
             movingClouds+=std::abs(WorldAtmosphere::density(u,v,0)-WorldAtmosphere::density(u,v,1));
         }
+        // The day-nine regression was an unbounded latitude derivative.
+        for(double day:{9.,30.,365.,10000.,1000000.})
+        {
+            const double a=WorldAtmosphere::advectedLongitude(.5,.4,day);
+            const double b=WorldAtmosphere::advectedLongitude(.5,.4001,day);
+            PALADIN_CHECK(std::abs(b-a)<.0001);
+        }
         PALADIN_CHECK(movingClouds>1);
         // Exercise actual filtered cloud output: identical paused frames,
         // continuous small camera movements, and visible clock-driven winds.
@@ -556,6 +569,11 @@ namespace Paladin::Test
         const auto cloudPaused=cloudsAt(cloudView,0);
         const auto cloudLater=cloudsAt(cloudView,1);
         saveWorldReview(native,"atmosphere-next-day.png");
+        for(double day:{9.,365.,10000.})
+        {
+            cloudsAt(cloudView,day);
+            saveWorldReview(native,"atmosphere-age-"+std::to_string(int(day))+".png");
+        }
         auto movedView=cloudView; movedView.cx+=.25;
         const auto cloudMoved=cloudsAt(movedView,0);
         double cameraDifference=0,timeDifference=0;

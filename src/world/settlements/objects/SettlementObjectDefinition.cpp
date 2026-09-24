@@ -43,9 +43,12 @@ namespace Paladin
             d.visual.iconHeight = float(d.previewHeight);
             return d;
         }
-        constexpr std::array<SettlementObjectDefinition, 17>
+        constexpr std::array<SettlementObjectDefinition, 18>
             rawObjectDefinitions{
-                {enclosed(
+                {{SettlementObjectTypes::Graveyard,"Graveyard",SettlementObjectCategory::Wellness,1,
+                  SettlementFootprintSelectionMode::DragRectangle,1,1,3,3,false,false,false,false,
+                  SettlementObjectPlacementLayer::Structure,{{74,77,79},{72,92,70},3,3},initialConstructionResourceCosts,false},
+                 enclosed(
                      {SettlementObjectTypes::CityKeep,
                       "City Keep",
                       SettlementObjectCategory::Rule,

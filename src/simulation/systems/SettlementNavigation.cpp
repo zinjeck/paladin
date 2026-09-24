@@ -5,7 +5,6 @@
 #include <cmath>
 #include <limits>
 #include <queue>
-#include <unordered_map>
 namespace Paladin
 {
     void SettlementNavigation::synchronize(const SettlementMap& map)
@@ -15,6 +14,7 @@ namespace Paladin
         {
             return;
         }
+        routeCache_.clear();
         roads_.assign(map.grid().tileCount(), 0);
         hasRoads_ = false;
         for (const auto& object : map.objectState().completedObjects())
@@ -124,6 +124,17 @@ namespace Paladin
         candidates = 0;
         lastCost = 0;
 
+        // Terrain excavation publishes through the same navigation revision
+        // as construction. Cached failures must be retried after a new passage
+        // opens, even before the next activity synchronization.
+        if (routeSource_ != map.instanceId() ||
+            routeVersion_ != map.objectState().navigationVersion())
+        {
+            routeCache_.clear();
+            routeSource_ = map.instanceId();
+            routeVersion_ = map.objectState().navigationVersion();
+        }
+
         if (!map.grid().isValidPosition(start) ||
             !walkable(
                 map,
@@ -138,6 +149,20 @@ namespace Paladin
         {
             return {};
         }
+        for(const auto& cached:routeCache_)
+        {
+            const auto& p=cached.policy;
+            if(cached.start==start && cached.goal==goal && p.diagonalCost==policy.diagonalCost &&
+               p.roadSpeedMultiplier==policy.roadSpeedMultiplier && p.avoidBuildingFootprints==policy.avoidBuildingFootprints &&
+               p.escapeConstructionSite==policy.escapeConstructionSite && p.maximumExpandedNodes==policy.maximumExpandedNodes)
+            {if(!cached.path.empty() || start==goal) --failures;lastCost=cached.cost;return cached.path;}
+        }
+        const auto remember=[&](const auto& path,double cost)
+        {
+            if(path.size()>4096) return;
+            routeCache_.push_back({start,goal,policy,path,cost});
+            while(routeCache_.size()>128) routeCache_.pop_front();
+        };
         const int width = map.grid().width();
         const auto heuristic = [&](SettlementTilePosition p)
         {
@@ -182,6 +207,7 @@ namespace Paladin
                 {
                     --failures;
                     lastCost = cost;
+                    remember(direct,cost);
                     return direct;
                 }
                 // A nearby road may beat the straight walk. Keep this proven
@@ -194,11 +220,6 @@ namespace Paladin
         { return std::size_t(p.y) * width + p.x; };
         const auto position = [width](std::size_t i)
         { return SettlementTilePosition{int(i % width), int(i / width)}; };
-        struct Record
-        {
-            double cost;
-            std::size_t parent;
-        };
         struct Entry
         {
             double estimate, cost;
@@ -218,14 +239,13 @@ namespace Paladin
                 return tile > rhs.tile;
             }
         };
-        std::unordered_map<std::size_t, Record> records;
-        const auto distance = std::size_t(std::abs(goal.x - start.x)) +
-                              std::size_t(std::abs(goal.y - start.y));
-        records.reserve(std::min(policy.maximumExpandedNodes * 2,
-                                 std::max<std::size_t>(64, distance * 8)));
+        if(searchRecords_.size()!=map.grid().tileCount()) searchRecords_.resize(map.grid().tileCount());
+        if(++searchGeneration_==0) {for(auto& r:searchRecords_) r.generation=0; ++searchGeneration_;}
+        auto& records=searchRecords_;
+        std::size_t touched=1;
         std::priority_queue<Entry> frontier;
         const auto startIndex = index(start), goalIndex = index(goal);
-        records.emplace(startIndex, Record{0, startIndex});
+        records[startIndex]={0,startIndex,searchGeneration_};
         frontier.push({heuristic(start), 0, startIndex});
         std::size_t expanded = 0;
         while (!frontier.empty() && expanded < policy.maximumExpandedNodes)
@@ -233,7 +253,7 @@ namespace Paladin
             const auto current = frontier.top();
             frontier.pop();
             if (current.estimate >= directCost) { break; }
-            if (current.cost != records.at(current.tile).cost)
+            if (current.cost != records[current.tile].cost)
             {
                 continue;
             }
@@ -241,19 +261,20 @@ namespace Paladin
             {
                 std::vector<SettlementTilePosition> path;
                 for (auto i = goalIndex; i != startIndex;
-                     i = records.at(i).parent)
+                     i = records[i].parent)
                 {
                     path.push_back(position(i));
                 }
                 std::reverse(path.begin(), path.end());
                 --failures;
                 lastCost = current.cost;
-                candidates = records.size();
+                candidates = touched;
+                remember(path,lastCost);
                 return path;
             }
             ++expanded;
             expandedNodes = expanded;
-            candidates = records.size();
+            candidates = touched;
             const auto from = position(current.tile);
             for (int dy = -1; dy <= 1; ++dy)
             {
@@ -273,12 +294,10 @@ namespace Paladin
                     const auto ni = index(next);
                     const double cost =
                         current.cost + stepCost(map, from, next, policy);
-                    const auto found = records.find(ni);
-                    if (found != records.end() && found->second.cost <= cost)
-                    {
-                        continue;
-                    }
-                    records.insert_or_assign(ni, Record{cost, current.tile});
+                    auto& found=records[ni];
+                    if(found.generation==searchGeneration_ && found.cost<=cost) continue;
+                    touched+=found.generation!=searchGeneration_;
+                    found={cost,current.tile,searchGeneration_};
                     frontier.push({cost + heuristic(next), cost, ni});
                 }
             }
@@ -287,8 +306,10 @@ namespace Paladin
         {
             --failures;
             lastCost = directCost;
+            remember(direct,lastCost);
             return direct;
         }
+        remember(std::vector<SettlementTilePosition>{},0);
         return {};
     }
 } // namespace Paladin

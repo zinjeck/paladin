@@ -78,6 +78,7 @@ namespace Paladin
                 );
             }
             const auto bytes = manager->residentGpuBytes();
+            PALADIN_CHECK(app.renderer_->compiledAssets({}, true) == manager);
             const auto cache = app.renderer_->sceneSpriteCache();
             PALADIN_CHECK(cache && cache->ready() && bytes > 0);
             SceneSpriteLibrary second;
@@ -90,6 +91,16 @@ namespace Paladin
             const auto* first = cache->find("citizen.militia.male.front.walk");
             const auto* reused = second.find("citizen.militia.male.front.walk");
             PALADIN_CHECK(first && reused && first->texture == reused->texture);
+            // Reuse the records and their CPU alpha masks, not only GPU
+            // textures. A facade must not deep-copy the resident library.
+            PALADIN_CHECK(first == reused);
+            PALADIN_CHECK(&second.pieces() == &cache->pieces());
+            PALADIN_CHECK(&second.lights() == &cache->lights());
+            second.setTime(123);
+            PALADIN_CHECK(cache->time() != second.time());
+            second.reset();
+            second.load(*app.renderer_, (std::filesystem::path(SDL_GetBasePath()) / "assets/sprites").string());
+            PALADIN_CHECK(second.find("citizen.militia.male.front.walk") == first);
             PALADIN_CHECK(
                 first->selectionSilhouette == reused->selectionSilhouette
             );
@@ -228,7 +239,19 @@ namespace Paladin
                     &route
                 ) == ShipmentResult::Success
             );
-            WorldShipmentSystem::tick(world, 360, 27);
+            WorldShipmentSystem::tick(world, 360, .01);
+            for(bool globe:{false,true})
+            {
+                focus(app,8.5,12.5,globe,24); frame(app);
+                const auto point=WorldMapNavigation::annotationPosition(*app.camera_,world.grid(),w,h,24,globe,8.5,12.5);
+                PALADIN_CHECK(point);
+                click(app,float(point->x),float(point->y));frame(app);
+                PALADIN_CHECK(app.worldSettlementPanel_->selection()==source);
+                PALADIN_CHECK(!app.caravanPanel_->isOpen());
+                app.worldSettlementPanel_->close();
+            }
+            PALADIN_CHECK(sim.setPresentedSettlement(home));
+            WorldShipmentSystem::tick(world, 360.01, 26.99);
             PALADIN_CHECK(world.shipment(route)->cargo == 17);
             for (bool globe : {false, true})
             {

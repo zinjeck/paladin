@@ -250,10 +250,11 @@ namespace Paladin
                 SceneSpriteLibrary::environmentArtEnabled();
 
             auto& pixels = infrastructurePixels_;
-            pixels.assign(
+            if (!state.constructionSites().empty()) pixels.assign(
                 settlementMap.grid().tileCount(),
                 RenderColor{0, 0, 0, 0}
             );
+            else { pixels.clear(); cachedInfrastructureTexture_.reset(); }
 
             cachedInfrastructureOutlines_.clear();
             cachedInfrastructureOutlines_.reserve(
@@ -330,13 +331,13 @@ namespace Paladin
 
             const int width = settlementMap.grid().width(),
                       height = settlementMap.grid().height();
-            if (!cachedInfrastructureTexture_ ||
+            if (!state.constructionSites().empty() && (!cachedInfrastructureTexture_ ||
                 cachedInfrastructureTexture_->width() != width ||
                 cachedInfrastructureTexture_->height() != height ||
                 !renderer.updateTexturePixels(
                     *cachedInfrastructureTexture_,
                     pixels
-                ))
+                )))
             {
                 cachedInfrastructureTexture_ =
                     renderer.createTextureFromPixels(width, height, pixels);

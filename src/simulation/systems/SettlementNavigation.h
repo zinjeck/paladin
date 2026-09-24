@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include <deque>
 namespace Paladin
 {
     class SettlementMap;
@@ -58,5 +59,19 @@ namespace Paladin
         std::uint64_t version_ = ~std::uint64_t(0);
         std::vector<std::uint8_t> roads_;
         bool hasRoads_ = false;
+        struct SearchRecord { double cost=0; std::size_t parent=0; std::uint64_t generation=0; };
+        // Per-map scratch survives requests. Stamps avoid clearing the entire
+        // city for each A* search and eliminate one heap allocation per node.
+        mutable std::vector<SearchRecord> searchRecords_;
+        mutable std::uint64_t searchGeneration_=0;
+        struct CachedRoute
+        {
+            SettlementTilePosition start,goal;
+            CitizenMovementPolicy policy;
+            std::vector<SettlementTilePosition> path;
+            double cost=0;
+        };
+        mutable std::deque<CachedRoute> routeCache_;
+        mutable std::uint64_t routeSource_=0, routeVersion_=~std::uint64_t(0);
     };
 } // namespace Paladin

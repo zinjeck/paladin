@@ -189,6 +189,20 @@ namespace Paladin
         bool deployed = false;
     };
 
+    struct CitizenRemains
+    {
+        std::uint64_t sequence=0;
+        CitizenId citizen;
+        std::string name;
+        std::uint16_t age=0;
+        CitizenSex sex=CitizenSex::Male;
+        double diedMinute=0;
+        SettlementTilePosition position{-1,-1},grave{-1,-1};
+        SettlementObjectId graveyard;
+        CitizenId carrier;
+        bool pickedUp=false,buried=false;
+    };
+
     class SettlementCitizenState
     {
         friend class SettlementCommerce;
@@ -207,12 +221,18 @@ namespace Paladin
             person.deathRecorded = true;
             deaths_.push_back({++deathSequence_, person.id, person.name,
                                minute, person.militaryDeployed});
+            if(!person.militaryDeployed && person.tilePosition.x>=0)
+                remains_.push_back({deathSequence_,person.id,person.name,person.ageYears,person.sex,minute,person.tilePosition});
             while (deaths_.size() > 128) { deaths_.pop_front(); }
         }
         const std::deque<CitizenDeathRecord>& deaths() const noexcept
         {
             return deaths_;
         }
+        const std::vector<CitizenRemains>& remains() const noexcept { return remains_; }
+        double remainsMinute() const noexcept { return remainsMinute_; }
+        const CitizenRemains* graveAt(SettlementTilePosition p) const noexcept
+        { for(const auto& r:remains_) if(r.buried && r.grave==p) return &r; return nullptr; }
         std::uint64_t deathSequence() const noexcept { return deathSequence_; }
 
         [[nodiscard]]
@@ -314,6 +334,8 @@ namespace Paladin
         std::uint64_t familyVersion_ = 0;
         std::deque<PopulationSample> populationHistory_;
         std::deque<CitizenDeathRecord> deaths_;
+        std::vector<CitizenRemains> remains_;
+        double remainsMinute_=0;
         std::uint64_t deathSequence_ = 0;
         SettlementAttributeReport attributeReport_;
         SettlementNavigation navigation_;

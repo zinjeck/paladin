@@ -298,6 +298,57 @@ namespace
             draw("mountain-seed-42-fragment-"+std::to_string(p.x)+"-"+std::to_string(p.y)+".png");
         }
     }
+    void wellnessViews(Renderer& renderer, SDL_Window* window)
+    {
+        auto map=flatMap();
+        complete(map,SettlementObjectTypes::CityKeep,{{2,2},5,7});
+        const auto bakery=complete(map,SettlementObjectTypes::Bakery,{{9,17},9,7});
+        const auto yard=complete(map,SettlementObjectTypes::Graveyard,{{26,16},11,11});
+        SettlementCitizenState people; PALADIN_CHECK(people.initialize(3,245)); people.placeUnpositionedCitizens(map);
+        auto& victim=const_cast<SettlementCitizen&>(people.citizens().back()); victim.tilePosition={24,20}; victim.health=0;
+        map.activities.policy.hungerPerDay=0; map.activities.policy.awakeEnergyPerMinute=0; map.activities.policy.dailyBirthChance=0;
+        map.activities.policy.shiftStartMinute=0; map.activities.policy.shiftEndMinute=1440;
+        map.activities.tick(map,people,360,1);
+        map.employment().synchronize(map.objectState(),people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(bakery),1,people));
+        for(int y=32;y<39;++y) for(int x=10;x<21;++x)
+        { auto& t=*map.grid().tile({x,y});t.terrain=TerrainType::Mountain;t.relief=ReliefType::Hills; }
+        for(int y=32;y<39;++y) for(int x=27;x<38;++x)
+        { auto& t=*map.grid().tile({x,y});t.rockFloor=true;t.caveInterior=true; }
+        map.objectState().terrainChanged();
+        SettlementObjectPlacementController placement; SettlementCommandController commands;
+        SettlementInspectionController selection; SettlementInspectionPanel inspector; GrayUiRenderer ui;
+        TileRenderMetrics metrics; Camera2D camera(24,25);camera.setZoom(4);
+        CityRenderer city;city.presentation.roofsVisible=false;city.presentation.cloudsEnabled=false;city.animationTimeOverride=42;
+        const auto draw=[&](const char* name) {
+            for(int warm=0;warm<30;++warm) {
+                renderer.beginFrame(); city.render(renderer,map,camera,metrics,placement,commands,people,selection,1,12);
+                if(selection.kind()==SettlementInspectionKind::Grave) inspector.render(renderer,ui,selection,map,people,camera,metrics);
+                if(warm==29) capture(window,name); renderer.endFrame();
+            }
+        };
+        draw("next-city-body-normal.png");
+        camera.setPosition(24.5,20.5);camera.setZoom(12);
+        draw("next-city-body-close.png");
+        camera.setPosition(24,25);camera.setZoom(4);
+        map.activities.tick(map,people,361,1450);
+        draw("next-city-skeleton-normal.png");
+        camera.setPosition(24.5,20.5);camera.setZoom(12);
+        draw("next-city-skeleton-close.png");
+        camera.setPosition(24,25);camera.setZoom(4);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(yard),1,people));
+        map.activities.tick(map,people,1811,300);
+        PALADIN_CHECK(people.remains().size()==1 && people.remains().front().buried);
+        draw("next-city-grave-normal.png");
+        camera.setPosition(26,19);camera.setZoom(12);
+        PALADIN_CHECK(selection.selectAt(people.remains().front().grave,map.objectState(),people,true,nullptr,false));
+        PALADIN_CHECK(selection.kind()==SettlementInspectionKind::Grave);
+        draw("next-city-grave-inspection.png");
+        selection.clear();camera.setPosition(13.5,20.5);
+        draw("next-bakery-ovens-close.png");
+        camera.setPosition(24,35);camera.setZoom(8);
+        draw("next-grassy-hill-dark-cave.png");
+    }
     void orderUi(Renderer& renderer, SDL_Window* window)
     {
         TradeFixture f;
@@ -362,6 +413,18 @@ namespace
         layout(); renderer.endFrame();
         e.type=SDL_EVENT_MOUSE_BUTTON_UP; panel.handle(e,world,f.seller);
         PALADIN_CHECK(map.trade.orders.size()==1 && map.trade.orders[0].resource=="stone");
+        const auto remote=world.foundSettlement({68,32},f.seller,playerSettlementFoundationProfile(456));
+        SettlementMapGenerationSettings options; options.localTilesPerWorldTile=16;
+        PALADIN_CHECK(remote && f.sim.prepareSettlementMap(remote,options));
+        auto& remoteMap=*f.sim.settlementMap(remote);
+        for(int yy=0;yy<remoteMap.grid().height();++yy) for(int xx=0;xx<remoteMap.grid().width();++xx)
+        { auto& tile=*remoteMap.grid().tile({xx,yy});tile.terrain=TerrainType::Land;tile.caveInterior=false; }
+        remoteMap.objectState().terrainChanged();
+        const auto remoteDepot=complete(remoteMap,SettlementObjectTypes::TradeDepot,{{12,3},8,5});
+        PALADIN_CHECK(WorldMarketSystem::placeOrder(world,f.seller,remote,remoteDepot,"iron",TradeDirection::Import,3,true));
+        layout();panel.render(renderer,ui,world,f.seller);capture(window,"next-realm-depot-orders.png");renderer.endFrame();
+        click(left.x+left.width-30,left.y+25+80+18);
+        PALADIN_CHECK(remoteMap.trade.orders.empty() && map.trade.orders.size()==1);
         std::cout << "[city-corrections/ui] real order buttons, amount 2, one-shot/standing, cancellation and stale-click safety\n";
     }
 }
@@ -381,6 +444,7 @@ int main()
         mountainFragmentViews(renderer,window.nativeHandle());
         orderUi(renderer,window.nativeHandle());
         reliefUi(renderer,window.nativeHandle());
+        wellnessViews(renderer,window.nativeHandle());
     }
     catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; result=1; }
     SDL_Quit(); return result;

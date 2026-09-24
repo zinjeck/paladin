@@ -3,6 +3,7 @@
 #include "interaction/GlobeCameraNavigation.h"
 #include "platform/Window.h"
 #include "rendering/Camera2D.h"
+#include "rendering/CityRenderer.h"
 #include "rendering/Renderer.h"
 #include "rendering/TileRenderMetrics.h"
 #include "rendering/WorldRenderer.h"
@@ -46,6 +47,9 @@ namespace Paladin
         SDL_HideWindow(window_->nativeHandle());
         SDL_SetRenderVSync(SDL_GetRenderer(window_->nativeHandle()), 0);
         startWorldSession();
+        WorldGenerationSettings cameraSettings;
+        cameraSettings.seed = 73517;
+        simulation_ = std::make_unique<Simulation>(cameraSettings);
         auto& world = simulation_->world();
         SettlementId capital;
         for (int y = 20; y < world.grid().height() - 20 && !capital; ++y)
@@ -86,6 +90,7 @@ namespace Paladin
                   << SDL_GetRendererName(
                          SDL_GetRenderer(window_->nativeHandle())
                      )
+                  << " viewport=" << renderer_->outputWidth() << 'x' << renderer_->outputHeight()
                   << " local_map=" << map->grid().width() << 'x'
                   << map->grid().height() << " realms=" << world.realmCount()
                   << " settlements=" << world.settlementCount() << '\n';
@@ -115,8 +120,19 @@ namespace Paladin
                     clampCameraToWorld();
                     simulationClock_->beginFrame();
                     layoutFrame();
+                    const auto layoutEnd = SDL_GetTicksNS();
                     renderFrame();
                     samples.push_back(double(SDL_GetTicksNS() - start) / 1e6);
+                    if (SDL_getenv("PALADIN_CAMERA_PROFILE"))
+                    {
+                        std::cout << "camera_frame=" << i << " scroll=" << scroll
+                                  << " speed=" << speed << " pixels=" << pixels
+                                  << " total_ms=" << samples.back()
+                                  << " layout_ms=" << double(layoutEnd-start)/1e6;
+                        for (std::size_t stage=0;stage<cityRenderer_->renderTimings.size();++stage)
+                            std::cout << " stage" << stage << "_ms=" << cityRenderer_->renderTimings[stage];
+                        std::cout << '\n';
+                    }
                     SDL_PumpEvents();
                 }
                 double total = 0;

@@ -7,24 +7,15 @@ namespace Paladin
     // Weather is a translucent lighting layer, separate from authored sprites.
     class CityClouds
     {
-        mutable std::unique_ptr<Texture> body_, shadow_;
+        mutable std::shared_ptr<Texture> body_, shadow_;
 
     public:
-        void render(
-            Renderer& r,
-            const SceneProjection& p,
-            double seconds,
-            double day,
-            bool sky,
-            int mapWidth,
-            int mapHeight
-        ) const
+        void prepare(Renderer& r) const
         {
-            const double visibility =
-                sky ? std::clamp((10. - p.tilePixels) / 5., 0., 1.) : 1.;
-            if (visibility <= 0)
+            if (!body_ && r.cityCloudBody_ && r.cityCloudShadow_)
             {
-                return;
+                body_ = r.cityCloudBody_;
+                shadow_ = r.cityCloudShadow_;
             }
             if (!body_)
             {
@@ -59,7 +50,27 @@ namespace Paladin
                 }
                 body_ = r.createTextureFromPixels(w, h, body);
                 shadow_ = r.createTextureFromPixels(w, h, shadow);
+                r.cityCloudBody_ = body_;
+                r.cityCloudShadow_ = shadow_;
             }
+        }
+        void render(
+            Renderer& r,
+            const SceneProjection& p,
+            double seconds,
+            double day,
+            bool sky,
+            int mapWidth,
+            int mapHeight
+        ) const
+        {
+            const double visibility =
+                sky ? std::clamp((10. - p.tilePixels) / 5., 0., 1.) : 1.;
+            if (visibility <= 0)
+            {
+                return;
+            }
+            prepare(r);
             if (!body_ || !shadow_)
             {
                 return;

@@ -65,6 +65,14 @@ namespace Paladin
         if (event.type != SDL_EVENT_MOUSE_BUTTON_DOWN || event.button.button != SDL_BUTTON_LEFT ||
             worldSettlementPanel_->choosingDestination() || activeHudContainsPoint(event.button.x, event.button.y)) return false;
         const double pixels = worldPixels(*camera_, world, *renderer_, *tileRenderMetrics_, worldRenderer_->globeEnabled);
+        // Settlement symbols own their compact plate even when a caravan is
+        // stopped at the same destination. The caravan remains selectable
+        // outside the plate and from its shared logistics panel.
+        for(const auto& city:world.settlements())
+        {
+            const auto p=WorldMapNavigation::annotationPosition(*camera_,world.grid(),renderer_->outputWidth(),renderer_->outputHeight(),pixels,worldRenderer_->globeEnabled,city.position().x+.5,city.position().y+.5);
+            if(p && std::abs(event.button.x-p->x)<=11 && std::abs(event.button.y-p->y)<=14) return false;
+        }
         ShipmentId hit;
         double best = std::numeric_limits<double>::max();
         for (const auto& caravan : world.shipments())

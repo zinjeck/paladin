@@ -40,17 +40,27 @@ namespace Paladin
                 left_ = width;
                 top_ = height;
                 right_ = bottom_ = 0;
+                for (const auto& object : map.objectState().completedObjects())
+                {
+                    const auto& f=object.footprint;
+                    left_=std::min(left_,std::max(0,f.topLeft.x));
+                    top_=std::min(top_,std::max(0,f.topLeft.y));
+                    right_=std::max(right_,std::min(width,f.topLeft.x+f.width));
+                    bottom_=std::max(bottom_,std::min(height,f.topLeft.y+f.height));
+                }
+                if(right_<=left_ || bottom_<=top_)
+                {
+                    texture_.reset();
+                    return;
+                }
+                const int imageWidth=right_-left_, imageHeight=bottom_-top_;
                 std::vector<RenderColor> pixels(
-                    std::size_t(width) * height,
+                    std::size_t(imageWidth) * imageHeight,
                     {0, 0, 0, 0}
                 );
                 for (const auto& object : map.objectState().completedObjects())
                 {
                     const auto& f = object.footprint;
-                    left_ = std::min(left_, f.topLeft.x);
-                    top_ = std::min(top_, f.topLeft.y);
-                    right_ = std::max(right_, f.topLeft.x + f.width);
-                    bottom_ = std::max(bottom_, f.topLeft.y + f.height);
                     const auto& style =
                         sprites.objectStyle(object.objectTypeId);
                     const bool compound = style.mode == "compound";
@@ -113,24 +123,24 @@ namespace Paladin
                             {
                                 color = {0x7A, 0x50, 0x38, 255};
                             }
-                            pixels[std::size_t(y) * width + x] = color;
+                            pixels[std::size_t(y-top_) * imageWidth + x-left_] = color;
                         }
                     }
                 }
-                if (!texture_ || texture_->width() != width ||
-                    texture_->height() != height ||
+                if (!texture_ || texture_->width() != imageWidth ||
+                    texture_->height() != imageHeight ||
                     !renderer.updateTexturePixels(*texture_, pixels))
                 {
                     texture_ =
-                        renderer.createTextureFromPixels(width, height, pixels);
+                        renderer.createTextureFromPixels(imageWidth, imageHeight, pixels);
                 }
             }
             if (texture_ && right_ > left_ && bottom_ > top_)
             {
                 renderer.drawTexture(
                     *texture_,
-                    float(left_),
-                    float(top_),
+                    0,
+                    0,
                     float(right_ - left_),
                     float(bottom_ - top_),
                     float(

@@ -1103,6 +1103,8 @@ namespace Paladin
                          map.logistics
                              .receivable(destination.id, goods.resource)}
                     );
+                    const bool urgent=(resource && resource->edible) || source.used()>=source.capacity*3/4;
+                    if(!market && !urgent && amount<policy.carryingCapacity && minute-goods.batchMinute<45) continue;
                     if (amount > 0)
                     {
                         opportunities.push_back(
@@ -1110,7 +1112,7 @@ namespace Paladin
                              destination.id,
                              goods.resource,
                              amount,
-                             distance(c.tilePosition, source.footprint) +
+                             -amount*8 - (urgent?100:0) + distance(c.tilePosition, source.footprint) +
                                  distance(
                                      source.footprint.topLeft,
                                      destination.footprint
@@ -1746,7 +1748,15 @@ namespace Paladin
             c.activity = CitizenActivity::TravelingToWork;
             return true;
         }
-        if (!route(map, citizens, c, workplace.footprint, true))
+        const auto* definition=SettlementObjectCatalog::definition(workplace.objectTypeId);
+        if(definition && definition->wallThickness>0)
+        {
+            const auto room=buildingInterior(workplace.footprint,workplace.objectTypeId);
+            const int slot=int(c.id.value()%std::max(1,room.width*room.height));
+            const SettlementTilePosition station{room.topLeft.x+slot%room.width,room.topLeft.y+slot/room.width};
+            if(!route(map,citizens,c,{station,1,1},true)) return false;
+        }
+        else         if (!route(map, citizens, c, workplace.footprint, true))
         {
             return false;
         }

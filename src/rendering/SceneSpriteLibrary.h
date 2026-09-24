@@ -30,19 +30,20 @@ namespace Paladin
             environmentArtEnabled_ = enabled;
         }
         void load(Renderer& renderer, const std::string& root, const AssetLoadProgress& progress = {});
-        bool ready() const noexcept { return assets_ && !sprites_.empty(); }
+        bool ready() const noexcept { return shared_ ? shared_->ready() : assets_ && !sprites_.empty(); }
         void reset()
         {
             loaded_ = false;
+            refreshAssets_ = true;
             // Keep the previous valid generation alive if replacement validation fails.
         }
         const std::vector<BlueprintLight>& lights() const
         {
-            return lights_;
+            return shared_ ? shared_->lights() : lights_;
         }
         const std::vector<BuildingPiece>& pieces() const
         {
-            return pieces_;
+            return shared_ ? shared_->pieces() : pieces_;
         }
         void setShadowsEnabled(bool enabled)
         {
@@ -80,6 +81,7 @@ namespace Paladin
         const SceneSprite* find(const std::string& id) const;
         bool opaqueAt(const SceneDrawItem& item, int x, int y) const
         {
+            if (shared_) return shared_->opaqueAt(item, x, y);
             for (const auto& [id, sprite] : sprites_)
             {
                 if (sprite.texture.get() == item.texture)
@@ -91,6 +93,7 @@ namespace Paladin
         }
         bool renderSelection(Renderer& renderer, const SceneDrawItem& item) const
         {
+            if (shared_) return shared_->renderSelection(renderer, item);
             for (const auto& [id, sprite] : sprites_)
                 if (sprite.texture.get() == item.texture && !sprite.selectionMask.alpha.empty())
                 {
@@ -136,6 +139,10 @@ namespace Paladin
         ) const;
 
     private:
+        // Immutable prepared art is shared; time/shadow preferences remain
+        // local to each facade. Copying every alpha mask here caused the
+        // first city/HUD frame to duplicate the entire resident library.
+        std::shared_ptr<const SceneSpriteLibrary> shared_;
         std::shared_ptr<AssetManager> assets_;
         bool shadowsEnabled_ = true;
         void submitWind(
@@ -149,6 +156,7 @@ namespace Paladin
         ) const;
         inline static bool environmentArtEnabled_ = true;
         bool loaded_ = false;
+        bool refreshAssets_ = false;
         double seconds_ = 0;
         std::vector<BuildingPiece> pieces_;
         std::vector<BlueprintLight> lights_;

@@ -306,7 +306,7 @@ namespace Paladin
 
         if (grid.width() != mapWidth_ || grid.height() != mapHeight_ || !tile ||
             tile->terrain == TerrainType::Water ||
-            tile->terrain == TerrainType::Mountain)
+            tile->terrain == TerrainType::Mountain || tile->caveInterior)
         {
             return SettlementTilePlacementStatus::InvalidTerrain;
         }
@@ -840,7 +840,7 @@ namespace Paladin
                 const WorldTile* worldTile = grid.tile({x, y});
                 const bool invalidTerrain =
                     !worldTile || worldTile->terrain == TerrainType::Water ||
-                    worldTile->terrain == TerrainType::Mountain;
+                    worldTile->terrain == TerrainType::Mountain || worldTile->caveInterior;
                 const bool structureBlocked =
                     invalidTerrain || structureOccupiedTiles_[tile] != 0;
                 const bool infrastructureBlocked =

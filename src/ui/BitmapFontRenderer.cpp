@@ -189,6 +189,9 @@ namespace Paladin
         RenderColor color
     ) const
     {
+        // Anchor the whole glyph run before rounding individual pixel edges.
+        // Fractional camera positions must not alternate thin/thick strokes.
+        x=std::round(x); y=std::round(y);
         float cursorX = x;
         std::vector<RenderRectangle> rectangles;
         rectangles.reserve(text.size() * 18U);

@@ -367,7 +367,7 @@ namespace Paladin
                 homeChimney(queue, projection, sprites, map, object, id);
             }
             if (const auto* soil = sprites.find("road.floor");
-                detailed && soil && style.mode != "enclosed" &&
+                detailed && soil && style.mode != "enclosed" && object.objectTypeId!=SettlementObjectTypes::Graveyard &&
                 (!sprites.find(style.floor) || !sprites.find("terrain.plain") ||
                  sprites.find(style.floor)->texture !=
                      sprites.find("terrain.plain")->texture))
@@ -520,6 +520,43 @@ namespace Paladin
             } // Floor is a ground surface, visible through the roof toggle. It
             // retains the existing footprint palette until the artist replaces
             // it.
+            if(object.objectTypeId==SettlementObjectTypes::Bakery && !policy.roofsVisible)
+            {
+                for(int ox=1;ox<int(w)-1;ox+=2)
+                {
+                    const auto part=[&](double xx,double yy,double ww,double hh,RenderColor color,int n)
+                    {queue.submit({projection.bounds({x+ox+xx,y+1+yy,0,ww,hh,0,0}),color,y+2,id,0,700+ox*8+n});};
+                    part(0,0,.85,.8,{89,102,121,255},0);
+                    part(.12,.12,.61,.5,{78,59,57,255},1);
+                    part(.20,.32,.45,.30,{8,15,27,255},2);
+                    part(.24,.45,.37,.12,{189,134,76,255},3);
+                }
+            }
+            if(object.objectTypeId==SettlementObjectTypes::Graveyard)
+            {
+                // Kept grounds, flowers and small boundary trees. Graves are
+                // rendered from the persistent deceased-person records.
+                for(int edge=0;edge<2;++edge) for(int xx=0;xx<int(w);xx+=4)
+                {
+                    const double yy=y+(edge? h-.4:.15);
+                    queue.submit({projection.bounds({x+xx+.2,yy,0,.25,.4,0,0}),{35,87,71,255},yy,id,0,800+xx+edge*100});
+                    queue.submit({projection.bounds({x+xx+.2,yy-.05,0,.2,.15,0,0}),{243,182,154,255},yy,id,0,801+xx+edge*100});
+                }
+                for(int corner=0;corner<2;++corner)
+                {
+                    const double tx=x+(corner?w-.5:.5),ty=y+.5;
+                    if(sprites.submitTree(queue,projection,tx,ty,id*17+corner,.65)) continue;
+                    const auto tree=[&](double dx,double dy,double ww,double hh,RenderColor color,int part)
+                    { queue.submit({projection.bounds({tx+dx,ty+dy,0,ww,hh,0,0}),color,ty,id,1,1100+corner*8+part}); };
+                    tree(-.125,-.5,.25,.65,{99,62,75,255},0);
+                    tree(-.5,-1,.875,.5,{35,87,71,255},1);
+                    tree(-.375,-1.375,.625,.625,{73,151,91,255},2);
+                    tree(-.125,-1.25,.25,.375,{166,205,89,255},3);
+                }
+                // Preserve the actual textured turf; no generic opaque zone
+                // slab may cover grass or the persistent grave sprites.
+                continue;
+            }
             homeDetails(
                 queue,
                 projection,

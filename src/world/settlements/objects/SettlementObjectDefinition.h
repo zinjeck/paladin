@@ -15,7 +15,8 @@ namespace Paladin
         Logistics,
         Food,
         Production,
-        Warfare
+        Warfare,
+        Wellness
     };
 
     enum class SettlementFootprintSelectionMode : std::uint8_t
@@ -75,6 +76,7 @@ namespace Paladin
 
     namespace SettlementObjectTypes
     {
+        inline constexpr std::string_view Graveyard = "graveyard";
         inline constexpr std::string_view CityKeep = "city_keep";
         inline constexpr std::string_view Road = "road";
         inline constexpr std::string_view House = "house";

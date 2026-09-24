@@ -446,9 +446,13 @@ void runSettlementActivityTests()
     navigation.synchronize(movementMap);
     movementMap.grid().tile({1, 0})->terrain = TerrainType::Water;
     movementMap.grid().tile({0, 1})->terrain = TerrainType::Mountain;
+    movementMap.objectState().terrainChanged();
     PALADIN_CHECK(!navigation.canStep(movementMap, {0, 0}, {1, 1}));
     PALADIN_CHECK(navigation.findPath(movementMap, {0, 0}, {2, 2}, {}).empty());
     movementMap.grid().tile({0, 1})->terrain = TerrainType::Land;
+    // Runtime digging publishes this revision so a cached failed route can
+    // discover the newly opened passage.
+    movementMap.objectState().terrainChanged();
     const auto detour = navigation.findPath(movementMap, {0, 0}, {2, 2}, {});
     PALADIN_CHECK(!detour.empty());
     PALADIN_CHECK((detour.front() == SettlementTilePosition{0, 1}));

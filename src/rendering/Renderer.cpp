@@ -10,6 +10,7 @@
 #endif
 
 #include <cmath>
+#include <bit>
 #include <cstddef>
 #include <cstring>
 #include <stdexcept>
@@ -17,14 +18,73 @@
 
 namespace Paladin
 {
+    namespace
+    {
+        SDL_PixelFormat nativePixelFormat(SDL_Renderer* renderer)
+        {
+            const char* name = SDL_GetRendererName(renderer);
+            return name && std::strcmp(name, "software") == 0
+                ? SDL_PIXELFORMAT_ARGB8888 : SDL_PIXELFORMAT_RGBA32;
+        }
+        bool uploadRgbaPixels(SDL_Texture* texture, const SDL_Rect* area,
+                              const void* pixels, int pitch)
+        {
+            const auto format = SDL_PixelFormat(SDL_GetNumberProperty(
+                SDL_GetTextureProperties(texture), SDL_PROP_TEXTURE_FORMAT_NUMBER,
+                SDL_PIXELFORMAT_RGBA32));
+            if (format == SDL_PIXELFORMAT_RGBA32)
+                return SDL_UpdateTexture(texture, area, pixels, pitch);
+            const int w = area ? area->w : int(texture->w);
+            const int h = area ? area->h : int(texture->h);
+            thread_local std::vector<std::uint32_t> converted;
+            converted.resize(std::size_t(w) * h);
+            if constexpr (std::endian::native == std::endian::little)
+            {
+                if(format==SDL_PIXELFORMAT_ARGB8888 || format==SDL_PIXELFORMAT_XRGB8888)
+                {
+                    // Exact channel permutation, without temporary SDL
+                    // surfaces or a general color-space conversion.
+                    unsigned alpha=255;
+                    for(int y=0;y<h;++y)
+                    {
+                        const auto* row=static_cast<const std::uint8_t*>(pixels)+std::size_t(y)*pitch;
+                        auto* output=converted.data()+std::size_t(y)*w;
+                        for(int x=0;x<w;++x)
+                        {
+                            std::uint32_t pixel;
+                            std::memcpy(&pixel,row+x*4,4);
+                            alpha &= pixel>>24;
+                            output[x]=(pixel&0xff00ff00u)|((pixel&255u)<<16)|((pixel>>16)&255u);
+                        }
+                    }
+                    if(format==SDL_PIXELFORMAT_XRGB8888 && alpha!=255) return false;
+                    return SDL_UpdateTexture(texture,area,converted.data(),w*4);
+                }
+            }
+            if (!SDL_ISPIXELFORMAT_ALPHA(format))
+                for (int y=0;y<h;++y)
+                {
+                    const auto* row=static_cast<const std::uint8_t*>(pixels)+std::size_t(y)*pitch;
+                    for(int x=0;x<w;++x) if(row[x*4+3]!=255) return false;
+                }
+            return SDL_ConvertPixels(w, h, SDL_PIXELFORMAT_RGBA32, pixels, pitch,
+                                     format, converted.data(), w * 4) &&
+                   SDL_UpdateTexture(texture, area, converted.data(), w * 4);
+        }
+    }
     bool Renderer::usesSoftwareRasterizer() const noexcept
     {
         const char* name = renderer_ ? SDL_GetRendererName(renderer_) : nullptr;
         return name && std::strcmp(name, "software") == 0;
     }
 
-    std::shared_ptr<AssetManager> Renderer::compiledAssets(const AssetLoadProgress& progress)
+    std::shared_ptr<AssetManager> Renderer::compiledAssets(const AssetLoadProgress& progress, bool refresh)
     {
+        if (assetManager_ && !refresh)
+        {
+            if (progress) progress(1, 1, "Assets already resident");
+            return assetManager_;
+        }
         const auto base = std::filesystem::path(SDL_GetBasePath()) / "assets";
         std::string signature =
             assetDigest(readAssetFile(base / "packages/assets.manifest"));
@@ -190,7 +250,7 @@ namespace Paladin
         {
             auto* t = SDL_CreateTexture(
                 renderer_,
-                SDL_PIXELFORMAT_RGBA32,
+                nativePixelFormat(renderer_),
                 SDL_TEXTUREACCESS_TARGET,
                 side,
                 side
@@ -401,11 +461,11 @@ namespace Paladin
             linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST
         );
     }
-    std::unique_ptr<Texture> Renderer::createEmptyTexture(int width, int height)
+    std::unique_ptr<Texture> Renderer::createEmptyTexture(int width, int height, bool opaqueOnly)
     {
         auto* texture = SDL_CreateTexture(
             renderer_,
-            SDL_PIXELFORMAT_RGBA32,
+            opaqueOnly && usesSoftwareRasterizer() ? SDL_PIXELFORMAT_XRGB8888 : nativePixelFormat(renderer_),
             SDL_TEXTUREACCESS_STREAMING,
             width,
             height
@@ -437,15 +497,25 @@ namespace Paladin
         SDL_SetTextureScaleMode(light.texture_, SDL_SCALEMODE_LINEAR);
         SDL_SetTextureBlendMode(light.texture_, SDL_BLENDMODE_MOD);
         const SDL_FRect area{0, 0, float(outputWidth()), float(outputHeight())};
-        SDL_RenderTexture(renderer_, light.texture_, nullptr, &area);
+        copyTexture(light.texture_, nullptr, &area);
         SDL_SetTextureScaleMode(glow.texture_, SDL_SCALEMODE_LINEAR);
         SDL_SetTextureBlendMode(glow.texture_, SDL_BLENDMODE_ADD);
-        SDL_RenderTexture(renderer_, glow.texture_, nullptr, &area);
+        copyTexture(glow.texture_, nullptr, &area);
         SDL_SetTextureBlendMode(light.texture_, SDL_BLENDMODE_BLEND);
         SDL_SetTextureBlendMode(glow.texture_, SDL_BLENDMODE_BLEND);
     }
+    void Renderer::compositeAmbientLight(RenderColor color)
+    {
+        SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_MOD);
+        SDL_SetRenderDrawColor(renderer_, color.red, color.green, color.blue, 255);
+        SDL_RenderFillRect(renderer_, nullptr);
+        SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
+    }
     Renderer::~Renderer()
     {
+        cityCloudBody_.reset();
+        cityCloudShadow_.reset();
+        softwareScaleScratch_.reset();
         sceneSpriteCache_.reset();
         assetManager_.reset();
         pixelScene_.reset();
@@ -610,7 +680,8 @@ namespace Paladin
     std::unique_ptr<Texture> Renderer::createTextureFromPixels(
         int width,
         int height,
-        std::span<const RenderColor> pixels
+        std::span<const RenderColor> pixels,
+        bool opaqueOnly
     )
     {
         static_assert(sizeof(RenderColor) == 4);
@@ -622,9 +693,12 @@ namespace Paladin
             return nullptr;
         }
 
+        const bool opaque = std::all_of(pixels.begin(), pixels.end(),
+            [](const auto& pixel) { return pixel.alpha == 255; });
+        if (opaqueOnly && !opaque) return nullptr;
         SDL_Texture* texture = SDL_CreateTexture(
             renderer_,
-            SDL_PIXELFORMAT_RGBA32,
+            opaqueOnly && usesSoftwareRasterizer() ? SDL_PIXELFORMAT_XRGB8888 : nativePixelFormat(renderer_),
             SDL_TEXTUREACCESS_STATIC,
             width,
             height
@@ -637,7 +711,7 @@ namespace Paladin
             return nullptr;
         }
 
-        if (!SDL_UpdateTexture(
+        if (!uploadRgbaPixels(
                 texture,
                 nullptr,
                 pixels.data(),
@@ -651,10 +725,10 @@ namespace Paladin
         }
 
         SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
-
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
-
-        return std::unique_ptr<Texture>(new Texture(texture, width, height));
+        auto result = std::unique_ptr<Texture>(new Texture(texture, width, height));
+        result->opaque_ = opaque;
+        return result;
     }
 
 
@@ -743,7 +817,7 @@ namespace Paladin
         }
         SDL_Texture* texture = SDL_CreateTexture(
             renderer_,
-            SDL_PIXELFORMAT_RGBA32,
+            nativePixelFormat(renderer_),
             SDL_TEXTUREACCESS_TARGET,
             width,
             height
@@ -821,7 +895,9 @@ namespace Paladin
             return false;
         }
         const SDL_Rect rect{x, y, width, height};
-        return SDL_UpdateTexture(
+        texture.opaque_ = !SDL_ISPIXELFORMAT_ALPHA(texture.texture_->format);
+        SDL_SetTextureBlendMode(texture.texture_, SDL_BLENDMODE_BLEND);
+        return uploadRgbaPixels(
             texture.texture_,
             &rect,
             pixels.data(),
@@ -834,16 +910,16 @@ namespace Paladin
         if (!std::isfinite(pitch) || pitch <= 1) return false;
         return activatePixelScene(pitch);
     }
-    bool Renderer::activatePixelScene(double pitch)
+    void Renderer::prepareSceneBuffers()
     {
         const int w = outputWidth(), h = outputHeight();
-        if (w <= 0 || h <= 0) return false;
+        if (w <= 0 || h <= 0) return;
         if (!pixelScene_ || pixelScene_->width() != w ||
             pixelScene_->height() != h)
         {
             auto* texture = SDL_CreateTexture(
                 renderer_,
-                SDL_PIXELFORMAT_RGBA8888,
+                nativePixelFormat(renderer_),
                 SDL_TEXTUREACCESS_TARGET,
                 w,
                 h
@@ -858,6 +934,21 @@ namespace Paladin
             SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
             pixelScene_.reset(new Texture(texture, w, h));
         }
+        if (usesSoftwareRasterizer() && (!softwareScaleScratch_ ||
+            softwareScaleScratch_->width()!=w || softwareScaleScratch_->height()!=h))
+        {
+            auto* scratch=SDL_CreateTexture(renderer_,nativePixelFormat(renderer_),SDL_TEXTUREACCESS_TARGET,w,h);
+            if(scratch)
+            {
+                softwareScaleScratch_.reset(new Texture(scratch,w,h));
+                SDL_SetTextureScaleMode(scratch,SDL_SCALEMODE_NEAREST);
+            }
+        }
+    }
+    bool Renderer::activatePixelScene(double pitch)
+    {
+        prepareSceneBuffers();
+        if (!pixelScene_) return false;
         if (!SDL_SetRenderTarget(renderer_, pixelScene_->texture_))
         {
             throw std::runtime_error("Cannot activate world pixel grid");
@@ -892,7 +983,9 @@ namespace Paladin
             return false;
         }
 
-        return SDL_UpdateTexture(
+        texture.opaque_ = !SDL_ISPIXELFORMAT_ALPHA(texture.texture_->format);
+        SDL_SetTextureBlendMode(texture.texture_, SDL_BLENDMODE_BLEND);
+        return uploadRgbaPixels(
             texture.texture_,
             nullptr,
             pixels.data(),
@@ -900,6 +993,65 @@ namespace Paladin
         );
     }
 
+
+    void Renderer::copyTexture(SDL_Texture* texture, const SDL_FRect* source,
+                               const SDL_FRect* destination)
+    {
+        // The GPU handles scaling/blending together efficiently. SDL's
+        // software path instead uses a generic per-pixel loop for large
+        // scaled blends. A bounded reusable intermediate lets it use its
+        // optimized scaler and unscaled blend, with the same sample grid.
+        if (!usesSoftwareRasterizer())
+        {
+            SDL_RenderTexture(renderer_, texture, source, destination);
+            return;
+        }
+        float sx=1, sy=1;
+        SDL_GetRenderScale(renderer_, &sx, &sy);
+        const int w=int(destination->w*sx), h=int(destination->h*sy);
+        const int sw=source ? int(source->w) : int(texture->w);
+        const int sh=source ? int(source->h) : int(texture->h);
+        SDL_BlendMode blend;
+        SDL_GetTextureBlendMode(texture, &blend);
+        if ((w==sw && h==sh) ||
+            (blend==SDL_BLENDMODE_NONE && texture->format==SDL_PIXELFORMAT_XRGB8888 && !SDL_GetRenderTarget(renderer_)) ||
+            w<=0 || h<=0 || std::int64_t(w)*h < 65536 || w>outputWidth() || h>outputHeight())
+        {
+            SDL_RenderTexture(renderer_, texture, source, destination);
+            return;
+        }
+        const int width=outputWidth(), height=outputHeight();
+        if (!softwareScaleScratch_ || softwareScaleScratch_->width()!=width || softwareScaleScratch_->height()!=height)
+        {
+            auto* scratch=SDL_CreateTexture(renderer_, nativePixelFormat(renderer_), SDL_TEXTUREACCESS_TARGET, width, height);
+            if (!scratch) { SDL_RenderTexture(renderer_, texture, source, destination); return; }
+            softwareScaleScratch_.reset(new Texture(scratch,width,height));
+            SDL_SetTextureScaleMode(scratch,SDL_SCALEMODE_NEAREST);
+        }
+        auto* target=SDL_GetRenderTarget(renderer_);
+        Uint8 red,green,blue,alpha;
+        SDL_GetTextureColorMod(texture,&red,&green,&blue);
+        SDL_GetTextureAlphaMod(texture,&alpha);
+        SDL_SetRenderTarget(renderer_,softwareScaleScratch_->texture_);
+        SDL_SetRenderScale(renderer_,1,1);
+        SDL_SetRenderViewport(renderer_,nullptr);
+        SDL_SetRenderClipRect(renderer_,nullptr);
+        SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_NONE);
+        SDL_SetTextureColorMod(texture,255,255,255);
+        SDL_SetTextureAlphaMod(texture,255);
+        const SDL_FRect area{0,0,float(w),float(h)};
+        SDL_RenderTexture(renderer_,texture,source,&area);
+        SDL_SetRenderTarget(renderer_,target);
+        SDL_SetRenderScale(renderer_,sx,sy);
+        SDL_SetTextureBlendMode(texture,blend);
+        SDL_SetTextureColorMod(texture,red,green,blue);
+        SDL_SetTextureAlphaMod(texture,alpha);
+        auto* scratch=softwareScaleScratch_->texture_;
+        SDL_SetTextureBlendMode(scratch,blend);
+        SDL_SetTextureColorMod(scratch,red,green,blue);
+        SDL_SetTextureAlphaMod(scratch,alpha);
+        SDL_RenderTexture(renderer_,scratch,&area,destination);
+    }
 
     void Renderer::drawTexture(
         const Texture& texture,
@@ -947,8 +1099,13 @@ namespace Paladin
             bottom - top
         };
 
+        SDL_BlendMode savedBlend = SDL_BLENDMODE_BLEND;
+        SDL_GetTextureBlendMode(texture.texture_, &savedBlend);
+        if (texture.opaque_ && opacity == 255 && savedBlend == SDL_BLENDMODE_BLEND)
+            SDL_SetTextureBlendMode(texture.texture_, SDL_BLENDMODE_NONE);
         if (opacity != 255)
         {
+            if (savedBlend == SDL_BLENDMODE_NONE) SDL_SetTextureBlendMode(texture.texture_, SDL_BLENDMODE_BLEND);
             SDL_SetTextureAlphaMod(texture.texture_, opacity);
             if (texture.premultiplied_)
             {
@@ -960,7 +1117,8 @@ namespace Paladin
                 );
             }
         }
-        SDL_RenderTexture(renderer_, texture.texture_, &source, &destination);
+        copyTexture(texture.texture_, &source, &destination);
+        SDL_SetTextureBlendMode(texture.texture_, savedBlend);
         if (opacity != 255)
         {
             SDL_SetTextureAlphaMod(texture.texture_, 255);

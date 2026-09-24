@@ -816,7 +816,7 @@ namespace
             hud.setFortress(fortress);
             hud.setSettlementStatus(true, 8);
             hud.layout(960, 640);
-            const float x = (960.F - 76.F * (fortress ? 4 : 8)) * .5F +
+            const float x = (960.F - 76.F * (fortress ? 4 : 9)) * .5F +
                             76 * (fortress ? 3 : 6) + 38;
             const auto press = [&](float px, float py)
             {
@@ -846,6 +846,19 @@ namespace
                 SettlementObjectTypes::ArmySupplyDepot
             );
             hud.closeCategoryMenus();
+            if (!fortress)
+            {
+                const float wellnessX = (960.F - 76.F * 9) * .5F + 76 * 8 + 38;
+                press(wellnessX, 608);
+                renderer.beginFrame();
+                renderer.fillRectangle(0, 0, 960, 640, {35, 87, 71, 255});
+                hud.render(renderer, ui);
+                capture(window, "next-wellness-menu.png");
+                renderer.endFrame();
+                PALADIN_CHECK(press(wellnessX, 538) == CityHudAction::BeginObjectPlacement);
+                PALADIN_CHECK(hud.selectedObjectTypeId() == SettlementObjectTypes::Graveyard);
+                hud.closeCategoryMenus();
+            }
         }
     }
     void diplomacyAndOverflow(

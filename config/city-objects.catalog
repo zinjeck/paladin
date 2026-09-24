@@ -36,3 +36,5 @@ gold_mine ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
 quarry ground - - - mine.hoist 3 3 .2 .01 0 0 0 0 0 9AA7AF 394658 .6 .45
 
 trade_depot compound stockpile.floor wall.adobe roof.thatch - 5 5 .85 1 30 65 32 65 0 dbd6c2 524d3d .6 .45 decor.tribal
+
+graveyard ground terrain.plain - - - 1 1 0 .08 0 0 0 0 0 235747 394658 .6 .45

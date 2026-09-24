@@ -122,7 +122,7 @@ namespace Paladin
         {
             if (tile.rockFloor)
             {
-                return "mine.strata";
+                return "terrain.plain";
             }
 
             std::string id = terrainIds[terrainIndex(tile)];
@@ -1154,11 +1154,17 @@ namespace Paladin
             std::unordered_map<const SceneSprite*, SceneSprite> cpuArt;
             std::vector<const SceneSprite*> materials(grid.tileCount());
             std::vector<RenderColor> pixels(grid.tileCount());
+            std::vector<TerrainType> terrainSnapshot(grid.tileCount());
             // Only 81 city terrain/biome/temperature combinations exist. The
             // overview used to build and hash the same asset strings once per
             // map tile on the first city frame.
             std::array<const SceneSprite*, 81> resolved{};
             std::array<bool, 81> resolvedOnce{};
+            const SceneSprite* previousArt = nullptr;
+            const SceneSprite* previousCpuArt = nullptr;
+            std::array<RenderColor,27> landColors{};
+            std::array<const SceneSprite*,27> landMaterials{};
+            std::array<bool,27> landReady{};
             const auto resolve =
                 [&](const WorldTile& tile) -> const SceneSprite*
             {
@@ -1166,7 +1172,7 @@ namespace Paladin
                 {
                     if (tile.rockFloor)
                     {
-                        return sprites->find("mine.strata");
+                        return sprites->find("terrain.plain");
                     }
                     const double t = tile.temperature.value();
                     const int climate = t > .68 ? 2 : t > 0 && t < .32 ? 1 : 0;
@@ -1192,8 +1198,64 @@ namespace Paladin
                 for (std::int32_t x = 0; x < grid.width(); ++x)
                 {
                     const auto& tile = *grid.tile({x, y});
+                    if constexpr (std::is_same_v<Grid, SettlementGrid>)
+                    {
+                        if (hasTerrainArt && sprites && tile.terrain == TerrainType::Land &&
+                            !tile.rockFloor && !tile.caveInterior &&
+                            grid.cityTileType({x,y}) != CityTileType::Beach &&
+                            grid.cityTileType({x,y}) != CityTileType::ShallowWater)
+                        {
+                            const double t=tile.temperature.value();
+                            const int key=int(tile.biome)*3+(t>.68 ? 2 : t>0 && t<.32 ? 1 : 0);
+                            if (!landReady[key])
+                            {
+                                landReady[key]=true;
+                                auto color=artOverviewColor(tile);
+                                const auto* art=resolve(tile);
+                                if (art && art->overviewColor.alpha==255)
+                                {
+                                    color=art->overviewColor;
+                                    if (art->materialPixels && art->materialWidth>=16)
+                                    {
+                                        auto [entry,inserted]=cpuArt.try_emplace(art,*art);
+                                        if(inserted) { entry->second.texture.reset(); entry->second.shadow.reset(); }
+                                        landMaterials[key]=&entry->second;
+                                    }
+                                }
+                                landColors[key]=color;
+                            }
+                            const auto index=std::size_t(y)*grid.width()+x;
+                            pixels[index]=landColors[key];
+                            materials[index]=landMaterials[key];
+                            terrainSnapshot[index]=tile.terrain;
+                            continue;
+                        }
+                    }
+                    // Water and rock overwrite their material color below;
+                    // the contour worker only samples materials on land.
+                    // Resolve their final colors directly, without redundant
+                    // sprite lookups and material records for every tile.
+                    if (hasTerrainArt && tile.terrain != TerrainType::Land)
+                    {
+                        RenderColor color;
+                        if(tile.terrain == TerrainType::Water)
+                            color=shoreWater(grid,x,y) ? RenderColor{0x54,0x8A,0xC4,255} : RenderColor{0x3F,0x5F,0x9A,255};
+                        else
+                        {
+                            color=mountainInterior(grid,x,y) ? RenderColor{0x08,0x0F,0x1B,255} : RenderColor{0x39,0x46,0x58,255};
+                            if constexpr(std::is_same_v<Grid,WorldGrid>) color={78,59,57,255};
+                            else if(tile.relief==ReliefType::Hills) color={59,101,55,255};
+                        }
+                        if constexpr(std::is_same_v<Grid,SettlementGrid>)
+                        { if(tile.caveInterior) color={8,15,27,255}; else if(tile.rockFloor) color={57,70,88,255}; }
+                        const auto index=std::size_t(y)*grid.width()+x;
+                        pixels[index]=color;
+                        terrainSnapshot[index]=tile.terrain;
+                        continue;
+                    }
                     auto color = hasTerrainArt ? artOverviewColor(tile)
                                                : tileColor(tile);
+                    terrainSnapshot[std::size_t(y) * grid.width() + x] = tile.terrain;
                     if (hasTerrainArt && sprites)
                     {
                         auto index = terrainIndex(tile);
@@ -1220,15 +1282,19 @@ namespace Paladin
                             color = art->overviewColor;
                             if (art->materialPixels && art->materialWidth >= 16)
                             {
-                                auto [entry, inserted] =
-                                    cpuArt.try_emplace(art, *art);
-                                if (inserted)
+                                if (previousArt != art)
                                 {
-                                    entry->second.texture.reset();
-                                    entry->second.shadow.reset();
+                                    auto [entry, inserted] = cpuArt.try_emplace(art, *art);
+                                    if (inserted)
+                                    {
+                                        entry->second.texture.reset();
+                                        entry->second.shadow.reset();
+                                    }
+                                    previousArt = art;
+                                    previousCpuArt = &entry->second;
                                 }
                                 materials[std::size_t(y) * grid.width() + x] =
-                                    &entry->second;
+                                    previousCpuArt;
                             }
                         }
                     }
@@ -1249,9 +1315,11 @@ namespace Paladin
                         }
                         else if (tile.relief == ReliefType::Hills)
                         {
-                            color = CityReliefSurface::stone(x+.5,y+.5);
+                            color = {59,101,55,255};
                         }
                     }
+                    if constexpr (std::is_same_v<Grid, SettlementGrid>)
+                    { if(tile.caveInterior) color={8,15,27,255}; else if(tile.rockFloor) color={57,70,88,255}; }
                     pixels
                         [static_cast<std::size_t>(y) *
                              static_cast<std::size_t>(grid.width()) +
@@ -1266,11 +1334,13 @@ namespace Paladin
             cachedTerrainTexture_ = renderer.createTextureFromPixels(
                 grid.width(),
                 grid.height(),
-                pixels
+                pixels,
+                true
             );
             overviewPending_ = std::async(
                 std::launch::async,
-                [grid,
+                [w = grid.width(), h = grid.height(),
+                 terrainSnapshot = std::move(terrainSnapshot),
                  pixels = std::move(pixels),
                  cpuArt = std::move(cpuArt),
                  materials = std::move(materials),
@@ -1280,16 +1350,19 @@ namespace Paladin
                     // distant zoom, without traversing coastline geometry on
                     // camera frames.
                     constexpr int density = 4;
-                    const int w = grid.width(), h = grid.height();
-                    std::vector<RenderColor> smooth(
-                        std::size_t(w * density) * h * density
-                    );
+                    // A single multi-megabyte Debug-heap allocation can hold
+                    // the heap lock while the render thread creates textures.
+                    // Match the existing 32-row upload units instead.
+                    std::vector<std::vector<RenderColor>> smooth;
+                    smooth.reserve((h*density+31)/32);
                     for (int py = 0; py < h * density; ++py)
                     {
                         if (cancelled->load())
                         {
                             return OverviewData{};
                         }
+                        if(py%32==0) smooth.emplace_back(std::size_t(w*density)*std::min(32,h*density-py));
+                        auto* row=smooth.back().data()+std::size_t(py%32)*w*density;
                         for (int px = 0; px < w * density; ++px)
                         {
                             const auto sample = coastSample(
@@ -1311,10 +1384,10 @@ namespace Paladin
                                 {
                                     const int x = std::clamp(ix + i, 0, w - 1),
                                               y = std::clamp(iy + j, 0, h - 1);
-                                    const auto* tile = grid.tile({x, y});
+                                    const auto terrain = terrainSnapshot[std::size_t(y) * w + x];
                                     const int k =
-                                        tile->terrain == TerrainType::Water ? 0
-                                        : tile->terrain == TerrainType::Mountain
+                                        terrain == TerrainType::Water ? 0
+                                        : terrain == TerrainType::Mountain
                                             ? 2
                                             : 1;
                                     const double weight =
@@ -1340,7 +1413,7 @@ namespace Paladin
                                           : weights[1] > 0  ? 1
                                                             : 2;
                             const double sum = std::max(weights[k], .0001);
-                            smooth[std::size_t(py) * w * density + px] = {
+                            row[px] = {
                                 std::uint8_t(r[k] / sum),
                                 std::uint8_t(g[k] / sum),
                                 std::uint8_t(b[k] / sum),
@@ -1362,8 +1435,7 @@ namespace Paladin
                                     {
                                         int x = std::clamp(ix + i, 0, w - 1),
                                             y = std::clamp(iy + j, 0, h - 1);
-                                        const auto* t = grid.tile({x, y});
-                                        if (t->terrain != TerrainType::Land)
+                                        if (terrainSnapshot[std::size_t(y) * w + x] != TerrainType::Land)
                                         {
                                             continue;
                                         }
@@ -1374,9 +1446,7 @@ namespace Paladin
                                         if (!chosen && choice < accumulated &&
                                             material)
                                         {
-                                            smooth
-                                                [std::size_t(py) * w * density +
-                                                 px] =
+                                            row[px] =
                                                     landscapePaint(
                                                         *material,
                                                         (px + .5) / density,
@@ -1412,7 +1482,8 @@ namespace Paladin
             {
                 overviewUpload_ = renderer.createEmptyTexture(
                     overviewReady_.width,
-                    overviewReady_.height
+                    overviewReady_.height,
+                    true
                 );
             }
             const int rows =
@@ -1423,11 +1494,7 @@ namespace Paladin
                 overviewUploadRow_,
                 overviewReady_.width,
                 rows,
-                std::span(overviewReady_.pixels)
-                    .subspan(
-                        std::size_t(overviewUploadRow_) * overviewReady_.width,
-                        std::size_t(rows) * overviewReady_.width
-                    )
+                std::span(overviewReady_.bands[overviewUploadRow_/32])
             );
             overviewUploadRow_ += rows;
             if (overviewUploadRow_ == overviewReady_.height)
@@ -1484,6 +1551,9 @@ namespace Paladin
         const double displayTilePixels =
             metrics.scaledTilePixels(camera.zoom());
         const bool drawDetail = displayTilePixels > 8 || bool(project);
+        // Ground detail starts above 8px. Only prepare its adjacent zoom band;
+        // a 2px city overview must not build invisible 12px terrain chunks.
+        if (!drawDetail && displayTilePixels < 6) return;
         // Prepare canonical ground while zoomed out, within the same per-frame
         // budget. Entering normal city zoom should not discover every ground
         // chunk cold and expose a central patch of detail over the overview.
@@ -1686,6 +1756,8 @@ namespace Paladin
                             if constexpr (!world)
                             {
                                 cityRelief = CityReliefSurface(grid,x,y);
+                                if(tile.relief==ReliefType::Hills && tile.terrain==TerrainType::Mountain)
+                                    if(const auto* grass=sprites.find("terrain.plain")) valleyMaterial=grass;
                                 if (cityRelief.active())
                                 {
                                     // A chipped cliff boundary needs the real

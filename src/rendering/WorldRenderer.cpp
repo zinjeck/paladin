@@ -353,7 +353,8 @@ namespace Paladin
             if (!thematicMapMode(mapMode_))
                 atmosphere_.render(renderer,GlobeView::from(camera,world.grid(),renderer.outputWidth(),renderer.outputHeight()),
                     presentationTilePixels,(world.time().totalGameMinutes()+solarSecondsOffset/60.)/1440.,
-                    world.time().secondsIntoDay()+solarSecondsOffset);
+                    world.time().secondsIntoDay()+solarSecondsOffset,&world.grid());
+            territoryPresentationRenderer_.renderOutlines(renderer,world,camera,presentationTilePixels,true,presentation);
             stage(6);
             // Geometry and native annotations share the source camera and the
             // same final residual. No independently snapped object camera.
@@ -441,6 +442,7 @@ namespace Paladin
                 .renderOutlines(renderer, outlines, renderCamera, metrics);
         }
 
+        territoryPresentationRenderer_.renderOutlines(renderer,world,camera,presentationTilePixels,false,presentation);
         worldObjectRenderer_.render(
             renderer,
             world,

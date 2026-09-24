@@ -1,5 +1,6 @@
 #pragma once
 #include "CityCorrectionsChecks.h"
+#include <set>
 
 namespace Paladin::Test::DepotRegression
 {
@@ -91,5 +92,61 @@ namespace Paladin::Test::DepotRegression
         PALADIN_CHECK(map.logistics.inventory(depot)->amount("stone")==0);
         std::cout << "[depot-regression] funded lumber batch fetched across city beyond ordinary hauling radius\n";
     }
-    inline void run() { lumberAcrossCity(); }
+    inline void inactiveStandingOrders()
+    {
+        CityCorrections::TradeFixture f;
+        auto& world=f.sim.world();
+        const auto other=world.foundSettlement({68,32},f.seller,playerSettlementFoundationProfile(123));
+        PALADIN_CHECK(other);
+        SettlementMapGenerationSettings settings; settings.localTilesPerWorldTile=4;
+        PALADIN_CHECK(f.sim.prepareSettlementMap(other,settings));
+        auto& map=*f.map;
+        auto& people=world.settlement(f.home)->simulationState().citizens();
+        people.placeUnpositionedCitizens(map);
+        map.employment().synchronize(map.objectState(),people);
+        PALADIN_CHECK(map.employment().adjust(map.employment().forObject(f.depot),1,people));
+        map.activities.policy.shiftStartMinute=0;
+        map.activities.policy.shiftEndMinute=1440;
+        map.activities.policy.hungerPerDay=0;
+        map.activities.policy.awakeEnergyPerMinute=0;
+        map.activities.policy.dailyBirthChance=0;
+        PALADIN_CHECK(f.sim.setDetailedSimulationSettlement(other));
+        PALADIN_CHECK(f.sim.setPresentedSettlement(other));
+        f.sim.setSpeed(SimulationSpeed::Normal);
+        const double before=f.goods("iron");
+        PALADIN_CHECK(WorldMarketSystem::placeOrder(world,f.seller,f.home,f.depot,"iron",TradeDirection::Export,2,true));
+        const auto id=map.trade.orders.back().id;
+        bool switchedWithCargo=false;
+        std::set<ShipmentId> deliveredIds;
+        for(int minute=0;minute<1600;++minute)
+        {
+            f.sim.tick(1./f.sim.gameMinutesPerTick(1.));
+            for(const auto& person:people.citizens()) if(person.carriedResource=="iron" && person.carriedAmount)
+            {
+                // Both switches must preserve the very same haul claim/cargo.
+                PALADIN_CHECK(f.sim.setDetailedSimulationSettlement(f.home));
+                PALADIN_CHECK(f.sim.setDetailedSimulationSettlement(other));
+                switchedWithCargo=true;
+            }
+            for(const auto& shipment:world.shipments()) if(shipment.resource=="iron" && shipment.deliveries) deliveredIds.insert(shipment.id);
+            if(deliveredIds.size()>=2) break;
+        }
+        const auto delivered=deliveredIds.size();
+        if(!switchedWithCargo || delivered<2)
+        {
+            std::cerr<<"inactive minute="<<world.time().totalGameMinutes()<<" delivered="<<delivered<<" carried="<<switchedWithCargo<<'\n';
+            for(const auto& o:map.trade.orders) std::cerr<<o.status<<" auth="<<o.collectionAuthorized<<" issue="<<int(o.collectionIssue)<<'\n';
+            for(const auto& p:people.citizens()) if(p.workplaceId) std::cerr<<"worker task="<<int(p.task.kind)<<" at="<<p.tilePosition.x<<','<<p.tilePosition.y<<" health="<<p.health<<" energy="<<p.energy<<" cargo="<<p.carriedAmount<<'\n';
+        }
+        PALADIN_CHECK(switchedWithCargo && delivered>=2);
+        double conserved=map.logistics.total("iron")+2*delivered;
+        for(const auto& person:people.citizens()) if(person.carriedResource=="iron") conserved+=person.carriedAmount;
+        for(const auto& shipment:world.shipments()) if(shipment.resource=="iron") conserved+=shipment.cargo;
+        PALADIN_CHECK(conserved==before);
+        PALADIN_CHECK(std::any_of(map.trade.orders.begin(),map.trade.orders.end(),[&](const auto& o){return o.id==id && o.enabled;}));
+        PALADIN_CHECK(WorldMarketSystem::cancelOrder(world,f.seller,f.home,f.depot,id));
+        PALADIN_CHECK(map.trade.orders.empty());
+        std::cout << "[depot-regression] inactive city: repeated paid collection/delivery, mid-haul city switches and cancellation passed\n";
+    }
+    inline void run() { lumberAcrossCity(); inactiveStandingOrders(); }
 }

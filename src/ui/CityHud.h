@@ -202,7 +202,7 @@ namespace Paladin
         UiRectangle treasuryPanel_, extensionPanel_;
         std::int64_t treasuryGold_ = 0;
 
-        static constexpr std::size_t CategoryCount = 8;
+        static constexpr std::size_t CategoryCount = 9;
 
         [[nodiscard]]
         bool optionIsVisible(std::size_t optionIndex) const noexcept;

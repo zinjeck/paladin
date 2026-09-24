@@ -14,6 +14,77 @@
 
 namespace Paladin
 {
+    bool SettlementActivitySystem::chooseBurial(SettlementMap& map,SettlementCitizenState& citizens,SettlementCitizen& c,double minute)
+    {
+        const auto* w=map.employment().workplace(c.workplaceId);
+        const auto* yard=w ? map.objectState().completedObject(w->objectId) : nullptr;
+        if(!yard || yard->objectTypeId!=SettlementObjectTypes::Graveyard) return false;
+        CitizenRemains* nearest=nullptr; int distance=97;
+        for(auto& r:citizens.remains_)
+        {
+            if(r.buried || r.carrier || routeFailed(c,RouteFailureDomain::Workplace,
+                (std::uint64_t(1)<<63)|r.sequence,c.tilePosition,map,minute)) continue;
+            const int d=std::abs(r.position.x-c.tilePosition.x)+std::abs(r.position.y-c.tilePosition.y);
+            if(d<distance) { distance=d; nearest=&r; }
+        }
+        if(!nearest) return false;
+        SettlementTilePosition slot{-1,-1};
+        for(int y=yard->footprint.topLeft.y+1;y<yard->footprint.topLeft.y+yard->footprint.height && slot.x<0;y+=2)
+            for(int x=yard->footprint.topLeft.x+1;x<yard->footprint.topLeft.x+yard->footprint.width;x+=2)
+            {
+                const SettlementTilePosition p{x,y};
+                if(citizens.navigation_.walkable(map,p) && std::none_of(citizens.remains_.begin(),citizens.remains_.end(),[&](const auto& r){return r.grave==p;})) {slot=p;break;}
+            }
+        if(slot.x<0) return false;
+        CitizenRoutePlan trip(c);
+        const auto failed=[&]() {
+            if(!routeBudgetLimited_) rememberRouteFailure(c,RouteFailureDomain::Workplace,
+                (std::uint64_t(1)<<63)|nearest->sequence,c.tilePosition,map,minute);
+            return false;
+        };
+        if(!route(map,citizens,trip,{nearest->position,1,1},true)) return failed();
+        auto delivery=trip.fromPosition(trip.destination);
+        if(!route(map,citizens,delivery,{slot,1,1},true)) return failed();
+        finish(map,c,minute); trip.applyTo(c);
+        c.haulDeliveryPath=std::move(delivery.path); c.haulDeliveryTarget=slot;
+        c.haulDeliveryTopology=map.objectState().navigationVersion();
+        c.task.kind=CitizenTaskKind::Burial; c.task.remainsSequence=nearest->sequence;
+        c.task.object=yard->id; c.task.target=nearest->position;
+        nearest->carrier=c.id; nearest->grave=slot; nearest->graveyard=yard->id;
+        c.activity=CitizenActivity::TravelingToWork;
+        return true;
+    }
+    void SettlementActivitySystem::executeBurial(SettlementMap& map,SettlementCitizenState& citizens,SettlementCitizen& c,double minute,double elapsed)
+    {
+        auto it=std::find_if(citizens.remains_.begin(),citizens.remains_.end(),[&](const auto& r){return r.sequence==c.task.remainsSequence && r.carrier==c.id;});
+        if(it==citizens.remains_.end()) {finish(map,c,minute);return;}
+        auto& r=*it;
+        if(r.pickedUp) r.position=c.tilePosition;
+        if(!c.path.empty()) return;
+        if(!r.pickedUp)
+        {
+            if(c.tilePosition!=r.position) {r.carrier={};r.grave={-1,-1};finish(map,c,minute);return;}
+            CitizenRoutePlan trip(c);
+            if(c.haulDeliveryTopology==map.objectState().navigationVersion())
+            {
+                trip.path=std::move(c.haulDeliveryPath);trip.pathIndex=0;trip.stepProgress=0;
+                trip.destination=r.grave;trip.explicitMovement=!trip.path.empty();
+                if(!trip.path.empty()) trip.stepDuration=citizens.navigation_.stepCost(map,c.tilePosition,trip.path.front(),citizens.movementPolicy);
+            }
+            else if(!route(map,citizens,trip,{r.grave,1,1},true))
+            {
+                if(!routeBudgetLimited_) {r.carrier={};r.grave={-1,-1};finish(map,c,minute);}
+                return;
+            }
+            trip.applyTo(c); r.pickedUp=true; c.activity=CitizenActivity::Hauling; return;
+        }
+        if(c.tilePosition!=r.grave) {r.carrier={};r.pickedUp=false;r.grave={-1,-1};finish(map,c,minute);return;}
+        c.activity=CitizenActivity::AtWork; c.workAnimationMinutes+=elapsed;
+        c.task.laborMinutes+=elapsed;
+        if(c.task.laborMinutes>=20)
+        {r.buried=true;r.pickedUp=false;r.carrier={};r.position=r.grave;finish(map,c,minute);}
+    }
+
     void SettlementActivitySystem::cancelDepotTasks(
         SettlementMap& map, SettlementCitizenState& citizens,
         SettlementObjectId depot, double minute)
@@ -74,6 +145,8 @@ namespace Paladin
         {
             return;
         }
+        citizens.remainsMinute_=minute+elapsed;
+        std::erase_if(citizens.remains_,[&](const auto& r){return !r.buried && !r.carrier && minute+elapsed-r.diedMinute>=3*1440;});
         families_.update(map, citizens, policy, *this, minute, elapsed);
         bool died = false;
         for (auto& person : citizens.citizens_)
@@ -102,7 +175,11 @@ namespace Paladin
     )
     {
         families_.assignHomes(map, citizens, *this);
-        assignHomeBeds(map, citizens.citizens_);
+        if(bedsTopology_!=map.objectState().navigationVersion() || bedsFamily_!=citizens.familyVersion_ || bedsPopulation_!=citizens.citizens_.size())
+        {
+            assignHomeBeds(map,citizens.citizens_);
+            bedsTopology_=map.objectState().navigationVersion(); bedsFamily_=citizens.familyVersion_; bedsPopulation_=citizens.citizens_.size();
+        }
     }
 
     bool SettlementActivitySystem::pastureWorkerAvailableForGeneralLabor(
@@ -241,6 +318,15 @@ namespace Paladin
         double elapsed
     )
     {
+        citizens.remainsMinute_=minute+elapsed;
+        for(auto& remains:citizens.remains_)
+        {
+            if(!remains.carrier) continue;
+            const auto* worker=citizens.citizen(remains.carrier);
+            if(!worker || worker->task.kind!=CitizenTaskKind::Burial || worker->task.remainsSequence!=remains.sequence)
+            { if(worker && remains.pickedUp) remains.position=worker->tilePosition; remains.carrier={}; remains.pickedUp=false; remains.grave={-1,-1}; }
+        }
+        std::erase_if(citizens.remains_,[&](const auto& r){return !r.buried && !r.carrier && minute-r.diedMinute>=3*1440;});
         map.logistics.synchronize(map.objectState(), minute);
         families_.update(map, citizens, policy, *this, minute, elapsed);
         map.employment().synchronize(map.objectState(), citizens);
@@ -490,10 +576,13 @@ namespace Paladin
                          : (other->child && (other->motherId == c.id ||
                                              other->fatherId == c.id)));
             }
+            if(c.task.kind==CitizenTaskKind::Burial)
+                valid=w && w->operational && w->objectTypeId==SettlementObjectTypes::Graveyard;
             if (c.task.kind == CitizenTaskKind::Work)
             {
                 valid = c.youngDependents == 0 && shift && activeWorkplace &&
                         w && w->operational && w->objectId == c.task.object;
+                if(valid && w->objectTypeId==SettlementObjectTypes::Graveyard && std::any_of(citizens.remains_.begin(),citizens.remains_.end(),[](const auto& r){return !r.buried && !r.carrier;})) valid=false;
             }
             if (c.task.kind == CitizenTaskKind::Sleep)
             {
@@ -872,6 +961,7 @@ namespace Paladin
                 {
                     return;
                 }
+                if(workplace.objectTypeId==SettlementObjectTypes::Graveyard && chooseBurial(map,citizens,c,minute)) return;
                 chooseWork(map, citizens, c, minute);
                 return;
             }
@@ -909,6 +999,8 @@ namespace Paladin
         double elapsed
     )
     {
+        if(c.task.kind==CitizenTaskKind::Burial)
+        { executeBurial(map,citizens,c,minute,elapsed); return; }
         if (c.inFishingBoat)
         {
             c.activity = c.path.empty() ? CitizenActivity::Fishing
@@ -1246,6 +1338,7 @@ namespace Paladin
                     auto* tile = map.grid().tile(c.task.workTile);
                     tile->terrain = TerrainType::Land;
                     tile->rockFloor = true;
+                    tile->caveInterior = tile->relief != ReliefType::Hills;
                     map.grid().markExcavated(c.task.workTile);
                     map.objectState().terrainChanged();
                     map.logistics.drop(

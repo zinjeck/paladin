@@ -22,7 +22,7 @@ namespace Paladin
     namespace
     {
         // Reference-area capacities follow Godot; stockpile staffing is new.
-        constexpr std::array<WorkplaceDefinition, 14> definitions{
+        constexpr std::array<WorkplaceDefinition, 15> definitions{
             WorkplaceDefinition{SettlementObjectTypes::CoalMine, 1, 1, 9, 80},
             WorkplaceDefinition{SettlementObjectTypes::IronMine, 1, 1, 9, 80},
             WorkplaceDefinition{SettlementObjectTypes::GoldMine, 1, 1, 9, 40},
@@ -30,6 +30,7 @@ namespace Paladin
             TradeDepotWorkplace,
             MarketWorkplace,
             StockpileWorkplace,
+            WorkplaceDefinition{SettlementObjectTypes::Graveyard,1,1,1024,0},
             FisheryWorkplace,
             WheatFarmWorkplace,
             PasturelandWorkplace,

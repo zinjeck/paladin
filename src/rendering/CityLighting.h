@@ -33,6 +33,8 @@ namespace Paladin
         int width_ = 0, height_ = 0;
         std::array<double, 7> lastKey_{};
         bool cached_ = false;
+        bool ambientOnly_ = false;
+        RenderColor ambientColor_{};
 
     public:
         void reset()
@@ -78,10 +80,11 @@ namespace Paladin
                 policy.localLightsEnabled ? effectTime : -1
             };
             if (cached_ && key == lastKey_ && instance_ == map.instanceId() &&
-                version_ == map.objectState().navigationVersion() && light_ &&
-                glow_)
+                version_ == map.objectState().navigationVersion() &&
+                (ambientOnly_ || (light_ && glow_)))
             {
-                renderer.compositeLighting(*light_, *glow_);
+                if (ambientOnly_) renderer.compositeAmbientLight(ambientColor_);
+                else renderer.compositeLighting(*light_, *glow_);
                 return;
             }
             if (instance_ != map.instanceId() ||
@@ -126,6 +129,15 @@ namespace Paladin
                 byte(255 * (.34 + .66 * day)),
                 255
             };
+            if (!policy.localLightsEnabled || buildings_.empty())
+            {
+                ambientOnly_=true;
+                ambientColor_=ambient;
+                lastKey_=key;
+                cached_=true;
+                renderer.compositeAmbientLight(ambient);
+                return;
+            }
             pixels_.assign(std::size_t(w) * h, ambient);
             emission_.assign(pixels_.size(), {0, 0, 0, 255});
             std::vector<RenderRectangle> obstacles;
@@ -301,6 +313,19 @@ namespace Paladin
                         }
                     }
                 }
+            }
+            ambientOnly_ = std::all_of(pixels_.begin(), pixels_.end(), [&](const auto& p) {
+                return p.red == ambient.red && p.green == ambient.green && p.blue == ambient.blue;
+            }) && std::all_of(emission_.begin(), emission_.end(), [](const auto& p) {
+                return p.red == 0 && p.green == 0 && p.blue == 0;
+            });
+            ambientColor_ = ambient;
+            if (ambientOnly_)
+            {
+                lastKey_=key;
+                cached_=true;
+                renderer.compositeAmbientLight(ambient);
+                return;
             }
             if (!light_)
             {

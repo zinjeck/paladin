@@ -493,7 +493,10 @@ namespace Paladin
         );
         auto* map =
             simulation_->settlementMap(simulation_->presentedSettlementId());
-        if (!settlement || !map)
+        // World inspection must also work after selecting an owned city whose
+        // local map has not been materialized. Only local employment edits
+        // require that map; world picking and realm controls do not.
+        if (!settlement)
         {
             return false;
         }
@@ -516,7 +519,7 @@ namespace Paladin
         if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
             event.button.button == SDL_BUTTON_LEFT)
         {
-            employmentCapturedPointer_ = employmentPanel_->pointerPressed(
+            employmentCapturedPointer_ = map && employmentPanel_->pointerPressed(
                 event.button.x,
                 event.button.y
             );
@@ -533,6 +536,11 @@ namespace Paladin
         {
             if (employmentCapturedPointer_)
             {
+                if (!map)
+                {
+                    employmentCapturedPointer_ = false;
+                    return true;
+                }
                 employmentPanel_->pointerReleased(
                     event.button.x,
                     event.button.y,

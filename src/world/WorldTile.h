@@ -36,5 +36,6 @@ namespace Paladin
         // Local polar ice exclusion; connected habitable land remains eligible.
         bool polarContinent = false;
         bool rockFloor = false;
+        bool caveInterior = false;
     };
 } // namespace Paladin

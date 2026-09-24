@@ -67,53 +67,11 @@ namespace Paladin
         double minute
     ) const
     {
-        const bool shift = c.workplaceId && policy.isWorkTime(minute);
-        if (c.task.kind == CitizenTaskKind::Sleep)
-        {
-            return c.energy < policy.fullRestEnergy &&
-                   (!shift || c.energy < policy.fatigueEnergy);
-        }
-        // Forecasts and leisure preferences may never initiate nearly-full
-        // rest. Only an already sleeping citizen can continue recovering
-        // above 50.
-        if (c.energy >= policy.fatigueEnergy)
-        {
-            return false;
-        }
-        if (c.energy <= policy.criticalRestEnergy)
-        {
-            return true;
-        }
-        if (shift)
-        {
-            return false;
-        }
-        const double time = policy.localMinute(minute);
-        const double recoveryMinutes =
-            (policy.fullRestEnergy - c.energy) / policy.sleepEnergyPerMinute;
-        if (c.workplaceId && policy.shiftEndMinute > policy.shiftStartMinute)
-        {
-            const double workMinutes =
-                policy.shiftEndMinute - policy.shiftStartMinute;
-            const double offMinutes = 1440 - workMinutes;
-            const double sinceShiftEnd =
-                std::fmod(time - policy.shiftEndMinute + 1440, 1440.0);
-            const double untilShift = offMinutes - sinceShiftEnd;
-            const double nextShiftCost =
-                policy.awakeEnergyPerMinute * (untilShift + workMinutes) +
-                policy.workEnergyPerMinute * workMinutes;
-            if (untilShift <=
-                    std::max(policy.requiredSleepMinutes, recoveryMinutes) &&
-                c.energy - nextShiftCost < policy.fatigueEnergy)
-            {
-                return true;
-            }
-        }
-        const bool night =
-            time < 360 || time >= 1080;
-        return c.energy <=
-               (night ? c.restThreshold : policy.fatigueEnergy - 10);
+        (void)minute;
+        return c.task.kind==CitizenTaskKind::Sleep ? c.energy<policy.fullRestEnergy
+                                                  : c.energy<=policy.fatigueEnergy;
     }
+
     bool SettlementActivitySystem::enterHome(
         SettlementMap& map,
         const SettlementCitizenState& citizens,
@@ -404,20 +362,12 @@ namespace Paladin
         c.modifyAttributes(
             {{AttributeEffect::Metabolism, policy.hungerPerDay * days}}
         );
-        // Scale damage with depletion: reaching 100 from 75 costs 100 health.
-        const auto primitive = [&](double hunger)
-        {
-            const double above =
-                std::max(0.0, hunger - policy.starvationThreshold);
-            return above * above / (2 * (100 - policy.starvationThreshold));
-        };
-        const double depletion = std::max(1e-9, policy.hungerPerDay);
-        const double risingDays = (c.hunger - before) / depletion;
-        const double damage =
-            (8 * policy.hungerPerDay) *
-            ((primitive(c.hunger) - primitive(before)) / depletion +
-             std::max(0.0, days - risingDays));
-        c.modifyAttributes({{AttributeEffect::Starvation, -damage}});
+        // No hunger penalty before saturation. Integrate only the part of
+        // this step spent starving; a healthy resident has 2.5 days to recover.
+        const double untilStarving=std::max(0.,policy.starvationThreshold-before)/
+            std::max(1.e-9,policy.hungerPerDay);
+        const double starvingDays=std::max(0.,days-untilStarving);
+        c.modifyAttributes({{AttributeEffect::Starvation,-policy.starvationHealthPerDay*starvingDays}});
         if ((!c.child || c.ageYears >= policy.independentEatingAge) &&
             c.hunger < policy.foodSeekThreshold &&
             c.energy >= policy.fatigueEnergy)
@@ -435,12 +385,9 @@ namespace Paladin
         {
             c.homelessMinutes += elapsed;
         }
-        // A normal interval between meals is not distress. Start at the same
-        // threshold that makes a citizen seek food, not at half that threshold.
-        const double hungerPressure =
-            std::clamp((c.hunger - policy.foodSeekThreshold) /
-                           std::max(1.0, 100.0 - policy.foodSeekThreshold),
-                       0.0, 1.0) * 12;
+        // Ordinary meal-seeking creates no hunger distress. Only time spent
+        // at full hunger contributes the starvation happiness penalty.
+        const double hungerPressure = days>0 ? 12*starvingDays/days : 0;
         const double healthPressure = (100 - c.health) / 100 * 24;
         const double homelessPressure =
             c.homeId
@@ -469,7 +416,7 @@ namespace Paladin
         const SettlementCitizen& c
     )
     {
-        if (c.hunger > 75)
+        if (c.hunger >= 100)
         {
             return "Starving";
         }
